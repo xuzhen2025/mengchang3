@@ -1,0 +1,144 @@
+export type AssetLibraryType = "finished" | "viral" | "template" | "component" | "ad_delivery" | "archive" | "trash";
+
+export interface AssetVersion {
+  id: string;
+  version: string;
+  label: string;
+  url: string;
+  updatedAt: string;
+  updatedBy: string;
+  changelog: string;
+  fileSize: string;
+  isCurrent?: boolean;
+}
+
+export interface RawMaterialRelation {
+  id: string;
+  name: string;
+  type: "image" | "video" | "audio" | "script";
+  url?: string;
+  role: string;
+}
+
+export interface AssetPerformance {
+  views: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  completionRate: string;
+  gmv: number;
+  roi: number;
+  orders: number;
+  conversionRate: string;
+}
+
+export interface AssetFileInfo {
+  size: string;
+  resolution: string;
+  duration: string;
+  format: string;
+  bitrate?: string;
+  aspectRatio?: string;
+}
+
+export interface Asset {
+  id: string;
+  name: string;
+  type: "image" | "video" | "audio" | "document" | "template";
+  url: string;
+  size: string;
+  createdAt: string;
+  category?: string;
+  
+  // Rich Asset Library extensions
+  libraryType?: AssetLibraryType;
+  isViral?: boolean;
+  viralRank?: "S级" | "A级" | "B级" | "非爆款";
+  version?: string;
+  versions?: AssetVersion[];
+  rawMaterials?: RawMaterialRelation[];
+  creator?: string;
+  project?: string;
+  platforms?: string[];
+  deliveryStatus?: "未投放" | "投放中" | "已结束" | "已暂停";
+  performance?: AssetPerformance;
+  tags?: string[];
+  copyrightStatus?: "已授权" | "自有版权" | "待核验" | "商业专有";
+  permission?: "内部使用" | "对外分发" | "商业全渠道授权";
+  expireDate?: string;
+  notes?: string;
+  fileInfo?: AssetFileInfo;
+  deletedAt?: string;
+}
+
+export interface Task {
+  id: string;
+  name: string;
+  type: "detail_set" | "watermark" | "subtitle" | "enhance" | "video_gen" | "image_gen" | "fission";
+  status: "queue" | "generating" | "completed" | "failed";
+  progress: number;
+  inputFiles: string[];
+  outputFiles?: string[];
+  createdAt: string;
+  creditsCost: number;
+}
+
+export interface CreditTransaction {
+  id: string;
+  type: "recharge" | "consume" | "refund";
+  tool?: string;
+  amount: number;
+  time: string;
+  date?: string;
+  remark?: string;
+  note?: string;
+  balance?: number;
+}
+
+export interface GalleryItem {
+  id: string;
+  title: string;
+  author: string;
+  authorAvatar: string;
+  type: "image" | "video";
+  url: string;
+  coverUrl?: string;
+  likes: number;
+  views: number;
+  category: string;
+  prompt?: string;
+  duration?: string;
+  tags?: string[];
+}
+
+export type ActiveScreen = "home" | "quick_creation" | "agent_creation" | "video_remake" | "ai_video" | "ai_image" | "canvas" | "assets" | "detail_set" | "enhance" | "watermark" | "subtitle" | "fission" | "credits" | "resources" | "materials" | "finished_videos" | "scripts" | "images" | "audio" | "ad_delivery" | "same_style_video" | "account_management" | "task_collaboration" | "message_center";
+
+export interface MessageDetailItem {
+  label: string;
+  value: string;
+  isLink?: boolean;
+}
+
+export interface AppMessage {
+  id: string;
+  category: string; // 创作, 投放, 卡审, 审核, 任务, 账号, 导出
+  subcategory: string; // e.g. 积分审核, 上传视频, 视频审核不通过, etc.
+  type?: string;
+  title: string;
+  detail: string;
+  status: "unread" | "read";
+  time: string;
+  summary?: string;
+  categoryName?: string;
+  isRedDot?: boolean;
+  details: MessageDetailItem[];
+
+  // Approval specific fields
+  approvalType?: "credits";
+  approvalStatus?: "pending" | "approved" | "rejected";
+  applicantName?: string;
+  managerName?: string;
+  creditsAmount?: number;
+  reason?: string;
+  rejectReason?: string;
+}
