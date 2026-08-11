@@ -70,7 +70,7 @@ export const PERSONAL_TAG_GROUPS: Record<string, string[]> = {
 export interface OperationLogItem {
   id: string;
   operator: string;
-  actionType: "修改标题" | "修改公共标签" | "修改个人标签" | "修改备注" | "类目变更" | "系统生成";
+  actionType: "修改标题" | "修改公共标签" | "修改个人标签" | "修改备注" | "类目变更" | "系统生成" | "修改套图排序";
   timestamp: string;
   beforeValue: string;
   afterValue: string;
@@ -171,13 +171,16 @@ export default function ImageDetailView({
     setLogs((prev) => [newLog, ...prev]);
   };
 
-  // Thumbnails
-  const thumbnails = [
-    { url: item.imageUrl, name: "微信图片_20230..." },
-    { url: "https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?w=600&auto=format&fit=crop&q=80", name: "微信图片_20230..." }
-  ];
+  // Suite Images / Thumbnails state
+  const [suiteImages, setSuiteImages] = useState([
+    { id: "img-sub-1", url: item.imageUrl, name: "微信图片_202303251645513.jpg" },
+    { id: "img-sub-2", url: "https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?w=600&auto=format&fit=crop&q=80", name: "微信图片_202303251645512.jpg" }
+  ]);
+  const [showSortModal, setShowSortModal] = useState(false);
+  const [tempSortList, setTempSortList] = useState<{ id: string; url: string; name: string }[]>([]);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
-  const currentImageUrl = thumbnails[selectedDetailThumbIndex]?.url || item.imageUrl;
+  const currentImageUrl = suiteImages[selectedDetailThumbIndex]?.url || item.imageUrl;
 
   const handleSaveNote = () => {
     if (tempNoteText.trim() !== noteText) {
@@ -240,9 +243,9 @@ export default function ImageDetailView({
 
             {/* Thumbnails Strip */}
             <div className="flex items-center gap-3 overflow-x-auto pb-1">
-              {thumbnails.map((t, idx) => (
+              {suiteImages.map((t, idx) => (
                 <div
-                  key={idx}
+                  key={t.id || idx}
                   onClick={() => setSelectedDetailThumbIndex(idx)}
                   className={`relative w-24 h-20 rounded-xl overflow-hidden cursor-pointer transition-all border-2 shrink-0 ${
                     selectedDetailThumbIndex === idx
@@ -372,9 +375,12 @@ export default function ImageDetailView({
             {/* 3. Icon Action Buttons & Record Buttons */}
             <div className="flex items-center gap-2 pt-1 flex-wrap">
               <button
-                onClick={() => showToast("已切换图片展示顺序")}
+                onClick={() => {
+                  setTempSortList([...suiteImages]);
+                  setShowSortModal(true);
+                }}
                 className="p-2 rounded-xl border border-purple-200 bg-purple-50/60 hover:bg-purple-100 text-purple-600 cursor-pointer transition-colors"
-                title="排序/调换"
+                title="图片排序 (拖拽进行排序)"
               >
                 <ArrowUpDown className="w-4 h-4" />
               </button>
@@ -1337,6 +1343,130 @@ export default function ImageDetailView({
                 className="px-5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
               >
                 确定
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. 图片排序 Modal */}
+      {showSortModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-2xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-slate-100 overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-4.5 bg-[#7C3AED] rounded-full inline-block"></span>
+                <span className="font-bold text-slate-900 text-base">图片排序</span>
+                <span className="text-slate-500 text-xs sm:text-sm font-normal">
+                  (拖拽图片进行排序，保存后生效)
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSortModal(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-3 max-h-[420px] overflow-y-auto bg-slate-50/30">
+              {tempSortList.map((imgItem, idx) => (
+                <div
+                  key={imgItem.id || idx}
+                  draggable
+                  onDragStart={() => setDraggedIndex(idx)}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (draggedIndex === null || draggedIndex === idx) return;
+                    const newList = [...tempSortList];
+                    const [dragged] = newList.splice(draggedIndex, 1);
+                    newList.splice(idx, 0, dragged);
+                    setTempSortList(newList);
+                    setDraggedIndex(null);
+                  }}
+                  className={`p-3 rounded-2xl border flex items-center gap-4 bg-white transition-all cursor-grab active:cursor-grabbing hover:shadow-2xs select-none ${
+                    draggedIndex === idx
+                      ? "opacity-30 border-purple-400 bg-purple-50/20"
+                      : "border-slate-200/90 hover:border-purple-300"
+                  }`}
+                >
+                  <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                    <img
+                      src={imgItem.url}
+                      alt={imgItem.name}
+                      className="w-full h-full object-cover pointer-events-none"
+                    />
+                  </div>
+                  <span className="font-medium text-slate-800 text-sm flex-1 truncate">
+                    {imgItem.name}
+                  </span>
+
+                  {/* Up / Down buttons */}
+                  <div className="flex flex-col gap-1">
+                    <button
+                      type="button"
+                      disabled={idx === 0}
+                      onClick={() => {
+                        if (idx === 0) return;
+                        const newList = [...tempSortList];
+                        const prev = newList[idx - 1];
+                        newList[idx - 1] = newList[idx];
+                        newList[idx] = prev;
+                        setTempSortList(newList);
+                      }}
+                      className="p-1 hover:bg-slate-100 text-slate-400 hover:text-purple-600 rounded disabled:opacity-20 cursor-pointer"
+                      title="向上移动"
+                    >
+                      <ChevronUp className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={idx === tempSortList.length - 1}
+                      onClick={() => {
+                        if (idx === tempSortList.length - 1) return;
+                        const newList = [...tempSortList];
+                        const next = newList[idx + 1];
+                        newList[idx + 1] = newList[idx];
+                        newList[idx] = next;
+                        setTempSortList(newList);
+                      }}
+                      className="p-1 hover:bg-slate-100 text-slate-400 hover:text-purple-600 rounded disabled:opacity-20 cursor-pointer"
+                      title="向下移动"
+                    >
+                      <ChevronDown className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-white border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowSortModal(false)}
+                className="px-7 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSuiteImages(tempSortList);
+                  setSelectedDetailThumbIndex(0);
+                  addOperationLog("修改套图排序", "原排序", "新排序");
+                  showToast("✅ 图片排序已保存！");
+                  setShowSortModal(false);
+                }}
+                className="px-7 py-2 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer shadow-xs active:scale-95"
+              >
+                保存
               </button>
             </div>
           </div>

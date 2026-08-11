@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import LinkScriptModal from "./LinkScriptModal";
 import {
   X,
   UploadCloud,
@@ -14,7 +15,8 @@ import {
   ChevronRight,
   ArrowLeft,
   FileText,
-  ListTodo
+  ListTodo,
+  Folder
 } from "lucide-react";
 
 interface UploadFinishedVideoModalProps {
@@ -193,11 +195,16 @@ export default function UploadFinishedVideoModal({
   const [selectedTask, setSelectedTask] = useState<{ id: string; name: string } | null>(
     initialTaskCode ? { id: initialTaskCode, name: "关联协作任务" } : null
   );
+  const [associatedTask, setAssociatedTask] = useState<string>(
+    initialTaskCode ? initialTaskCode : ""
+  );
+  const [showTaskDropdown, setShowTaskDropdown] = useState(false);
   const [selectedScript, setSelectedScript] = useState<{ id: string; name: string } | null>(null);
 
   // Task & Script Picker Modals
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [taskSearch, setTaskSearch] = useState("");
+  const [showScriptDropdown, setShowScriptDropdown] = useState(false);
   const [showScriptModal, setShowScriptModal] = useState(false);
   const [scriptSearch, setScriptSearch] = useState("");
 
@@ -444,7 +451,7 @@ export default function UploadFinishedVideoModal({
 
               {/* 1. 视频分区 (仅保留 成片 和 素材，去除图标与第三方) */}
               <div className="flex items-center gap-6 pl-3">
-                <span className="w-20 text-slate-600 font-medium shrink-0">
+                <span className="w-24 text-slate-700 font-bold text-right shrink-0">
                   <span className="text-rose-500 mr-0.5">*</span>视频分区
                 </span>
                 <div className="flex items-center gap-6">
@@ -470,7 +477,7 @@ export default function UploadFinishedVideoModal({
 
               {/* 2. 视频分类 (下拉框：左侧选择一级分类，右侧选择二级分类) */}
               <div className="flex items-start gap-6 pl-3">
-                <span className="w-20 text-slate-600 font-medium shrink-0 pt-2">
+                <span className="w-24 text-slate-700 font-bold text-right shrink-0 pt-2">
                   <span className="text-rose-500 mr-0.5">*</span>视频分类
                 </span>
                 <div className="flex-1 relative">
@@ -571,7 +578,7 @@ export default function UploadFinishedVideoModal({
 
               {/* 3. 视频名称 */}
               <div className="flex items-start gap-6 pl-3">
-                <span className="w-20 text-slate-600 font-medium shrink-0 pt-1">
+                <span className="w-24 text-slate-700 font-bold text-right shrink-0 pt-1">
                   <span className="text-rose-500 mr-0.5">*</span>视频名称
                 </span>
                 <div className="flex-1 space-y-2">
@@ -615,73 +622,109 @@ export default function UploadFinishedVideoModal({
                 </div>
               </div>
 
-              {/* 4. 关联任务 (选中后显示任务ID，从任务协作列表中选择) */}
-              <div className="flex items-center gap-6 pl-3">
-                <span className="w-20 text-slate-600 font-medium shrink-0">关联任务</span>
-                <div className="flex-1 flex items-center gap-2">
-                  <div className="flex-1 relative">
+              {/* 4. 关联任务 */}
+              <div className="flex items-center gap-6 pl-3 relative">
+                <span className="w-24 text-slate-700 font-bold text-right shrink-0">关联任务</span>
+                <div className="flex-1 relative">
+                  <div className="relative">
                     <input
                       type="text"
-                      readOnly
-                      value={selectedTask ? `ID: ${selectedTask.id} (${selectedTask.name})` : ""}
-                      onClick={() => setShowTaskModal(true)}
-                      placeholder="点击选择关联任务 (默认无关联任务ID)"
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 pr-8 text-xs text-slate-800 focus:outline-none focus:border-purple-500 cursor-pointer"
+                      value={associatedTask}
+                      onChange={(e) => {
+                        setAssociatedTask(e.target.value);
+                        if (!e.target.value) {
+                          setSelectedTask(null);
+                        }
+                      }}
+                      onFocus={() => setShowTaskDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowTaskDropdown(false), 200)}
+                      placeholder="输入任务编号 / 备注 / ID 搜索"
+                      className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-lg px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none transition-colors shadow-2xs pr-8"
                     />
-                    {selectedTask && (
+                    {associatedTask && (
                       <button
                         type="button"
-                        onClick={() => setSelectedTask(null)}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
-                        title="清除关联任务"
+                        onClick={() => {
+                          setAssociatedTask("");
+                          setSelectedTask(null);
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                       >
-                        ×
+                        <X className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowTaskModal(true)}
-                    className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg font-bold text-xs flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
-                  >
-                    <ListTodo className="w-3.5 h-3.5" />
-                    <span>选择关联任务</span>
-                  </button>
+
+                  {/* Task Popover */}
+                  {showTaskDropdown && (
+                    <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl p-6 w-80 animate-in fade-in duration-100">
+                      <p className="font-bold text-xs text-slate-700 mb-4">我的待办任务</p>
+                      <div className="flex flex-col items-center justify-center text-slate-400 py-4 space-y-2">
+                        <Folder className="w-10 h-10 stroke-1 text-slate-300" />
+                        <span className="text-xs">暂无待办任务</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* 5. 关联脚本 (从脚本管理列表中选择) */}
-              <div className="flex items-center gap-6 pl-3">
-                <span className="w-20 text-slate-600 font-medium shrink-0">关联脚本</span>
+              <div className="flex items-center gap-6 pl-3 relative">
+                <span className="w-24 text-slate-700 font-bold text-right shrink-0">关联脚本</span>
                 <div className="flex-1 flex items-center gap-2">
                   <div className="flex-1 relative">
                     <input
                       type="text"
                       readOnly
                       value={selectedScript ? `${selectedScript.id} - ${selectedScript.name}` : ""}
-                      onClick={() => setShowScriptModal(true)}
-                      placeholder="点击选择关联脚本，后续可自动统计脚本效果数据"
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 pr-8 text-xs text-slate-800 focus:outline-none focus:border-purple-500 cursor-pointer"
+                      onClick={() => setShowScriptDropdown(prev => !prev)}
+                      placeholder="关联脚本，后续可自动统计脚本效果数据"
+                      className="w-full bg-white border border-slate-200 hover:border-purple-400 focus:border-purple-500 rounded-lg px-3 py-2 pr-8 text-xs text-slate-800 cursor-pointer focus:outline-none transition-colors shadow-2xs"
                     />
                     {selectedScript && (
                       <button
                         type="button"
-                        onClick={() => setSelectedScript(null)}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedScript(null);
+                        }}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer text-xs"
                         title="清除关联脚本"
                       >
-                        ×
+                        ✕
                       </button>
                     )}
+
+                    {/* Popover dropdown matching user screenshot */}
+                    {showScriptDropdown && (
+                      <div className="absolute top-full left-0 mt-1.5 z-50 bg-white border border-slate-200/90 rounded-2xl shadow-2xl p-5 w-full max-w-md animate-in fade-in duration-100 space-y-4">
+                        {/* Header */}
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                          <span className="font-bold text-xs text-slate-800">任务关联脚本</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowScriptDropdown(false);
+                              setShowScriptModal(true);
+                            }}
+                            className="text-purple-600 hover:text-purple-700 font-bold text-xs cursor-pointer transition-colors"
+                          >
+                            从脚本库选择
+                          </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="py-6 flex flex-col items-center justify-center text-center space-y-2.5">
+                          <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300">
+                            <Folder className="w-7 h-7 stroke-[1.25]" />
+                          </div>
+                          <p className="text-xs text-slate-400 font-medium">
+                            {selectedTask || associatedTask ? "暂无关联脚本" : "暂无关联脚本，请先选择任务"}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowScriptModal(true)}
-                    className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg font-bold text-xs flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    <span>选择关联脚本</span>
-                  </button>
                 </div>
               </div>
 
@@ -697,7 +740,7 @@ export default function UploadFinishedVideoModal({
               {/* 1. 公共标签 */}
               <div className="space-y-3 pl-3">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="w-20 text-slate-700 font-bold shrink-0">
+                  <span className="w-24 text-slate-700 font-bold text-right shrink-0">
                     <span className="text-rose-500 mr-0.5">*</span>公共标签
                   </span>
 
@@ -849,7 +892,7 @@ export default function UploadFinishedVideoModal({
               {/* 2. 个人标签 */}
               <div className="space-y-3 pl-3 pt-2 border-t border-slate-100/80">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="w-20 text-slate-700 font-bold shrink-0">
+                  <span className="w-24 text-slate-700 font-bold text-right shrink-0">
                     个人标签
                   </span>
 
@@ -1009,7 +1052,7 @@ export default function UploadFinishedVideoModal({
               </div>
 
               <div className="flex items-center gap-6 pl-3">
-                <span className="w-20 text-slate-600 font-medium shrink-0">剪辑时间</span>
+                <span className="w-24 text-slate-700 font-bold text-right shrink-0">剪辑时间</span>
                 <input
                   type="date"
                   value={editDate}
@@ -1019,7 +1062,7 @@ export default function UploadFinishedVideoModal({
               </div>
 
               <div className="flex items-center gap-6 pl-3">
-                <span className="w-20 text-slate-600 font-medium shrink-0">授权有效期</span>
+                <span className="w-24 text-slate-700 font-bold text-right shrink-0">授权有效期</span>
                 <div className="flex items-center gap-2">
                   <input
                     type="date"
@@ -1049,7 +1092,7 @@ export default function UploadFinishedVideoModal({
               </div>
 
               <div className="flex items-start gap-6 pl-3">
-                <span className="w-20 text-slate-600 font-medium shrink-0 pt-2">视频说明</span>
+                <span className="w-24 text-slate-700 font-bold text-right shrink-0 pt-2">视频说明</span>
                 <textarea
                   value={videoDesc}
                   onChange={(e) => setVideoDesc(e.target.value)}
@@ -1059,7 +1102,7 @@ export default function UploadFinishedVideoModal({
               </div>
 
               <div className="flex items-center gap-6 pl-3">
-                <span className="w-20 text-slate-600 font-medium shrink-0">抖音数据</span>
+                <span className="w-24 text-slate-700 font-bold text-right shrink-0">抖音数据</span>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 font-medium">点赞</span>
                   <input
@@ -1113,7 +1156,7 @@ export default function UploadFinishedVideoModal({
               </div>
 
               <div className="flex items-start gap-6 pl-3">
-                <span className="w-24 text-slate-600 font-medium shrink-0 pt-0.5">
+                <span className="w-24 text-slate-700 font-bold text-right shrink-0 pt-0.5">
                   <span className="text-rose-500 mr-0.5">*</span>视频查看权限
                 </span>
                 <div className="flex-1 space-y-3">
@@ -1249,7 +1292,7 @@ export default function UploadFinishedVideoModal({
               </div>
 
               <div className="flex items-center gap-6 pl-3">
-                <span className="w-24 text-slate-600 font-medium shrink-0">修改日期</span>
+                <span className="w-24 text-slate-700 font-bold text-right shrink-0">修改日期</span>
                 <div className="flex items-center gap-3">
                   <input
                     type="date"
@@ -1272,7 +1315,7 @@ export default function UploadFinishedVideoModal({
               </div>
 
               <div className="flex items-center gap-6 pl-3">
-                <span className="w-24 text-slate-600 font-medium shrink-0">接收人</span>
+                <span className="w-24 text-slate-700 font-bold text-right shrink-0">接收人</span>
                 <div className="flex-1 space-y-1">
                   <select
                     value={receiver}
@@ -1287,7 +1330,7 @@ export default function UploadFinishedVideoModal({
               </div>
 
               <div className="flex items-center gap-6 pl-3">
-                <span className="w-24 text-slate-600 font-medium shrink-0">消息内容</span>
+                <span className="w-24 text-slate-700 font-bold text-right shrink-0">消息内容</span>
                 <input
                   type="text"
                   value={messageContent}
@@ -1449,87 +1492,16 @@ export default function UploadFinishedVideoModal({
       )}
 
       {/* Script Selection Modal */}
-      {showScriptModal && (
-        <div className="fixed inset-0 z-[140] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[80vh]">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-purple-600" />
-                <h3 className="font-extrabold text-slate-900 text-sm">选择关联脚本</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowScriptModal(false)}
-                className="p-1 hover:bg-slate-200/60 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-4 border-b border-slate-100 bg-white">
-              <div className="relative">
-                <input
-                  type="text"
-                  value={scriptSearch}
-                  onChange={(e) => setScriptSearch(e.target.value)}
-                  placeholder="搜索脚本ID或脚本标题..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-purple-500"
-                />
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {MOCK_SCRIPTS_LIST
-                .filter(s => s.id.includes(scriptSearch) || s.name.includes(scriptSearch))
-                .map((script) => (
-                  <div
-                    key={script.id}
-                    onClick={() => {
-                      setSelectedScript({ id: script.id, name: script.name });
-                      setShowScriptModal(false);
-                    }}
-                    className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                      selectedScript?.id === script.id
-                        ? "border-purple-600 bg-purple-50/60 shadow-2xs"
-                        : "border-slate-200/80 hover:border-purple-300 hover:bg-slate-50/80"
-                    }`}
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
-                          {script.id}
-                        </span>
-                        <span className="font-bold text-xs text-slate-800">{script.name}</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-[11px] text-slate-400">
-                        <span>类型: {script.type}</span>
-                        <span>编剧/创作者: {script.creator}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {selectedScript?.id === script.id && (
-                        <Check className="w-4 h-4 text-purple-600" />
-                      )}
-                    </div>
-                  </div>
-                ))}
-            </div>
-
-            <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-slate-400 text-xs">点击列表行关联指定脚本</span>
-              <button
-                type="button"
-                onClick={() => setShowScriptModal(false)}
-                className="px-4 py-1.5 bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-              >
-                关闭
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <LinkScriptModal
+        isOpen={showScriptModal}
+        onClose={() => setShowScriptModal(false)}
+        onConfirm={(selected) => {
+          const chosen = Array.isArray(selected) ? selected[0] : selected;
+          if (chosen) {
+            setSelectedScript({ id: chosen.id, name: chosen.title });
+          }
+        }}
+      />
 
       {/* 存为预设模板 Modal */}
       {showSaveTemplateModal && (

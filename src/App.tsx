@@ -39,6 +39,7 @@ export default function App() {
   const [screenHistory, setScreenHistory] = useState<ActiveScreen[]>(["home"]);
   const activeScreen = screenHistory[screenHistory.length - 1] || "home";
   const [selectedTaskForCollaboration, setSelectedTaskForCollaboration] = useState<TaskItem | null>(null);
+  const [selectedTaskTabForCollaboration, setSelectedTaskTabForCollaboration] = useState<"to_me" | "my_published" | "all">("all");
 
   const handleNavigate = (screen: ActiveScreen) => {
     setScreenHistory((prev) => {
@@ -497,6 +498,10 @@ export default function App() {
         return (
           <HomeView
             setActiveScreen={handleNavigate}
+            onNavigateToTaskTab={(tab) => {
+              setSelectedTaskTabForCollaboration(tab);
+              handleNavigate("task_collaboration");
+            }}
             onOpenMaterialSelector={handleOpenMaterialSelector}
             messages={messages}
             onApproveCredits={handleApproveCredits}
@@ -627,6 +632,7 @@ export default function App() {
             onNavigateToMaterials={() => handleNavigate("materials")}
             initialDetailTask={selectedTaskForCollaboration}
             onClearInitialDetailTask={() => setSelectedTaskForCollaboration(null)}
+            initialTab={selectedTaskTabForCollaboration}
           />
         );
 

@@ -203,7 +203,7 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
     if (!selectedScriptForTasks) return;
     const taskItem: TaskItem = {
       id: task.id || "06131146256",
-      publisher: "梁靖琪",
+      publisher: "徐振",
       publishDate: "2026-06-12",
       deadlineDate: task.deadline || "2026-07-02",
       assignee: task.assignee.split(" ")[0] || task.assignee,

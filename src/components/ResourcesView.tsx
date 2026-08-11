@@ -5,6 +5,7 @@ import ScriptManagementView from "./ScriptManagementView";
 import ImageManagementView from "./ImageManagementView";
 import AudioManagementView from "./AudioManagementView";
 import UploadFinishedVideoModal from "./UploadFinishedVideoModal";
+import UploadImageModal from "./UploadImageModal";
 import UploadGenericResourcePage from "./UploadGenericResourcePage";
 import { TaskItem } from "./TaskCollaborationView";
 import { 
@@ -259,7 +260,26 @@ export default function ResourcesView({
 
       {/* 对应的内容视图/上传页面渲染区 */}
       <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
-        {uploadPageView ? (
+        {uploadPageView === "图片" ? (
+          <UploadImageModal
+            isOpen={true}
+            isPage={true}
+            onClose={() => setUploadPageView(null)}
+            onPublishSuccess={(msg) => {
+              showToast(msg);
+              setUploadPageView(null);
+            }}
+          />
+        ) : uploadPageView === "脚本" || uploadPageView === "音频" ? (
+          <UploadGenericResourcePage
+            type={uploadPageView}
+            onClose={() => setUploadPageView(null)}
+            onPublishSuccess={(msg) => {
+              showToast(msg);
+              setUploadPageView(null);
+            }}
+          />
+        ) : uploadPageView ? (
           <UploadFinishedVideoModal
             isOpen={true}
             isPage={true}

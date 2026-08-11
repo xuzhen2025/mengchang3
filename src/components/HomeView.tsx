@@ -55,6 +55,7 @@ import ApprovalActionBox from "./ApprovalActionBox";
 
 interface HomeViewProps {
   setActiveScreen: (screen: ActiveScreen) => void;
+  onNavigateToTaskTab?: (tab: "to_me" | "my_published" | "all") => void;
   onOpenMaterialSelector?: (callback: (selectedUrls: string[]) => void) => void;
   messages?: AppMessage[];
   onApproveCredits?: (msgId: string) => void;
@@ -152,6 +153,7 @@ interface UpdateLogItem {
 
 export default function HomeView({ 
   setActiveScreen,
+  onNavigateToTaskTab,
   messages: propMessages,
   onApproveCredits,
   onRejectCredits,
@@ -970,7 +972,10 @@ export default function HomeView({
                 </div>
 
                 <button
-                  onClick={() => setActiveScreen("task_collaboration")}
+                  onClick={() => {
+                    if (onNavigateToTaskTab) onNavigateToTaskTab("all");
+                    else setActiveScreen("task_collaboration");
+                  }}
                   className="text-xs font-extrabold text-purple-600 hover:text-purple-700 flex items-center gap-1 cursor-pointer shrink-0 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-xl transition-all"
                 >
                   <span>任务协作</span>
@@ -982,7 +987,10 @@ export default function HomeView({
               <div className="space-y-2.5 flex-1 flex flex-col justify-around">
                 {/* 1. 给我的任务 */}
                 <div
-                  onClick={() => setActiveScreen("task_collaboration")}
+                  onClick={() => {
+                    if (onNavigateToTaskTab) onNavigateToTaskTab("to_me");
+                    else setActiveScreen("task_collaboration");
+                  }}
                   className="bg-slate-50 hover:bg-purple-50/60 border border-slate-200/90 hover:border-purple-300 p-3 rounded-2xl transition-all cursor-pointer group flex items-center justify-between gap-3 shadow-2xs"
                 >
                   <div className="space-y-1">
@@ -1010,7 +1018,10 @@ export default function HomeView({
 
                 {/* 2. 我发布的任务 */}
                 <div
-                  onClick={() => setActiveScreen("task_collaboration")}
+                  onClick={() => {
+                    if (onNavigateToTaskTab) onNavigateToTaskTab("my_published");
+                    else setActiveScreen("task_collaboration");
+                  }}
                   className="bg-slate-50 hover:bg-purple-50/60 border border-slate-200/90 hover:border-purple-300 p-3 rounded-2xl transition-all cursor-pointer group flex items-center justify-between gap-3 shadow-2xs"
                 >
                   <div className="space-y-1">
@@ -1038,7 +1049,10 @@ export default function HomeView({
 
                 {/* 3. 全部任务 */}
                 <div
-                  onClick={() => setActiveScreen("task_collaboration")}
+                  onClick={() => {
+                    if (onNavigateToTaskTab) onNavigateToTaskTab("all");
+                    else setActiveScreen("task_collaboration");
+                  }}
                   className="bg-slate-50 hover:bg-purple-50/60 border border-slate-200/90 hover:border-purple-300 p-3 rounded-2xl transition-all cursor-pointer group flex items-center justify-between gap-3 shadow-2xs"
                 >
                   <div className="space-y-1">

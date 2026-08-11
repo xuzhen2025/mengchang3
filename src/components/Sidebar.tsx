@@ -165,7 +165,7 @@ export default function Sidebar({
           />
           {!collapsed && (
             <div className="text-left min-w-0">
-              <p className="text-xs font-semibold text-slate-800 truncate">AIGC电商至尊</p>
+              <p className="text-xs font-semibold text-slate-800 truncate">徐振</p>
               <p className="text-[10px] text-slate-400 truncate">VIP 高级权益</p>
             </div>
           )}

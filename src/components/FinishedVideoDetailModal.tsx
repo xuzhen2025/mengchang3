@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import LinkScriptModal from "./LinkScriptModal";
 import ReferencedVideosProduced from "./ReferencedVideosProduced";
 import {
   X,
@@ -5176,75 +5177,26 @@ export default function FinishedVideoDetailModal({
       )}
 
       {/* 选择关联新脚本 Modal */}
-      {showAddScriptModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[120] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-4 bg-purple-600 rounded-full"></span>
-                <h3 className="text-base font-extrabold text-slate-900 tracking-tight">选择要关联的脚本</h3>
-              </div>
-              <button
-                onClick={() => setShowAddScriptModal(false)}
-                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* List */}
-            <div className="p-6 space-y-3 max-h-[400px] overflow-y-auto">
-              <p className="text-xs text-slate-500 font-medium mb-2">可关联脚本列表：</p>
-              {availableScriptsToLink.map((scr) => {
-                const isAlreadyLinked = associatedScripts.some(s => s.id === scr.id);
-                return (
-                  <div
-                    key={scr.id}
-                    className="p-3.5 border border-slate-200 rounded-xl flex items-center justify-between hover:border-purple-300 hover:bg-purple-50/30 transition-all"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-800 text-xs">{scr.title}</span>
-                        <span className="bg-purple-100 text-purple-700 text-[10px] px-2 py-0.5 rounded font-medium">{scr.template}</span>
-                      </div>
-                      <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-3">
-                        <span>发布人: {scr.publisher}</span>
-                        <span>发布时间: {scr.publishTime}</span>
-                      </div>
-                    </div>
-                    <button
-                      disabled={isAlreadyLinked}
-                      onClick={() => {
-                        setAssociatedScripts([...associatedScripts, scr]);
-                        showToast(`✅ 已关联脚本《${scr.title}》`);
-                        setShowAddScriptModal(false);
-                      }}
-                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        isAlreadyLinked
-                          ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-                          : "bg-purple-600 hover:bg-purple-700 text-white shadow-xs"
-                      }`}
-                    >
-                      {isAlreadyLinked ? "已关联" : "选择关联"}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-3.5 bg-slate-50/50 border-t border-slate-100 flex justify-end">
-              <button
-                onClick={() => setShowAddScriptModal(false)}
-                className="px-4 py-1.5 bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-              >
-                关闭
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <LinkScriptModal
+        isOpen={showAddScriptModal}
+        onClose={() => setShowAddScriptModal(false)}
+        onConfirm={(selected) => {
+          const chosen = Array.isArray(selected) ? selected[0] : selected;
+          if (chosen) {
+            setAssociatedScripts((prev) => [
+              ...prev,
+              {
+                id: chosen.id,
+                title: chosen.title,
+                template: chosen.template || "通用模板",
+                publisher: chosen.publisher || "管理员",
+                publishTime: chosen.publishTime || new Date().toLocaleString(),
+              }
+            ]);
+            showToast(`✅ 已关联脚本《${chosen.title}》`);
+          }
+        }}
+      />
 
       {/* 脚本详情 Modal */}
       {showScriptDetailModal && selectedScriptDetail && (

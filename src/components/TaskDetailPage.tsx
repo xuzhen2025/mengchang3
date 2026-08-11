@@ -1,4 +1,8 @@
 import React, { useState } from "react";
+import LinkScriptModal from "./LinkScriptModal";
+import UploadFinishedVideoModal from "./UploadFinishedVideoModal";
+import UploadImageModal from "./UploadImageModal";
+import UploadGenericResourcePage from "./UploadGenericResourcePage";
 import {
   ArrowLeft,
   UploadCloud,
@@ -6,6 +10,7 @@ import {
   HelpCircle,
   Search,
   ChevronDown,
+  ChevronRight,
   Calendar,
   Filter,
   RotateCcw,
@@ -21,7 +26,11 @@ import {
   Percent,
   MessageSquare,
   Box,
-  Upload
+  Upload,
+  Film,
+  Image as ImageIcon,
+  Music,
+  X
 } from "lucide-react";
 import { TaskItem } from "./TaskCollaborationView";
 
@@ -36,8 +45,11 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
   onBack,
   onShowToast,
 }) => {
-  // Main Sub-tabs: 成片 | 素材 | 第三方 | 图片 | 文案 | 音频
-  const [activeTab, setActiveTab] = useState<"成片" | "素材" | "第三方" | "图片" | "文案" | "音频">("成片");
+  // Main Sub-tabs: 成片 | 素材 | 脚本 | 图片 | 音频
+  const [activeTab, setActiveTab] = useState<"成片" | "素材" | "脚本" | "图片" | "音频">("成片");
+
+  // Upload Page View State ("成片" | "素材" | "脚本" | "图片" | "音频" | null)
+  const [uploadPageView, setUploadPageView] = useState<"成片" | "素材" | "脚本" | "图片" | "音频" | null>(null);
 
   // Filters State
   const [l1Category, setL1Category] = useState<string>("全部");
@@ -65,13 +77,9 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
   const [selectedScriptIds, setSelectedScriptIds] = useState<string[]>([]);
 
   // Modals for Actions inside Detail Page
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isUploadTypeSelectModalOpen, setIsUploadTypeSelectModalOpen] = useState(false);
   const [isAssociateScriptModalOpen, setIsAssociateScriptModalOpen] = useState(false);
   const [isUploadScriptModalOpen, setIsUploadScriptModalOpen] = useState(false);
-
-  // Upload Form State
-  const [uploadWorkName, setUploadWorkName] = useState("");
-  const [uploadWorkType, setUploadWorkType] = useState("成片");
 
   // Mock Associated Scripts List
   const [associatedScripts, setAssociatedScripts] = useState([
@@ -148,6 +156,46 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
       publishTime: "2026-06-20 20:12:39",
     }
   ]);
+
+  // If user opened an upload page view, render the corresponding upload component (same as ResourcesView)
+  if (uploadPageView) {
+    if (uploadPageView === "图片") {
+      return (
+        <UploadImageModal
+          isOpen={true}
+          isPage={true}
+          onClose={() => setUploadPageView(null)}
+          onPublishSuccess={(msg) => {
+            onShowToast(msg);
+            setUploadPageView(null);
+          }}
+        />
+      );
+    }
+    if (uploadPageView === "成片" || uploadPageView === "素材") {
+      return (
+        <UploadFinishedVideoModal
+          isOpen={true}
+          isPage={true}
+          onClose={() => setUploadPageView(null)}
+          onPublishSuccess={(msg) => {
+            onShowToast(msg);
+            setUploadPageView(null);
+          }}
+        />
+      );
+    }
+    return (
+      <UploadGenericResourcePage
+        type={uploadPageView}
+        onClose={() => setUploadPageView(null)}
+        onPublishSuccess={(msg) => {
+          onShowToast(msg);
+          setUploadPageView(null);
+        }}
+      />
+    );
+  }
 
   const togglePublicTag = (tag: string) => {
     if (selectedPublicTags.includes(tag)) {
@@ -239,7 +287,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
               下单
             </div>
             <div className="px-4 py-3 flex items-center font-bold text-slate-800 grow">
-              {task.publisher || "梁靖琪"}
+              {task.publisher || "徐振"}
             </div>
           </div>
 
@@ -303,7 +351,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
             </div>
 
             <button
-              onClick={() => setIsUploadModalOpen(true)}
+              onClick={() => setIsUploadTypeSelectModalOpen(true)}
               className="px-4 py-1.5 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold rounded-lg shadow-2xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
             >
               <UploadCloud className="w-4 h-4" />
@@ -317,7 +365,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
       <div className="bg-white rounded-xl border border-slate-200/80 p-3 px-5 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         {/* Tabs */}
         <div className="flex items-center gap-6 sm:gap-8 overflow-x-auto w-full sm:w-auto">
-          {(["成片", "素材", "第三方", "图片", "文案", "音频"] as const).map((tab) => (
+          {(["成片", "素材", "脚本", "图片", "音频"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -716,10 +764,10 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
         </div>
         <p className="text-slate-400 font-bold text-sm">暂无数据</p>
         <button
-          onClick={() => setIsUploadModalOpen(true)}
+          onClick={() => setUploadPageView(activeTab)}
           className="mt-1 px-4 py-1.5 bg-purple-50 text-[#7C3AED] hover:bg-purple-100 font-bold rounded-lg text-xs transition-colors cursor-pointer"
         >
-          上传此分类作品/素材
+          上传此分类作品/素材 ({activeTab})
         </button>
       </div>
 
@@ -811,71 +859,96 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
         </div>
       </div>
 
-      {/* MODAL: 上传作品 */}
-      {isUploadModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in font-sans">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6 text-slate-800 space-y-4">
+      {/* MODAL: 选择作品/素材上传类型 */}
+      {isUploadTypeSelectModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-[200] p-4 font-sans animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 text-slate-800 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-extrabold text-slate-900">去上传作品</h3>
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-4 bg-[#7C3AED] rounded-full" />
+                <h3 className="text-base font-extrabold text-slate-900">选择上传类型</h3>
+              </div>
               <button
-                onClick={() => setIsUploadModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+                onClick={() => setIsUploadTypeSelectModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer transition-colors"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block font-bold text-slate-600 mb-1">作品名称</label>
-                <input
-                  type="text"
-                  placeholder="请输入作品名称"
-                  value={uploadWorkName}
-                  onChange={(e) => setUploadWorkName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-medium focus:outline-none focus:border-purple-500"
-                />
-              </div>
+            <p className="text-xs text-slate-500 font-medium">请选择要上传的作品/素材类型，点击直接进入上传页面：</p>
 
-              <div>
-                <label className="block font-bold text-slate-600 mb-1">作品分类</label>
-                <select
-                  value={uploadWorkType}
-                  onChange={(e) => setUploadWorkType(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-medium focus:outline-none focus:border-purple-500"
-                >
-                  <option value="成片">成片</option>
-                  <option value="素材">素材</option>
-                  <option value="第三方">第三方</option>
-                  <option value="图片">图片</option>
-                  <option value="文案">文案</option>
-                  <option value="音频">音频</option>
-                </select>
-              </div>
-
-              <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center hover:border-purple-400 transition-colors cursor-pointer bg-slate-50/50">
-                <UploadCloud className="w-8 h-8 text-purple-500 mx-auto mb-2" />
-                <p className="font-bold text-slate-700">点击或将视频/文件拖拽至此处上传</p>
-                <p className="text-[11px] text-slate-400 mt-1">支持 MP4, MOV, PNG, MP3 等格式</p>
-              </div>
+            <div className="grid grid-cols-1 gap-2.5">
+              {[
+                {
+                  type: "成片" as const,
+                  label: "成片作品",
+                  desc: "高清渲染成片、广告视频，一键推送投放与效果追溯",
+                  icon: Film,
+                  color: "text-purple-600 bg-purple-50 group-hover:bg-purple-600 group-hover:text-white"
+                },
+                {
+                  type: "素材" as const,
+                  label: "原始素材",
+                  desc: "实拍原片、高清高光切片、产品镜头",
+                  icon: ShoppingBag,
+                  color: "text-amber-600 bg-amber-50 group-hover:bg-amber-600 group-hover:text-white"
+                },
+                {
+                  type: "脚本" as const,
+                  label: "分镜脚本",
+                  desc: "口播文案、AI分镜拆解与衍生剧本",
+                  icon: FileText,
+                  color: "text-blue-600 bg-blue-50 group-hover:bg-blue-600 group-hover:text-white"
+                },
+                {
+                  type: "图片" as const,
+                  label: "图片素材",
+                  desc: "宣发海报、商品主图、模特细节图",
+                  icon: ImageIcon,
+                  color: "text-emerald-600 bg-emerald-50 group-hover:bg-emerald-600 group-hover:text-white"
+                },
+                {
+                  type: "音频" as const,
+                  label: "音频文件",
+                  desc: "口播旁白、配音人声、BGM衬乐与音效",
+                  icon: Music,
+                  color: "text-indigo-600 bg-indigo-50 group-hover:bg-indigo-600 group-hover:text-white"
+                }
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.type}
+                    onClick={() => {
+                      setIsUploadTypeSelectModalOpen(false);
+                      setUploadPageView(item.type);
+                    }}
+                    className="p-3.5 border border-slate-200/90 rounded-xl flex items-center gap-3.5 hover:border-purple-300 hover:bg-purple-50/40 transition-all cursor-pointer text-left group shadow-2xs"
+                  >
+                    <div className={`p-2.5 rounded-xl transition-colors shrink-0 ${item.color}`}>
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-extrabold text-xs text-slate-800 group-hover:text-purple-700 transition-colors">
+                        {item.label}
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5 truncate">
+                        {item.desc}
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-purple-600 transition-colors shrink-0" />
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex justify-end pt-2 border-t border-slate-100">
               <button
-                onClick={() => setIsUploadModalOpen(false)}
+                onClick={() => setIsUploadTypeSelectModalOpen(false)}
                 className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold rounded-lg text-xs cursor-pointer"
               >
                 取消
-              </button>
-              <button
-                onClick={() => {
-                  setIsUploadModalOpen(false);
-                  onShowToast("✅ 作品上传成功！");
-                  setUploadWorkName("");
-                }}
-                className="px-4 py-2 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold rounded-lg text-xs shadow-2xs cursor-pointer"
-              >
-                确认提交
               </button>
             </div>
           </div>
@@ -883,68 +956,28 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
       )}
 
       {/* MODAL: 关联脚本 */}
-      {isAssociateScriptModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in font-sans">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 text-slate-800 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-extrabold text-slate-900">关联新脚本</h3>
-              <button
-                onClick={() => setIsAssociateScriptModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-500">选择要关联到此任务的脚本：</p>
-
-            <div className="space-y-2 max-h-60 overflow-y-auto text-xs">
-              {[
-                { id: "S-101", name: "爆款二创变现脚本", author: "莫钦全" },
-                { id: "S-102", name: "保暖内衣场景评测脚本", author: "梁靖琪" },
-                { id: "S-103", name: "吊带短视频口播脚本", author: "张华" }
-              ].map((s) => (
-                <div key={s.id} className="p-3 border border-slate-200 rounded-xl flex items-center justify-between hover:bg-purple-50/50 cursor-pointer">
-                  <div>
-                    <div className="font-bold text-slate-800">{s.name}</div>
-                    <div className="text-[11px] text-slate-400">发布人: {s.author}</div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setAssociatedScripts([
-                        ...associatedScripts,
-                        {
-                          id: `SCR-NEW-${Date.now()}`,
-                          title: s.name,
-                          template: "二创衍生",
-                          tag: "二创",
-                          status: "待审核",
-                          publisher: s.author,
-                          publishTime: new Date().toLocaleString(),
-                        }
-                      ]);
-                      setIsAssociateScriptModalOpen(false);
-                      onShowToast(`✅ 已关联脚本: ${s.name}`);
-                    }}
-                    className="px-3 py-1 bg-[#7C3AED] text-white rounded-lg font-bold text-[11px] shadow-2xs hover:bg-purple-700 cursor-pointer"
-                  >
-                    关联
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex justify-end pt-2 border-t border-slate-100">
-              <button
-                onClick={() => setIsAssociateScriptModalOpen(false)}
-                className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold rounded-lg text-xs cursor-pointer"
-              >
-                关闭
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <LinkScriptModal
+        isOpen={isAssociateScriptModalOpen}
+        onClose={() => setIsAssociateScriptModalOpen(false)}
+        onConfirm={(selected) => {
+          const chosen = Array.isArray(selected) ? selected[0] : selected;
+          if (chosen) {
+            setAssociatedScripts((prev) => [
+              ...prev,
+              {
+                id: chosen.id,
+                title: chosen.title,
+                template: chosen.template || "二创衍生",
+                tag: chosen.tags?.[0] || "二创",
+                status: chosen.status || "待审核",
+                publisher: chosen.publisher || "莫钦全",
+                publishTime: chosen.publishTime || new Date().toLocaleString(),
+              }
+            ]);
+            onShowToast(`✅ 已关联脚本: ${chosen.title}`);
+          }
+        }}
+      />
 
       {/* MODAL: 上传脚本 */}
       {isUploadScriptModalOpen && (

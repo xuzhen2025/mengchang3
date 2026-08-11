@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import LinkScriptModal from "./LinkScriptModal";
+import CategoryCascader from "./CategoryCascader";
 import {
   ArrowLeft,
   UploadCloud,
@@ -7,14 +9,16 @@ import {
   Music,
   Video,
   X,
-  Check,
-  Sparkles,
   Shield,
-  FolderPlus,
   HelpCircle,
-  Tag
+  RefreshCw,
+  Calendar,
+  Search,
+  ChevronDown,
+  Folder
 } from "lucide-react";
 import { UploadFileType } from "./ResourcesView";
+import UploadScriptPage from "./UploadScriptPage";
 
 interface UploadGenericResourcePageProps {
   type: UploadFileType;
@@ -22,11 +26,21 @@ interface UploadGenericResourcePageProps {
   onPublishSuccess?: (msg: string) => void;
 }
 
+const TAG_GROUPS_DATA: Record<string, string[]> = {
+  "电商痛点": ["价格昂贵", "穿戴繁琐", "臃肿显胖", "闷热不透气", "掉档跑偏"],
+  "产品亮点": ["极致无痕", "高弹透气", "轻盈裸感", "德绒蓄热", "防勾抗起球"],
+  "剪辑风格": ["硬广直投", "剧情反转", "口播种草", "高光切片", "混剪卡点"],
+  "人群画像": ["年轻职场", "宝妈群体", "学生党", "大码人群", "精致高净值"]
+};
+
 export default function UploadGenericResourcePage({
   type,
   onClose,
   onPublishSuccess
 }: UploadGenericResourcePageProps) {
+  if (type === "脚本") {
+    return <UploadScriptPage onClose={onClose} onPublishSuccess={onPublishSuccess} />;
+  }
   // Config per type
   const configMap: Record<
     UploadFileType,
@@ -70,27 +84,62 @@ export default function UploadGenericResourcePage({
       icon: Music,
       defaultName: "欢快节奏电商带货背景音效_BGM.mp3",
       accept: "audio/*",
-      defaultCategory: ["BGM衬乐", "旁白口播", "人声音效", "转场音效"]
+      defaultCategory: ["提臀裤", "保温衣", "内衣"]
     }
   };
 
-  const config = configMap[type] || configMap["脚本"];
-  const TypeIcon = config.icon;
+  const config = configMap[type] || configMap["音频"];
 
   // Form State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [title, setTitle] = useState<string>(config.defaultName.replace(/\.[^/.]+$/, ""));
-  const [category, setCategory] = useState<string>(config.defaultCategory[0] || "通用");
-  const [visibility, setVisibility] = useState<"公开" | "仅团队" | "私密">("公开");
-  const [selectedTag, setSelectedTag] = useState<string>("热门推荐");
-  const [remarks, setRemarks] = useState<string>("");
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  
+  // Preset Templates
+  const [presetTemplate, setPresetTemplate] = useState("");
+
+  // Basic Info States
+  const [primaryCategory, setPrimaryCategory] = useState("爆款素材");
+  const [secondaryCategory, setSecondaryCategory] = useState("服饰内衣");
+  const [audioCategorySearch, setAudioCategorySearch] = useState("");
+  const [selectedCategoryTag, setSelectedCategoryTag] = useState<string>("提臀裤");
+  const [namingType, setNamingType] = useState<"file_name" | "custom" | "prefix">("file_name");
+  
+  // Task & Script States
+  const [associatedTask, setAssociatedTask] = useState("1148431");
+  const [showTaskDropdown, setShowTaskDropdown] = useState(false);
+  const [associatedScript, setAssociatedScript] = useState("");
+  const [showScriptDropdown, setShowScriptDropdown] = useState(false);
+  const [showScriptModal, setShowScriptModal] = useState(false);
+  const [scriptSearchText, setScriptSearchText] = useState("");
+
+  // Public Tag 3-Column States
+  const [publicTagSearch, setPublicTagSearch] = useState("");
+  const [publicGroupSearch, setPublicGroupSearch] = useState("");
+  const [publicSubSearch, setPublicSubSearch] = useState("");
+  const [selectedPublicGroupKey, setSelectedPublicGroupKey] = useState("电商痛点");
+  const [addedPublicTags, setAddedPublicTags] = useState<string[]>([]);
+
+  // Personal Tag 3-Column States
+  const [personalTagSearch, setPersonalTagSearch] = useState("");
+  const [personalGroupSearch, setPersonalGroupSearch] = useState("");
+  const [personalSubSearch, setPersonalSubSearch] = useState("");
+  const [selectedPersonalGroupKey, setSelectedPersonalGroupKey] = useState("电商痛点");
+  const [addedPersonalTags, setAddedPersonalTags] = useState<string[]>([]);
+
+  // Other Info
+  const [audioDescription, setAudioDescription] = useState("");
+
+  // Permission Settings
+  const [presetPermissionConfig, setPresetPermissionConfig] = useState("");
+  const [viewPermission, setViewPermission] = useState<"公开" | "团队成员" | "小组成员" | "公用资源" | "指定范围">("公开");
+  const [effectiveDate, setEffectiveDate] = useState("");
+  const [receiver, setReceiver] = useState("");
+  const [messageContent, setMessageContent] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setSelectedFile(file);
-      setTitle(file.name.replace(/\.[^/.]+$/, ""));
     }
   };
 
@@ -100,16 +149,16 @@ export default function UploadGenericResourcePage({
       setIsSubmitting(false);
       onClose();
       if (onPublishSuccess) {
-        onPublishSuccess(`✅ 已成功上传【${type}】资源：${title}`);
+        onPublishSuccess(`✅ 已成功上传【${type}】资源`);
       }
     }, 600);
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[#F8F9FD] w-full h-full overflow-hidden animate-in fade-in duration-150">
+    <div className="flex-1 flex flex-col min-h-0 bg-[#F5F6FA] w-full h-full overflow-hidden animate-in fade-in duration-150">
       
       {/* Top Page Header Bar */}
-      <div className="px-6 py-4 bg-white border-b border-slate-200/80 flex items-center justify-between shrink-0 shadow-2xs">
+      <div className="px-6 py-3.5 bg-white border-b border-slate-200/80 flex items-center justify-between shrink-0 shadow-2xs">
         <div className="flex items-center gap-3">
           <button
             onClick={onClose}
@@ -120,39 +169,26 @@ export default function UploadGenericResourcePage({
             <span>返回列表</span>
           </button>
           
-          <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center">
-            <TypeIcon className="w-5 h-5" />
+          <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center shrink-0">
+            <UploadCloud className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-3">
               <h2 className="text-base font-extrabold text-slate-900">{config.title}页面</h2>
               <span className="text-xs text-slate-400">
-                支持格式：{config.formats}
+                支持拖拽上传{type}文件，上传后的文件将显示在资源库列表中。
               </span>
             </div>
           </div>
         </div>
-
-        <button
-          onClick={onClose}
-          className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
-          title="关闭"
-        >
-          <X className="w-5 h-5" />
-        </button>
       </div>
 
-      {/* Page Form Scrollable Content */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs text-slate-700 font-sans max-w-5xl mx-auto w-full">
+      {/* Page Scrollable Form Area */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-5 text-xs text-slate-700 font-sans w-full">
         
-        {/* Upload Zone Card */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-2xs space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-4 bg-purple-600 rounded-full" />
-            <h3 className="font-bold text-slate-900 text-sm">选择/拖拽上传文件</h3>
-          </div>
-
-          <div className="border-2 border-dashed border-purple-200 hover:border-purple-500 bg-purple-50/20 hover:bg-purple-50/40 rounded-2xl p-8 text-center transition-all relative group cursor-pointer">
+        {/* 1. File Upload Dropzone (Upper Card) */}
+        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-2xs">
+          <div className="border-2 border-dashed border-purple-300 hover:border-purple-500 bg-[#FAFAFE] rounded-2xl p-10 text-center transition-all relative group cursor-pointer">
             <input
               type="file"
               accept={config.accept}
@@ -160,148 +196,724 @@ export default function UploadGenericResourcePage({
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
             />
             <div className="flex flex-col items-center justify-center space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center text-xl font-bold">
-                <UploadCloud className="w-6 h-6" />
-              </div>
-              <div className="text-sm font-bold text-slate-800">
-                {selectedFile ? `已选择文件: ${selectedFile.name}` : "点击此处或将文件拖拽至此上传"}
-              </div>
-              <p className="text-xs text-slate-400">
-                支持 {config.formats}
+              <button
+                type="button"
+                className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-2.5 rounded-lg text-xs inline-flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+              >
+                <UploadCloud className="w-4 h-4" />
+                <span>上传本地文件</span>
+              </button>
+              <p className="text-xs text-slate-400 font-medium">
+                {selectedFile ? `已选择文件: ${selectedFile.name}` : "粘贴或拖拽至此，或点击上传按钮上传"}
               </p>
-              
-              <div className="pt-2 z-20">
-                <span className="bg-purple-600 text-white font-bold px-5 py-2 rounded-xl text-xs inline-flex items-center gap-2 shadow-xs group-hover:bg-purple-700 transition-colors">
-                  <UploadCloud className="w-4 h-4" />
-                  浏览本地文件
-                </span>
-              </div>
             </div>
           </div>
         </div>
 
-        {/* Basic Info Card */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-2xs space-y-5">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <div className="w-1.5 h-4 bg-purple-600 rounded-full" />
-            <h3 className="font-bold text-slate-900 text-sm">基本属性设置</h3>
+        {/* 2. 音频信息 Card */}
+        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-2xs space-y-6">
+          {/* Header Row */}
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center shrink-0">
+                <Music className="w-4 h-4" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <h3 className="font-bold text-slate-900 text-sm">{config.title.replace("上传", "")}信息</h3>
+                <span className="text-xs text-slate-400">填写{config.title.replace("上传", "")}分类、统一命名、关联任务及标签</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <select
+                  value={presetTemplate}
+                  onChange={(e) => setPresetTemplate(e.target.value)}
+                  className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-600 focus:outline-none focus:border-purple-500 pr-8 appearance-none cursor-pointer"
+                >
+                  <option value="">选择预设模板</option>
+                  <option value="template_1">电商带货通用配音模板</option>
+                  <option value="template_2">短视频二创音效模板</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+
+              <button
+                type="button"
+                className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <span>存为预设模板</span>
+                <HelpCircle className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
-          {/* Title */}
-          <div className="flex items-center gap-6 pl-2">
-            <span className="w-24 font-bold text-slate-700 shrink-0">
-              <span className="text-rose-500 mr-1">*</span>资源名称
-            </span>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="请输入资源名称"
-              className="flex-1 bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:bg-white transition-all"
-            />
-          </div>
+          {/* --- Sub-section: 基础信息 --- */}
+          <div className="space-y-5">
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-3.5 bg-purple-600 rounded-full" />
+              <h4 className="font-bold text-slate-900 text-xs">基础信息</h4>
+            </div>
 
-          {/* Category */}
-          <div className="flex items-start gap-6 pl-2">
-            <span className="w-24 font-bold text-slate-700 shrink-0 pt-2">
-              <span className="text-rose-500 mr-1">*</span>资源分类
-            </span>
-            <div className="flex-1 space-y-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                {config.defaultCategory.map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setCategory(cat)}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      category === cat
-                        ? "bg-purple-600 text-white shadow-2xs"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
+            <div className="space-y-4 pl-3">
+              {/* 分类 */}
+              <div className="flex items-center gap-4">
+                <label className="w-24 font-bold text-slate-700 text-right shrink-0">
+                  <span className="text-rose-500 mr-0.5">*</span>{config.title.replace("上传", "")}分类
+                </label>
+                <div className="flex-1">
+                  <CategoryCascader
+                    primaryCategory={primaryCategory}
+                    secondaryCategory={secondaryCategory}
+                    onSelect={(p, s) => {
+                      setPrimaryCategory(p);
+                      setSecondaryCategory(s);
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* 名称 */}
+              <div className="flex items-center gap-4">
+                <label className="w-24 font-bold text-slate-700 text-right shrink-0">
+                  <span className="text-rose-500 mr-0.5">*</span>{config.title.replace("上传", "")}名称
+                </label>
+                <div className="flex items-center gap-6">
+                  {(
+                    [
+                      { id: "file_name", label: "使用文件名称" },
+                      { id: "custom", label: "自定义" },
+                      { id: "prefix", label: "前缀+文件名称" }
+                    ] as const
+                  ).map((item) => (
+                    <label key={item.id} className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-slate-700">
+                      <input
+                        type="radio"
+                        name="namingType"
+                        checked={namingType === item.id}
+                        onChange={() => setNamingType(item.id)}
+                        className="accent-purple-600 w-3.5 h-3.5 cursor-pointer"
+                      />
+                      <span>{item.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* 关联任务 */}
+              <div className="flex items-center gap-4 relative">
+                <label className="w-24 font-bold text-slate-700 text-right shrink-0">
+                  关联任务
+                </label>
+                <div className="flex-1 relative">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={associatedTask}
+                      onChange={(e) => setAssociatedTask(e.target.value)}
+                      onFocus={() => setShowTaskDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowTaskDropdown(false), 200)}
+                      placeholder="输入任务编号 / 备注 / ID 搜索"
+                      className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:outline-none transition-colors shadow-2xs pr-8"
+                    />
+                    {associatedTask && (
+                      <button
+                        type="button"
+                        onClick={() => setAssociatedTask("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Task Popover */}
+                  {showTaskDropdown && (
+                    <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl p-6 w-80 animate-in fade-in duration-100">
+                      <p className="font-bold text-xs text-slate-700 mb-4">我的待办任务</p>
+                      <div className="flex flex-col items-center justify-center text-slate-400 py-4 space-y-2">
+                        <Folder className="w-10 h-10 stroke-1 text-slate-300" />
+                        <span className="text-xs">暂无待办任务</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 关联脚本 */}
+              <div className="flex items-center gap-4 relative">
+                <label className="w-24 font-bold text-slate-700 text-right shrink-0">
+                  关联脚本
+                </label>
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={associatedScript}
+                    onClick={() => setShowScriptDropdown(prev => !prev)}
+                    readOnly
+                    placeholder="关联脚本，后续可自动统计脚本效果数据"
+                    className="w-full bg-white border border-slate-200 hover:border-purple-400 focus:border-purple-500 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 cursor-pointer focus:outline-none transition-colors shadow-2xs"
+                  />
+                  {associatedScript && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAssociatedScript("");
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 text-xs cursor-pointer"
+                      title="清除关联脚本"
+                    >
+                      ✕
+                    </button>
+                  )}
+
+                  {/* Script Dropdown Popover */}
+                  {showScriptDropdown && (
+                    <div className="absolute top-full left-0 mt-1.5 z-50 bg-white border border-slate-200/90 rounded-2xl shadow-2xl p-5 w-full max-w-md animate-in fade-in duration-100 space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <span className="font-bold text-xs text-slate-800">任务关联脚本</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowScriptDropdown(false);
+                            setShowScriptModal(true);
+                          }}
+                          className="text-purple-600 hover:text-purple-700 font-bold text-xs cursor-pointer transition-colors"
+                        >
+                          从脚本库选择
+                        </button>
+                      </div>
+
+                      <div className="py-6 flex flex-col items-center justify-center text-center space-y-2.5">
+                        <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300">
+                          <Folder className="w-7 h-7 stroke-[1.25]" />
+                        </div>
+                        <p className="text-xs text-slate-400 font-medium">
+                          {associatedTask ? "暂无关联脚本" : "暂无关联脚本，请先选择任务"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Visibility */}
-          <div className="flex items-center gap-6 pl-2">
-            <span className="w-24 font-bold text-slate-700 shrink-0">
-              <span className="text-rose-500 mr-1">*</span>查看权限
-            </span>
-            <div className="flex items-center gap-5">
-              {(["公开", "仅团队", "私密"] as const).map((v) => (
-                <label key={v} className="flex items-center gap-1.5 cursor-pointer font-bold text-slate-700">
-                  <input
-                    type="radio"
-                    name="genericVisibility"
-                    checked={visibility === v}
-                    onChange={() => setVisibility(v)}
-                    className="accent-purple-600 w-4 h-4 cursor-pointer"
-                  />
-                  <span>{v}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Tag */}
-          <div className="flex items-center gap-6 pl-2">
-            <span className="w-24 font-bold text-slate-700 shrink-0">标签</span>
+          {/* --- Sub-section: 标签信息 --- */}
+          <div className="space-y-5 pt-2 border-t border-slate-100">
             <div className="flex items-center gap-2">
-              {["热门推荐", "爆款核验", "团队共享", "高转化"].map((t) => (
+              <div className="w-1.5 h-3.5 bg-purple-600 rounded-full" />
+              <h4 className="font-bold text-slate-900 text-xs">标签信息</h4>
+            </div>
+
+            {/* 1. 公共标签 */}
+            <div className="space-y-3 pl-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="w-24 text-slate-700 font-bold text-right shrink-0">
+                  <span className="text-rose-500 mr-0.5">*</span>公共标签
+                </span>
+
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={publicTagSearch}
+                    onChange={(e) => setPublicTagSearch(e.target.value)}
+                    placeholder="请选择公共标签，支持输入文字搜索"
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 pr-8 text-xs text-slate-700 focus:outline-none focus:border-purple-500 shadow-2xs"
+                  />
+                  <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+
                 <button
-                  key={t}
                   type="button"
-                  onClick={() => setSelectedTag(t)}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
-                    selectedTag === t
-                      ? "border-purple-600 text-purple-700 bg-purple-50"
-                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                  }`}
+                  className="px-3.5 py-1.5 bg-white border border-purple-600 text-purple-600 hover:bg-purple-50 rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0"
                 >
-                  #{t}
+                  编辑公共标签
                 </button>
-              ))}
+              </div>
+
+              {/* 公共标签 3 模块 Panel */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-[#F8F9FC] border border-slate-200/80 rounded-xl p-3">
+                {/* Col 1: 标签组 */}
+                <div className="bg-white border border-slate-200 rounded-lg p-2.5 space-y-2 flex flex-col h-[220px]">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-700 border-b border-slate-100 pb-1.5 shrink-0">
+                    <span>标签组</span>
+                    <button
+                      type="button"
+                      onClick={() => setPublicGroupSearch("")}
+                      className="text-purple-600 hover:underline flex items-center gap-0.5 font-normal text-[11px] cursor-pointer"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      刷新
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={publicGroupSearch}
+                    onChange={(e) => setPublicGroupSearch(e.target.value)}
+                    placeholder="请输入标签组名称"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:outline-none shrink-0"
+                  />
+                  <div className="flex-1 overflow-y-auto space-y-1 pr-1">
+                    {Object.keys(TAG_GROUPS_DATA)
+                      .filter(g => g.includes(publicGroupSearch.trim()))
+                      .map((group) => (
+                        <div
+                          key={group}
+                          onClick={() => setSelectedPublicGroupKey(group)}
+                          className={`px-2.5 py-1.5 rounded-md cursor-pointer text-xs font-medium transition-colors ${
+                            selectedPublicGroupKey === group
+                              ? "text-purple-600 font-bold bg-purple-50"
+                              : "text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          {group}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Col 2: 子标签 */}
+                <div className="bg-white border border-slate-200 rounded-lg p-2.5 space-y-2 flex flex-col h-[220px]">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-700 border-b border-slate-100 pb-1.5 shrink-0">
+                    <span>子标签</span>
+                    <span className="text-[10px] text-slate-400 font-normal">多选</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={publicSubSearch}
+                    onChange={(e) => setPublicSubSearch(e.target.value)}
+                    placeholder="请输入标签名称"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:outline-none shrink-0"
+                  />
+                  <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 pt-1">
+                    {(TAG_GROUPS_DATA[selectedPublicGroupKey] || [])
+                      .filter(sub => sub.includes(publicSubSearch.trim()))
+                      .map((subTag) => {
+                        const isChecked = addedPublicTags.includes(subTag);
+                        return (
+                          <label
+                            key={subTag}
+                            className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer hover:text-purple-600 select-none px-1"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                if (isChecked) {
+                                  setAddedPublicTags(addedPublicTags.filter(t => t !== subTag));
+                                } else {
+                                  setAddedPublicTags([...addedPublicTags, subTag]);
+                                }
+                              }}
+                              className="accent-purple-600 w-3.5 h-3.5 rounded"
+                            />
+                            <span>{subTag}</span>
+                          </label>
+                        );
+                      })}
+                  </div>
+                </div>
+
+                {/* Col 3: 已添加标签 */}
+                <div className="bg-white border border-slate-200 rounded-lg p-2.5 space-y-2 flex flex-col h-[220px]">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-700 border-b border-slate-100 pb-1.5 shrink-0">
+                    <span>已添加标签</span>
+                    {addedPublicTags.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setAddedPublicTags([])}
+                        className="text-slate-400 hover:text-rose-500 text-[10px] cursor-pointer"
+                      >
+                        清空
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex-1 overflow-y-auto pt-1">
+                    {addedPublicTags.length === 0 ? (
+                      <p className="text-slate-400 text-xs text-center py-12">
+                        暂未添加标签
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {addedPublicTags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1"
+                          >
+                            <span>{tag}</span>
+                            <button
+                              type="button"
+                              onClick={() => setAddedPublicTags(addedPublicTags.filter(t => t !== tag))}
+                              className="text-purple-400 hover:text-rose-600 ml-0.5 cursor-pointer"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. 个人标签 */}
+            <div className="space-y-3 pl-3 pt-2">
+              <div className="flex items-center justify-between gap-3">
+                <span className="w-24 text-slate-700 font-bold text-right shrink-0">
+                  个人标签
+                </span>
+
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={personalTagSearch}
+                    onChange={(e) => setPersonalTagSearch(e.target.value)}
+                    placeholder="请选择个人标签，支持输入文字搜索"
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 pr-8 text-xs text-slate-700 focus:outline-none focus:border-purple-500 shadow-2xs"
+                  />
+                  <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+
+                <button
+                  type="button"
+                  className="px-3.5 py-1.5 bg-white border border-purple-600 text-purple-600 hover:bg-purple-50 rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0"
+                >
+                  编辑个人标签
+                </button>
+              </div>
+
+              {/* 个人标签 3 模块 Panel */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-[#F8F9FC] border border-slate-200/80 rounded-xl p-3">
+                {/* Col 1: 标签组 */}
+                <div className="bg-white border border-slate-200 rounded-lg p-2.5 space-y-2 flex flex-col h-[220px]">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-700 border-b border-slate-100 pb-1.5 shrink-0">
+                    <span>标签组</span>
+                    <button
+                      type="button"
+                      onClick={() => setPersonalGroupSearch("")}
+                      className="text-purple-600 hover:underline flex items-center gap-0.5 font-normal text-[11px] cursor-pointer"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      刷新
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={personalGroupSearch}
+                    onChange={(e) => setPersonalGroupSearch(e.target.value)}
+                    placeholder="请输入标签组名称"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:outline-none shrink-0"
+                  />
+                  <div className="flex-1 overflow-y-auto space-y-1 pr-1">
+                    {Object.keys(TAG_GROUPS_DATA)
+                      .filter(g => g.includes(personalGroupSearch.trim()))
+                      .map((group) => (
+                        <div
+                          key={group}
+                          onClick={() => setSelectedPersonalGroupKey(group)}
+                          className={`px-2.5 py-1.5 rounded-md cursor-pointer text-xs font-medium transition-colors ${
+                            selectedPersonalGroupKey === group
+                              ? "text-purple-600 font-bold bg-purple-50"
+                              : "text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          {group}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Col 2: 子标签 */}
+                <div className="bg-white border border-slate-200 rounded-lg p-2.5 space-y-2 flex flex-col h-[220px]">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-700 border-b border-slate-100 pb-1.5 shrink-0">
+                    <span>子标签</span>
+                    <span className="text-[10px] text-slate-400 font-normal">多选</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={personalSubSearch}
+                    onChange={(e) => setPersonalSubSearch(e.target.value)}
+                    placeholder="请输入标签名称"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:outline-none shrink-0"
+                  />
+                  <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 pt-1">
+                    {(TAG_GROUPS_DATA[selectedPersonalGroupKey] || [])
+                      .filter(sub => sub.includes(personalSubSearch.trim()))
+                      .map((subTag) => {
+                        const isChecked = addedPersonalTags.includes(subTag);
+                        return (
+                          <label
+                            key={subTag}
+                            className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer hover:text-purple-600 select-none px-1"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                if (isChecked) {
+                                  setAddedPersonalTags(addedPersonalTags.filter(t => t !== subTag));
+                                } else {
+                                  setAddedPersonalTags([...addedPersonalTags, subTag]);
+                                }
+                              }}
+                              className="accent-purple-600 w-3.5 h-3.5 rounded"
+                            />
+                            <span>{subTag}</span>
+                          </label>
+                        );
+                      })}
+                  </div>
+                </div>
+
+                {/* Col 3: 已添加标签 */}
+                <div className="bg-white border border-slate-200 rounded-lg p-2.5 space-y-2 flex flex-col h-[220px]">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-700 border-b border-slate-100 pb-1.5 shrink-0">
+                    <span>已添加标签</span>
+                    {addedPersonalTags.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setAddedPersonalTags([])}
+                        className="text-slate-400 hover:text-rose-500 text-[10px] cursor-pointer"
+                      >
+                        清空
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex-1 overflow-y-auto pt-1">
+                    {addedPersonalTags.length === 0 ? (
+                      <p className="text-slate-400 text-xs text-center py-12">
+                        暂未添加标签
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {addedPersonalTags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1"
+                          >
+                            <span>{tag}</span>
+                            <button
+                              type="button"
+                              onClick={() => setAddedPersonalTags(addedPersonalTags.filter(t => t !== tag))}
+                              className="text-purple-400 hover:text-rose-600 ml-0.5 cursor-pointer"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Remarks */}
-          <div className="flex items-start gap-6 pl-2">
-            <span className="w-24 font-bold text-slate-700 shrink-0 pt-2">备注说明</span>
-            <textarea
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-              placeholder="请输入格式说明或补充备注..."
-              className="flex-1 bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:bg-white transition-all min-h-[80px]"
-            />
+          {/* --- Sub-section: 其他信息 --- */}
+          <div className="space-y-4 pt-2 border-t border-slate-100">
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-3.5 bg-purple-600 rounded-full" />
+              <div className="flex items-baseline gap-2">
+                <h4 className="font-bold text-slate-900 text-xs">其他信息</h4>
+                <span className="text-xs text-slate-400">补充说明</span>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4 pl-3">
+              <label className="w-24 font-bold text-slate-700 text-right shrink-0 pt-2">
+                {config.title.replace("上传", "")}说明
+              </label>
+              <textarea
+                value={audioDescription}
+                onChange={(e) => setAudioDescription(e.target.value)}
+                placeholder={`请输入${config.title.replace("上传", "")}说明`}
+                rows={3}
+                className="flex-1 bg-white border border-slate-200 focus:border-purple-500 rounded-lg p-3 text-xs text-slate-800 focus:outline-none shadow-2xs resize-y"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 3. 权限设置 Card */}
+        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-2xs space-y-6">
+          {/* Header Row */}
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center shrink-0">
+                <Shield className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm">权限设置</h3>
+                <p className="text-[11px] text-slate-400">设置查看权限、定时权限变更和消息提醒</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <select
+                  value={presetPermissionConfig}
+                  onChange={(e) => setPresetPermissionConfig(e.target.value)}
+                  className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-600 focus:outline-none focus:border-purple-500 pr-8 appearance-none cursor-pointer"
+                >
+                  <option value="">选择预设配置</option>
+                  <option value="p1">公开访问配置</option>
+                  <option value="p2">仅团队访问配置</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+
+              <button
+                type="button"
+                className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <span>存为预设模板</span>
+                <HelpCircle className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
+          {/* Sub-section: 查看权限 */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-4 bg-purple-600 rounded-full" />
+              <h4 className="font-bold text-slate-900 text-xs">查看权限</h4>
+            </div>
+
+            <div className="space-y-2 pl-3.5 border-l-2 border-slate-100">
+              <div className="flex items-center gap-4">
+                <label className="w-24 font-bold text-slate-700 text-right shrink-0">
+                  <span className="text-rose-500 mr-1">*</span>{config.title.replace("上传", "")}查看权限
+                </label>
+                <div className="flex items-center gap-5 text-xs font-bold text-slate-700">
+                  {(["公开", "团队成员", "小组成员", "公用资源", "指定范围"] as const).map((opt) => (
+                    <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="permission"
+                        checked={viewPermission === opt}
+                        onChange={() => setViewPermission(opt)}
+                        className="text-purple-600 focus:ring-purple-500 accent-purple-600 w-3.5 h-3.5 cursor-pointer"
+                      />
+                      <span>{opt}</span>
+                      {opt === "公用资源" && <HelpCircle className="w-3.5 h-3.5 text-slate-400 ml-0.5" />}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <p className="ml-28 text-[11px] text-slate-400">
+                控制{config.title.replace("上传", "")}上传后哪些人可以查看该{config.title.replace("上传", "")}。
+              </p>
+            </div>
+          </div>
+
+          {/* Sub-section: 定期权限 */}
+          <div className="space-y-4 pt-2 border-t border-slate-100">
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-4 bg-purple-600 rounded-full" />
+              <h4 className="font-bold text-slate-900 text-xs">定期权限</h4>
+              <span className="text-[11px] text-slate-400 font-normal">可选，到期后自动修改查看权限</span>
+            </div>
+
+            <div className="space-y-2 pl-3.5 border-l-2 border-slate-100">
+              <div className="flex items-center gap-4">
+                <label className="w-24 font-bold text-slate-700 text-right shrink-0">
+                  修改日期
+                </label>
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="date"
+                      value={effectiveDate}
+                      onChange={(e) => setEffectiveDate(e.target.value)}
+                      className="bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-700 focus:outline-none focus:border-purple-500 shadow-2xs"
+                    />
+                  </div>
+                  <span className="text-[11px] text-slate-400">将在所选日期 00:00 自动修改查看权限</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Sub-section: 消息提醒 */}
+          <div className="space-y-4 pt-2 border-t border-slate-100">
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-4 bg-purple-600 rounded-full" />
+              <h4 className="font-bold text-slate-900 text-xs">消息提醒</h4>
+            </div>
+
+            <div className="space-y-3 pl-3.5 border-l-2 border-slate-100">
+              {/* 接收人 */}
+              <div className="flex items-center gap-4">
+                <label className="w-24 font-bold text-slate-700 text-right shrink-0">
+                  接收人
+                </label>
+                <select
+                  value={receiver}
+                  onChange={(e) => setReceiver(e.target.value)}
+                  className="flex-1 bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-700 focus:outline-none focus:border-purple-500 cursor-pointer shadow-2xs"
+                >
+                  <option value="">请选择</option>
+                  <option value="user1">李明 (剪辑负责人)</option>
+                  <option value="user2">王芳 (项目经理)</option>
+                </select>
+              </div>
+
+              {/* 消息内容 */}
+              <div className="flex items-center gap-4">
+                <label className="w-24 font-bold text-slate-700 text-right shrink-0">
+                  消息内容
+                </label>
+                <input
+                  type="text"
+                  value={messageContent}
+                  onChange={(e) => setMessageContent(e.target.value)}
+                  placeholder="请输入消息内容"
+                  className="flex-1 bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:outline-none transition-colors shadow-2xs"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
       </div>
 
-      {/* Page Bottom Action Bar */}
-      <div className="px-8 py-4 bg-white border-t border-slate-200/80 flex items-center justify-between shrink-0 shadow-lg">
+      {/* Page Bottom Fixed Bar */}
+      <div className="px-8 py-3 bg-white border-t border-slate-200/80 flex items-center justify-end gap-3 shrink-0 shadow-lg">
         <button
           type="button"
-          onClick={onClose}
-          className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-2 rounded-xl text-xs transition-colors cursor-pointer"
+          onClick={handlePublish}
+          disabled={isSubmitting}
+          className="bg-white border border-purple-200 hover:border-purple-300 hover:bg-purple-50/50 text-purple-700 font-bold text-xs px-5 py-2 rounded-full transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-2xs"
         >
-          取消并返回
+          <span>发布后，相同配置继续上传</span>
+          <HelpCircle className="w-4 h-4 text-purple-500 stroke-[1.75]" />
         </button>
 
         <button
           type="button"
           onClick={handlePublish}
           disabled={isSubmitting}
-          className="bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-extrabold text-xs px-8 py-2.5 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+          className="bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-extrabold text-xs px-9 py-2 rounded-full transition-all shadow-md cursor-pointer disabled:opacity-50"
         >
-          {isSubmitting ? "正在保存发布..." : `确认发布【${type}】`}
+          {isSubmitting ? "正在发布..." : "发布"}
         </button>
       </div>
+
+      {/* Script Association Modal (任务关联脚本) */}
+      <LinkScriptModal
+        isOpen={showScriptModal}
+        onClose={() => setShowScriptModal(false)}
+        onConfirm={(selected) => {
+          const chosen = Array.isArray(selected) ? selected[0] : selected;
+          if (chosen) {
+            setAssociatedScript(chosen.title);
+          }
+        }}
+      />
 
     </div>
   );

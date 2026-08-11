@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import LinkScriptModal from "./LinkScriptModal";
 import { TaskDetailPage } from "./TaskDetailPage";
 import {
   Search,
@@ -79,12 +80,13 @@ interface TaskCollaborationViewProps {
   onNavigateToMaterials?: () => void;
   initialDetailTask?: TaskItem | null;
   onClearInitialDetailTask?: () => void;
+  initialTab?: "to_me" | "my_published" | "all";
 }
 
 const INITIAL_TASKS: TaskItem[] = [
   {
     id: "06131146256",
-    publisher: "梁靖琪",
+    publisher: "徐振",
     publishDate: "2026-06-12",
     deadlineDate: "2026-06-13",
     assignee: "梁浩然",
@@ -94,81 +96,81 @@ const INITIAL_TASKS: TaskItem[] = [
     status: "pending",
     cost: 0,
     associatedScript: {
-      title: "【完美记忆】...",
+      title: "【完美记忆】无钢圈内衣卡点混剪",
       status: "可以拍摄",
       versionCount: 2
     },
-    product: "6017内衣",
-    scriptType: "剧情（微创新）",
+    product: "6017无钢圈内衣",
+    scriptType: "剧情演绎",
     scriptDeconstruction: "填写拆解表",
     remark: "另：复刻可正常提交当储备，合适也会安排"
   },
   {
     id: "06131146255",
-    publisher: "梁靖琪",
+    publisher: "徐振",
     publishDate: "2026-06-12",
     deadlineDate: "2026-06-13",
     assignee: "莫钦全",
     assigneeDeptPath: "快手投流组 / 快手 / 莫钦全",
     orderCount: 8,
-    completedCount: 0,
-    status: "pending",
-    cost: 0,
+    completedCount: 3,
+    status: "in_progress",
+    cost: 450,
     associatedScript: {
-      title: "改写",
+      title: "【爆款改写】无钢圈内衣舒适度实测",
       status: "可以拍摄",
       versionCount: 2
     },
     associatedWorks: [
-      { id: "w_250319", type: "video", name: "250319定卖点混剪为什...", status: "待审核" }
+      { id: "w_250319", type: "video", name: "250319定卖点混剪视频", status: "待审核" }
     ],
-    product: "6017内衣",
-    scriptType: "剧情（微创新）",
+    product: "6017无钢圈内衣",
+    scriptType: "痛点对比",
     scriptDeconstruction: "填写拆解表",
     remark: "本周训练二创为主，8条的任务都是二创。\n另：复刻可正常提交当储备，合适也会安排"
   },
   {
     id: "06061131660",
-    publisher: "梁靖琪",
+    publisher: "蔡卓良",
     publishDate: "2026-06-01",
     deadlineDate: "2026-06-06",
-    assignee: "莫钦全",
-    assigneeDeptPath: "快手投流组 / 快手 / 莫钦全",
-    orderCount: 8,
-    completedCount: 0,
-    status: "pending",
-    cost: 0,
+    assignee: "徐振",
+    assigneeDeptPath: "快手投流组 / 磁力引擎 / 徐振",
+    orderCount: 5,
+    completedCount: 5,
+    status: "completed",
+    cost: 1200,
     associatedScript: {
-      title: "改写",
+      title: "【抗衰精华】A醇精油夜间修复种草",
       status: "可以拍摄",
       versionCount: 1
     },
     associatedWorks: [
-      { id: "w_20250328", type: "image", name: "微信图片_20250328183...", status: "待审核" }
+      { id: "w_20250328", type: "video", name: "抗衰精华实测特写01.mp4", status: "通过" }
     ],
-    product: "6017内衣",
-    scriptType: "剧情（微创新）",
-    scriptDeconstruction: "填写拆解表",
-    remark: "本周训练二创为主，8条的任务都是二创。\n另：复刻可正常提交当储备，合适也会安排"
+    product: "抗衰精华液",
+    scriptType: "口播种草",
+    scriptDeconstruction: "已拆解",
+    remark: "质感要求极高，请使用高清晰度4K打光源"
   },
   {
     id: "06201148431",
-    publisher: "梁靖琪",
+    publisher: "徐振",
     publishDate: "2026-06-15",
     deadlineDate: "2026-06-20",
     assignee: "蔡卓良",
     assigneeDeptPath: "快手投流组 / 磁力引擎 / 蔡卓良",
     orderCount: 8,
-    completedCount: 0,
-    status: "pending",
-    cost: 0,
+    completedCount: 2,
+    status: "in_progress",
+    cost: 300,
     associatedScript: {
-      title: "改写",
+      title: "【补水面膜】夏季晒后修护混剪",
       status: "待审核",
       versionCount: 2
     },
-    product: "抗衰精华液",
-    scriptType: "口播种草",
+    product: "补水面膜",
+    scriptType: "特写展示",
     scriptDeconstruction: "填写拆解表",
     remark: "加急制作，本周首发"
   },
@@ -177,21 +179,138 @@ const INITIAL_TASKS: TaskItem[] = [
     publisher: "蔡卓良",
     publishDate: "2026-06-14",
     deadlineDate: "2026-06-18",
-    assignee: "王剪辑",
-    assigneeDeptPath: "快手投流组 / 快手 / 王剪辑",
-    orderCount: 5,
-    completedCount: 5,
+    assignee: "徐振",
+    assigneeDeptPath: "快手投流组 / 磁力引擎 / 徐振",
+    orderCount: 6,
+    completedCount: 6,
     status: "completed",
-    cost: 1500,
+    cost: 1800,
     associatedScript: {
-      title: "【秋装风衣】高爆Hook...",
+      title: "【秋装风衣】高爆Hook透气防风",
       status: "可以拍摄",
       versionCount: 3
     },
+    associatedWorks: [
+      { id: "w_061801", type: "video", name: "风衣走秀快切成片_V3.mp4", status: "通过" }
+    ],
     product: "加绒风衣",
     scriptType: "混剪卡点",
     scriptDeconstruction: "已拆解",
-    remark: "效果优异，完成跑量"
+    remark: "效果优异，已完成跑量"
+  },
+  {
+    id: "06211055102",
+    publisher: "梁浩然",
+    publishDate: "2026-06-18",
+    deadlineDate: "2026-06-22",
+    assignee: "徐振",
+    assigneeDeptPath: "天猫/拼多多组 / 天猫 / 徐振",
+    orderCount: 4,
+    completedCount: 1,
+    status: "pending",
+    cost: 200,
+    associatedScript: {
+      title: "【防晒冰袖】户外骑行冰凉感实测",
+      status: "可以拍摄",
+      versionCount: 1
+    },
+    product: "防晒冰袖",
+    scriptType: "开箱测评",
+    scriptDeconstruction: "填写拆解表",
+    remark: "突出冰感触感与透气网眼细节"
+  },
+  {
+    id: "06220912301",
+    publisher: "徐振",
+    publishDate: "2026-06-19",
+    deadlineDate: "2026-06-24",
+    assignee: "王剪辑",
+    assigneeDeptPath: "快手投流组 / 快手 / 王剪辑",
+    orderCount: 10,
+    completedCount: 10,
+    status: "completed",
+    cost: 2500,
+    associatedScript: {
+      title: "【修护霜】屏障受损肌救星口播",
+      status: "可以拍摄",
+      versionCount: 4
+    },
+    associatedWorks: [
+      { id: "w_062402", type: "video", name: "修护霜对比成片_终版.mp4", status: "通过" }
+    ],
+    product: "修护霜",
+    scriptType: "痛点对比",
+    scriptDeconstruction: "已拆解",
+    remark: "投放千川大盘，消耗突破5万"
+  },
+  {
+    id: "06231430099",
+    publisher: "孙剧本",
+    publishDate: "2026-06-20",
+    deadlineDate: "2026-06-25",
+    assignee: "徐振",
+    assigneeDeptPath: "直播部 / 抖音直播 / 徐振",
+    orderCount: 6,
+    completedCount: 0,
+    status: "pending",
+    cost: 0,
+    associatedScript: {
+      title: "【星光吊坠】送女友生日礼物情境剧",
+      status: "改写",
+      versionCount: 2
+    },
+    product: "星光吊坠",
+    scriptType: "剧情演绎",
+    scriptDeconstruction: "填写拆解表",
+    remark: "强调情侣节日赠礼情感价值"
+  },
+  {
+    id: "06241600120",
+    publisher: "徐振",
+    publishDate: "2026-06-21",
+    deadlineDate: "2026-06-26",
+    assignee: "周洋",
+    assigneeDeptPath: "天猫/拼多多组 / 天猫 / 周洋",
+    orderCount: 5,
+    completedCount: 3,
+    status: "in_progress",
+    cost: 800,
+    associatedScript: {
+      title: "【复古马丁靴】百搭穿搭卡点短视频",
+      status: "可以拍摄",
+      versionCount: 2
+    },
+    associatedWorks: [
+      { id: "w_062501", type: "video", name: "马丁靴上脚卡点01.mp4", status: "待审核" }
+    ],
+    product: "复古马丁靴",
+    scriptType: "混剪卡点",
+    scriptDeconstruction: "已拆解",
+    remark: "注意配合潮流BGM音频节奏"
+  },
+  {
+    id: "06251820455",
+    publisher: "莫钦全",
+    publishDate: "2026-06-22",
+    deadlineDate: "2026-06-27",
+    assignee: "徐振",
+    assigneeDeptPath: "快手投流组 / 快手 / 徐振",
+    orderCount: 8,
+    completedCount: 4,
+    status: "in_progress",
+    cost: 1000,
+    associatedScript: {
+      title: "【抗衰精华液】早C晚A组合推荐",
+      status: "可以拍摄",
+      versionCount: 3
+    },
+    associatedWorks: [
+      { id: "w_062608", type: "video", name: "早C晚A抗衰精油切片.mp4", status: "待审核" }
+    ],
+    product: "抗衰精华液",
+    scriptType: "口播种草",
+    scriptDeconstruction: "已拆解",
+    remark: "二创卡点素材已同步上传"
   }
 ];
 
@@ -310,7 +429,7 @@ const HIERARCHY_DATA: HierarchyTeam[] = [
         id: "grp_edit_1",
         name: "剪辑一组",
         publishers: [
-          { id: "pub_ljq", name: "梁靖琪" },
+          { id: "pub_xz", name: "徐振" },
           { id: "pub_czl", name: "蔡卓良" },
           { id: "pub_zmx", name: "张美学" },
           { id: "pub_zsy", name: "周摄影" }
@@ -405,12 +524,19 @@ export default function TaskCollaborationView({
   onNavigateToDelivery,
   onNavigateToMaterials,
   initialDetailTask,
-  onClearInitialDetailTask
+  onClearInitialDetailTask,
+  initialTab = "all"
 }: TaskCollaborationViewProps) {
   const [tasks, setTasks] = useState<TaskItem[]>(INITIAL_TASKS);
 
   // Top Scope Tab: "to_me" (给我的任务), "my_published" (我发布的任务), "all" (全部任务)
-  const [activeTab, setActiveTab] = useState<"to_me" | "my_published" | "all">("all");
+  const [activeTab, setActiveTab] = useState<"to_me" | "my_published" | "all">(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // Top Right Date Pickers
   const [dateRange, setDateRange] = useState("2026-06-01 至 2026-06-30");
@@ -554,7 +680,7 @@ export default function TaskCollaborationView({
       template: "对标翻拍",
       tags: ["单人...", "显瘦..."],
       status: "已通过",
-      publisher: "梁靖琪",
+      publisher: "徐振",
       publishTime: "2026-06-21 18:30:11"
     },
     {
@@ -594,7 +720,7 @@ export default function TaskCollaborationView({
       template: "产品细节",
       tags: ["促销...", "高清..."],
       status: "已通过",
-      publisher: "梁靖琪",
+      publisher: "徐振",
       publishTime: "2026-06-22 14:10:20"
     },
     {
@@ -614,7 +740,7 @@ export default function TaskCollaborationView({
       template: "产品细节",
       tags: ["透气...", "细节..."],
       status: "已通过",
-      publisher: "梁靖琪",
+      publisher: "徐振",
       publishTime: "2026-06-21 11:20:00"
     },
     {
@@ -664,7 +790,7 @@ export default function TaskCollaborationView({
       template: "背景音乐",
       tags: ["卡点...", "欢快..."],
       status: "已通过",
-      publisher: "梁靖琪",
+      publisher: "徐振",
       publishTime: "2026-06-20 18:22:10"
     }
   ];
@@ -1146,7 +1272,7 @@ export default function TaskCollaborationView({
       template: "分镜拆解",
       tags: ["家居...", "高端..."],
       status: "已通过",
-      publisher: "梁靖琪",
+      publisher: "徐振",
       publishTime: "2026-06-21 19:12:00"
     },
     {
@@ -1182,7 +1308,7 @@ export default function TaskCollaborationView({
       template: "二创衍生",
       tags: ["限时...", "冲量..."],
       status: "待审核",
-      publisher: "梁靖琪",
+      publisher: "徐振",
       publishTime: "2026-06-20 22:15:00"
     },
     {
@@ -1416,7 +1542,7 @@ export default function TaskCollaborationView({
   const [activeSubGroupIndex, setActiveSubGroupIndex] = useState<number | null>(0);
 
   // Filter Tasks
-  const currentUser = "梁靖琪";
+  const currentUser = "徐振";
 
   const filteredTasks = tasks.filter((task) => {
     // Top Scope Tab Filter
@@ -1725,7 +1851,7 @@ export default function TaskCollaborationView({
               activeTab === "to_me" ? "text-purple-700" : "text-slate-500 hover:text-slate-800"
             }`}
           >
-            <span>给我的任务 (0)</span>
+            <span>给我的任务 ({tasks.filter((t) => t.assignee === currentUser).length})</span>
             {activeTab === "to_me" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600 rounded-full" />}
           </button>
 
@@ -1735,7 +1861,7 @@ export default function TaskCollaborationView({
               activeTab === "my_published" ? "text-purple-700" : "text-slate-500 hover:text-slate-800"
             }`}
           >
-            <span>我发布的任务 (0)</span>
+            <span>我发布的任务 ({tasks.filter((t) => t.publisher === currentUser).length})</span>
             {activeTab === "my_published" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600 rounded-full" />}
           </button>
 
@@ -2519,25 +2645,10 @@ export default function TaskCollaborationView({
           </button>
 
           <button
-            onClick={() => showToast("📊 已生成并打开数据汇总看板")}
-            className="px-3.5 py-1.5 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold text-xs rounded-lg shadow-2xs transition-all cursor-pointer flex items-center gap-1 active:scale-95"
-          >
-            <span>数据汇总</span>
-          </button>
-
-          <button
             onClick={() => showToast("📥 任务列表 Excel 已开始导出")}
             className="px-3.5 py-1.5 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold text-xs rounded-lg shadow-2xs transition-all cursor-pointer flex items-center gap-1 active:scale-95"
           >
             <span>批量导出</span>
-          </button>
-
-          <button
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            className="px-3 py-1.5 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold text-xs rounded-lg shadow-2xs transition-all cursor-pointer flex items-center gap-1 active:scale-95"
-          >
-            <Maximize2 className="w-3.5 h-3.5" />
-            <span>{isFullscreen ? "退出全屏" : "全屏"}</span>
           </button>
 
           <button
@@ -2546,14 +2657,6 @@ export default function TaskCollaborationView({
             title="刷新"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-          </button>
-
-          <button
-            onClick={() => showToast("⚙ 表格列定制配置面板已打开")}
-            className="p-2 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold rounded-lg shadow-2xs transition-all cursor-pointer active:scale-95"
-            title="表格设置"
-          >
-            <Settings className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
@@ -2593,12 +2696,6 @@ export default function TaskCollaborationView({
                             className="w-full text-center py-2 px-3 hover:bg-purple-50 hover:text-purple-700 text-slate-700 font-medium text-xs rounded-lg transition-colors block whitespace-nowrap cursor-pointer"
                           >
                             关联图片
-                          </button>
-                          <button
-                            onClick={() => { setSelectedWorkTypeFilter('关联文案'); setHeaderWorkDropdownOpen(false); showToast('📝 已筛选：关联文案'); }}
-                            className="w-full text-center py-2 px-3 hover:bg-purple-50 hover:text-purple-700 text-slate-700 font-medium text-xs rounded-lg transition-colors block whitespace-nowrap cursor-pointer"
-                          >
-                            关联文案
                           </button>
                           <button
                             onClick={() => { setSelectedWorkTypeFilter('关联音频'); setHeaderWorkDropdownOpen(false); showToast('🎵 已筛选：关联音频'); }}
@@ -2648,7 +2745,7 @@ export default function TaskCollaborationView({
                     {/* 1. 发布任务 (Publisher, Date, ID) */}
                     <td className="py-3.5 px-4 text-center whitespace-nowrap">
                       <div className="flex flex-col items-center justify-center gap-1">
-                        <div className="flex items-center justify-center gap-2">
+                        <div className="flex items-center justify-center gap-1.5">
                           <span className="text-purple-700 font-bold">{task.publisher}</span>
                           <span className="text-slate-400 font-mono text-[11px]">{task.publishDate}</span>
                         </div>
@@ -2784,12 +2881,6 @@ export default function TaskCollaborationView({
                                   className="w-full text-center py-2 px-3 hover:bg-purple-50 hover:text-purple-700 text-slate-700 font-medium text-xs rounded-lg transition-colors block whitespace-nowrap cursor-pointer"
                                 >
                                   关联图片
-                                </button>
-                                <button
-                                  onClick={() => handleOpenWorkModal(task.id, "text", "关联文案")}
-                                  className="w-full text-center py-2 px-3 hover:bg-purple-50 hover:text-purple-700 text-slate-700 font-medium text-xs rounded-lg transition-colors block whitespace-nowrap cursor-pointer"
-                                >
-                                  关联文案
                                 </button>
                                 <button
                                   onClick={() => handleOpenWorkModal(task.id, "audio", "关联音频")}
@@ -3442,7 +3533,7 @@ export default function TaskCollaborationView({
                     <option value="">作者</option>
                     <option value="陈婷婷">陈婷婷</option>
                     <option value="鲁月园">鲁月园</option>
-                    <option value="梁靖琪">梁靖琪</option>
+                    <option value="徐振">徐振</option>
                     <option value="莫钦全">莫钦全</option>
                   </select>
 
@@ -3584,247 +3675,32 @@ export default function TaskCollaborationView({
       })()}
 
       {/* ================= MODAL: 关联脚本 ================= */}
-      {isScriptModalOpen && (() => {
-        const filteredScripts = MOCK_SCRIPTS.filter((s) => {
-          if (
-            scriptSearchTitle.trim() &&
-            !s.title.includes(scriptSearchTitle.trim()) &&
-            !s.id.includes(scriptSearchTitle.trim())
-          )
-            return false;
-          if (scriptSearchCategory.trim() && !s.template.includes(scriptSearchCategory.trim())) return false;
-          if (scriptSearchTag.trim() && !s.tags.some(t => t.includes(scriptSearchTag.trim()))) return false;
-          if (scriptSearchAuthor && s.publisher !== scriptSearchAuthor) return false;
-          return true;
-        });
-
-        const scriptTotalPages = Math.max(1, Math.ceil(filteredScripts.length / scriptPageSize));
-        const currentScriptPage = Math.min(scriptPage, scriptTotalPages);
-        const pagedScripts = filteredScripts.slice((currentScriptPage - 1) * scriptPageSize, currentScriptPage * scriptPageSize);
-
-        return (
-          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 font-sans animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-4xl w-full overflow-hidden text-slate-800 flex flex-col max-h-[90vh]">
-              {/* Header */}
-              <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-4 bg-[#7C3AED] rounded-full" />
-                  <h3 className="text-base font-extrabold text-slate-900">关联脚本</h3>
-                </div>
-                <button
-                  onClick={() => setIsScriptModalOpen(false)}
-                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Body Content */}
-              <div className="p-6 space-y-4 overflow-y-auto text-xs flex-1">
-                {/* Search Row 1 */}
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    placeholder="请输入脚本标题或id"
-                    value={scriptSearchTitle}
-                    onChange={(e) => {
-                      setScriptSearchTitle(e.target.value);
-                      setScriptPage(1);
-                    }}
-                    className="flex-1 bg-slate-50/80 border border-slate-200/90 rounded-lg px-3.5 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:border-purple-500 transition-colors"
-                  />
-                  <button
-                    onClick={() => {
-                      setScriptPage(1);
-                      showToast("已执行条件查询");
-                    }}
-                    className="px-6 py-2 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold text-xs rounded-lg transition-all cursor-pointer shadow-2xs active:scale-95 shrink-0"
-                  >
-                    查询
-                  </button>
-                </div>
-
-                {/* Search Row 2 */}
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <div className="relative min-w-[120px] flex-1">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-                    <input
-                      type="text"
-                      placeholder="搜索分类"
-                      value={scriptSearchCategory}
-                      onChange={(e) => {
-                        setScriptSearchCategory(e.target.value);
-                        setScriptPage(1);
-                      }}
-                      className="w-full pl-8 pr-3 py-1.5 bg-slate-50/80 border border-slate-200/90 rounded-lg text-xs font-medium focus:bg-white focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-
-                  <div className="relative min-w-[120px] flex-1">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-                    <input
-                      type="text"
-                      placeholder="搜索标签"
-                      value={scriptSearchTag}
-                      onChange={(e) => {
-                        setScriptSearchTag(e.target.value);
-                        setScriptPage(1);
-                      }}
-                      className="w-full pl-8 pr-3 py-1.5 bg-slate-50/80 border border-slate-200/90 rounded-lg text-xs font-medium focus:bg-white focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-
-                  <select
-                    value={scriptSearchAuthor}
-                    onChange={(e) => {
-                      setScriptSearchAuthor(e.target.value);
-                      setScriptPage(1);
-                    }}
-                    className="px-3 py-1.5 bg-slate-50/80 border border-slate-200/90 rounded-lg text-xs font-medium text-slate-700 focus:outline-none cursor-pointer min-w-[90px]"
-                  >
-                    <option value="">作者</option>
-                    <option value="陈婷婷">陈婷婷</option>
-                    <option value="鲁月园">鲁月园</option>
-                    <option value="梁靖琪">梁靖琪</option>
-                    <option value="莫钦全">莫钦全</option>
-                  </select>
-
-                  <select className="px-3 py-1.5 bg-slate-50/80 border border-slate-200/90 rounded-lg text-xs font-medium text-slate-400 focus:outline-none cursor-pointer min-w-[160px]">
-                    <option value="">请选择(支持输入搜索)</option>
-                  </select>
-
-                  <div className="flex items-center gap-1 px-3 py-1.5 bg-slate-50/80 border border-slate-200/90 rounded-lg text-xs text-slate-500">
-                    <Calendar className="w-3.5 h-3.5 text-slate-400 mr-1" />
-                    <span>开始日期</span>
-                    <span className="text-slate-300 mx-1">至</span>
-                    <span>结束日期</span>
-                  </div>
-                </div>
-
-                {/* Script List Table */}
-                <div className="border border-slate-200/90 rounded-xl overflow-hidden mt-3 shadow-2xs bg-white flex flex-col">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50/90 border-b border-slate-200/90 text-slate-600 font-bold text-xs">
-                        <th className="py-3 px-3.5 w-10 text-center">
-                          <input
-                            type="checkbox"
-                            className="w-3.5 h-3.5 rounded accent-[#7C3AED] cursor-pointer"
-                            onChange={(e) => {
-                              if (e.target.checked && pagedScripts.length > 0) {
-                                setSelectedScriptId(pagedScripts[0].id);
-                              }
-                            }}
-                          />
-                        </th>
-                        <th className="py-3 px-3">脚本标题</th>
-                        <th className="py-3 px-3">脚本模板</th>
-                        <th className="py-3 px-3">标签</th>
-                        <th className="py-3 px-3">状态</th>
-                        <th className="py-3 px-3">发布人</th>
-                        <th className="py-3 px-3">发布时间</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-xs">
-                      {pagedScripts.map((script) => {
-                        const isSelected = selectedScriptId === script.id;
-                        return (
-                          <tr
-                            key={script.id}
-                            onClick={() => setSelectedScriptId(script.id)}
-                            className={`cursor-pointer transition-colors ${
-                              isSelected ? "bg-purple-50/60 font-medium text-slate-900" : "hover:bg-slate-50 text-slate-700"
-                            }`}
-                          >
-                            <td className="py-3 px-3.5 text-center">
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => setSelectedScriptId(script.id)}
-                                className="w-3.5 h-3.5 rounded accent-[#7C3AED] cursor-pointer"
-                              />
-                            </td>
-                            <td className="py-3 px-3 font-bold text-slate-800">{script.title}</td>
-                            <td className="py-3 px-3 text-slate-600">{script.template}</td>
-                            <td className="py-3 px-3">
-                              <div className="flex items-center gap-1">
-                                {script.tags.map((tag, idx) => (
-                                  <span
-                                    key={idx}
-                                    className="px-2 py-0.5 bg-sky-50 text-sky-600 rounded text-[10px] font-medium border border-sky-100"
-                                  >
-                                    {tag}
-                                  </span>
-                                ))}
-                              </div>
-                            </td>
-                            <td className="py-3 px-3">
-                              <span className={`px-2.5 py-0.5 text-white font-bold rounded text-[10px] shadow-2xs ${
-                                script.status === "已通过" ? "bg-emerald-500" : "bg-[#FF5722]"
-                              }`}>
-                                {script.status}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3 text-slate-700 font-medium">{script.publisher}</td>
-                            <td className="py-3 px-3 font-mono text-[11px] text-slate-500">{script.publishTime}</td>
-                          </tr>
-                        );
-                      })}
-                      {pagedScripts.length === 0 && (
-                        <tr>
-                          <td colSpan={7} className="py-8 text-center text-slate-400 font-medium">
-                            暂无符合条件的脚本数据
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-
-                  {/* Pagination Bar */}
-                  {renderPagination(
-                    currentScriptPage,
-                    scriptPageSize,
-                    filteredScripts.length,
-                    setScriptPage,
-                    setScriptPageSize,
-                    scriptJumpInput,
-                    setScriptJumpInput
-                  )}
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="px-6 py-3.5 bg-slate-50/80 border-t border-slate-100 flex justify-between items-center text-xs">
-                <span className="text-slate-500">
-                  {selectedScriptId ? (
-                    <span>
-                      已选择脚本 ID: <strong className="text-purple-700 font-mono">{selectedScriptId}</strong>
-                    </span>
-                  ) : (
-                    <span>请勾选列表中的脚本进行关联</span>
-                  )}
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsScriptModalOpen(false)}
-                    className="px-4 py-2 border border-slate-200 hover:bg-slate-100 text-slate-700 font-medium rounded-lg transition-colors cursor-pointer"
-                  >
-                    取消
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleConfirmAssociateScript}
-                    className="px-5 py-2 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold rounded-lg transition-all cursor-pointer shadow-2xs active:scale-95"
-                  >
-                    确认关联
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      <LinkScriptModal
+        isOpen={isScriptModalOpen}
+        onClose={() => setIsScriptModalOpen(false)}
+        onConfirm={(selected) => {
+          const chosen = Array.isArray(selected) ? selected[0] : selected;
+          if (chosen) {
+            setSelectedScriptId(chosen.id);
+            if (editAssociatedModalTask) {
+              setEditModalScriptList((prev) => [
+                ...prev,
+                {
+                  id: chosen.id,
+                  title: chosen.title,
+                  template: chosen.template || "对标翻拍",
+                  tags: chosen.tags || ["促销...", "稍微..."],
+                  status: chosen.status || "待审核",
+                  publisher: chosen.publisher || "陈婷婷",
+                  publishTime: chosen.publishTime || "2026-06-22 15:15:53"
+                }
+              ]);
+            }
+            showToast(`✅ 已成功关联脚本: ${chosen.title}`);
+          }
+        }}
+        initialSelectedId={selectedScriptId || "S001"}
+      />
 
       {/* ================= MODAL: 编辑当前已关联脚本 (参考用户截图) ================= */}
       {editAssociatedModalTask && (() => {

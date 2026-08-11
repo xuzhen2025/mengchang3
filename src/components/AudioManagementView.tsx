@@ -974,32 +974,6 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
                       {!isSelectionMode && (
                         <div className="hidden group-hover:flex items-center gap-1">
                           <button
-                            onClick={(e) => openDetailModal(item, e)}
-                            className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors"
-                            title="查看详情"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              showToast(`已归档音频 [${item.title}]`);
-                            }}
-                            className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors"
-                            title="归档"
-                          >
-                            <Archive className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={(e) => toggleStar(item.id, e)}
-                            className={`p-1 hover:bg-slate-100 rounded-lg transition-colors ${
-                              item.starred ? "text-amber-500 fill-amber-500" : "text-slate-400"
-                            }`}
-                            title="收藏"
-                          >
-                            <Star className="w-3.5 h-3.5" />
-                          </button>
-                          <button
                             onClick={(e) => {
                               e.stopPropagation();
                               showToast(`正在下载: ${item.title}.mp3`);
