@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import FinishedVideoDetailModal from "./FinishedVideoDetailModal";
+import { Pagination } from "./Pagination";
 import { 
   Film, 
   Play, 
@@ -633,6 +634,8 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
   const [selectAllPage, setSelectAllPage] = useState(false);
   const [selectedVideoIds, setSelectedVideoIds] = useState<string[]>([]);
   const [isSelectionActive, setIsSelectionActive] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [hoveredVideoId, setHoveredVideoId] = useState<string | null>(null);
   const [activeCardMenu, setActiveCardMenu] = useState<{
@@ -766,13 +769,23 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
     return 0;
   });
 
+  // Pagination
+  const totalCount = filteredVideos.length;
+  const totalPages = Math.ceil(totalCount / pageSize) || 1;
+  const paginatedVideos = filteredVideos.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
   const handleSelectAllPageToggle = () => {
     if (selectAllPage) {
-      setSelectedVideoIds([]);
+      const currentIds = paginatedVideos.map(v => v.id);
+      setSelectedVideoIds(prev => prev.filter(id => !currentIds.includes(id)));
       setSelectAllPage(false);
     } else {
       setIsSelectionActive(true);
-      setSelectedVideoIds(filteredVideos.map(v => v.id));
+      const currentIds = paginatedVideos.map(v => v.id);
+      setSelectedVideoIds(prev => Array.from(new Set([...prev, ...currentIds])));
       setSelectAllPage(true);
     }
   };
@@ -1864,7 +1877,7 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredVideos.map((video) => (
+              {paginatedVideos.map((video) => (
                 <tr key={video.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="p-3">
                     <input
@@ -1935,7 +1948,7 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
       ) : (
         /* GRID VIEW MODE matching reference screenshot style */
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5">
-          {filteredVideos.map((video) => {
+          {paginatedVideos.map((video) => {
             const getStatusBadgeStyle = (st?: string) => {
               switch (st) {
                 case "待审核": return "bg-[#f08080] text-white";
@@ -2338,6 +2351,19 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
           })}
         </div>
       )}
+
+      {/* 底部翻页模块 */}
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        pageSize={pageSize}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(newSize) => {
+          setPageSize(newSize);
+          setCurrentPage(1);
+        }}
+      />
       </>
       )}
 

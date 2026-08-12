@@ -200,7 +200,7 @@ export default function HomeView({
       status: "unread", 
       time: "2026-07-31 18:20",
       details: [
-        { label: "提示发起人", value: "致上致上致上" },
+        { label: "提示发起人", value: "张立 (致上运营)" },
         { label: "上传成片", value: "冬季风衣短视频_01.mp4" },
         { label: "触发动作", value: "资源库上传成片并选择提示团队成员" },
         { label: "网页链接", value: "http://ygj-zssoft.sucaicloud.com/#/video-detail/42021437", isLink: true }
@@ -262,7 +262,7 @@ export default function HomeView({
       status: "unread", 
       time: "2026-07-31 17:45",
       details: [
-        { label: "修改人", value: "致上致上致上" },
+        { label: "修改人", value: "张立 (致上运营)" },
         { label: "修改前后", value: "修改前 -> 审核驳回" },
         { label: "文案内容", value: "好看好🙋！！这个补水面膜效果真的是最顶级的了..." },
         { label: "修改文案备注", value: "最顶级" },

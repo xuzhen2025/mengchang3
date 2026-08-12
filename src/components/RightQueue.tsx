@@ -22,7 +22,7 @@ export default function RightQueue({
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed right-0 top-1/2 -translate-y-1/2 bg-white border-l border-t border-b border-slate-200 text-purple-600 p-2.5 rounded-l-xl hover:bg-slate-50 hover:text-purple-700 transition-all shadow-lg flex flex-col items-center gap-2 z-40 cursor-pointer"
+        className="fixed right-0 top-1/2 -translate-y-1/2 bg-white border-l border-t border-b border-purple-200 text-purple-600 p-2.5 rounded-l-2xl hover:bg-purple-50 hover:text-purple-700 transition-all shadow-xl flex flex-col items-center gap-2 z-50 cursor-pointer"
       >
         <span className="text-[10px] font-bold tracking-wider [writing-mode:vertical-lr] uppercase">任务队列</span>
         <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
@@ -39,7 +39,7 @@ export default function RightQueue({
   const generatingCount = tasks.filter((t) => t.status === "generating").length;
 
   return (
-    <div className="w-80 h-screen bg-white border-l border-slate-200 text-slate-800 flex flex-col shadow-2xl relative z-40">
+    <div className="w-80 h-screen bg-white border-l border-slate-200 text-slate-800 flex flex-col shadow-2xl relative z-50">
       {/* Header */}
       <div className="p-4 border-b border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-2">

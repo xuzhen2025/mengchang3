@@ -43,8 +43,8 @@ const PERSONAL_PROFILES: Record<
     taskAnalysis: Record<string, { valA: number | string; valB: number | string }>;
   }
 > = {
-  "致上致上致上": {
-    name: "致上致上致上",
+  "致上运营": {
+    name: "致上运营",
     radar: {
       spend: 35,
       contribution: 82,
@@ -305,7 +305,7 @@ export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
   const [activeTab, setActiveTab] = useState<"personal" | "group">("personal");
 
   // 2. Target Dropdowns State
-  const [targetA, setTargetA] = useState<string>("致上致上致上");
+  const [targetA, setTargetA] = useState<string>("致上运营");
   const [targetB, setTargetB] = useState<string>("抖音1");
 
   // Group Dropdowns State
@@ -321,13 +321,13 @@ export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
   const [showLeadershipModal, setShowLeadershipModal] = useState<boolean>(false);
 
   // Leadership Modal Comparison States
-  const [leadershipA, setLeadershipA] = useState<string>("致上致上致上");
+  const [leadershipA, setLeadershipA] = useState<string>("致上运营");
   const [leadershipB, setLeadershipB] = useState<string>("抖音1");
 
   // Get Current Data based on selections
   const currentProfileA =
     activeTab === "personal"
-      ? PERSONAL_PROFILES[targetA] || PERSONAL_PROFILES["致上致上致上"]
+      ? PERSONAL_PROFILES[targetA] || PERSONAL_PROFILES["致上运营"]
       : GROUP_PROFILES[groupTargetA] || GROUP_PROFILES["抖音1组"];
 
   const currentProfileB =
@@ -423,8 +423,8 @@ export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
                     onChange={(e) => setTargetA(e.target.value)}
                     className="px-3 py-1.5 bg-white/20 backdrop-blur-md border border-white/30 text-white rounded-xl text-xs font-bold outline-none cursor-pointer focus:bg-white/30"
                   >
-                    <option value="致上致上致上" className="text-slate-800">
-                      致上致上致上
+                    <option value="致上运营" className="text-slate-800">
+                      致上运营
                     </option>
                     <option value="抖音1" className="text-slate-800">
                       抖音1
@@ -451,8 +451,8 @@ export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
                     <option value="抖音1" className="text-slate-800">
                       抖音1
                     </option>
-                    <option value="致上致上致上" className="text-slate-800">
-                      致上致上致上
+                    <option value="致上运营" className="text-slate-800">
+                      致上运营
                     </option>
                     <option value="莫钦全" className="text-slate-800">
                       莫钦全
@@ -710,7 +710,7 @@ export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
                 onChange={(e) => setLeadershipA(e.target.value)}
                 className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-700 focus:outline-none focus:border-purple-500 cursor-pointer"
               >
-                <option value="致上致上致上">致上致上致上</option>
+                <option value="致上运营">致上运营</option>
                 <option value="抖音1">抖音1</option>
                 <option value="莫钦全">莫钦全</option>
               </select>
@@ -723,7 +723,7 @@ export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
                 className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-700 focus:outline-none focus:border-purple-500 cursor-pointer"
               >
                 <option value="抖音1">抖音1</option>
-                <option value="致上致上致上">致上致上致上</option>
+                <option value="致上运营">致上运营</option>
                 <option value="莫钦全">莫钦全</option>
               </select>
               <div className="w-3.5 h-3.5 bg-[#8B5CF6] rounded-xs shrink-0" />
@@ -732,7 +732,7 @@ export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
             {/* Radar Chart */}
             <div className="flex justify-center">
               <SVGInteractiveRadarChart
-                dataA={PERSONAL_PROFILES[leadershipA]?.radar || PERSONAL_PROFILES["致上致上致上"].radar}
+                dataA={PERSONAL_PROFILES[leadershipA]?.radar || PERSONAL_PROFILES["致上运营"].radar}
                 dataB={PERSONAL_PROFILES[leadershipB]?.radar || PERSONAL_PROFILES["抖音1"].radar}
                 nameA={leadershipA}
                 nameB={leadershipB}

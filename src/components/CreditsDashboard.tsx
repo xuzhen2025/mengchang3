@@ -19,6 +19,7 @@ import { CreditTransaction } from "../types";
 
 interface CreditsDashboardProps {
   credits: number;
+  extraRequestedCredits?: number;
   transactions: CreditTransaction[];
   onAddCredits: (amount: number, remark: string) => void;
   onRequestCredits?: (amount: number, manager: string, reason: string, project?: string) => void;
@@ -26,6 +27,7 @@ interface CreditsDashboardProps {
 
 export default function CreditsDashboard({
   credits,
+  extraRequestedCredits: propExtraRequestedCredits,
   transactions,
   onAddCredits,
   onRequestCredits
@@ -33,8 +35,10 @@ export default function CreditsDashboard({
   // Tabs: profile (个人信息) and history (明细账单)
   const [activeSubTab, setActiveSubTab] = useState<"profile" | "history">("profile");
   
-  // Extra requested credits state
-  const [extraRequestedCredits, setExtraRequestedCredits] = useState<number>(350.00);
+  // Extra requested credits state fallback
+  const [internalExtraRequestedCredits, setInternalExtraRequestedCredits] = useState<number>(350.00);
+  const extraRequestedCreditsVal = propExtraRequestedCredits !== undefined ? propExtraRequestedCredits : internalExtraRequestedCredits;
+  const totalAvailableCredits = credits + extraRequestedCreditsVal;
 
   // Filters for Billing History
   const [typeFilter, setTypeFilter] = useState<"all" | "consume" | "recharge" | "refund">("all");
@@ -87,7 +91,7 @@ export default function CreditsDashboard({
       showToast(`✅ 已成功提交 ${amountNum} 积分申请！`);
     }
 
-    setExtraRequestedCredits(prev => prev + amountNum);
+    setInternalExtraRequestedCredits(prev => prev + amountNum);
     setShowApplyModal(false);
     setApplyForm({
       amount: "500",
@@ -181,35 +185,66 @@ export default function CreditsDashboard({
         </div>
 
         {/* Balance Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* 可用总积分 */}
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-50/70 via-purple-100/30 to-white border border-purple-100 p-5 shadow-xs">
-            <div className="absolute right-3 top-3 opacity-10">
-              <Coins className="w-24 h-24 text-purple-600" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Card 1: 可用积分 (主卡片 / 核心算力总额) */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 via-indigo-600 to-purple-800 text-white p-5 shadow-md flex flex-col justify-between">
+            <div className="absolute right-2 top-2 opacity-15 pointer-events-none">
+              <Coins className="w-24 h-24 text-white" />
             </div>
-            <p className="text-xs font-bold text-purple-600">可用总积分</p>
-            <h3 className="text-3xl font-extrabold text-purple-900 font-mono mt-1.5">
-              {credits.toFixed(2)}
-            </h3>
-            <div className="mt-4 flex items-center gap-2 text-[10px] text-purple-600">
-              <CheckCircle className="w-3.5 h-3.5 text-purple-500" />
-              <span>全平台 AI 模型通用，无失效期限</span>
+            <div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-purple-200">✦ 可用积分 ✦</p>
+                <span className="text-[10px] bg-white/20 backdrop-blur-xs text-white px-2 py-0.5 rounded-full font-bold">
+                  总额
+                </span>
+              </div>
+              <h3 className="text-3xl font-black font-mono mt-2 tracking-tight">
+                {totalAvailableCredits.toFixed(2)}
+              </h3>
+            </div>
+            <div className="mt-4 pt-3 border-t border-white/15 text-[11px] text-purple-100 flex items-center justify-between font-mono">
+              <span>= 当月剩余积分({credits.toFixed(2)}) + 额外申请积分({extraRequestedCreditsVal.toFixed(2)})</span>
             </div>
           </div>
 
-          {/* 额外申请积分 */}
+          {/* Card 2: 当月剩余积分 */}
+          <div className="relative overflow-hidden rounded-2xl bg-purple-50/70 border border-purple-200/80 p-5 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-purple-700">当月剩余积分</p>
+                <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold">
+                  基础额度
+                </span>
+              </div>
+              <h3 className="text-3xl font-extrabold text-purple-950 font-mono mt-2">
+                {credits.toFixed(2)}
+              </h3>
+            </div>
+            <div className="mt-4 flex items-center gap-1.5 text-[10px] text-purple-600">
+              <CheckCircle className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+              <span>全平台 AI 模型通用基础算力</span>
+            </div>
+          </div>
+
+          {/* Card 3: 额外申请积分 */}
           <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
-                <p className="text-xs font-bold text-slate-500">额外申请积分</p>
+                <p className="text-xs font-bold text-slate-600">额外申请积分</p>
+                <button
+                  onClick={() => setShowApplyModal(true)}
+                  className="text-[10px] bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold px-2.5 py-1 rounded-full border border-purple-200 transition-colors cursor-pointer"
+                >
+                  + 申请补给
+                </button>
               </div>
-              <h3 className="text-3xl font-extrabold text-slate-800 font-mono mt-1.5">
-                {extraRequestedCredits.toFixed(2)}
+              <h3 className="text-3xl font-extrabold text-slate-800 font-mono mt-2">
+                {extraRequestedCreditsVal.toFixed(2)}
               </h3>
             </div>
-            <div className="mt-4 flex items-center gap-2 text-[10px] text-slate-400">
-              <div className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-              <span>经部门主管/部长审批补给的专项业务算力额度</span>
+            <div className="mt-4 flex items-center gap-1.5 text-[10px] text-slate-500">
+              <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
+              <span>经主管/部长审批补给的算力额度</span>
             </div>
           </div>
         </div>
@@ -235,21 +270,18 @@ export default function CreditsDashboard({
 
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className="text-lg font-black text-slate-900">AIGC电商核心 (张总)</h2>
+                      <h2 className="text-lg font-black text-slate-900">徐振</h2>
                       <span className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full shadow-xs">
-                        超级管理员 SUPER_ADMIN
-                      </span>
-                      <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-amber-200">
-                        VIP 核心创始人
+                        剪辑师
                       </span>
                     </div>
 
                     <p className="text-xs text-slate-500 mt-1 flex items-center gap-3 flex-wrap">
-                      <span className="font-mono">工号: ZS-001</span>
+                      <span className="font-mono">工号: ZS-008</span>
                       <span>•</span>
-                      <span>手机号: 138****8000</span>
+                      <span>手机号: 138****8888</span>
                       <span>•</span>
-                      <span>邮箱: zhang@dreamchang.com</span>
+                      <span>邮箱: xuzhen@dreamchang.com</span>
                     </p>
 
                     <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-400">

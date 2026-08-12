@@ -259,7 +259,7 @@ export default function ResourcesView({
       )}
 
       {/* 对应的内容视图/上传页面渲染区 */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {uploadPageView === "图片" ? (
           <UploadImageModal
             isOpen={true}

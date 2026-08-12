@@ -130,7 +130,7 @@ export default function ImageDetailView({
   const [logs, setLogs] = useState<OperationLogItem[]>([
     {
       id: "log_1",
-      operator: "致上致上致上 (管理员)",
+      operator: "致上运营 (管理员)",
       actionType: "修改备注",
       timestamp: "2026-08-02 14:20:10",
       beforeValue: "暂无",
@@ -162,7 +162,7 @@ export default function ImageDetailView({
   ) => {
     const newLog: OperationLogItem = {
       id: `log_${Date.now()}`,
-      operator: "致上致上致上 (当前用户)",
+      operator: "致上运营 (当前用户)",
       actionType,
       timestamp: new Date().toLocaleString("zh-CN", { hour12: false }),
       beforeValue: beforeValue || "无",
@@ -194,7 +194,7 @@ export default function ImageDetailView({
   const filteredLogs = logFilterType === "all" ? logs : logs.filter((l) => l.actionType === logFilterType);
 
   return (
-    <div className="bg-slate-50/60 min-h-screen text-slate-800 space-y-6 pb-12 animate-fade-in font-sans">
+    <div className="bg-slate-50/60 flex-1 min-h-0 h-full overflow-y-auto text-slate-800 space-y-6 pb-12 animate-fade-in font-sans">
       {/* 1. Top Page Header with Back Button & ID */}
       <div className="px-6 py-4 bg-white text-slate-900 flex items-center justify-between border-b border-slate-200/90 shadow-2xs sticky top-0 z-20">
         <button
@@ -273,7 +273,7 @@ export default function ImageDetailView({
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 text-xs sm:text-sm">
-                    {item.author || "致上致上致上"} / 默认分组 / 默认团队
+                    {item.author || "致上运营"} / 默认分组 / 默认团队
                   </h3>
                   <p className="text-[11px] text-slate-400 mt-0.5">发布时间：2025-05-26 12:25:11</p>
                 </div>
@@ -549,176 +549,7 @@ export default function ImageDetailView({
           </div>
         </div>
 
-        {/* Bottom Section: Tabs matching FinishedVideoDetailModal */}
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200/90 p-6 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setActiveBottomTab("usage")}
-                className={`px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer ${
-                  activeBottomTab === "usage"
-                    ? "bg-purple-600 text-white shadow-xs"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >
-                <History className="w-4 h-4" />
-                <span>使用记录</span>
-              </button>
 
-              <button
-                onClick={() => setActiveBottomTab("associated")}
-                className={`px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer ${
-                  activeBottomTab === "associated"
-                    ? "bg-purple-600 text-white shadow-xs"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >
-                <Film className="w-4 h-4" />
-                <span>关联成片/项目</span>
-              </button>
-
-              <button
-                onClick={() => setActiveBottomTab("logs")}
-                className={`px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer ${
-                  activeBottomTab === "logs"
-                    ? "bg-purple-600 text-white shadow-xs"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >
-                <FileText className="w-4 h-4" />
-                <span>操作日志</span>
-              </button>
-            </div>
-
-            {/* Log filter if on logs tab */}
-            {activeBottomTab === "logs" && (
-              <select
-                value={logFilterType}
-                onChange={(e) => setLogFilterType(e.target.value)}
-                className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none cursor-pointer font-medium"
-              >
-                <option value="all">全部事项</option>
-                <option value="修改标题">修改标题</option>
-                <option value="类目变更">类目变更</option>
-                <option value="修改公共标签">修改公共标签</option>
-                <option value="修改个人标签">修改个人标签</option>
-                <option value="修改备注">修改备注</option>
-                <option value="系统生成">系统生成</option>
-              </select>
-            )}
-          </div>
-
-          {/* Tab 1 Content: Usage Record */}
-          {activeBottomTab === "usage" && (
-            <div className="space-y-3 text-xs">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200/80">
-                      <th className="p-3">使用账号</th>
-                      <th className="p-3">发布平台</th>
-                      <th className="p-3">关联广告计划</th>
-                      <th className="p-3">使用时间</th>
-                      <th className="p-3">表现效果 (ROI)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-700">
-                    <tr className="hover:bg-slate-50/80">
-                      <td className="p-3 font-bold text-slate-900">致上美妆首发官方号</td>
-                      <td className="p-3">
-                        <span className="bg-black text-white px-2 py-0.5 rounded text-[10px] font-bold">抖音</span>
-                      </td>
-                      <td className="p-3 text-purple-600 font-medium">AD_2026_0802_DOUYIN</td>
-                      <td className="p-3 text-slate-500">2026-08-01 10:30</td>
-                      <td className="p-3 text-emerald-600 font-bold">2.84 🔥</td>
-                    </tr>
-                    <tr className="hover:bg-slate-50/80">
-                      <td className="p-3 font-bold text-slate-900">致上官方旗舰店</td>
-                      <td className="p-3">
-                        <span className="bg-red-500 text-white px-2 py-0.5 rounded text-[10px] font-bold">小红书</span>
-                      </td>
-                      <td className="p-3 text-purple-600 font-medium">XH_2026_BEAUTY_01</td>
-                      <td className="p-3 text-slate-500">2026-07-28 15:45</td>
-                      <td className="p-3 text-emerald-600 font-bold">3.12 🔥</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Tab 2 Content: Associated Finished Videos */}
-          {activeBottomTab === "associated" && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="border border-slate-200 rounded-2xl p-3 bg-slate-50/50 flex gap-3 items-center hover:border-purple-300 transition-colors">
-                <div className="w-16 h-16 bg-slate-200 rounded-xl overflow-hidden shrink-0">
-                  <img src="https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=200&auto=format&fit=crop&q=80" alt="成片1" className="w-full h-full object-cover" />
-                </div>
-                <div className="space-y-1 text-xs">
-                  <h4 className="font-bold text-slate-900 line-clamp-1">防脱发洗发水高爆混剪_V1</h4>
-                  <p className="text-slate-400 text-[11px]">时长: 00:28 | 关联位置: 00:03</p>
-                  <span className="text-purple-600 font-bold text-[11px]">包含此图片</span>
-                </div>
-              </div>
-
-              <div className="border border-slate-200 rounded-2xl p-3 bg-slate-50/50 flex gap-3 items-center hover:border-purple-300 transition-colors">
-                <div className="w-16 h-16 bg-slate-200 rounded-xl overflow-hidden shrink-0">
-                  <img src="https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?w=200&auto=format&fit=crop&q=80" alt="成片2" className="w-full h-full object-cover" />
-                </div>
-                <div className="space-y-1 text-xs">
-                  <h4 className="font-bold text-slate-900 line-clamp-1">女装新品夏季特惠宣传视频</h4>
-                  <p className="text-slate-400 text-[11px]">时长: 00:15 | 关联位置: 00:00</p>
-                  <span className="text-purple-600 font-bold text-[11px]">作为背景图</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Tab 3 Content: Operation Logs */}
-          {activeBottomTab === "logs" && (
-            <div className="space-y-3 text-xs">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200/80">
-                      <th className="p-3">操作人</th>
-                      <th className="p-3">事项类型</th>
-                      <th className="p-3">变更前内容</th>
-                      <th className="p-3">变更后内容</th>
-                      <th className="p-3">操作时间</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-700">
-                    {filteredLogs.map((log) => {
-                      const actionColor =
-                        log.actionType === "修改备注" ? "bg-purple-50 text-purple-700 border-purple-200" :
-                        log.actionType === "修改标题" ? "bg-amber-50 text-amber-700 border-amber-200" :
-                        log.actionType === "类目变更" ? "bg-blue-50 text-blue-700 border-blue-200" :
-                        log.actionType === "修改公共标签" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                        log.actionType === "修改个人标签" ? "bg-indigo-50 text-indigo-700 border-indigo-200" :
-                        "bg-slate-100 text-slate-700 border-slate-200";
-
-                      return (
-                        <tr key={log.id} className="hover:bg-purple-50/30 transition-colors">
-                          <td className="p-3 font-bold text-slate-900">{log.operator}</td>
-                          <td className="p-3">
-                            <span className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold border ${actionColor}`}>
-                              {log.actionType}
-                            </span>
-                          </td>
-                          <td className="p-3 text-slate-500 max-w-xs truncate">{log.beforeValue}</td>
-                          <td className="p-3 font-medium text-slate-800 max-w-xs truncate">{log.afterValue}</td>
-                          <td className="p-3 text-slate-400 font-mono text-[11px]">{log.timestamp}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-        </div>
       </div>
 
       {/* Full-Screen Image Lightbox */}
@@ -959,10 +790,10 @@ export default function ImageDetailView({
         </div>
       )}
 
-      {/* MODAL 3: 关联公共标签 Modal (Matching FinishedVideoDetailModal 4-column layout) */}
+      {/* MODAL 3: 关联公共标签 Modal (Matching FinishedVideoDetailModal 3-column layout) */}
       {showPublicTagModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[110] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-5xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
               <div className="flex items-center gap-2">
@@ -979,7 +810,7 @@ export default function ImageDetailView({
 
             {/* Body */}
             <div className="p-6">
-              <div className="grid grid-cols-4 gap-3.5 h-[420px]">
+              <div className="grid grid-cols-3 gap-3.5 h-[380px]">
                 {/* Col 1: 标签组 */}
                 <div className="border border-slate-200/80 rounded-xl overflow-hidden flex flex-col bg-white">
                   <div className="bg-slate-100/90 text-slate-700 text-xs font-bold py-2.5 px-3.5 border-b border-slate-200/80 flex items-center justify-between">
@@ -1103,61 +934,6 @@ export default function ImageDetailView({
                         ))}
                       </div>
                     )}
-                  </div>
-                </div>
-
-                {/* Col 4: 右侧管理面板 */}
-                <div className="border border-slate-200/80 rounded-xl overflow-hidden flex flex-col bg-slate-50/70 p-2.5 space-y-2.5">
-                  {/* Top Card: 最近选择的标签 */}
-                  <div className="bg-white rounded-xl border border-slate-200/80 p-3">
-                    <div className="flex justify-between items-center text-xs font-bold text-slate-800">
-                      <span>最近选择的标签</span>
-                      <button
-                        onClick={() => {
-                          const currentGroupSubs = (PUBLIC_TAG_GROUPS[selectedPublicGroupKey] || []).map(s => `${selectedPublicGroupKey}: ${s}`);
-                          const merged = Array.from(new Set([...tempAddedPublicTags, ...currentGroupSubs]));
-                          setTempAddedPublicTags(merged);
-                        }}
-                        className="flex items-center gap-1 text-purple-600 hover:underline cursor-pointer text-xs font-normal"
-                      >
-                        <span>全选</span>
-                        <ChevronUp className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    <div className="text-center text-slate-400 text-xs py-3">
-                      暂无数据
-                    </div>
-                  </div>
-
-                  {/* Bottom Panel */}
-                  <div className="bg-white rounded-xl border border-slate-200/80 p-3 flex-1 flex flex-col overflow-hidden">
-                    <div className="flex items-center gap-2 mb-3">
-                      <button
-                        onClick={() => setPublicPresetTab("我的预设")}
-                        className={`px-3 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-colors ${
-                          publicPresetTab === "我的预设"
-                            ? "bg-purple-600 text-white shadow-2xs"
-                            : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-                        }`}
-                      >
-                        我的预设
-                      </button>
-                      <button
-                        onClick={() => setPublicPresetTab("分享给我")}
-                        className={`px-3 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-colors ${
-                          publicPresetTab === "分享给我"
-                            ? "bg-purple-600 text-white shadow-2xs"
-                            : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-                        }`}
-                      >
-                        分享给我
-                      </button>
-                    </div>
-
-                    <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
-                      <Box className="w-10 h-10 text-slate-200 mb-2 stroke-[1.25]" />
-                      <span className="text-slate-400 text-xs font-medium">暂无数据</span>
-                    </div>
                   </div>
                 </div>
               </div>

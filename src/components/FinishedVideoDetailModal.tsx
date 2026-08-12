@@ -334,6 +334,7 @@ interface FinishedVideoDetailModalProps {
   onSyncToAd?: (video: FinishedVideo) => void;
   isMaterialMode?: boolean;
   initialTagModal?: "public" | "personal";
+  isAdminMode?: boolean;
 }
 
 // Mock campaign plans data
@@ -755,7 +756,7 @@ export interface AuditAnnotation {
 const INITIAL_AUDIT_ANNOTATIONS: AuditAnnotation[] = [
   {
     id: "ann_1",
-    author: "致上致上致上",
+    author: "致上运营",
     avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&h=80&fit=crop",
     createdAt: "05-13 15:24",
     version: "第1版",
@@ -772,16 +773,16 @@ const INITIAL_AUDIT_ANNOTATIONS: AuditAnnotation[] = [
     replies: [
       {
         id: "rep_1",
-        author: "致上致上致上",
-        replyTo: "致上致上致上",
-        text: "已修改 @致上致上致上",
+        author: "致上运营",
+        replyTo: "致上运营",
+        text: "已修改 @致上运营",
         time: "05-13 15:26"
       },
       {
         id: "rep_2",
-        author: "致上致上致上",
-        replyTo: "致上致上致上",
-        text: "二次修改 @致上致上致上",
+        author: "致上运营",
+        replyTo: "致上运营",
+        text: "二次修改 @致上运营",
         time: "05-13 15:39"
       }
     ]
@@ -810,7 +811,8 @@ export default function FinishedVideoDetailModal({
   onClose,
   onSyncToAd,
   isMaterialMode = false,
-  initialTagModal
+  initialTagModal,
+  isAdminMode = false
 }: FinishedVideoDetailModalProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -988,7 +990,7 @@ export default function FinishedVideoDetailModal({
     }
   };
   const SYSTEM_AT_USERS = [
-    "@致上致上致上",
+    "@致上运营",
     "@致上编导",
     "@dy4",
     "@lan",
@@ -1001,7 +1003,7 @@ export default function FinishedVideoDetailModal({
   ];
 
   const [annotationInputText, setAnnotationInputText] = useState("");
-  const [mentionedMembers, setMentionedMembers] = useState<string[]>(["@致上致上致上"]);
+  const [mentionedMembers, setMentionedMembers] = useState<string[]>(["@致上运营"]);
   const [atSearchText, setAtSearchText] = useState("");
   const [showAtDropdown, setShowAtDropdown] = useState(false);
   const [sendNotification, setSendNotification] = useState(true);
@@ -1011,7 +1013,7 @@ export default function FinishedVideoDetailModal({
     if (auditStatusFilter === "待处理" && ann.isResolved) return false;
     if (auditStatusFilter === "已解决" && !ann.isResolved) return false;
     if (auditTypeFilter !== "全部批注" && ann.type !== auditTypeFilter) return false;
-    if (onlyAtMe && !ann.commentText.includes("@致上致上致上")) return false;
+    if (onlyAtMe && !ann.commentText.includes("@致上运营")) return false;
     return true;
   });
 
@@ -2373,7 +2375,7 @@ export default function FinishedVideoDetailModal({
                           {/* Author Handle & Music Note Banner */}
                           <div className="space-y-1 text-left">
                             <p className="font-bold text-xs text-white drop-shadow-xs flex items-center gap-1.5">
-                              <span>@{video.author || "致上致上致上"}</span>
+                              <span>@{video.author || "致上运营"}</span>
                               <span className="bg-purple-600/80 text-[9px] px-1.5 py-0.2 rounded text-white font-normal">官方创作</span>
                             </p>
                             <p className="text-[11px] text-white/90 line-clamp-2 leading-snug drop-shadow-xs">
@@ -2562,7 +2564,7 @@ export default function FinishedVideoDetailModal({
             )}
 
               {/* 秒级高光分镜拆解 (Frame Highlight Strip) */}
-              {!isMaterialMode && (
+              {!isMaterialMode && !isAdminMode && (
                 <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs space-y-2.5">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-slate-800 flex items-center gap-1.5">
@@ -2638,7 +2640,7 @@ export default function FinishedVideoDetailModal({
                     </div>
                   </div>
 
-                  {/* Right: Action Buttons (权限检测 | 视频对比) */}
+                  {/* Right: Action Buttons (权限检测) */}
                   <div className="flex items-center gap-2 shrink-0">
                     <button
                       onClick={() => setShowPermissionModal(true)}
@@ -2646,13 +2648,6 @@ export default function FinishedVideoDetailModal({
                     >
                       <ShieldCheck className="w-3.5 h-3.5" />
                       <span>权限检测</span>
-                    </button>
-                    <button
-                      onClick={() => showToast("📹 启动视频对比：已开启版本 A/B 剪辑拆解对比视窗")}
-                      className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Film className="w-3.5 h-3.5" />
-                      <span>视频对比</span>
                     </button>
                   </div>
                 </div>
@@ -2946,15 +2941,6 @@ export default function FinishedVideoDetailModal({
                     <div className="pt-4 border-t border-slate-100 space-y-3">
                       {/* Row 1: Small Action Buttons */}
                       <div className="flex flex-wrap items-center gap-2">
-                        {/* Favorite / Star Icon */}
-                        <button
-                          onClick={() => showToast("⭐ 已添加至爆款视频收藏夹")}
-                          className="p-2 border border-slate-200 hover:border-amber-300 rounded-xl text-slate-600 hover:text-amber-500 hover:bg-amber-50 transition-all cursor-pointer shadow-2xs"
-                          title={isMaterialMode ? "收藏素材" : "收藏成片"}
-                        >
-                          <Star className="w-4 h-4" />
-                        </button>
-
                         {/* Share Button with Hover Menu (PC & Mobile links) */}
                         <div
                           className="relative group"
@@ -3001,18 +2987,6 @@ export default function FinishedVideoDetailModal({
                           </div>
                         </div>
 
-                        {/* 推送广告账户 */}
-                        <button
-                          onClick={() => {
-                            if (onSyncToAd) onSyncToAd(video);
-                            else showToast("🚀 已一键推送至 5 个授权巨量/千川广告账户");
-                          }}
-                          className="px-3 py-2 border border-purple-300 hover:bg-purple-50 text-purple-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
-                        >
-                          <Send className="w-3.5 h-3.5 text-purple-600" />
-                          <span>推送广告账户</span>
-                        </button>
-
                         {/* 操作记录 */}
                         <button
                           onClick={() => setShowOperationLogsModal(true)}
@@ -3042,16 +3016,6 @@ export default function FinishedVideoDetailModal({
 
                               {/* Menu Card */}
                               <div className="absolute bottom-full right-0 mb-3 z-50 bg-white border border-slate-200 shadow-xl rounded-2xl p-2 w-48 flex flex-col gap-0.5 text-center font-medium text-slate-700 text-xs animate-in fade-in zoom-in-95 duration-100">
-                                <button
-                                  onClick={() => {
-                                    setShowMoreMenu(false);
-                                    showToast("🚀 正在衍生视频并准备推送至广告账户...");
-                                  }}
-                                  className="w-full py-2 px-3 text-slate-600 hover:text-purple-700 hover:bg-purple-50 rounded-xl transition-colors cursor-pointer text-center font-medium"
-                                >
-                                  衍生视频并推送
-                                </button>
-
                                 <button
                                   onClick={() => {
                                     setShowMoreMenu(false);
@@ -3110,10 +3074,10 @@ export default function FinishedVideoDetailModal({
                         </div>
                       </div>
 
-                      {/* Row 2: Main Solid Purple Action Split Buttons with Dropdown Popovers */}
-                      <div className="grid grid-cols-2 gap-3 pt-1">
+                      {/* Row 2: Main Solid Purple Action Split Button */}
+                      <div className="pt-1">
                         {/* 1. 下载转码视频 Dropdown Button */}
-                        <div className="relative">
+                        <div className="relative w-full">
                           <button
                             onClick={() => setShowDownloadMenu(!showDownloadMenu)}
                             className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center overflow-hidden cursor-pointer active:scale-98"
@@ -3157,68 +3121,6 @@ export default function FinishedVideoDetailModal({
                                   className="w-full py-2 px-3 text-slate-600 hover:text-purple-700 hover:bg-purple-50 rounded-xl transition-colors cursor-pointer text-center font-medium"
                                 >
                                   下载预览视频 (带水印)
-                                </button>
-
-                                <div className="absolute -bottom-1.5 right-4 w-3 h-3 bg-white rotate-45 border-r border-b border-slate-200/90 pointer-events-none"></div>
-                              </div>
-                            </>
-                          )}
-                        </div>
-
-                        {/* 2. 复制到剪映 Dropdown Button */}
-                        <div className="relative">
-                          <button
-                            onClick={() => setShowJianyingMenu(!showJianyingMenu)}
-                            className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center overflow-hidden cursor-pointer active:scale-98"
-                          >
-                            <span className="flex-1 py-3 px-3 text-center font-bold">
-                              复制到剪映
-                            </span>
-                            <div className="w-px h-5 bg-purple-400/50"></div>
-                            <span className="py-3 px-3 flex items-center justify-center">
-                              <ChevronDown className={`w-4 h-4 text-purple-200 transition-transform duration-200 ${showJianyingMenu ? "rotate-180" : ""}`} />
-                            </span>
-                          </button>
-
-                          {showJianyingMenu && (
-                            <>
-                              <div className="fixed inset-0 z-40" onClick={() => setShowJianyingMenu(false)} />
-                              <div className="absolute bottom-full right-0 mb-3 z-50 bg-white border border-slate-200/90 shadow-xl rounded-2xl p-2 w-52 flex flex-col gap-0.5 text-center text-xs font-medium text-slate-700 animate-in fade-in zoom-in-95 duration-100">
-                                <button
-                                  onClick={() => {
-                                    setShowJianyingMenu(false);
-                                    showToast("✂️ 已复制原片至剪映剪切板！");
-                                  }}
-                                  className="w-full py-2 px-3 text-slate-600 hover:text-purple-700 hover:bg-purple-50 rounded-xl transition-colors cursor-pointer text-center font-medium"
-                                >
-                                  复制原片到剪映
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setShowJianyingMenu(false);
-                                    showToast("✂️ 已复制转码后视频至剪映剪切板！");
-                                  }}
-                                  className="w-full py-2 px-3 text-slate-600 hover:text-purple-700 hover:bg-purple-50 rounded-xl transition-colors cursor-pointer text-center font-medium"
-                                >
-                                  复制转码后视频到剪映
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setShowJianyingMenu(false);
-                                    showToast("📖 已打开 Windows 平台剪映导入教程");
-                                  }}
-                                  className="w-full py-2 px-3 text-slate-600 hover:text-purple-700 hover:bg-purple-50 rounded-xl transition-colors cursor-pointer text-center font-medium"
-                                >
-                                  使用教程 (Windows)
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setShowJianyingMenu(false);
-                                    showToast("📖 已打开 Mac 平台剪映导入教程");
-                                  }}
-                                  className="w-full py-2 px-3 text-slate-600 hover:text-purple-700 hover:bg-purple-50 rounded-xl transition-colors cursor-pointer text-center font-medium"
-                                >
-                                  使用教程 (Mac)
                                 </button>
 
                                 <div className="absolute -bottom-1.5 right-4 w-3 h-3 bg-white rotate-45 border-r border-b border-slate-200/90 pointer-events-none"></div>
@@ -3550,7 +3452,7 @@ export default function FinishedVideoDetailModal({
                               const atString = mentionedMembers.length > 0 ? " " + mentionedMembers.join(" ") : "";
                               const newAnn: AuditAnnotation = {
                                 id: `ann_${Date.now()}`,
-                                author: "致上致上致上",
+                                author: "致上运营",
                                 avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&h=80&fit=crop",
                                 createdAt: new Date().toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" }) + " " + new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false }),
                                 version: selectedVersion || "第1版",
@@ -4006,7 +3908,7 @@ export default function FinishedVideoDetailModal({
 
 
             {/* Bottom Full-Width Section: 素材数据 (Asset Performance Data & Sync) */}
-            {!isMaterialMode && (
+            {!isMaterialMode && !isAdminMode && (
               <div className="lg:col-span-12 bg-white p-5 rounded-3xl border border-slate-200/90 shadow-xs space-y-4">
                 {/* Header row matching Screenshot 1 */}
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 pb-3">
@@ -4210,8 +4112,9 @@ export default function FinishedVideoDetailModal({
             )}
 
             {/* Bottom Full-Width Section: 镜头溯源与视频关联 / 被引用后出片 */}
-            <div className="lg:col-span-12 bg-white p-5 rounded-3xl border border-slate-200/90 shadow-xs space-y-4">
-              {isMaterialMode ? (
+            {!isAdminMode && (
+              <div className="lg:col-span-12 bg-white p-5 rounded-3xl border border-slate-200/90 shadow-xs space-y-4">
+                {isMaterialMode ? (
                 <>
                   <div className="border-b border-slate-100 pb-3">
                     <h3 className="text-sm font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
@@ -4516,6 +4419,7 @@ export default function FinishedVideoDetailModal({
                 </>
               )}
             </div>
+            )}
 
           </div>
 
@@ -5189,6 +5093,8 @@ export default function FinishedVideoDetailModal({
                 id: chosen.id,
                 title: chosen.title,
                 template: chosen.template || "通用模板",
+                tag: chosen.tags?.[0] || "痛点库",
+                status: chosen.status || "通过",
                 publisher: chosen.publisher || "管理员",
                 publishTime: chosen.publishTime || new Date().toLocaleString(),
               }

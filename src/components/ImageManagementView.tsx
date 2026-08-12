@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import ImageDetailView from "./ImageDetailView";
+import { Pagination } from "./Pagination";
 import {
   Search,
   ChevronDown,
@@ -55,105 +56,105 @@ interface ImageManagementViewProps {
 const MOCK_IMAGES: ImageItem[] = [
   {
     id: "img-1",
-    title: "洗发水",
-    subtitle: "测试2",
+    title: "防晒植物提取精华液展图.jpg",
+    subtitle: "高清主图",
     imageUrl: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=600&auto=format&fit=crop&q=80",
     badge: "图片",
-    downloads: 0,
+    downloads: 12,
     filesCount: 1,
-    author: "致上致上致上",
+    author: "致上互娱",
     time: "1小时前",
-    primaryCategory: "资质",
-    secondaryCategory: "a店铺",
-    publicTags: ["场景"],
-    personalTag: "有个人标签",
+    primaryCategory: "美妆护肤",
+    secondaryCategory: "致上旗舰店",
+    publicTags: ["产品实拍", "成分党"],
+    personalTag: "精选主图",
     size: "2.4 MB",
     resolution: "1080x1440"
   },
   {
     id: "img-2",
-    title: "1dab213bce8ce3c70c9...",
-    subtitle: "测试11111111111111111111",
+    title: "无痕防晒冰丝丝袜场景模特图.png",
+    subtitle: "模特穿搭展图",
     imageUrl: "https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?w=600&auto=format&fit=crop&q=80",
     badge: "图片",
-    downloads: 0,
+    downloads: 8,
     filesCount: 1,
     author: "汤小真",
     time: "2025-05-23",
-    primaryCategory: "设计",
-    secondaryCategory: "a店铺",
-    publicTags: ["场景"],
-    personalTag: "无个人标签",
+    primaryCategory: "服饰内衣",
+    secondaryCategory: "致上旗舰店",
+    publicTags: ["模特出镜", "清凉冰丝"],
+    personalTag: "精选主图",
     size: "1.8 MB",
     resolution: "800x1200",
     isFolder: true
   },
   {
     id: "img-3",
-    title: "飞飞飞.pptx",
-    subtitle: "ces12345",
+    title: "夏日爆款产品宣发介绍图册.pptx",
+    subtitle: "宣发图册",
     imageUrl: "https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=600&auto=format&fit=crop&q=80",
     badge: "图片",
-    downloads: 1,
+    downloads: 15,
     filesCount: 1,
-    author: "致上致上致上",
+    author: "致上互娱",
     time: "2025-05-12",
-    primaryCategory: "图片一级分类1",
-    secondaryCategory: "b店铺",
-    publicTags: [],
-    personalTag: "7-3个人标签组",
+    primaryCategory: "宣发图库",
+    secondaryCategory: "云享专营店",
+    publicTags: ["宣发海报"],
+    personalTag: "营销资料库",
     size: "4.5 MB",
     resolution: "1920x1080",
     isFolder: true
   },
   {
     id: "img-4",
-    title: "微信图片_2025032818...",
-    subtitle: "1108标签2",
+    title: "草本护肤成分拆解对比展图.png",
+    subtitle: "成分拆解",
     imageUrl: "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=600&auto=format&fit=crop&q=80",
     badge: "图片",
-    downloads: 1,
+    downloads: 6,
     filesCount: 1,
     author: "汤小真",
     time: "2025-04-28",
-    primaryCategory: "演示分类",
-    secondaryCategory: "a店铺",
-    publicTags: ["场景"],
+    primaryCategory: "美妆护肤",
+    secondaryCategory: "致上旗舰店",
+    publicTags: ["对比实测"],
     personalTag: "收藏夹",
     size: "3.1 MB",
     resolution: "1080x1080"
   },
   {
     id: "img-5",
-    title: "一张_1",
-    subtitle: "1",
+    title: "防晒霜SPF50+权威检测报告图片.jpg",
+    subtitle: "资质证明",
     imageUrl: "https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=600&auto=format&fit=crop&q=80",
     badge: "图片",
-    downloads: 2,
+    downloads: 20,
     filesCount: 1,
-    author: "致上致上致上",
+    author: "致上互娱",
     time: "2025-04-24",
-    primaryCategory: "资质/链接-医药",
-    secondaryCategory: "b店铺",
-    publicTags: [],
-    personalTag: "666888",
+    primaryCategory: "资质文件",
+    secondaryCategory: "云享专营店",
+    publicTags: ["成分党"],
+    personalTag: "品牌资质",
     size: "1.2 MB",
     resolution: "1080x1920"
   },
   {
     id: "img-6",
-    title: "一张_3",
-    subtitle: "1",
+    title: "补水面膜水分提升对比实验图.jpg",
+    subtitle: "实验效果",
     imageUrl: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=600&auto=format&fit=crop&q=80",
     badge: "图片",
-    downloads: 1,
+    downloads: 11,
     filesCount: 1,
-    author: "致上致上致上",
+    author: "致上互娱",
     time: "2025-04-24",
-    primaryCategory: "资质",
-    secondaryCategory: "a店铺",
-    publicTags: ["场景"],
-    personalTag: "有个人标签",
+    primaryCategory: "美妆护肤",
+    secondaryCategory: "致上旗舰店",
+    publicTags: ["对比实测"],
+    personalTag: "精选主图",
     size: "2.9 MB",
     resolution: "1080x1440"
   },
@@ -167,16 +168,16 @@ const MOCK_IMAGES: ImageItem[] = [
     filesCount: 1,
     author: "美妆设计组",
     time: "2025-04-20",
-    primaryCategory: "设计",
-    secondaryCategory: "a店铺",
-    publicTags: ["场景"],
-    personalTag: "测试分享",
+    primaryCategory: "宣发图库",
+    secondaryCategory: "致上旗舰店",
+    publicTags: ["爆款短视频"],
+    personalTag: "精选主图",
     size: "5.4 MB",
     resolution: "2000x2000"
   },
   {
     id: "img-8",
-    title: "高奢护肤瓶身渲染特写",
+    title: "高奢护肤瓶身渲染特写.jpg",
     subtitle: "3D透视修图",
     imageUrl: "https://images.unsplash.com/photo-1608248597261-833257058444?w=600&auto=format&fit=crop&q=80",
     badge: "图片",
@@ -184,10 +185,10 @@ const MOCK_IMAGES: ImageItem[] = [
     filesCount: 1,
     author: "汤小真",
     time: "2025-04-18",
-    primaryCategory: "图片一级分类2",
-    secondaryCategory: "b店铺",
-    publicTags: [],
-    personalTag: "标签组2",
+    primaryCategory: "美妆护肤",
+    secondaryCategory: "云享专营店",
+    publicTags: ["高端质感"],
+    personalTag: "3D渲染图",
     size: "3.8 MB",
     resolution: "1440x1920"
   }
@@ -210,6 +211,10 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
   // Selection state
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedImageIds, setSelectedImageIds] = useState<string[]>([]);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   // Modals & Popups
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
@@ -238,31 +243,24 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
   // Primary categories from reference screenshot
   const primaryCategories = [
     "全部",
-    "设计",
-    "资质",
-    "图片一级分类1",
-    "演示分类",
-    "资质/链接-医药",
-    "7.4一级分类21",
-    "图片一级分类2",
-    "图片一级分类3"
+    "美妆护肤",
+    "服饰内衣",
+    "3C数码",
+    "资质文件",
+    "宣发图库",
+    "家居日用",
+    "食品饮料"
   ];
 
   // Personal tag buttons from reference screenshot
   const personalTagsList = [
     "全部",
-    "无个人标签",
-    "有个人标签",
-    "7-3个人标签组",
+    "精选主图",
+    "品牌资质",
+    "营销资料库",
     "收藏夹",
-    "666888",
-    "测试分享",
-    "标签组2",
-    "标签组",
-    "111",
-    "个人标签11",
-    "覆盖",
-    "222"
+    "3D渲染图",
+    "对比素材"
   ];
 
   // Filtered list
@@ -292,6 +290,13 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
     }
     return true;
   });
+
+  const totalCount = filteredImages.length;
+  const totalPages = Math.ceil(totalCount / pageSize) || 1;
+  const paginatedImages = filteredImages.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
 
   // Handle select all on current page
   const handleSelectPage = () => {
@@ -765,7 +770,7 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
             className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-600 bg-white focus:outline-none cursor-pointer"
           >
             <option value="">作者</option>
-            <option value="致上致上致上">致上致上致上</option>
+            <option value="致上互娱">致上互娱</option>
             <option value="汤小真">汤小真</option>
             <option value="美妆设计组">美妆设计组</option>
           </select>
@@ -807,7 +812,7 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
       {/* Grid or List View of Images */}
       {viewMode === "grid" ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5">
-          {filteredImages.map((item) => {
+          {paginatedImages.map((item) => {
             const isSelected = selectedImageIds.includes(item.id);
             const isSelectionActive = isSelectionMode || selectedImageIds.length > 0;
             return (
@@ -963,7 +968,7 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
-              {filteredImages.map((item) => {
+              {paginatedImages.map((item) => {
                 const isSelected = selectedImageIds.includes(item.id);
                 return (
                   <tr
@@ -1027,6 +1032,19 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
           </table>
         </div>
       )}
+
+      {/* 底部翻页模块 */}
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        pageSize={pageSize}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(newSize) => {
+          setPageSize(newSize);
+          setCurrentPage(1);
+        }}
+      />
 
       {/* Full-Screen Image Lightbox Modal (点击图片可查看大图) */}
       {fullScreenImage && (

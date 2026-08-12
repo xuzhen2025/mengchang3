@@ -581,25 +581,25 @@ export default function ScriptDetailPage({
             {/* Basic Details List */}
             <div className="space-y-2.5 pt-1 text-xs">
               {/* Badge & Category Row */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-2 py-0.5 bg-[#10B981] text-white font-extrabold rounded text-[11px] shadow-2xs shrink-0">
-                  脚本
-                </span>
-                <span className="text-slate-800 font-bold">{currentScript.basicType}</span>
-                <button
-                  onClick={() => {
-                    const currentCat = currentScript.basicType || "演示分类 / 卸妆油";
-                    setEditCategoryInput(currentCat);
-                    setTempCategoryPath(currentCat);
-                    setSelectedPrimaryCat("宠物食品");
-                    setIsCategoryDropdownOpen(true);
-                    setShowModifyCategoryModal(true);
-                  }}
-                  className="text-slate-400 hover:text-purple-600 cursor-pointer p-0.5 flex items-center gap-1 font-medium hover:underline text-xs"
-                >
-                  <Edit3 className="w-3.5 h-3.5 text-purple-600" />
-                  <span className="text-purple-600">修改</span>
-                </button>
+              <div className="flex items-center gap-3">
+                <span className="w-20 text-slate-500 font-medium shrink-0">脚本区</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-800 font-bold">{currentScript.basicType}</span>
+                  <button
+                    onClick={() => {
+                      const currentCat = currentScript.basicType || "演示分类 / 卸妆油";
+                      setEditCategoryInput(currentCat);
+                      setTempCategoryPath(currentCat);
+                      setSelectedPrimaryCat("宠物食品");
+                      setIsCategoryDropdownOpen(true);
+                      setShowModifyCategoryModal(true);
+                    }}
+                    className="text-slate-400 hover:text-purple-600 cursor-pointer p-0.5 flex items-center gap-1 font-medium hover:underline text-xs"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-purple-600" />
+                    <span className="text-purple-600">修改</span>
+                  </button>
+                </div>
               </div>
 
               {/* Title Row */}
@@ -1889,7 +1889,7 @@ export default function ScriptDetailPage({
       {/* MODAL 4: Public Tag Modal (关联公共标签 Modal - Matching FinishedVideoDetailModal) */}
       {showPublicTagModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[110] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-5xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
               <div className="flex items-center gap-2">
@@ -1906,7 +1906,7 @@ export default function ScriptDetailPage({
 
             {/* Body */}
             <div className="p-6">
-              <div className="grid grid-cols-4 gap-3.5 h-[420px]">
+              <div className="grid grid-cols-3 gap-3.5 h-[380px]">
                 {/* Col 1: 标签组 */}
                 <div className="border border-slate-200/80 rounded-xl overflow-hidden flex flex-col bg-white">
                   <div className="bg-slate-100/90 text-slate-700 text-xs font-bold py-2.5 px-3.5 border-b border-slate-200/80 flex items-center justify-between">
@@ -2029,64 +2029,6 @@ export default function ScriptDetailPage({
                         ))}
                       </div>
                     )}
-                  </div>
-                </div>
-
-                {/* Col 4: 右侧管理面板 */}
-                <div className="border border-slate-200/80 rounded-xl overflow-hidden flex flex-col bg-slate-50/70 p-2.5 space-y-2.5">
-                  {/* Top Card: 最近选择的标签 */}
-                  <div className="bg-white rounded-xl border border-slate-200/80 p-3">
-                    <div className="flex justify-between items-center text-xs font-bold text-slate-800">
-                      <span>最近选择的标签</span>
-                      <button
-                        onClick={() => {
-                          const currentGroupSubs = PUBLIC_TAG_GROUPS[selectedPublicGroupKey] || [];
-                          const merged = Array.from(new Set([...tempAddedPublicTags, ...currentGroupSubs]));
-                          setTempAddedPublicTags(merged);
-                        }}
-                        className="flex items-center gap-1 text-purple-600 hover:underline cursor-pointer text-xs font-normal"
-                      >
-                        <span>全选</span>
-                        <ChevronUp className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    <div className="text-center text-slate-400 text-xs py-3">
-                      暂无数据
-                    </div>
-                  </div>
-
-                  {/* Bottom Panel */}
-                  <div className="bg-white rounded-xl border border-slate-200/80 p-3 flex-1 flex flex-col overflow-hidden">
-                    <div className="flex items-center gap-2 mb-3">
-                      <button
-                        onClick={() => setPublicPresetTab("我的预设")}
-                        className={`px-3 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-colors ${
-                          publicPresetTab === "我的预设"
-                            ? "bg-purple-600 text-white shadow-2xs"
-                            : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-                        }`}
-                      >
-                        我的预设
-                      </button>
-                      <button
-                        onClick={() => setPublicPresetTab("分享给我")}
-                        className={`px-3 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-colors ${
-                          publicPresetTab === "分享给我"
-                            ? "bg-purple-600 text-white shadow-2xs"
-                            : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-                        }`}
-                      >
-                        分享给我
-                      </button>
-                      <select className="border border-slate-200 rounded-lg text-[11px] px-2 py-1 text-slate-600 focus:outline-none bg-white cursor-pointer ml-auto">
-                        <option>脚本</option>
-                      </select>
-                    </div>
-
-                    <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
-                      <Box className="w-10 h-10 text-slate-200 mb-2 stroke-[1.25]" />
-                      <span className="text-slate-400 text-xs font-medium">暂无数据</span>
-                    </div>
                   </div>
                 </div>
               </div>

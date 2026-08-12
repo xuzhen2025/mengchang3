@@ -1551,11 +1551,27 @@ export default function AccountManagementView() {
     notifyUser: boolean;
     forceNextChange: boolean;
   } | null>(null);
+  const getDeptAndGroupFromId = (id: string, deptsList: DeptNode[]) => {
+    const item = deptsList.find(d => d.id === id);
+    if (!item) {
+      const defaultDept = deptsList.find(d => d.parentId === "dept_root" || d.id === "dept_root" || d.levelType === "department");
+      return { deptId: defaultDept?.id || "dept_root", groupId: "" };
+    }
+    const parent = deptsList.find(d => d.id === item.parentId);
+    if (parent && parent.id !== "dept_root") {
+      return { deptId: parent.id, groupId: item.id };
+    } else {
+      return { deptId: item.id, groupId: "" };
+    }
+  };
+
   const [memberForm, setMemberForm] = useState({
     name: "",
     employeeNo: "",
     phone: "",
     email: "",
+    selectedDeptId: "",
+    selectedGroupId: "",
     deptId: "",
     roleId: "",
     dataScope: "self" as AccountMember["dataScope"],
@@ -1905,14 +1921,43 @@ export default function AccountManagementView() {
   };
 
   // ================= MEMBER HANDLERS =================
+  const handleMemberDeptChange = (newDeptId: string) => {
+    const groups = depts.filter(g => g.parentId === newDeptId);
+    const newGroupId = groups[0]?.id || "";
+    const finalDeptId = newGroupId || newDeptId;
+    setMemberForm(prev => ({
+      ...prev,
+      selectedDeptId: newDeptId,
+      selectedGroupId: newGroupId,
+      deptId: finalDeptId
+    }));
+  };
+
+  const handleMemberGroupChange = (newGroupId: string) => {
+    const finalDeptId = newGroupId || memberForm.selectedDeptId;
+    setMemberForm(prev => ({
+      ...prev,
+      selectedGroupId: newGroupId,
+      deptId: finalDeptId
+    }));
+  };
+
   const handleOpenAddMember = () => {
     const nextNo = "ZS-" + Math.floor(100 + Math.random() * 900);
+    const firstDept = depts.find(d => d.parentId === "dept_root" && d.id !== "dept_root") || depts.find(d => d.id === "dept_root") || depts[0];
+    const selDeptId = firstDept?.id || "dept_root";
+    const availableGroups = depts.filter(g => g.parentId === selDeptId);
+    const selGroupId = availableGroups[0]?.id || "";
+    const finalDeptId = selGroupId || selDeptId;
+
     setMemberForm({
       name: "",
       employeeNo: nextNo,
       phone: "",
       email: "",
-      deptId: depts[0]?.id || "dept_root",
+      selectedDeptId: selDeptId,
+      selectedGroupId: selGroupId,
+      deptId: finalDeptId,
       roleId: roles[2]?.id || roles[0]?.id || "",
       dataScope: "self",
       status: "normal",
@@ -1923,14 +1968,17 @@ export default function AccountManagementView() {
   };
 
   const handleOpenEditMember = (m: AccountMember) => {
+    const { deptId: selDeptId, groupId: selGroupId } = getDeptAndGroupFromId(m.deptId, depts);
     setMemberForm({
       name: m.name,
       employeeNo: m.employeeNo,
       phone: m.phone,
       email: m.email,
-      deptId: m.deptId,
+      selectedDeptId: selDeptId,
+      selectedGroupId: selGroupId,
+      deptId: selGroupId || selDeptId || m.deptId,
       roleId: m.roleIds[0] || "",
-      dataScope: m.dataScope,
+      dataScope: m.dataScope || "self",
       status: m.status,
       boundAccount: m.boundAccount || "巨量千川-千川主账号01 (1776342461268999)",
       remark: m.remark || ""
@@ -2565,7 +2613,7 @@ export default function AccountManagementView() {
                     className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>新增部门</span>
+                    <span>新增部门/分组</span>
                   </button>
                 </div>
               </div>
@@ -2626,19 +2674,19 @@ export default function AccountManagementView() {
 
                                   {isRoot && (
                                     <span className="bg-purple-600 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-full shadow-2xs">
-                                      1级公司 (最高节点)
+                                      1级公司
                                     </span>
                                   )}
 
                                   {isDept && (
                                     <span className="bg-purple-100 text-purple-800 text-[9px] font-bold px-2 py-0.5 rounded-md border border-purple-200">
-                                      2级部门
+                                      部门
                                     </span>
                                   )}
 
                                   {isGroup && (
                                     <span className="bg-indigo-100 text-indigo-800 text-[9px] font-bold px-2 py-0.5 rounded-md border border-indigo-200">
-                                      3级分组 (只挂载人员)
+                                      分组
                                     </span>
                                   )}
                                 </div>
@@ -2678,8 +2726,7 @@ export default function AccountManagementView() {
 
                           {/* Column 5: Manager */}
                           <td className="p-4">
-                            <div className="flex items-center gap-1.5 font-bold text-slate-800">
-                              <UserCheck className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                            <div className="font-bold text-slate-800">
                               <span>{d.manager || "未设定"}</span>
                             </div>
                             <p className="text-[10px] text-slate-400 font-mono mt-0.5">{d.phone}</p>
@@ -2715,10 +2762,10 @@ export default function AccountManagementView() {
                                 <button
                                   onClick={() => handleOpenAddDept("dept_root", "department")}
                                   className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1 border border-purple-200"
-                                  title="在公司下新增部门"
+                                  title="在公司下新增部门/分组"
                                 >
                                   <Plus className="w-3 h-3" />
-                                  <span>新增部门</span>
+                                  <span>新增部门/分组</span>
                                 </button>
                               )}
 
@@ -2746,6 +2793,7 @@ export default function AccountManagementView() {
                                   <span>查看人员 ({deptMembers.length})</span>
                                 </button>
                               )}
+
 
                               <button
                                 onClick={() => handleOpenEditDept(d)}
@@ -2936,7 +2984,6 @@ export default function AccountManagementView() {
                     <th className="p-4">成员基础信息</th>
                     <th className="p-4">所属部门</th>
                     <th className="p-4">绑定岗位角色</th>
-                    <th className="p-4">数据可见粒度</th>
                     <th className="p-4">账号状态</th>
                     <th className="p-4">注册/活跃时间</th>
                     <th className="p-4 text-right">管理操作</th>
@@ -3006,15 +3053,6 @@ export default function AccountManagementView() {
                         <td className="p-4">
                           <span className="bg-indigo-50 text-indigo-900 text-xs px-2.5 py-1 rounded-full border border-indigo-200/80 font-bold">
                             {m.roleName}
-                          </span>
-                        </td>
-
-                        <td className="p-4">
-                          <span className={`text-[11px] px-2 py-0.5 rounded-md font-bold ${
-                            m.dataScope === "all" ? "bg-amber-100 text-amber-900" :
-                            m.dataScope === "dept_tree" ? "bg-blue-100 text-blue-900" : "bg-slate-100 text-slate-700"
-                          }`}>
-                            {m.dataScope === "all" ? "全公司数据" : m.dataScope === "dept_tree" ? "本部门及下属分组" : "仅限本人创建"}
                           </span>
                         </td>
 
@@ -4063,43 +4101,26 @@ export default function AccountManagementView() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-slate-500 font-bold block">上级归属节点</label>
-                  {deptForm.levelType === "department" ? (
-                    <div className="px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-700 flex items-center justify-between">
-                      <span>梦畅AIGC (最高公司)</span>
-                      <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">1级公司</span>
-                    </div>
-                  ) : (
-                    <select
-                      value={deptForm.parentId}
-                      onChange={(e) => setDeptForm({ ...deptForm, parentId: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
-                    >
-                      {depts
-                        .filter(d => d.parentId === "dept_root" && d.id !== "dept_root" && d.id !== deptModal.data?.id)
-                        .map(d => (
-                          <option key={d.id} value={d.id}>{d.name} (2级部门)</option>
-                        ))}
-                    </select>
-                  )}
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-slate-500 font-bold block">业务职能分类</label>
+              <div className="space-y-1">
+                <label className="text-slate-500 font-bold block">上级归属节点</label>
+                {deptForm.levelType === "department" ? (
+                  <div className="px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-700 flex items-center justify-between">
+                    <span>梦畅AIGC (最高公司)</span>
+                    <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">1级公司</span>
+                  </div>
+                ) : (
                   <select
-                    value={deptForm.type}
-                    onChange={(e) => setDeptForm({ ...deptForm, type: e.target.value as any })}
+                    value={deptForm.parentId}
+                    onChange={(e) => setDeptForm({ ...deptForm, parentId: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
                   >
-                    <option value="投放组">投放组 (千川/金牛/TikTok)</option>
-                    <option value="编导组">编导组 (脚本对标拆解)</option>
-                    <option value="剪辑组">剪辑组 (HappyHorse AI剪辑)</option>
-                    <option value="运营组">运营组 (达人合作/直播)</option>
-                    <option value="行政财务">行政财务组</option>
+                    {depts
+                      .filter(d => d.parentId === "dept_root" && d.id !== "dept_root" && d.id !== deptModal.data?.id)
+                      .map(d => (
+                        <option key={d.id} value={d.id}>{d.name} (部门)</option>
+                      ))}
                   </select>
-                </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -4222,25 +4243,48 @@ export default function AccountManagementView() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-slate-500 font-bold block">所属架构节点 (部门/分组) *</label>
+                  <label className="text-slate-500 font-bold block">所属部门 *</label>
                   <select
-                    value={memberForm.deptId}
-                    onChange={(e) => setMemberForm({ ...memberForm, deptId: e.target.value })}
+                    value={memberForm.selectedDeptId}
+                    onChange={(e) => handleMemberDeptChange(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
                   >
-                    {depts.map(d => {
-                      const isRoot = d.id === "dept_root";
-                      const isDept = d.parentId === "dept_root" && !isRoot;
-                      const levelName = isRoot ? "1级公司" : isDept ? "2级部门" : "3级分组";
-                      return (
+                    {depts
+                      .filter(d => d.parentId === "dept_root" || d.id === "dept_root" || d.levelType === "department" || d.levelType === "company")
+                      .map(d => (
                         <option key={d.id} value={d.id}>
-                          {d.name} ({levelName})
+                          {d.name}
                         </option>
-                      );
-                    })}
+                      ))}
                   </select>
                 </div>
 
+                <div className="space-y-1">
+                  <label className="text-slate-500 font-bold block">所属分组</label>
+                  <select
+                    value={memberForm.selectedGroupId}
+                    onChange={(e) => handleMemberGroupChange(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
+                  >
+                    {depts.filter(g => g.parentId === memberForm.selectedDeptId).length > 0 ? (
+                      <>
+                        <option value="">-- 选择分组 (可选) --</option>
+                        {depts
+                          .filter(g => g.parentId === memberForm.selectedDeptId)
+                          .map(g => (
+                            <option key={g.id} value={g.id}>
+                              {g.name}
+                            </option>
+                          ))}
+                      </>
+                    ) : (
+                      <option value="">暂无下属分组</option>
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-slate-500 font-bold block">绑定岗位角色</label>
                   <select
@@ -4251,21 +4295,6 @@ export default function AccountManagementView() {
                     {roles.map(r => (
                       <option key={r.id} value={r.id}>{r.name}</option>
                     ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-slate-500 font-bold block">数据可见范围隔离</label>
-                  <select
-                    value={memberForm.dataScope}
-                    onChange={(e) => setMemberForm({ ...memberForm, dataScope: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
-                  >
-                    <option value="self">仅限本人创建的数据与素材</option>
-                    <option value="dept_tree">本部门及所有下属分组数据</option>
-                    <option value="all">全公司所有成片与投放数据</option>
                   </select>
                 </div>
 

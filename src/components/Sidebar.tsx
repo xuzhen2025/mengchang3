@@ -19,7 +19,9 @@ import {
   Clapperboard,
   ChevronDown,
   Zap,
-  ListTodo
+  ListTodo,
+  ShieldCheck,
+  LayoutDashboard
 } from "lucide-react";
 import { ActiveScreen } from "../types";
 
@@ -30,6 +32,10 @@ interface SidebarProps {
   setCollapsed: (collapsed: boolean) => void;
   credits: number;
   openCreditsModal: () => void;
+  appMode?: "user" | "admin";
+  setAppMode?: (mode: "user" | "admin") => void;
+  adminActiveScreen?: string;
+  setAdminActiveScreen?: (screen: string) => void;
 }
 
 export default function Sidebar({
@@ -38,9 +44,15 @@ export default function Sidebar({
   collapsed,
   setCollapsed,
   credits,
-  openCreditsModal
+  openCreditsModal,
+  appMode = "user",
+  setAppMode = () => {},
+  adminActiveScreen = "content_management",
+  setAdminActiveScreen = () => {}
 }: SidebarProps) {
-  const menuItems: { id: string; label: string; icon: any; badge?: string }[] = [
+  const [modeDropdownOpen, setModeDropdownOpen] = useState(false);
+
+  const userMenuItems: { id: string; label: string; icon: any; badge?: string }[] = [
     { id: "home", label: "首页", icon: Home },
     { id: "quick_creation", label: "快速创作", icon: Zap },
     { id: "agent_creation", label: "Agent 创作", icon: Sparkles },
@@ -54,38 +66,109 @@ export default function Sidebar({
     { id: "account_management", label: "系统管理", icon: Settings },
   ];
 
+  const adminMenuItems: { id: string; label: string; icon: any; badge?: string }[] = [
+    { id: "content_management", label: "内容管理", icon: LayoutDashboard },
+  ];
+
+  const currentMenuItems = appMode === "admin" ? adminMenuItems : userMenuItems;
+
   return (
     <aside 
-      className={`h-screen bg-white text-slate-800 flex flex-col justify-between border-r border-slate-100 shadow-xs transition-all duration-300 ${
+      className={`h-screen bg-white text-slate-800 flex flex-col justify-between border-r border-slate-100 shadow-xs transition-all duration-300 relative z-30 ${
         collapsed ? "w-16" : "w-64"
       }`}
     >
-      <div>
-        {/* LOGO Header */}
-        <div className="p-4 flex items-center gap-3 border-b border-slate-100 overflow-hidden">
-          <div className="relative flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-tr from-purple-600 via-pink-500 to-amber-400 flex items-center justify-center shadow-lg shadow-purple-500/10">
-            <Sparkles className="w-4 h-4 text-white" />
-            <div className="absolute inset-0 rounded-xl bg-white/20 animate-pulse" />
-          </div>
-          {!collapsed && (
-            <div className="flex flex-col whitespace-nowrap animate-fade-in">
-              <span className="font-extrabold text-base tracking-tight text-slate-900 bg-clip-text">
+      <div className="relative z-20">
+        {/* LOGO Header & Mode Switch Dropdown */}
+        <div className="p-4 flex items-center justify-between border-b border-slate-100 relative">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="relative flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-tr from-purple-600 via-pink-500 to-amber-400 flex items-center justify-center shadow-lg shadow-purple-500/10">
+              <Sparkles className="w-4 h-4 text-white" />
+              <div className="absolute inset-0 rounded-xl bg-white/20 animate-pulse" />
+            </div>
+            {!collapsed && (
+              <span className="font-extrabold text-base tracking-tight text-slate-900 shrink-0">
                 梦畅AIGC
               </span>
+            )}
+          </div>
+
+          {!collapsed && (
+            <div className="relative shrink-0">
+              <button
+                id="btn-client-mode-dropdown"
+                type="button"
+                onClick={() => setModeDropdownOpen(!modeDropdownOpen)}
+                className="flex items-center gap-1 text-[11px] px-2 py-1 bg-slate-100 hover:bg-slate-200/80 text-slate-700 font-bold rounded-lg transition-all cursor-pointer border border-slate-200/60"
+              >
+                <span>{appMode === "user" ? "用户端" : "管理端"}</span>
+                <ChevronDown className={`w-3 h-3 text-slate-500 transition-transform ${modeDropdownOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {modeDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setModeDropdownOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1.5 w-28 bg-white border border-slate-200 rounded-xl shadow-xl py-1 z-50 animate-fade-in">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAppMode("user");
+                        setModeDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-xs hover:bg-purple-50 flex items-center justify-between cursor-pointer ${
+                        appMode === "user" ? "text-purple-600 font-bold bg-purple-50/60" : "text-slate-700 font-medium"
+                      }`}
+                    >
+                      <span>用户端</span>
+                      {appMode === "user" && <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAppMode("admin");
+                        setModeDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-xs hover:bg-purple-50 flex items-center justify-between cursor-pointer ${
+                        appMode === "admin" ? "text-purple-600 font-bold bg-purple-50/60" : "text-slate-700 font-medium"
+                      }`}
+                    >
+                      <span>管理端</span>
+                      {appMode === "admin" && <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
+          )}
+
+          {collapsed && (
+            <button
+              type="button"
+              onClick={() => {
+                setCollapsed(false);
+                setModeDropdownOpen(true);
+              }}
+              className="text-[10px] bg-purple-50 text-purple-600 font-bold p-1 rounded hover:bg-purple-100 transition-colors cursor-pointer shrink-0"
+              title={`当前: ${appMode === "user" ? "用户端" : "管理端"} (点击切换)`}
+            >
+              {appMode === "user" ? "用" : "管"}
+            </button>
           )}
         </div>
 
         {/* Navigation List */}
         <nav className="p-2 space-y-1">
-          {menuItems.map((item) => {
+          {currentMenuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = 
-              activeScreen === item.id || 
-              (item.id === "resources" && ["resources", "materials", "finished_videos"].includes(activeScreen)) ||
-              (item.id === "quick_creation" && [
-                "detail_set", "enhance", "watermark", "subtitle", "fission"
-              ].includes(activeScreen));
+            const isActive = appMode === "admin"
+              ? adminActiveScreen === item.id
+              : (
+                  activeScreen === item.id || 
+                  (item.id === "resources" && ["resources", "materials", "finished_videos"].includes(activeScreen)) ||
+                  (item.id === "quick_creation" && [
+                    "detail_set", "enhance", "watermark", "subtitle", "fission"
+                  ].includes(activeScreen))
+                );
 
             return (
               <button
@@ -93,7 +176,11 @@ export default function Sidebar({
                 id={`sidebar-item-${item.id}`}
                 type="button"
                 onClick={() => {
-                  setActiveScreen(item.id as ActiveScreen);
+                  if (appMode === "admin") {
+                    setAdminActiveScreen(item.id);
+                  } else {
+                    setActiveScreen(item.id as ActiveScreen);
+                  }
                 }}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group relative cursor-pointer ${
                   isActive
@@ -166,7 +253,7 @@ export default function Sidebar({
           {!collapsed && (
             <div className="text-left min-w-0">
               <p className="text-xs font-semibold text-slate-800 truncate">徐振</p>
-              <p className="text-[10px] text-slate-400 truncate">VIP 高级权益</p>
+              <p className="text-[10px] text-slate-400 truncate">剪辑师</p>
             </div>
           )}
         </div>

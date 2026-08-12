@@ -39,7 +39,7 @@ export const INITIAL_MESSAGES: AppMessage[] = [
     status: "unread", 
     time: "2026-08-05 18:20:00",
     details: [
-      { label: "修改人", value: "致上致上致上" },
+      { label: "修改人", value: "致上运营团队" },
       { label: "关联文件", value: "冬季风衣短视频_01.mp4" },
       { label: "处理状态", value: "上传成功 - 已分配智能剪辑节点" }
     ]
@@ -54,7 +54,7 @@ export const INITIAL_MESSAGES: AppMessage[] = [
     status: "unread", 
     time: "2026-08-04 17:45:00",
     details: [
-      { label: "修改人", value: "致上致上致上" },
+      { label: "修改人", value: "致上运营团队" },
       { label: "修改前后", value: "修改前 -> 审核驳回" },
       { label: "文案内容", value: "好看好🙋！！这个补水面膜效果真的是最顶级的了..." },
       { label: "修改文案备注", value: "最顶级" }

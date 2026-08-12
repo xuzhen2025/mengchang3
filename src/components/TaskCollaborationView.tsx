@@ -5,6 +5,7 @@ import {
   Search,
   Calendar,
   ChevronDown,
+  ChevronUp,
   ChevronRight,
   Plus,
   RotateCcw,
@@ -19,6 +20,9 @@ import {
   Trash2,
   HelpCircle,
   FileText,
+  Video,
+  Image,
+  Music,
   Eye,
   CheckCircle2,
   AlertCircle,
@@ -45,6 +49,17 @@ export interface AssociatedWorkItem {
   createdAt?: string;
 }
 
+export interface AssociatedScriptItem {
+  id?: string;
+  title: string;
+  template?: string;
+  status: "待审核" | "可以拍摄" | "改写" | "无关联" | "已通过";
+  versionCount?: number;
+  product?: string;
+  scriptType?: string;
+  publishTime?: string;
+}
+
 export interface TaskItem {
   id: string;
   publisher: string;
@@ -56,12 +71,8 @@ export interface TaskItem {
   completedCount: number;
   status: "pending" | "completed" | "in_progress"; // 未完成, 已达标, 进行中
   cost: number;
-  associatedScript?: {
-    title: string;
-    template?: string;
-    status: "待审核" | "可以拍摄" | "改写" | "无关联";
-    versionCount?: number;
-  };
+  associatedScript?: AssociatedScriptItem;
+  associatedScripts?: AssociatedScriptItem[];
   associatedWorks?: AssociatedWorkItem[];
   product?: string;
   scriptType?: string;
@@ -100,6 +111,10 @@ const INITIAL_TASKS: TaskItem[] = [
       status: "可以拍摄",
       versionCount: 2
     },
+    associatedScripts: [
+      { id: "S-101", title: "【完美记忆】无钢圈内衣卡点混剪", status: "可以拍摄", versionCount: 2, template: "通用模板", product: "6017无钢圈内衣", scriptType: "混剪卡点" },
+      { id: "S-102", title: "【完美记忆】舒适透气细节对比", status: "待审核", versionCount: 1, template: "暴利卡点", product: "6017无钢圈内衣", scriptType: "痛点对比" }
+    ],
     product: "6017无钢圈内衣",
     scriptType: "剧情演绎",
     scriptDeconstruction: "填写拆解表",
@@ -121,6 +136,10 @@ const INITIAL_TASKS: TaskItem[] = [
       status: "可以拍摄",
       versionCount: 2
     },
+    associatedScripts: [
+      { id: "S-201", title: "【爆款改写】无钢圈内衣舒适度实测", status: "可以拍摄", versionCount: 2, template: "通用模板", product: "6017无钢圈内衣", scriptType: "痛点对比" },
+      { id: "S-202", title: "【爆款改写】软支撑穿搭体验分镜", status: "可以拍摄", versionCount: 1, template: "信息流种草", product: "6017无钢圈内衣", scriptType: "开箱测评" }
+    ],
     associatedWorks: [
       { id: "w_250319", type: "video", name: "250319定卖点混剪视频", status: "待审核" }
     ],
@@ -145,6 +164,9 @@ const INITIAL_TASKS: TaskItem[] = [
       status: "可以拍摄",
       versionCount: 1
     },
+    associatedScripts: [
+      { id: "S-301", title: "【抗衰精华】A醇精油夜间修复种草", status: "可以拍摄", versionCount: 1, template: "口播种草", product: "抗衰精华液", scriptType: "口播种草" }
+    ],
     associatedWorks: [
       { id: "w_20250328", type: "video", name: "抗衰精华实测特写01.mp4", status: "通过" }
     ],
@@ -169,6 +191,9 @@ const INITIAL_TASKS: TaskItem[] = [
       status: "待审核",
       versionCount: 2
     },
+    associatedScripts: [
+      { id: "S-401", title: "【补水面膜】夏季晒后修护混剪", status: "待审核", versionCount: 2, template: "混剪模板", product: "补水面膜", scriptType: "特写展示" }
+    ],
     product: "补水面膜",
     scriptType: "特写展示",
     scriptDeconstruction: "填写拆解表",
@@ -190,6 +215,11 @@ const INITIAL_TASKS: TaskItem[] = [
       status: "可以拍摄",
       versionCount: 3
     },
+    associatedScripts: [
+      { id: "S-501", title: "【秋装风衣】高爆Hook透气防风", status: "可以拍摄", versionCount: 3, template: "爆款二创", product: "加绒风衣", scriptType: "混剪卡点" },
+      { id: "S-502", title: "【秋装风衣】加绒防风细节质感展示", status: "可以拍摄", versionCount: 1, template: "通用模板", product: "加绒风衣", scriptType: "特写展示" },
+      { id: "S-503", title: "【秋装风衣】二创短视频走秀卡点", status: "待审核", versionCount: 1, template: "混剪模板", product: "加绒风衣", scriptType: "混剪卡点" }
+    ],
     associatedWorks: [
       { id: "w_061801", type: "video", name: "风衣走秀快切成片_V3.mp4", status: "通过" }
     ],
@@ -1111,6 +1141,54 @@ export default function TaskCollaborationView({
   // SCRIPT ASSOCIATION MODAL STATES
   const [isScriptModalOpen, setIsScriptModalOpen] = useState(false);
   const [editAssociatedModalTask, setEditAssociatedModalTask] = useState<TaskItem | null>(null);
+  const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
+
+  const toggleExpandTask = (taskId: string) => {
+    setExpandedTaskIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
+
+  const handleUnlinkScript = (taskId: string, scriptTitle: string) => {
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (t.id === taskId) {
+          const existing = t.associatedScripts || (t.associatedScript ? [t.associatedScript] : []);
+          const updated = existing.filter((s) => s.title !== scriptTitle);
+          return {
+            ...t,
+            associatedScript: updated.length > 0 ? updated[0] : undefined,
+            associatedScripts: updated
+          };
+        }
+        return t;
+      })
+    );
+    showToast(`已取消关联脚本: ${scriptTitle}`);
+  };
+
+  const handleRemoveWork = (taskId: string, workId: string) => {
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (t.id === taskId) {
+          const existing = t.associatedWorks || [];
+          const updated = existing.filter((w) => w.id !== workId);
+          return {
+            ...t,
+            associatedWorks: updated
+          };
+        }
+        return t;
+      })
+    );
+    showToast(`已移除关联作品`);
+  };
   const [editModalScriptList, setEditModalScriptList] = useState([
     {
       id: "SCR-101",
@@ -1502,13 +1580,26 @@ export default function TaskCollaborationView({
     setTasks((prev) =>
       prev.map((t) => {
         if (t.id === scriptModalTask.id) {
+          const newScriptItem: AssociatedScriptItem = {
+            id: chosen.id,
+            title: chosen.title,
+            status: chosen.status as any,
+            versionCount: 2,
+            template: chosen.template || "通用模板",
+            product: (chosen as any).product || t.product || "常规单品",
+            scriptType: (chosen as any).type || t.scriptType || "混剪卡点",
+            publishTime: chosen.publishTime || "2026-06-20 18:00:00"
+          };
+
+          const existingScripts = t.associatedScripts || (t.associatedScript ? [t.associatedScript] : []);
+          const updatedScripts = existingScripts.some((s) => s.title === chosen.title)
+            ? existingScripts.map((s) => (s.title === chosen.title ? { ...s, ...newScriptItem } : s))
+            : [...existingScripts, newScriptItem];
+
           return {
             ...t,
-            associatedScript: {
-              title: chosen.title,
-              status: chosen.status as any,
-              versionCount: (t.associatedScript?.versionCount || 1) + 1
-            }
+            associatedScript: newScriptItem,
+            associatedScripts: updatedScripts
           };
         }
         return t;
@@ -2743,7 +2834,7 @@ export default function TaskCollaborationView({
                 filteredTasks.map((task) => (
                   <tr key={task.id} className="hover:bg-purple-50/20 transition-colors">
                     {/* 1. 发布任务 (Publisher, Date, ID) */}
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                    <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
                       <div className="flex flex-col items-center justify-center gap-1">
                         <div className="flex items-center justify-center gap-1.5">
                           <span className="text-purple-700 font-bold">{task.publisher}</span>
@@ -2756,7 +2847,7 @@ export default function TaskCollaborationView({
                     </td>
 
                     {/* 2. 出片任务 (Deadline, Assignee) */}
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                    <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
                       <div className="flex flex-col items-center justify-center gap-1">
                         <div className="text-slate-500 font-mono text-[11px]">{task.deadlineDate}</div>
                         <div className="font-bold text-slate-800">{task.assignee}</div>
@@ -2764,7 +2855,7 @@ export default function TaskCollaborationView({
                     </td>
 
                     {/* 3. 出片进度 */}
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                    <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
                       <div className="flex flex-col items-center justify-center gap-1">
                         <div className="flex items-center justify-center gap-1.5 font-bold">
                           <span className={`w-2 h-2 rounded-full ${task.status === "completed" ? "bg-emerald-500" : "bg-rose-500"}`} />
@@ -2782,7 +2873,7 @@ export default function TaskCollaborationView({
                     </td>
 
                     {/* 4. 操作 (详情, 编辑, 复制, 删除) */}
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                    <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
                       <div className="flex items-center justify-center gap-2.5 font-medium text-purple-600">
                         <button
                           onClick={() => setDetailModalTask(task)}
@@ -2822,7 +2913,7 @@ export default function TaskCollaborationView({
                     </td>
 
                     {/* 5. 关联作品 (+) */}
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap relative">
+                    <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap relative">
                       <div className="flex items-center justify-center gap-2">
                         {/* Display existing associated works */}
                         {task.associatedWorks && task.associatedWorks.length > 0 && (
@@ -2896,62 +2987,124 @@ export default function TaskCollaborationView({
                     </td>
 
                     {/* 6. 任务关联消耗 */}
-                    <td className="py-3.5 px-4 text-center font-bold text-slate-700 whitespace-nowrap">
+                    <td className="py-3.5 px-4 text-center align-middle font-bold text-slate-700 whitespace-nowrap">
                       ¥{task.cost}
                     </td>
 
                     {/* 7. 关联脚本 */}
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-2 whitespace-nowrap">
-                        {/* 1. 脚本名称 */}
-                        <span className="font-bold text-slate-800 text-xs shrink-0">
-                          {task.associatedScript?.title || "改写"}
-                        </span>
+                    <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
+                      {(() => {
+                        const scripts = task.associatedScripts && task.associatedScripts.length > 0
+                          ? task.associatedScripts
+                          : (task.associatedScript ? [task.associatedScript] : []);
+                        const isExpanded = expandedTaskIds.has(task.id);
 
-                        {/* 2. 脚本状态 */}
-                        <span className="px-2 py-0.5 bg-[#FF5722] text-white text-[10px] font-extrabold rounded shadow-2xs shrink-0 whitespace-nowrap">
-                          {task.associatedScript?.status || "待审核"}
-                        </span>
+                        return (
+                          <div className="flex items-center justify-center gap-2 whitespace-nowrap">
+                            {/* 左侧：关联脚本列表 (展开时：有几个就竖着排列显示几个；未展开时：只显示第1个) */}
+                            {isExpanded ? (
+                              <div className="flex flex-col gap-2 text-left py-1">
+                                {scripts.map((sc, sIdx) => (
+                                  <div key={sc.id || sIdx} className="flex items-center gap-1.5 whitespace-nowrap">
+                                    <span className="font-bold text-slate-800 text-xs shrink-0 max-w-[140px] truncate" title={sc.title}>
+                                      {sc.title}
+                                    </span>
+                                    <span className="px-2 py-0.5 bg-[#FF5722] text-white text-[10px] font-extrabold rounded shadow-2xs shrink-0 whitespace-nowrap">
+                                      {sc.status || "待审核"}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                                <span className="font-bold text-slate-800 text-xs shrink-0 max-w-[140px] truncate" title={scripts[0]?.title || "改写"}>
+                                  {scripts[0]?.title || "改写"}
+                                </span>
+                                <span className="px-2 py-0.5 bg-[#FF5722] text-white text-[10px] font-extrabold rounded shadow-2xs shrink-0 whitespace-nowrap">
+                                  {scripts[0]?.status || "待审核"}
+                                </span>
+                              </div>
+                            )}
 
-                        {/* 3. 关联脚本 (图标展示) */}
-                        <button
-                          onClick={() => handleOpenScriptAssociationModal(task)}
-                          className="p-1.5 rounded-md bg-purple-50 hover:bg-purple-100 text-[#7C3AED] transition-all cursor-pointer shadow-2xs flex items-center justify-center shrink-0"
-                          title="关联脚本"
-                        >
-                          <Link2 className="w-3.5 h-3.5" />
-                        </button>
+                            {/* 右侧：3个关联操作按钮 (关联脚本、编辑脚本、向下/向上展开) */}
+                            <div className="flex items-center gap-1 shrink-0 self-center">
+                              {/* 1. 关联脚本 (图标展示 + hover 提示) */}
+                              <div className="relative group/link inline-block">
+                                <button
+                                  onClick={() => handleOpenScriptAssociationModal(task)}
+                                  className="p-1.5 rounded-md bg-purple-50 hover:bg-purple-100 text-[#7C3AED] transition-all cursor-pointer shadow-2xs flex items-center justify-center shrink-0"
+                                  title="关联脚本"
+                                >
+                                  <Link2 className="w-3.5 h-3.5" />
+                                </button>
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/link:flex items-center gap-1 z-50 bg-slate-800 text-white text-[10px] py-1 px-2 rounded-md whitespace-nowrap shadow-md pointer-events-none">
+                                  <span>关联脚本</span>
+                                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+                                </div>
+                              </div>
 
-                        {/* 4. 编辑当前已关联脚本 (图标展示) */}
-                        <button
-                          onClick={() => setEditAssociatedModalTask(task)}
-                          className="p-1.5 rounded-md bg-slate-100 hover:bg-purple-50 text-slate-600 hover:text-[#7C3AED] transition-all cursor-pointer shadow-2xs flex items-center justify-center shrink-0"
-                          title="编辑当前已关联脚本"
-                        >
-                          <FileEdit className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                              {/* 2. 编辑脚本 (图标展示 + hover 提示) */}
+                              <div className="relative group/edit inline-block">
+                                <button
+                                  onClick={() => setEditAssociatedModalTask(task)}
+                                  className="p-1.5 rounded-md bg-slate-100 hover:bg-purple-50 text-slate-600 hover:text-[#7C3AED] transition-all cursor-pointer shadow-2xs flex items-center justify-center shrink-0"
+                                  title="编辑脚本"
+                                >
+                                  <FileEdit className="w-3.5 h-3.5" />
+                                </button>
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/edit:flex items-center gap-1 z-50 bg-slate-800 text-white text-[10px] py-1 px-2 rounded-md whitespace-nowrap shadow-md pointer-events-none">
+                                  <span>编辑脚本</span>
+                                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+                                </div>
+                              </div>
+
+                              {/* 3. 向下/向上展开按钮 */}
+                              <div className="relative group/expand inline-block">
+                                <button
+                                  onClick={() => toggleExpandTask(task.id)}
+                                  className={`p-1.5 rounded-md transition-all cursor-pointer shadow-2xs flex items-center justify-center shrink-0 ${
+                                    isExpanded
+                                      ? "bg-[#7C3AED] text-white"
+                                      : "bg-purple-50 hover:bg-purple-100 text-[#7C3AED]"
+                                  }`}
+                                  title={isExpanded ? "收起" : "展开已关联脚本"}
+                                >
+                                  <ChevronDown
+                                    className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                                      isExpanded ? "rotate-180" : ""
+                                    }`}
+                                  />
+                                </button>
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/expand:flex items-center gap-1 z-50 bg-slate-800 text-white text-[10px] py-1 px-2 rounded-md whitespace-nowrap shadow-md pointer-events-none">
+                                  <span>{isExpanded ? "收起" : "展开已关联数据"}</span>
+                                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     {/* 8. 备注 */}
-                    <td className="py-3.5 px-4 text-center text-slate-600 max-w-[220px]">
+                    <td className="py-3.5 px-4 text-center align-middle text-slate-600 max-w-[220px]">
                       <div className="line-clamp-2 whitespace-pre-line text-[11px] leading-relaxed font-normal text-center mx-auto" title={task.remark}>
                         {task.remark || "--"}
                       </div>
                     </td>
 
                     {/* 9. 产品 */}
-                    <td className="py-3.5 px-4 text-center text-slate-800 font-medium whitespace-nowrap">
+                    <td className="py-3.5 px-4 text-center align-middle text-slate-800 font-medium whitespace-nowrap">
                       {task.product || "--"}
                     </td>
 
                     {/* 10. 脚本类型 */}
-                    <td className="py-3.5 px-4 text-center text-slate-800 font-medium whitespace-nowrap">
+                    <td className="py-3.5 px-4 text-center align-middle text-slate-800 font-medium whitespace-nowrap">
                       {task.scriptType || "--"}
                     </td>
 
                     {/* 11. 脚本拆解表 */}
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                    <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
                       <button
                         onClick={() => handleOpenDeconstructionModal(task)}
                         className="text-purple-600 hover:text-purple-800 font-bold hover:underline cursor-pointer text-xs"

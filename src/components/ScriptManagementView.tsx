@@ -234,14 +234,14 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
     {
       id: "S-10291",
       title: "脚本 1 - 口播温和洁面破圈案",
-      author: "致上致上致上",
+      author: "致上编导",
       categoryTag: "AI分镜拆解",
       content: "1: 哪怕是你一周染一次，也不会损伤你的头发，什么干枯毛躁，开叉打结都不会，就这样按一洗，洗出丰富的泡沫，使劲揉，使劲搓啊，它也不沾头皮...",
       status: "待审核",
       mainCategory: "个护家清",
       primaryCategory: "个人护理",
       secondaryCategory: "洗发护发",
-      classTag: "演示分类 / 卸妆油 (仅内部)",
+      classTag: "个护家清 / 卸妆油",
       descTag: "爆款洗发水口播",
       tasksCount: 2,
       tasks: [
@@ -270,15 +270,15 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
     {
       id: "S-10292",
       title: "脚本 2 - 植萃修护洗发水评测",
-      author: "致上致上致上",
+      author: "致上编导",
       categoryTag: "AI分镜拆解",
       content: "1: 哪怕是你一周染一次，也不会损伤你的头发，什么干枯毛躁，开叉打结都不会，就这样按一洗，洗出丰富的泡沫，使劲揉，使劲搓啊，它也不沾头皮...",
       status: "待审核",
       mainCategory: "个护家清",
       primaryCategory: "个人护理",
       secondaryCategory: "洗发护发",
-      classTag: "演示分类 / 卸妆油 (仅内部)",
-      descTag: "标签描述",
+      classTag: "个护家清 / 洗发水",
+      descTag: "植萃成分拆解",
       tasksCount: 0,
       tasks: [],
       createdAt: "2026-08-03 16:45",
@@ -287,14 +287,14 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
     {
       id: "S-10293",
       title: "脚本 3 - 卸妆油乳化深度实验",
-      author: "致上致上致上",
+      author: "致上编导",
       categoryTag: "AI分镜拆解",
       content: "1: 哪怕是你一周染一次，也不会损伤你的头发，什么干枯毛躁，开叉打结都不会，就这样按一洗，洗出丰富的泡沫，使劲揉，使劲搓啊，它也不沾头皮...",
       status: "审核通过",
       mainCategory: "美妆",
       primaryCategory: "美妆护肤",
       secondaryCategory: "卸妆清洁",
-      classTag: "演示分类 / 卸妆油 (仅内部)",
+      classTag: "美妆护肤 / 卸妆油",
       descTag: "标签描述",
       tasksCount: 1,
       tasks: [
@@ -496,7 +496,7 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
     const created: ScriptItem = {
       id: `S-${Math.floor(10000 + Math.random() * 90000)}`,
       title: newScriptTitle.trim(),
-      author: "致上致上致上",
+      author: "致上编导",
       categoryTag: "AI分镜拆解",
       content: newScriptContent.trim() || "1: 美妆爆款口播分镜拆解内容...",
       status: "待审核",
@@ -836,7 +836,7 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
 
           <select className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-500 bg-white focus:outline-none focus:border-purple-400 cursor-pointer">
             <option value="">作者</option>
-            <option value="致上致上致上">致上致上致上</option>
+            <option value="致上编导">致上编导</option>
             <option value="美妆团队A">美妆团队A</option>
           </select>
 

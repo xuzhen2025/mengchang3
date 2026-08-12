@@ -23,6 +23,7 @@ import FissionView from "./components/FissionView";
 import AccountManagementView from "./components/AccountManagementView";
 import TaskCollaborationView, { TaskItem } from "./components/TaskCollaborationView";
 import MessageCenterView from "./components/MessageCenterView";
+import AdminView from "./components/AdminView";
 
 import { 
   INITIAL_GALLERY, 
@@ -64,8 +65,13 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
 
+  // Mode switching state (用户端 vs 管理端)
+  const [appMode, setAppMode] = useState<"user" | "admin">("user");
+  const [adminActiveScreen, setAdminActiveScreen] = useState<string>("content_management");
+
   // App core states
   const [credits, setCredits] = useState(100.00);
+  const [extraRequestedCredits, setExtraRequestedCredits] = useState(350.00);
   const [transactions, setTransactions] = useState<CreditTransaction[]>(INITIAL_TRANSACTIONS);
   const [assets, setAssets] = useState<Asset[]>(INITIAL_ASSETS);
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>(INITIAL_GALLERY);
@@ -131,7 +137,7 @@ export default function App() {
     );
 
     // 2. Add credits to user
-    setCredits((prev) => prev + amount);
+    setExtraRequestedCredits((prev) => prev + amount);
 
     // 3. Record transaction
     const newTx: CreditTransaction = {
@@ -163,7 +169,7 @@ export default function App() {
         { label: "申请结果", value: "审核通过" },
         { label: "发放积分", value: `+${amount} 积分` },
         { label: "审核部长", value: "技术研发部 - 李部长" },
-        { label: "备注说明", value: "审核通过，已自动充值到可用总积分" }
+        { label: "备注说明", value: "审核通过，已自动充值到当月剩余积分" }
       ]
     };
 
@@ -493,6 +499,16 @@ export default function App() {
 
   // Rendering screen router
   const renderMainView = () => {
+    if (appMode === "admin") {
+      return (
+        <AdminView 
+          adminActiveScreen={adminActiveScreen} 
+          onTriggerTask={handleAddTask}
+          onOpenTaskQueue={() => setIsQueueOpen(true)}
+        />
+      );
+    }
+
     switch (activeScreen) {
       case "home":
         return (
@@ -611,6 +627,7 @@ export default function App() {
         return (
           <CreditsDashboard
             credits={credits}
+            extraRequestedCredits={extraRequestedCredits}
             transactions={transactions}
             onAddCredits={handleAddCredits}
             onRequestCredits={handleRequestCredits}
@@ -741,8 +758,12 @@ export default function App() {
         setActiveScreen={handleSidebarNavigate}
         collapsed={sidebarCollapsed}
         setCollapsed={setSidebarCollapsed}
-        credits={credits}
+        credits={credits + extraRequestedCredits}
         openCreditsModal={() => handleNavigate("credits")}
+        appMode={appMode}
+        setAppMode={setAppMode}
+        adminActiveScreen={adminActiveScreen}
+        setAdminActiveScreen={setAdminActiveScreen}
       />
 
       {/* 2. Main Workspace screen router */}
@@ -751,12 +772,14 @@ export default function App() {
       </main>
 
       {/* 3. Right task queue drawer */}
-      <RightQueue
-        tasks={tasks}
-        isOpen={isQueueOpen}
-        setIsOpen={setIsQueueOpen}
-        clearCompleted={clearCompletedTasks}
-      />
+      {appMode !== "admin" && (
+        <RightQueue
+          tasks={tasks}
+          isOpen={isQueueOpen}
+          setIsOpen={setIsQueueOpen}
+          clearCompleted={clearCompletedTasks}
+        />
+      )}
 
       {/* 4. Global Assets selector popup */}
       {selectorOpen && (

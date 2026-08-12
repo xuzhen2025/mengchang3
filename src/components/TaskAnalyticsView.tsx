@@ -69,9 +69,9 @@ const INITIAL_TASK_ROWS: TaskRow[] = [
   },
   {
     id: "2",
-    team: "默认部门",
-    group: "默认分组",
-    name: "致上致上致上",
+    team: "电商运营部",
+    group: "爆款运营组",
+    name: "致上运营",
     taskCount: 1,
     achievedCount: 0,
     pendingCount: 1,
@@ -287,7 +287,7 @@ export default function TaskAnalyticsView({ showToast }: TaskAnalyticsViewProps)
   const TEAMS_LEGEND = topTab === "personal"
     ? [
         { name: "汤小真", color: "#6366F1" },
-        { name: "致上致上致上", color: "#10B981" },
+        { name: "致上运营", color: "#10B981" },
         { name: "莫钦全", color: "#F59E0B" },
         { name: "lan同组", color: "#EF4444" },
         { name: "陈嘉", color: "#06B6D4" }
