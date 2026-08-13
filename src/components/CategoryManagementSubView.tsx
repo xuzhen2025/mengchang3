@@ -778,7 +778,7 @@ export default function CategoryManagementSubView() {
       )}
 
       {/* Top Resource Types Tabs */}
-      <div className="border-b border-slate-200/80 flex items-center gap-8 px-2 overflow-x-auto text-sm font-medium">
+      <div className="border-b border-slate-200/80 flex items-center gap-8 px-2 overflow-x-auto text-xs font-bold">
         {resourceTypes.map((type) => {
           const isActive = activeResourceType === type;
           return (
@@ -787,7 +787,7 @@ export default function CategoryManagementSubView() {
               onClick={() => handleResourceTypeChange(type)}
               className={`pb-3.5 transition-all cursor-pointer whitespace-nowrap relative ${
                 isActive
-                  ? "text-purple-600 font-bold border-b-2 border-purple-600 -mb-[1px]"
+                  ? "text-[#7C3AED] font-bold border-b-2 border-[#7C3AED] -mb-[1px]"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
@@ -806,10 +806,10 @@ export default function CategoryManagementSubView() {
             <div className="space-y-3">
               {/* Column Header */}
               <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
-                <span className="font-bold text-slate-700 text-sm">主类目</span>
+                <span className="font-bold text-slate-800 text-xs">主类目</span>
                 <button
                   onClick={() => openAddModal("main")}
-                  className="text-purple-600 hover:text-purple-700 border border-purple-300 hover:border-purple-400 bg-white hover:bg-purple-50 text-xs font-bold px-3 py-1 rounded-xl transition-all cursor-pointer shadow-2xs"
+                  className="bg-[#7C3AED] hover:bg-purple-700 text-white text-xs font-bold px-3 py-1 rounded-xl transition-all cursor-pointer shadow-2xs"
                 >
                   添加
                 </button>
@@ -830,7 +830,7 @@ export default function CategoryManagementSubView() {
                         onClick={() => handleSelectMain(main)}
                         className={`px-3 py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-between group ${
                           isSelected
-                            ? "bg-purple-600 text-white font-bold shadow-xs"
+                            ? "bg-[#7C3AED] text-white font-bold shadow-xs"
                             : "hover:bg-slate-100 text-slate-700 font-medium"
                         }`}
                       >
@@ -880,10 +880,10 @@ export default function CategoryManagementSubView() {
           <div className="space-y-3">
             {/* Column Header */}
             <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
-              <span className="font-bold text-slate-700 text-sm">一级分类</span>
+              <span className="font-bold text-slate-800 text-xs">一级分类</span>
               <button
                 onClick={() => openAddModal("l1")}
-                className="text-purple-600 hover:text-purple-700 border border-purple-300 hover:border-purple-400 bg-white hover:bg-purple-50 text-xs font-bold px-3 py-1 rounded-xl transition-all cursor-pointer shadow-2xs"
+                className="bg-[#7C3AED] hover:bg-purple-700 text-white text-xs font-bold px-3 py-1 rounded-xl transition-all cursor-pointer shadow-2xs"
               >
                 添加
               </button>
@@ -904,7 +904,7 @@ export default function CategoryManagementSubView() {
                       onClick={() => handleSelectL1(node)}
                       className={`px-3 py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-between group ${
                         isSelected
-                          ? "bg-purple-600 text-white font-bold shadow-xs"
+                          ? "bg-[#7C3AED] text-white font-bold shadow-xs"
                           : "hover:bg-slate-100 text-slate-700 font-medium"
                       }`}
                     >
@@ -953,10 +953,10 @@ export default function CategoryManagementSubView() {
           <div className="space-y-3">
             {/* Column Header */}
             <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
-              <span className="font-bold text-slate-700 text-sm">二级分类</span>
+              <span className="font-bold text-slate-800 text-xs">二级分类</span>
               <button
                 onClick={() => openAddModal("l2")}
-                className="text-purple-600 hover:text-purple-700 border border-purple-300 hover:border-purple-400 bg-white hover:bg-purple-50 text-xs font-bold px-3 py-1 rounded-xl transition-all cursor-pointer shadow-2xs"
+                className="bg-[#7C3AED] hover:bg-purple-700 text-white text-xs font-bold px-3 py-1 rounded-xl transition-all cursor-pointer shadow-2xs"
               >
                 添加
               </button>

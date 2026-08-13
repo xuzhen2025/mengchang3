@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { PublicTagFilter } from "./PublicTagFilter";
 import ImageDetailView from "./ImageDetailView";
 import { Pagination } from "./Pagination";
 import {
@@ -456,34 +457,10 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
         {/* Row 4: 公共标签 */}
         <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
           <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">公共标签：</span>
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative border border-slate-200 rounded-lg px-2.5 py-1 flex items-center gap-1.5 bg-white w-32 focus-within:border-purple-400">
-              <Search className="w-3.5 h-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="搜索标签"
-                value={publicTagSearch}
-                onChange={(e) => setPublicTagSearch(e.target.value)}
-                className="text-xs focus:outline-none w-full placeholder:text-slate-400 font-normal"
-              />
-            </div>
-
-            <button
-              onClick={() => setPublicTagSearch(publicTagSearch === "场景" ? "" : "场景")}
-              className={`transition-colors cursor-pointer text-xs px-2 py-0.5 rounded ${
-                publicTagSearch === "场景" ? "text-purple-600 font-bold bg-purple-50" : "text-slate-600 hover:text-purple-600 font-normal"
-              }`}
-            >
-              场景
-            </button>
-
-            <button
-              onClick={() => setPublicTagSearch("")}
-              className="text-slate-500 hover:text-purple-600 text-xs ml-3 cursor-pointer font-normal"
-            >
-              重置公共标签
-            </button>
-          </div>
+          <PublicTagFilter
+            selectedTag={publicTagSearch || "全部"}
+            onSelectTag={(tag) => setPublicTagSearch(tag === "全部" ? "" : tag)}
+          />
         </div>
 
         {/* Row 5: 个人标签 */}

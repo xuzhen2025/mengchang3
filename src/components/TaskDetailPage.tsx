@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { PublicTagFilter } from "./PublicTagFilter";
 import LinkScriptModal from "./LinkScriptModal";
 import UploadFinishedVideoModal from "./UploadFinishedVideoModal";
 import UploadImageModal from "./UploadImageModal";
@@ -559,47 +560,18 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
         </div>
 
         {/* 公共标签 */}
-        <div className="flex items-start gap-4">
-          <span className="w-20 font-bold text-slate-500 shrink-0 pt-1">公共标签:</span>
-          <div className="space-y-2 grow">
-            <div className="flex items-center gap-3">
-              <div className="relative w-44">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="搜索标签"
-                  value={publicTagSearch}
-                  onChange={(e) => setPublicTagSearch(e.target.value)}
-                  className="w-full pl-8 pr-2.5 py-1 bg-slate-50 border border-slate-200 rounded-md font-medium text-slate-700 focus:outline-none focus:border-purple-500"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              {PUBLIC_TAGS.filter(t => t.includes(publicTagSearch)).map((ptag) => {
-                const isSelected = selectedPublicTags.includes(ptag);
-                return (
-                  <button
-                    key={ptag}
-                    onClick={() => togglePublicTag(ptag)}
-                    className={`px-2.5 py-1 rounded font-medium cursor-pointer transition-all ${
-                      isSelected
-                        ? "bg-purple-100 text-[#7C3AED] border border-purple-300 font-bold"
-                        : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/60"
-                    }`}
-                  >
-                    {ptag}
-                  </button>
-                );
-              })}
-              <button
-                onClick={() => setSelectedPublicTags([])}
-                className="text-slate-400 hover:text-purple-600 font-medium ml-2 cursor-pointer"
-              >
-                重置公共标签
-              </button>
-            </div>
-          </div>
+        <div className="flex items-center gap-4">
+          <span className="w-20 font-bold text-slate-500 shrink-0">公共标签:</span>
+          <PublicTagFilter
+            selectedTag={selectedPublicTags[0] || "全部"}
+            onSelectTag={(tag) => {
+              if (tag === "全部") {
+                setSelectedPublicTags([]);
+              } else {
+                setSelectedPublicTags([tag]);
+              }
+            }}
+          />
         </div>
 
         {/* 个人标签 */}

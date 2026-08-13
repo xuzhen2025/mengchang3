@@ -68,6 +68,7 @@ export default function Sidebar({
 
   const adminMenuItems: { id: string; label: string; icon: any; badge?: string }[] = [
     { id: "content_management", label: "内容管理", icon: LayoutDashboard },
+    { id: "system_management", label: "系统管理", icon: Settings },
   ];
 
   const currentMenuItems = appMode === "admin" ? adminMenuItems : userMenuItems;

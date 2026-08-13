@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
+import { PublicTagFilter } from "./PublicTagFilter";
 import AudioDetailView from "./AudioDetailView";
+import { Pagination } from "./Pagination";
 import {
   Search,
   ChevronDown,
@@ -238,6 +240,10 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
   // Audio Playback State
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [currentTimeMap, setCurrentTimeMap] = useState<Record<string, number>>({});
@@ -389,9 +395,17 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
     return true;
   });
 
+  // Pagination calculations
+  const totalCount = filteredAudios.length;
+  const totalPages = Math.ceil(totalCount / pageSize) || 1;
+  const paginatedAudios = filteredAudios.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
   // Select all on current page
   const handleSelectPage = () => {
-    const pageIds = filteredAudios.map((a) => a.id);
+    const pageIds = paginatedAudios.map((a) => a.id);
     const allSelected = pageIds.every((id) => selectedIds.includes(id));
     if (allSelected) {
       setSelectedIds(selectedIds.filter((id) => !pageIds.includes(id)));
@@ -570,37 +584,10 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
         {/* Row 4: 公共标签 */}
         <div className="flex items-center gap-2 pb-2 border-b border-slate-100 flex-wrap">
           <span className="text-slate-900 font-bold shrink-0 w-20">公共标签：</span>
-          <div className="relative border border-slate-200 rounded-lg px-2.5 py-1 flex items-center gap-1.5 bg-white w-32 shrink-0 focus-within:border-purple-400 mr-1">
-            <Search className="w-3.5 h-3.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="搜索标签"
-              value={searchPublicTagKeyword}
-              onChange={(e) => setSearchPublicTagKeyword(e.target.value)}
-              className="text-xs focus:outline-none w-full placeholder:text-slate-400 font-normal"
-            />
-          </div>
-          <div className="flex items-center gap-1 flex-wrap">
-            {publicTags.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => setSelectedPublicTag(selectedPublicTag === tag ? "全部" : tag)}
-                className={`transition-colors cursor-pointer text-xs ${
-                  selectedPublicTag === tag
-                    ? "text-purple-600 font-bold bg-purple-50 px-2.5 py-1 rounded-md"
-                    : "text-slate-600 hover:text-purple-600 font-normal px-2.5 py-1"
-                }`}
-              >
-                {tag}
-              </button>
-            ))}
-            <button
-              onClick={() => setSelectedPublicTag("全部")}
-              className="text-slate-400 hover:text-purple-600 text-xs ml-2 cursor-pointer font-normal underline"
-            >
-              重置公共标签
-            </button>
-          </div>
+          <PublicTagFilter
+            selectedTag={selectedPublicTag}
+            onSelectTag={(tag) => setSelectedPublicTag(tag)}
+          />
         </div>
 
         {/* Row 5: 个人标签 */}

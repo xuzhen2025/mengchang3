@@ -1,0 +1,2690 @@
+import React, { useState } from "react";
+import {
+  ShieldCheck,
+  FileText,
+  Settings,
+  Tag,
+  Megaphone,
+  Key,
+  Globe,
+  Bell,
+  Users,
+  Search,
+  Plus,
+  Trash2,
+  Edit3,
+  Copy,
+  Check,
+  X,
+  ChevronDown,
+  ChevronRight,
+  Minus,
+  Filter,
+  Download,
+  Upload,
+  RefreshCw,
+  Sparkles,
+  Lock,
+  Eye,
+  CheckCircle2,
+  AlertCircle,
+  Sliders,
+  Building2,
+  Phone,
+  Mail,
+  UserPlus,
+  UserCheck,
+  UserX,
+  Layers,
+  RotateCcw,
+  Calendar,
+  Zap,
+  Server,
+  Activity,
+  Image as ImageIcon,
+  CheckSquare,
+  Square,
+  ArrowRight,
+  ShieldAlert,
+  SlidersHorizontal,
+  HardDrive
+} from "lucide-react";
+
+type SystemTabType =
+  | "roles"
+  | "audit"
+  | "watermark"
+  | "system_settings"
+  | "auto_tags"
+  | "ad_groups"
+  | "login_logs"
+  | "async_sync"
+  | "notifications"
+  | "users";
+
+// ---------------------------------------------------------------------------
+// TYPES & DATA STRUCTURES FOR ROLES & PERMISSIONS
+// ---------------------------------------------------------------------------
+export interface PermissionNode {
+  id: string;
+  label: string;
+  children?: PermissionNode[];
+}
+
+export interface RolePermission {
+  id: string;
+  name: string;
+  code?: string;
+  type?: "preset" | "custom";
+  category: "default" | "other" | "custom";
+  description: string;
+  memberCount: number;
+  dataScope?: "self" | "dept_tree" | "all";
+  enabled?: boolean;
+  checkedKeys?: string[];
+  permissions?: string[];
+  updatedAt?: string;
+}
+
+export const USER_CLIENT_PERMISSION_TREE: PermissionNode[] = [
+  {
+    id: "uc_cheng_pian",
+    label: "成片区",
+    children: [
+      { id: "uc_cp_view", label: "查看成片" },
+      { id: "uc_cp_edit", label: "修改视频信息" },
+      { id: "uc_cp_download", label: "下载成片" },
+      { id: "uc_cp_capcut", label: "复制到剪映" },
+      { id: "uc_cp_share", label: "分享" },
+      { id: "uc_cp_status", label: "修改状态" },
+    ]
+  },
+  {
+    id: "uc_su_cai",
+    label: "素材区",
+    children: [
+      { id: "uc_sc_view", label: "查看素材" },
+      { id: "uc_sc_upload", label: "上传素材" },
+      { id: "uc_sc_download", label: "下载素材" },
+      { id: "uc_sc_category", label: "批量修改分类" },
+      { id: "uc_sc_pin", label: "素材置顶" },
+    ]
+  },
+  {
+    id: "uc_di_san_fang",
+    label: "第三方",
+    children: [
+      { id: "uc_dsf_view", label: "查看第三方" },
+      { id: "uc_dsf_auth", label: "账号授权绑定" },
+    ]
+  },
+  {
+    id: "uc_tu_pian",
+    label: "图片",
+    children: [
+      { id: "uc_tp_view", label: "查看图片" },
+      { id: "uc_tp_gen", label: "AI生成图片" },
+      { id: "uc_tp_matting", label: "智能抠图" },
+    ]
+  },
+  {
+    id: "uc_wen_an",
+    label: "文案",
+    children: [
+      { id: "uc_wa_view", label: "查看文案" },
+      { id: "uc_wa_gen", label: "AI文案生成" },
+    ]
+  },
+  {
+    id: "uc_yin_pin",
+    label: "音频",
+    children: [
+      { id: "uc_yp_view", label: "查看音频" },
+      { id: "uc_yp_tts", label: "语音合成与配音" },
+    ]
+  },
+  {
+    id: "uc_jiao_ben",
+    label: "脚本",
+    children: [
+      { id: "uc_jb_view", label: "查看脚本" },
+      { id: "uc_jb_breakdown", label: "脚本拆解" },
+    ]
+  },
+  {
+    id: "uc_shu_ju_zhong_xin",
+    label: "数据中心",
+    children: [
+      { id: "uc_sj_view", label: "查看数据看板" },
+      { id: "uc_sj_export", label: "导出数据报表" },
+    ]
+  },
+  { id: "uc_public_tags", label: "可修改公共标签" },
+  {
+    id: "uc_ren_wu",
+    label: "任务",
+    children: [
+      { id: "uc_rw_view", label: "查看任务" },
+      { id: "uc_rw_create", label: "新建指派任务" },
+    ]
+  },
+  { id: "uc_push_plan_record", label: "推送/衍生/创建计划记录" },
+  { id: "uc_fang_pin", label: "仿品" },
+  {
+    id: "uc_ai_fen_jing",
+    label: "AI分镜拆解",
+    children: [
+      { id: "uc_aifj_view", label: "查看拆解" },
+      { id: "uc_aifj_run", label: "发起拆解" },
+    ]
+  },
+  { id: "uc_ai_fang_xie", label: "AI仿写" },
+  { id: "uc_move_to_trash", label: "把视频移动到回收站" },
+  { id: "uc_qian_chuan_guard", label: "千川计划守卫" },
+  { id: "uc_ad_account_auth", label: "广告账户授权" },
+  { id: "uc_appointment_center", label: "预约中心" },
+  { id: "uc_smart_mix_cut", label: "智能混剪" },
+  { id: "uc_live_stream", label: "直播" },
+  {
+    id: "uc_daren_crm",
+    label: "达人CRM",
+    children: [
+      { id: "uc_crm_view", label: "查看达人" },
+      { id: "uc_crm_edit", label: "编辑达人" },
+    ]
+  },
+  { id: "uc_check_other_perm", label: "检测其他人的操作权限" },
+  { id: "uc_server_shutdown", label: "服务器关机" },
+];
+
+export const ADMIN_BACKEND_PERMISSION_TREE: PermissionNode[] = [
+  {
+    id: "ab_content_mgmt",
+    label: "内容管理",
+    children: [
+      { id: "ab_res_library", label: "资源库" },
+      { id: "ab_category", label: "分类" },
+      { id: "ab_video_status", label: "视频状态" },
+      { id: "ab_script_tpl", label: "脚本模板" },
+      { id: "ab_script_status", label: "脚本状态" },
+      { id: "ab_task", label: "任务" },
+      { id: "ab_tags", label: "标签" },
+    ]
+  },
+  {
+    id: "ab_system_mgmt",
+    label: "系统管理",
+    children: [
+      { id: "ab_sys_users", label: "用户" },
+      { id: "ab_sys_roles", label: "角色" },
+      { id: "ab_sys_audit", label: "操作记录" },
+      { id: "ab_sys_watermark", label: "水印" },
+      { id: "ab_sys_settings", label: "系统设置" },
+      { id: "ab_sys_appoint", label: "预约管理" },
+      { id: "ab_sys_advertiser", label: "广告主管理" },
+    ]
+  },
+  {
+    id: "ab_daren_mgmt",
+    label: "达人管理",
+    children: [
+      { id: "ab_daren_category", label: "分类" },
+      { id: "ab_daren_tags", label: "标签" },
+      { id: "ab_daren_status", label: "状态" },
+      { id: "ab_daren_settings", label: "系统设置" },
+    ]
+  },
+  { id: "ab_cockpit", label: "驾驶舱" },
+  { id: "ab_biz_data_cockpit", label: "业务数据驾驶舱" },
+];
+
+const getLeafKeysFromNodes = (nodes: PermissionNode[]): string[] => {
+  let keys: string[] = [];
+  for (const n of nodes) {
+    if (n.children && n.children.length > 0) {
+      keys = keys.concat(getLeafKeysFromNodes(n.children));
+    } else {
+      keys.push(n.id);
+    }
+  }
+  return keys;
+};
+
+export const ALL_PERMISSION_KEYS = [
+  ...getLeafKeysFromNodes(USER_CLIENT_PERMISSION_TREE),
+  ...getLeafKeysFromNodes(ADMIN_BACKEND_PERMISSION_TREE),
+];
+
+const CREATION_KEYS = [
+  "uc_cp_view", "uc_cp_edit", "uc_sc_view", "uc_sc_download",
+  "uc_public_tags", "uc_fang_pin", "uc_ai_fang_xie", "uc_move_to_trash",
+  "uc_qian_chuan_guard", "uc_ad_account_auth", "uc_appointment_center",
+  "uc_check_other_perm", "uc_server_shutdown",
+  "ab_res_library", "ab_category", "ab_video_status", "ab_script_tpl",
+  "ab_script_status", "ab_task", "ab_tags",
+  "ab_sys_users", "ab_daren_category", "ab_daren_tags", "ab_daren_status",
+  "ab_cockpit", "ab_biz_data_cockpit"
+];
+
+const INITIAL_ROLES: RolePermission[] = [
+  {
+    id: "role_staff",
+    name: "普通员工",
+    code: "STAFF",
+    type: "preset",
+    category: "default",
+    description: "标准员工基础权限，支持剪辑、素材与爆款复刻协作",
+    memberCount: 18,
+    dataScope: "self",
+    enabled: true,
+    checkedKeys: CREATION_KEYS,
+    permissions: [],
+    updatedAt: "2026-07-24 10:00"
+  },
+  {
+    id: "role_super_admin",
+    name: "超级管理员",
+    code: "SUPER_ADMIN",
+    type: "preset",
+    category: "other",
+    description: "全站最高控制权限，全选所有业务模块与系统管理权限",
+    memberCount: 2,
+    dataScope: "all",
+    enabled: true,
+    checkedKeys: ALL_PERMISSION_KEYS,
+    permissions: [],
+    updatedAt: "2026-07-24 09:00"
+  },
+  {
+    id: "role_photo_edit",
+    name: "摄影+剪辑",
+    code: "PHOTO_EDIT",
+    type: "preset",
+    category: "other",
+    description: "拍摄素材采集与AI剪辑成片一体化配置",
+    memberCount: 6,
+    dataScope: "self",
+    enabled: true,
+    checkedKeys: [...CREATION_KEYS, "finished_upload", "finished_edit_title", "mat_batch_category", "mat_status"],
+    permissions: [],
+    updatedAt: "2026-07-23 15:20"
+  },
+  {
+    id: "role_director_assist",
+    name: "编导助理",
+    code: "DIRECTOR_ASSIST",
+    type: "preset",
+    category: "other",
+    description: "辅助爆款分镜拆解、剧本复刻与素材归类",
+    memberCount: 4,
+    dataScope: "self",
+    enabled: true,
+    checkedKeys: ["remake_view", "remake_create", "remake_mapping", "aivideo_script", "task_view", "task_update", "mat_view", "finished_view"],
+    permissions: [],
+    updatedAt: "2026-07-22 14:10"
+  },
+  {
+    id: "role_content_edit",
+    name: "内容部剪辑",
+    code: "CONTENT_EDIT",
+    type: "preset",
+    category: "other",
+    description: "内容中心专用精剪与字幕合成岗位",
+    memberCount: 8,
+    dataScope: "self",
+    enabled: true,
+    checkedKeys: CREATION_KEYS,
+    permissions: [],
+    updatedAt: "2026-07-21 11:30"
+  },
+  {
+    id: "role_transition_pitcher",
+    name: "(过渡性角色) 投手+编导",
+    code: "PITCH_DIR",
+    type: "custom",
+    category: "other",
+    description: "兼任千川建组投放与爆款视频拆解复刻",
+    memberCount: 2,
+    dataScope: "dept_tree",
+    enabled: true,
+    checkedKeys: [...CREATION_KEYS, "ad_view", "ad_publish", "ad_export", "finished_ad_data"],
+    permissions: [],
+    updatedAt: "2026-07-20 18:00"
+  },
+  {
+    id: "role_pitcher",
+    name: "投手",
+    code: "PITCHER",
+    type: "preset",
+    category: "other",
+    description: "负责广告主账号建组、消耗跟踪与一键同步投放",
+    memberCount: 12,
+    dataScope: "dept_tree",
+    enabled: true,
+    checkedKeys: ["finished_view", "finished_ad_data", "finished_export_ad", "ad_view", "ad_bind", "ad_publish", "ad_export"],
+    permissions: [],
+    updatedAt: "2026-07-20 16:45"
+  },
+  {
+    id: "role_editor",
+    name: "剪辑",
+    code: "EDITOR",
+    type: "preset",
+    category: "other",
+    description: "负责视频精剪、爆款微调与画质一键增强",
+    memberCount: 9,
+    dataScope: "self",
+    enabled: true,
+    checkedKeys: CREATION_KEYS,
+    permissions: [],
+    updatedAt: "2026-07-19 12:00"
+  },
+  {
+    id: "role_cameraman",
+    name: "摄影",
+    code: "CAMERAMAN",
+    type: "preset",
+    category: "other",
+    description: "现场素材拍摄、样片采集与原片批量归档",
+    memberCount: 3,
+    dataScope: "self",
+    enabled: true,
+    checkedKeys: ["mat_view", "mat_upload", "mat_download", "mat_pin", "asset_view", "asset_upload"],
+    permissions: [],
+    updatedAt: "2026-07-18 10:20"
+  },
+  {
+    id: "role_copywriter",
+    name: "文案",
+    code: "COPYWRITER",
+    type: "preset",
+    category: "other",
+    description: "AI文案写作、Hook爆点拆解与标题文案批注",
+    memberCount: 5,
+    dataScope: "self",
+    enabled: true,
+    checkedKeys: ["aivideo_script", "qc_subtitles", "finished_edit_title", "mat_edit_title", "task_view"],
+    permissions: [],
+    updatedAt: "2026-07-17 15:00"
+  },
+  {
+    id: "role_model",
+    name: "模特",
+    code: "MODEL",
+    type: "preset",
+    category: "other",
+    description: "数字形象、出镜素材确认与成品合集查看",
+    memberCount: 4,
+    dataScope: "self",
+    enabled: true,
+    checkedKeys: ["mat_view", "finished_view", "task_view"],
+    permissions: [],
+    updatedAt: "2026-07-16 09:30"
+  },
+  {
+    id: "role_brand_planner",
+    name: "品牌策划",
+    code: "BRAND_PLANNER",
+    type: "preset",
+    category: "other",
+    description: "品牌视觉风格设定与商详视觉卡片审核",
+    memberCount: 2,
+    dataScope: "dept_tree",
+    enabled: true,
+    checkedKeys: ["qc_detail", "aiimg_view", "aiimg_generate", "finished_view", "mat_view"],
+    permissions: [],
+    updatedAt: "2026-07-15 17:10"
+  },
+  {
+    id: "role_star_biz",
+    name: "星图商务",
+    code: "STAR_BIZ",
+    type: "preset",
+    category: "other",
+    description: "星图达人接单、第三方视频引用与合作对接",
+    memberCount: 3,
+    dataScope: "dept_tree",
+    enabled: true,
+    checkedKeys: ["tp_view", "tp_import", "tp_export", "tp_tags", "finished_view"],
+    permissions: [],
+    updatedAt: "2026-07-14 11:20"
+  },
+  {
+    id: "role_live_assist",
+    name: "直播助理",
+    code: "LIVE_ASSIST",
+    type: "preset",
+    category: "other",
+    description: "直播间切片推流、实时挂车与现场协助",
+    memberCount: 5,
+    dataScope: "self",
+    enabled: true,
+    checkedKeys: ["finished_view", "mat_view", "task_view", "task_update"],
+    permissions: [],
+    updatedAt: "2026-07-13 19:00"
+  },
+  {
+    id: "role_live_anchor",
+    name: "直播主播",
+    code: "LIVE_ANCHOR",
+    type: "preset",
+    category: "other",
+    description: "直播出镜与录屏切片归档授权",
+    memberCount: 6,
+    dataScope: "self",
+    enabled: true,
+    checkedKeys: ["finished_view", "mat_view"],
+    permissions: [],
+    updatedAt: "2026-07-12 16:10"
+  },
+  {
+    id: "role_live_head",
+    name: "直播负责人",
+    code: "LIVE_HEAD",
+    type: "preset",
+    category: "other",
+    description: "直播部门业务统筹、排期与切片发布管理",
+    memberCount: 2,
+    dataScope: "dept_tree",
+    enabled: true,
+    checkedKeys: ["finished_view", "finished_upload", "finished_push", "mat_view", "task_view", "task_create", "ad_view"],
+    permissions: [],
+    updatedAt: "2026-07-11 14:00"
+  },
+  {
+    id: "role_ops_head",
+    name: "运营负责人",
+    code: "OPS_HEAD",
+    type: "preset",
+    category: "other",
+    description: "整体电商运营策略、投放效果监控与大盘调度",
+    memberCount: 3,
+    dataScope: "all",
+    enabled: true,
+    checkedKeys: ALL_PERMISSION_KEYS.filter(k => !k.startsWith("sys_")),
+    permissions: [],
+    updatedAt: "2026-07-10 10:00"
+  },
+  {
+    id: "role_content_head",
+    name: "内容负责人",
+    code: "CONTENT_HEAD",
+    type: "preset",
+    category: "other",
+    description: "内容生产质量控制、AI复刻模版审批与团队质检",
+    memberCount: 2,
+    dataScope: "all",
+    enabled: true,
+    checkedKeys: ALL_PERMISSION_KEYS.filter(k => k !== "sys_roles" && k !== "sys_users"),
+    permissions: [],
+    updatedAt: "2026-07-09 15:40"
+  }
+];
+
+// ---------------------------------------------------------------------------
+// TYPES & DATA STRUCTURES FOR NOTIFICATIONS
+// ---------------------------------------------------------------------------
+export interface NotificationItem {
+  id: string;
+  title: string;
+  description: string;
+  enabled: boolean;
+  channels: {
+    system?: boolean;
+    mobile?: boolean;
+    feishu?: boolean;
+  };
+  hasCustomConfig?: boolean;
+}
+
+export interface NotificationCategory {
+  id: string;
+  title: string;
+  items: NotificationItem[];
+}
+
+export const INITIAL_NOTIFICATION_CATEGORIES: NotificationCategory[] = [
+  {
+    id: "creation",
+    title: "创作通知",
+    items: [
+      {
+        id: "upload_video",
+        title: "上传视频",
+        description: "在资源库里面点击上传成片时，选择了上传并提示某人后生成的提示信息",
+        enabled: true,
+        channels: { system: true, mobile: true }
+      },
+      {
+        id: "edit_video",
+        title: "编辑视频",
+        description: "编辑资源库内容的基础信息后生成的提示信息",
+        enabled: true,
+        channels: { system: true, mobile: true }
+      },
+      {
+        id: "video_status_change",
+        title: "视频状态修改",
+        description: "编辑资源库内容的基础信息或视频状态被修改后生成的提示信息",
+        enabled: true,
+        channels: { system: true, mobile: true },
+        hasCustomConfig: true
+      }
+    ]
+  },
+  {
+    id: "audit",
+    title: "卡审通知",
+    items: [
+      {
+        id: "video_audit_failed",
+        title: "视频审核不通过",
+        description: "视频审核不通过时，视频上传者收到消息提醒",
+        enabled: true,
+        channels: { system: true, mobile: true }
+      }
+    ]
+  },
+  {
+    id: "booking",
+    title: "预约通知",
+    items: [
+      {
+        id: "turn_to_book",
+        title: "轮到你预约",
+        description: "预约规则为按轮次预约，到预约时间时，可预约者收到消息提醒",
+        enabled: true,
+        channels: { system: true, mobile: true }
+      },
+      {
+        id: "booked_by_others",
+        title: "被预约",
+        description: "被预约后，预约规则设定者收到消息提醒",
+        enabled: true,
+        channels: { system: true, mobile: true },
+        hasCustomConfig: true
+      },
+      {
+        id: "cancel_booking",
+        title: "取消预约",
+        description: "预约取消后，预约规则设定者收到消息提醒",
+        enabled: true,
+        channels: { system: true, mobile: true },
+        hasCustomConfig: true
+      }
+    ]
+  },
+  {
+    id: "task",
+    title: "任务通知",
+    items: [
+      {
+        id: "publish_edit_task",
+        title: "发布/编辑任务",
+        description: "任务创建成功时，下单运营和被指派者收到消息提醒",
+        enabled: true,
+        channels: { system: true, mobile: true }
+      },
+      {
+        id: "task_link_video",
+        title: "任务关联视频",
+        description: "任务成功关联视频、图片、文案、音频时，任务创建者收到消息提醒",
+        enabled: true,
+        channels: { system: true, mobile: true }
+      }
+    ]
+  },
+  {
+    id: "account",
+    title: "账号通知",
+    items: [
+      {
+        id: "phone_unbind",
+        title: "手机号解绑",
+        description: "账号解绑了手机号，管理员收到消息提醒",
+        enabled: true,
+        channels: { system: true, mobile: true }
+      },
+      {
+        id: "account_locked",
+        title: "账号被锁定",
+        description: "账号5次输入错误密码后被锁定，管理员收到消息提醒",
+        enabled: true,
+        channels: { system: true, mobile: true }
+      }
+    ]
+  },
+  {
+    id: "export",
+    title: "导出通知",
+    items: [
+      {
+        id: "export_complete",
+        title: "导出完成",
+        description: "创作报表、任务报表、预约记录、计划报表、广告主报表、视频报表、投放报表、标签报表、TikTok店铺数据报表、TikTok订单数据报表、数据洞察报表导出任务生成后，操作导出者收到消息提醒",
+        enabled: true,
+        channels: { system: true, mobile: true }
+      }
+    ]
+  }
+];
+
+export default function AdminSystemManagementView() {
+  const [activeTab, setActiveTab] = useState<SystemTabType>("roles");
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3000);
+  };
+
+  const tabs: { id: SystemTabType; label: string; icon: any; desc: string }[] = [
+    { id: "roles", label: "角色与权限矩阵", icon: ShieldCheck, desc: "自定义角色菜单与按钮级精细化权限矩阵" },
+    { id: "audit", label: "操作记录", icon: FileText, desc: "全员系统操作审计日志与追溯" },
+    { id: "watermark", label: "水印", icon: ImageIcon, desc: "全局图文水印与视频防盗贴图设置" },
+    { id: "system_settings", label: "系统设置", icon: Settings, desc: "站点配置、存储引擎与渲染基础参数" },
+    { id: "auto_tags", label: "系统自动化标签", icon: Tag, desc: "AI智能触发打标规则与指标自动分流" },
+    { id: "ad_groups", label: "广告组管理", icon: Megaphone, desc: "跨平台广告组绑定、预算控制与同步" },
+    { id: "login_logs", label: "登录记录", icon: Key, desc: "账号登录历史、IP终端及安全预警" },
+    { id: "async_sync", label: "多站点异步同步", icon: Globe, desc: "分布式节点数据集群同步与队列表监控" },
+    { id: "notifications", label: "消息通知", icon: Bell, desc: "系统预警、任务状态与通知渠道订阅" },
+    { id: "users", label: "用户", icon: Users, desc: "系统账号列表、部门分配与状态管控" },
+  ];
+
+  // ---------------------------------------------------------------------------
+  // 1. 角色与权限矩阵 STATE & HANDLERS
+  // ---------------------------------------------------------------------------
+  const [roles, setRoles] = useState<RolePermission[]>(() => {
+    const saved = localStorage.getItem("cloud_video_roles");
+    if (!saved) return INITIAL_ROLES;
+    try {
+      const parsed: RolePermission[] = JSON.parse(saved);
+      let staffRole = parsed.find(r => r.id === "role_staff" || r.name === "普通员工");
+      if (!staffRole) {
+        staffRole = {
+          id: "role_staff",
+          name: "普通员工",
+          code: "STAFF",
+          type: "preset",
+          category: "default",
+          description: "标准员工基础权限，支持剪辑、素材与爆款复刻协作",
+          memberCount: 18,
+          dataScope: "self",
+          enabled: true,
+          checkedKeys: CREATION_KEYS,
+          permissions: [],
+          updatedAt: "2026-07-24 10:00"
+        };
+        return [staffRole, ...parsed];
+      }
+      return parsed;
+    } catch {
+      return INITIAL_ROLES;
+    }
+  });
+
+  const [selectedRoleId, setSelectedRoleId] = useState<string>("role_super_admin");
+  const selectedRole = roles.find((r) => r.id === selectedRoleId) || roles[0];
+  
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const [roleFormName, setRoleFormName] = useState("");
+  const [roleFormDesc, setRoleFormDesc] = useState("");
+  const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
+
+  const handleOpenAddRole = () => {
+    setEditingRoleId(null);
+    setRoleFormName("");
+    setRoleFormDesc("");
+    setIsRoleModalOpen(true);
+  };
+
+  const handleOpenEditRole = (role: RolePermission) => {
+    setEditingRoleId(role.id);
+    setRoleFormName(role.name);
+    setRoleFormDesc(role.description || "");
+    setIsRoleModalOpen(true);
+  };
+
+  const handleSaveRole = () => {
+    if (!roleFormName.trim()) {
+      showToast("请输入角色名称");
+      return;
+    }
+    if (editingRoleId) {
+      setRoles((prev) => {
+        const next = prev.map((r) =>
+          r.id === editingRoleId ? { ...r, name: roleFormName, description: roleFormDesc, updatedAt: new Date().toISOString().replace('T', ' ').substring(0, 16) } : r
+        );
+        localStorage.setItem("cloud_video_roles", JSON.stringify(next));
+        return next;
+      });
+      showToast("✅ 修改角色成功");
+    } else {
+      const newRole: RolePermission = {
+        id: `role_${Date.now()}`,
+        name: roleFormName.trim(),
+        code: `CUSTOM_${Date.now().toString().slice(-4)}`,
+        type: "custom",
+        category: "other",
+        description: roleFormDesc.trim() || "自定义新增业务角色",
+        memberCount: 0,
+        dataScope: "self",
+        enabled: true,
+        checkedKeys: CREATION_KEYS,
+        permissions: [],
+        updatedAt: new Date().toISOString().replace('T', ' ').substring(0, 16)
+      };
+      setRoles((prev) => {
+        const next = [...prev, newRole];
+        localStorage.setItem("cloud_video_roles", JSON.stringify(next));
+        return next;
+      });
+      setSelectedRoleId(newRole.id);
+      showToast(`🎉 已成功创建角色 [${roleFormName.trim()}]`);
+    }
+    setIsRoleModalOpen(false);
+  };
+
+  const handleDeleteRole = (id: string) => {
+    const roleToDelete = roles.find((r) => r.id === id);
+    if (roleToDelete?.category === "default") {
+      showToast("⚠️ 默认基础角色无法删除");
+      return;
+    }
+    if (confirm(`确定要删除角色【${roleToDelete?.name}】吗？`)) {
+      setRoles((prev) => {
+        const next = prev.filter((r) => r.id !== id);
+        localStorage.setItem("cloud_video_roles", JSON.stringify(next));
+        return next;
+      });
+      if (selectedRoleId === id) {
+        setSelectedRoleId("role_super_admin");
+      }
+      showToast("🗑️ 已删除该角色");
+    }
+  };
+
+  const handleCopyRole = (role: RolePermission, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newRole: RolePermission = {
+      ...role,
+      id: `role_copy_${Date.now()}`,
+      name: `${role.name} (副本)`,
+      code: `${role.code || 'ROLE'}_COPY`,
+      type: "custom",
+      category: "other",
+      memberCount: 0,
+      updatedAt: new Date().toISOString().replace('T', ' ').substring(0, 16)
+    };
+    setRoles(prev => {
+      const next = [...prev, newRole];
+      localStorage.setItem("cloud_video_roles", JSON.stringify(next));
+      return next;
+    });
+    setSelectedRoleId(newRole.id);
+    showToast(`📋 已成功复刻角色 [${role.name}]`);
+  };
+
+  const handleToggleRoleEnabled = () => {
+    if (!selectedRole) return;
+    const nextEnabled = !(selectedRole.enabled ?? true);
+    setRoles(prev => prev.map(r => r.id === selectedRoleId ? { ...r, enabled: nextEnabled } : r));
+    showToast(`⚡ 角色【${selectedRole.name}】已${nextEnabled ? '开启' : '停用'}`);
+  };
+
+  const handleToggleNodeChecked = (nodeId: string, nodeChildrenKeys: string[]) => {
+    if (!selectedRole) return;
+    const currentKeys = selectedRole.checkedKeys || [];
+    
+    let nextKeys: string[] = [];
+    if (nodeChildrenKeys.length > 0) {
+      const isAllChecked = nodeChildrenKeys.every(k => currentKeys.includes(k));
+      if (isAllChecked) {
+        nextKeys = currentKeys.filter(k => !nodeChildrenKeys.includes(k));
+      } else {
+        const setObj = new Set([...currentKeys, ...nodeChildrenKeys]);
+        nextKeys = Array.from(setObj);
+      }
+    } else {
+      if (currentKeys.includes(nodeId)) {
+        nextKeys = currentKeys.filter(k => k !== nodeId);
+      } else {
+        nextKeys = [...currentKeys, nodeId];
+      }
+    }
+
+    setRoles(prev => prev.map(r => r.id === selectedRoleId ? { ...r, checkedKeys: nextKeys } : r));
+  };
+
+  const handleSelectAllTree = () => {
+    if (!selectedRole) return;
+    setRoles(prev => prev.map(r => r.id === selectedRoleId ? { ...r, checkedKeys: ALL_PERMISSION_KEYS } : r));
+    showToast("✅ 已全选当前角色的所有控制菜单");
+  };
+
+  const handleClearAllTree = () => {
+    if (!selectedRole) return;
+    setRoles(prev => prev.map(r => r.id === selectedRoleId ? { ...r, checkedKeys: [] } : r));
+    showToast("🧹 已清空当前角色的所有控制权限");
+  };
+
+  const handleSaveRolePermissions = () => {
+    if (!selectedRole) return;
+    localStorage.setItem("cloud_video_roles", JSON.stringify(roles));
+    showToast(`✅ 角色【${selectedRole.name}】权限矩阵保存成功！`);
+  };
+
+  // Node Expansion State
+  const [expandedNodeIds, setExpandedNodeIds] = useState<string[]>([
+    "ab_content_mgmt", "ab_system_mgmt", "ab_daren_mgmt",
+    "uc_cheng_pian", "uc_su_cai"
+  ]);
+
+  const toggleExpandNode = (nodeId: string) => {
+    setExpandedNodeIds(prev =>
+      prev.includes(nodeId) ? prev.filter(id => id !== nodeId) : [...prev, nodeId]
+    );
+  };
+
+  const getLeafKeysOfNode = (node: PermissionNode): string[] => {
+    if (!node.children || node.children.length === 0) {
+      return [node.id];
+    }
+    let keys: string[] = [];
+    for (const child of node.children) {
+      keys = keys.concat(getLeafKeysOfNode(child));
+    }
+    return keys;
+  };
+
+  const getNodeCheckState = (node: PermissionNode, currentKeys: string[]) => {
+    const leafKeys = getLeafKeysOfNode(node);
+    const checkedCount = leafKeys.filter(k => currentKeys.includes(k)).length;
+    if (checkedCount === leafKeys.length && leafKeys.length > 0) {
+      return { isChecked: true, isIndeterminate: false };
+    } else if (checkedCount > 0) {
+      return { isChecked: false, isIndeterminate: true };
+    }
+    return { isChecked: false, isIndeterminate: false };
+  };
+
+  const handleToggleNode = (node: PermissionNode) => {
+    if (!selectedRole) return;
+    const currentKeys = selectedRole.checkedKeys || [];
+    const leafKeys = getLeafKeysOfNode(node);
+    const allChecked = leafKeys.every(k => currentKeys.includes(k));
+
+    let nextKeys: string[] = [];
+    if (allChecked) {
+      nextKeys = currentKeys.filter(k => !leafKeys.includes(k));
+    } else {
+      const setObj = new Set([...currentKeys, ...leafKeys]);
+      nextKeys = Array.from(setObj);
+    }
+
+    setRoles(prev => prev.map(r => r.id === selectedRoleId ? { ...r, checkedKeys: nextKeys } : r));
+  };
+
+  // Helper to render Tree Nodes for Roles matching screenshot style
+  const renderPermissionTreeNodes = (nodes: PermissionNode[]) => {
+    const currentKeys = selectedRole?.checkedKeys || [];
+
+    return (
+      <div className="space-y-1 font-sans">
+        {nodes.map(node => {
+          const hasChildren = Boolean(node.children && node.children.length > 0);
+          const isExpanded = expandedNodeIds.includes(node.id);
+          const { isChecked, isIndeterminate } = getNodeCheckState(node, currentKeys);
+
+          return (
+            <div key={node.id} className="select-none">
+              <div className="flex items-center gap-2 py-0.5 px-1 hover:bg-slate-50 rounded-md transition-colors group">
+                {/* Arrow indicator */}
+                {hasChildren ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleExpandNode(node.id)}
+                    className="w-4 h-4 flex items-center justify-center text-slate-400 hover:text-purple-600 cursor-pointer"
+                  >
+                    {isExpanded ? (
+                      <span className="text-[10px] transform rotate-90 inline-block text-slate-500 font-bold">▲</span>
+                    ) : (
+                      <span className="text-[10px] inline-block text-slate-400">▶</span>
+                    )}
+                  </button>
+                ) : (
+                  <div className="w-4" />
+                )}
+
+                {/* Custom Checkbox */}
+                <div
+                  onClick={() => handleToggleNode(node)}
+                  className={`w-4 h-4 rounded text-white flex items-center justify-center cursor-pointer transition-all shrink-0 ${
+                    isChecked || isIndeterminate
+                      ? "bg-[#7C3AED] border-[#7C3AED] shadow-2xs"
+                      : "bg-white border border-slate-300 hover:border-purple-400"
+                  }`}
+                >
+                  {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                  {isIndeterminate && <Minus className="w-3 h-3 stroke-[3]" />}
+                </div>
+
+                {/* Node Label */}
+                <span
+                  onClick={() => handleToggleNode(node)}
+                  className={`text-xs cursor-pointer font-medium ${
+                    isChecked || isIndeterminate ? "text-slate-900 font-bold" : "text-slate-700"
+                  }`}
+                >
+                  {node.label}
+                </span>
+              </div>
+
+              {/* Children Nodes */}
+              {hasChildren && isExpanded && (
+                <div className="pl-6 space-y-0.5 border-l border-slate-100 ml-2 mt-0.5">
+                  {renderPermissionTreeNodes(node.children!)}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // ---------------------------------------------------------------------------
+  // 2. 操作记录 STATE & HANDLERS
+  // ---------------------------------------------------------------------------
+  const [auditTab, setAuditTab] = useState<"today" | "history">("today");
+  const [auditActionType, setAuditActionType] = useState<string>("");
+  const [auditNameInput, setAuditNameInput] = useState<string>("");
+  const [auditStartDate, setAuditStartDate] = useState<string>("2025-04-22");
+  const [auditEndDate, setAuditEndDate] = useState<string>("2025-05-21");
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState<boolean>(false);
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState<boolean>(false);
+
+  // Active filter state triggered by "搜索"
+  const [appliedAuditFilter, setAppliedAuditFilter] = useState({
+    tab: "today" as "today" | "history",
+    actionType: "",
+    name: "",
+    startDate: "2025-04-22",
+    endDate: "2025-05-21",
+  });
+
+  const handleAuditSearch = () => {
+    setAppliedAuditFilter({
+      tab: auditTab,
+      actionType: auditActionType,
+      name: auditNameInput,
+      startDate: auditStartDate,
+      endDate: auditEndDate,
+    });
+    showToast("🔍 已完成日志查询筛选");
+  };
+
+  const handleSwitchAuditTab = (tab: "today" | "history") => {
+    setAuditTab(tab);
+    setAppliedAuditFilter((prev) => ({
+      ...prev,
+      tab: tab,
+      actionType: auditActionType,
+      name: auditNameInput,
+      startDate: auditStartDate,
+      endDate: auditEndDate,
+    }));
+  };
+
+  // Mock Audit Log Data with realistic mobile numbers for account and real names
+  const [allAuditLogs] = useState([
+    // 今日数据
+    { id: "LOG-1001", account: "13800138000", name: "致上", time: "2025-05-22 14:15:07", client: "用户端", ip: "112.5.168.19", actionType: "下载", relatedId: "41235080", isToday: true },
+    { id: "LOG-1002", account: "13912345678", name: "陈伟", time: "2025-05-22 14:15:01", client: "用户端", ip: "112.5.168.19", actionType: "上传", relatedId: "41235080", isToday: true },
+    { id: "LOG-1003", account: "15088889999", name: "刘洋", time: "2025-05-22 14:10:52", client: "用户端", ip: "112.5.168.19", actionType: "上传", relatedId: "41234568", isToday: true },
+    { id: "LOG-1004", account: "18666667777", name: "周敏", time: "2025-05-22 14:10:52", client: "用户端", ip: "112.5.168.19", actionType: "上传", relatedId: "41234567", isToday: true },
+    { id: "LOG-1005", account: "13755554444", name: "徐振", time: "2025-05-22 13:20:10", client: "管理端", ip: "121.34.89.12", actionType: "编辑", relatedId: "908123", isToday: true },
+    { id: "LOG-1006", account: "15811112222", name: "张小梅", time: "2025-05-22 11:05:44", client: "用户端", ip: "114.220.10.55", actionType: "移动到回收站", relatedId: "501239", isToday: true },
+    { id: "LOG-1007", account: "17733334444", name: "李强", time: "2025-05-22 09:40:12", client: "用户端", ip: "220.181.108.91", actionType: "推送", relatedId: "881204", isToday: true },
+    { id: "LOG-1008", account: "18955556666", name: "赵天", time: "2025-05-22 08:30:00", client: "管理端", ip: "58.216.2.100", actionType: "从回收站恢复", relatedId: "60128", isToday: true },
+
+    // 历史数据
+    { id: "LOG-2001", account: "13800138000", name: "致上", time: "2025-05-21 18:02:11", client: "用户端", ip: "27.30.115.46", actionType: "登录", relatedId: "703", isToday: false },
+    { id: "LOG-2002", account: "13912345678", name: "陈伟", time: "2025-05-21 18:00:00", client: "用户端", ip: "112.5.168.54", actionType: "登录", relatedId: "703", isToday: false },
+    { id: "LOG-2003", account: "15088889999", name: "刘洋", time: "2025-05-21 17:55:12", client: "用户端", ip: "112.5.168.54", actionType: "登录", relatedId: "703", isToday: false },
+    { id: "LOG-2004", account: "13699998888", name: "林建红", time: "2025-05-21 17:45:00", client: "管理端", ip: "112.5.168.54", actionType: "账号删除", relatedId: "53032", isToday: false },
+    { id: "LOG-2005", account: "18065731211", name: "灰灰", time: "2025-05-21 17:41:04", client: "用户端", ip: "112.5.168.54", actionType: "登录", relatedId: "29028", isToday: false },
+    { id: "LOG-2006", account: "13522223333", name: "王芳", time: "2025-05-20 14:12:00", client: "管理端", ip: "183.136.220.4", actionType: "彻底删除", relatedId: "77192", isToday: false },
+    { id: "LOG-2007", account: "17388889999", name: "陈明", time: "2025-05-19 11:30:15", client: "用户端", ip: "121.34.89.12", actionType: "编辑", relatedId: "33019", isToday: false },
+  ]);
+
+  const handleExportFile = (fileType: "csv" | "excel") => {
+    setIsExportDropdownOpen(false);
+    showToast(`✅ 已成功导出 ${fileType.toUpperCase()} 文件！`);
+  };
+
+  const filteredAuditLogs = allAuditLogs.filter((log) => {
+    // 1. Check today / history tab
+    if (appliedAuditFilter.tab === "today" && !log.isToday) return false;
+    if (appliedAuditFilter.tab === "history" && log.isToday) return false;
+
+    // 2. Check operation type filter
+    if (appliedAuditFilter.actionType && log.actionType !== appliedAuditFilter.actionType) {
+      return false;
+    }
+
+    // 3. Check name / account search key
+    if (appliedAuditFilter.name) {
+      const q = appliedAuditFilter.name.trim().toLowerCase();
+      const matchName = log.name.toLowerCase().includes(q);
+      const matchAccount = log.account.toLowerCase().includes(q);
+      if (!matchName && !matchAccount) return false;
+    }
+
+    return true;
+  });
+
+  const renderActionBadge = (actionType: string) => {
+    switch (actionType) {
+      case "上传":
+        return <span className="bg-[#DCFCE7] text-[#16A34A] font-bold px-3 py-1 rounded-md text-[11px]">上传</span>;
+      case "下载":
+        return <span className="bg-[#F3E8FF] text-[#7C3AED] font-bold px-3 py-1 rounded-md text-[11px]">下载</span>;
+      case "登录":
+        return <span className="bg-[#F3E8FF] text-[#7C3AED] font-bold px-3 py-1 rounded-md text-[11px]">登录</span>;
+      case "账号删除":
+        return <span className="bg-[#FEE2E2] text-[#DC2626] font-bold px-3 py-1 rounded-md text-[11px]">账号删除</span>;
+      case "彻底删除":
+        return <span className="bg-[#FEE2E2] text-[#DC2626] font-bold px-3 py-1 rounded-md text-[11px]">彻底删除</span>;
+      case "移动到回收站":
+        return <span className="bg-[#FFEDD5] text-[#EA580C] font-bold px-3 py-1 rounded-md text-[11px]">移动到回收站</span>;
+      case "从回收站恢复":
+        return <span className="bg-[#CCFBF1] text-[#0D9488] font-bold px-3 py-1 rounded-md text-[11px]">从回收站恢复</span>;
+      case "编辑":
+        return <span className="bg-[#DBEAFE] text-[#2563EB] font-bold px-3 py-1 rounded-md text-[11px]">编辑</span>;
+      case "推送":
+        return <span className="bg-[#DCFCE7] text-[#16A34A] font-bold px-3 py-1 rounded-md text-[11px]">推送</span>;
+      default:
+        return <span className="bg-slate-100 text-slate-700 font-bold px-3 py-1 rounded-md text-[11px]">{actionType}</span>;
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // 3. 水印 STATE & HANDLERS
+  // ---------------------------------------------------------------------------
+  const [watermarkType, setWatermarkType] = useState<"text" | "image">("text");
+  const [watermarkText, setWatermarkText] = useState("梦畅AIGC 版权所有");
+  const [watermarkOpacity, setWatermarkOpacity] = useState(80);
+  const [watermarkPosition, setWatermarkPosition] = useState("bottom-right");
+  const [watermarkEnabled, setWatermarkEnabled] = useState(true);
+
+  // ---------------------------------------------------------------------------
+  // 4. 系统设置 STATE & HANDLERS
+  // ---------------------------------------------------------------------------
+  const [sysName, setSysName] = useState("梦畅AIGC电商平台");
+  const [sysDomain, setSysDomain] = useState("https://aigc.mengchang.com");
+  const [sysStorageEngine, setSysStorageEngine] = useState("aliyun_oss");
+  const [sysMaxRenderTasks, setSysMaxRenderTasks] = useState(16);
+  const [sysDefaultResolution, setSysDefaultResolution] = useState("4K");
+  const [sysAutoGrantCredits, setSysAutoGrantCredits] = useState(true);
+
+  // ---------------------------------------------------------------------------
+  // 5. 系统自动化标签 STATE & HANDLERS
+  // ---------------------------------------------------------------------------
+  const [tagRules, setTagRules] = useState([
+    { id: "TR-01", name: "爆款复刻高赞标记", condition: "复刻视频完播率 > 45%", targetTag: "🔥 爆款潜质", enabled: true },
+    { id: "TR-02", name: "高清画质素材分类", condition: "素材分辨率 == 4K 且 帧率 >= 60", targetTag: "💎 极清原片", enabled: true },
+    { id: "TR-03", name: "千川高ROI商品标", condition: "消耗 > ¥5,000 且 ROI >= 2.5", targetTag: "💰 高转化商品", enabled: false },
+  ]);
+
+  const toggleTagRule = (id: string) => {
+    setTagRules((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r))
+    );
+    showToast("自动化打标规则状态已更新");
+  };
+
+  // ---------------------------------------------------------------------------
+  // 6. 广告组管理 STATE & HANDLERS
+  // ---------------------------------------------------------------------------
+  const [adGroups, setAdGroups] = useState([
+    { id: "ADG-101", name: "巨量千川 - 美妆夏日防晒组", platform: "抖音", account: "千川-174950182740", budget: "¥5,000/天", status: "投放中" },
+    { id: "ADG-102", name: "腾讯广点通 - 服装新品引流", platform: "微信", account: "广点通-90812341", budget: "¥3,000/天", status: "投放中" },
+    { id: "ADG-103", name: "快手磁力引擎 - 家电特惠组", platform: "快手", account: "磁力引擎-8812049", budget: "¥2,000/天", status: "已暂停" },
+  ]);
+
+  // ---------------------------------------------------------------------------
+  // 7. 登录记录 STATE & HANDLERS
+  // ---------------------------------------------------------------------------
+  const [loginLogs] = useState([
+    { id: "L-1", user: "徐振 (CEO)", ip: "121.34.89.12", location: "浙江省杭州市", device: "Chrome 127.0 (macOS)", time: "2026-08-12 23:10:05", status: "正常" },
+    { id: "L-2", user: "张小梅", ip: "114.220.10.55", location: "江苏省南京市", device: "Edge 126.0 (Windows)", time: "2026-08-12 21:05:12", status: "正常" },
+    { id: "L-3", user: "李强", ip: "220.181.108.91", location: "北京市", device: "Safari 17.5 (iOS)", time: "2026-08-12 19:12:40", status: "异地安全预警" },
+  ]);
+
+  // ---------------------------------------------------------------------------
+  // 8. 多站点异步同步 STATE & HANDLERS
+  // ---------------------------------------------------------------------------
+  const [syncNodes, setSyncNodes] = useState([
+    { id: "NODE-CN-1", name: "华东主数据中心 (杭州)", type: "Master", queueLength: 0, lastSync: "实时同步中", status: "healthy" },
+    { id: "NODE-CN-2", name: "华南镜像节点 (广州)", type: "Replica", queueLength: 12, lastSync: "2分钟前", status: "healthy" },
+    { id: "NODE-US-1", name: "北美跨境节点 (硅谷)", type: "Edge", queueLength: 145, lastSync: "15分钟前", status: "syncing" },
+  ]);
+
+  const handleManualSync = (nodeId: string) => {
+    setSyncNodes((prev) =>
+      prev.map((n) => (n.id === nodeId ? { ...n, queueLength: 0, lastSync: "刚刚", status: "healthy" } : n))
+    );
+    showToast("已发起该节点的增量同步任务");
+  };
+
+  // ---------------------------------------------------------------------------
+  // 9. 消息通知 STATE & HANDLERS
+  // ---------------------------------------------------------------------------
+  const [notifications, setNotifications] = useState<NotificationCategory[]>(() => {
+    const saved = localStorage.getItem("cloud_video_notification_settings");
+    if (!saved) return INITIAL_NOTIFICATION_CATEGORIES;
+    try {
+      return JSON.parse(saved);
+    } catch {
+      return INITIAL_NOTIFICATION_CATEGORIES;
+    }
+  });
+
+  const [collapsedCategoryIds, setCollapsedCategoryIds] = useState<string[]>([]);
+  const [configModalItem, setConfigModalItem] = useState<{
+    catId: string;
+    itemId: string;
+    title: string;
+    description: string;
+  } | null>(null);
+  const [customDescInput, setCustomDescInput] = useState("");
+
+  const [spendModalOpen, setSpendModalOpen] = useState(false);
+  const [spendModalCatId, setSpendModalCatId] = useState("");
+  const [spendValue, setSpendValue] = useState("10000");
+  const [growthValue, setGrowthValue] = useState("30");
+
+  const toggleCollapseCategory = (catId: string) => {
+    setCollapsedCategoryIds(prev => 
+      prev.includes(catId) ? prev.filter(id => id !== catId) : [...prev, catId]
+    );
+  };
+
+  const handleToggleEnable = (catId: string, itemId: string) => {
+    setNotifications(prev => prev.map(cat => {
+      if (cat.id !== catId) return cat;
+      return {
+        ...cat,
+        items: cat.items.map(item => {
+          if (item.id !== itemId) return item;
+          return { ...item, enabled: !item.enabled };
+        })
+      };
+    }));
+  };
+
+  const handleOpenSpendModal = (catId: string, item: NotificationItem) => {
+    setSpendModalCatId(catId);
+    const foundSpend = item.description.match(/(\d+)\s*¥/);
+    const foundGrowth = item.description.match(/(\d+)\s*%/);
+
+    setSpendValue(foundSpend ? foundSpend[1] : "10000");
+    setGrowthValue(foundGrowth ? foundGrowth[1] : "30");
+    setSpendModalOpen(true);
+  };
+
+  const handleSaveSpendConfig = () => {
+    const sVal = spendValue.trim() || "10000";
+    const gVal = growthValue.trim() || "30";
+    const newDesc = `当日消耗大于 ${sVal}¥ 并且涨幅大于 ${gVal}%，管理员收到消息提醒`;
+
+    setNotifications(prev => prev.map(cat => {
+      if (cat.id !== spendModalCatId) return cat;
+      return {
+        ...cat,
+        items: cat.items.map(item => {
+          if (item.id !== "daily_spend_growth") return item;
+          return { ...item, description: newDesc };
+        })
+      };
+    }));
+
+    showToast("✅ 已成功保存【当日消耗增长】配置");
+    setSpendModalOpen(false);
+  };
+
+  const handleOpenConfigModal = (catId: string, item: NotificationItem) => {
+    setConfigModalItem({
+      catId,
+      itemId: item.id,
+      title: item.title,
+      description: item.description
+    });
+    setCustomDescInput(item.description);
+  };
+
+  const handleSaveConfigModal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!configModalItem) return;
+    const trimmed = customDescInput.trim();
+    if (!trimmed) {
+      showToast("场景规则描述不能为空");
+      return;
+    }
+    setNotifications(prev => prev.map(cat => {
+      if (cat.id !== configModalItem.catId) return cat;
+      return {
+        ...cat,
+        items: cat.items.map(item => {
+          if (item.id !== configModalItem.itemId) return item;
+          return { ...item, description: trimmed };
+        })
+      };
+    }));
+    showToast(`✅ 已更新【${configModalItem.title}】的场景提醒规则`);
+    setConfigModalItem(null);
+  };
+
+  const handleSaveNotificationSettings = () => {
+    localStorage.setItem("cloud_video_notification_settings", JSON.stringify(notifications));
+    showToast("✅ 消息通知设置保存成功！");
+  };
+
+  // ---------------------------------------------------------------------------
+  // 10. 用户列表 STATE & HANDLERS
+  // ---------------------------------------------------------------------------
+  const [users, setUsers] = useState([
+    { id: "U-1", name: "徐振", phone: "13800138000", dept: "高管层", role: "超级管理员", time: "2025-12-16", status: true, avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&h=80&fit=crop" },
+    { id: "U-2", name: "张小梅", phone: "13912345678", dept: "剪辑1组", role: "普通剪辑师", time: "2026-01-10", status: true, avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop" },
+    { id: "U-3", name: "李强", phone: "13422223333", dept: "电商1组", role: "广告投放员", time: "2026-01-12", status: true, avatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=80&h=80&fit=crop" },
+    { id: "U-4", name: "赵天", phone: "13788889999", dept: "家电部", role: "剪辑总监", time: "2026-02-01", status: false, avatar: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=80&h=80&fit=crop" },
+  ]);
+
+  const [userSearchKey, setUserSearchKey] = useState("");
+  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+  const [userFormName, setUserFormName] = useState("");
+  const [userFormPhone, setUserFormPhone] = useState("");
+  const [userFormDept, setUserFormDept] = useState("剪辑1组");
+  const [userFormRole, setUserFormRole] = useState("普通剪辑师");
+
+  const toggleUserStatus = (id: string) => {
+    setUsers((prev) =>
+      prev.map((u) => (u.id === id ? { ...u, status: !u.status } : u))
+    );
+    showToast("用户状态更替完成");
+  };
+
+  const handleAddUser = () => {
+    if (!userFormName.trim() || !userFormPhone.trim()) {
+      showToast("请填写完整的成员姓名与手机号");
+      return;
+    }
+    const newUser = {
+      id: `U-${Date.now()}`,
+      name: userFormName,
+      phone: userFormPhone,
+      dept: userFormDept,
+      role: userFormRole,
+      time: new Date().toISOString().split("T")[0],
+      status: true,
+      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop",
+    };
+    setUsers((prev) => [newUser, ...prev]);
+    showToast(`已新增用户 [${userFormName}]`);
+    setIsAddUserModalOpen(false);
+    setUserFormName("");
+    setUserFormPhone("");
+  };
+
+  const filteredUsers = users.filter((u) =>
+    u.name.includes(userSearchKey) || u.phone.includes(userSearchKey) || u.role.includes(userSearchKey)
+  );
+
+  return (
+    <div className="h-full flex flex-col overflow-y-auto bg-slate-50 text-slate-800 font-sans relative">
+      {/* Toast Alert */}
+      {toastMessage && (
+        <div className="fixed top-20 right-8 z-[200] bg-slate-900/90 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 border border-slate-700 animate-in fade-in slide-in-from-top-2">
+          <Sparkles className="w-4 h-4 text-purple-400" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* 顶部一排导航栏 (与内容管理/资源库页面风格完全一致，顶部留出 pt-4 边距) */}
+      <div className="pt-4 px-5 pb-1 bg-slate-50 shrink-0 z-30 relative">
+        <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs relative">
+          <div className="flex items-center justify-between p-1.5 bg-slate-50/70 rounded-xl overflow-x-auto scrollbar-none">
+            <div className="flex items-center gap-1.5 min-w-max">
+              {tabs.map((t) => {
+                const Icon = t.icon;
+                const isActive = activeTab === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setActiveTab(t.id)}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+                      isActive
+                        ? "bg-white text-[#7C3AED] shadow-2xs border border-purple-200/80 ring-1 ring-purple-100"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 ${isActive ? "text-[#7C3AED]" : "text-slate-400"}`} />
+                    <span>{t.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tab Content Container */}
+      <div className="px-5 pt-3 pb-12 space-y-6 flex-1">
+        {/* --------------------------------------------------------------------------- */}
+        {/* TAB 1: 角色与权限矩阵 (ROLES & PERMISSION MATRIX)                             */}
+        {/* --------------------------------------------------------------------------- */}
+        {activeTab === "roles" && (
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
+            {/* Top Banner / Description */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+              <div>
+                <h2 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-purple-600" />
+                  <span>系统菜单与功能权限矩阵</span>
+                </h2>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  根据系统已有菜单和功能合理规划角色权限，左侧选择岗位角色，右侧配置树形控制权限
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500 font-mono">已配置角色: <strong className="text-purple-700 font-bold">{roles.length}</strong> 个</span>
+              </div>
+            </div>
+
+            {/* Split View Container */}
+            <div className="flex flex-col lg:flex-row gap-5 min-h-[580px]">
+              {/* Left Column: Role List Sidebar */}
+              <div className="w-full lg:w-64 border-r-0 lg:border-r border-slate-200/80 pr-0 lg:pr-4 space-y-4 shrink-0">
+                {/* Default Roles Section */}
+                <div className="space-y-1.5">
+                  <div className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-2">
+                    默认角色
+                  </div>
+                  <div className="space-y-1">
+                    {roles.filter(r => r.category === "default").map(r => {
+                      const isSelected = r.id === selectedRoleId;
+                      return (
+                        <div
+                          key={r.id}
+                          onClick={() => setSelectedRoleId(r.id)}
+                          className={`group flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            isSelected
+                              ? "bg-purple-100/80 text-purple-800 font-black border-l-4 border-purple-600 shadow-2xs"
+                              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 truncate">
+                            <span className="truncate">{r.name}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Other Roles Section */}
+                <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between px-2">
+                    <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
+                      其他角色
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleOpenAddRole}
+                      className="text-purple-600 hover:text-purple-800 text-[11px] font-extrabold flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>新增角色</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-1 max-h-[460px] overflow-y-auto pr-1 scrollbar-thin">
+                    {roles.filter(r => r.category !== "default").map(r => {
+                      const isSelected = r.id === selectedRoleId;
+                      return (
+                        <div
+                          key={r.id}
+                          onClick={() => setSelectedRoleId(r.id)}
+                          className={`group flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            isSelected
+                              ? "bg-purple-100/80 text-purple-800 font-black border-l-4 border-purple-600 shadow-2xs"
+                              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 truncate">
+                            <span className="truncate">{r.name}</span>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
+                              <button
+                                type="button"
+                                onClick={(e) => handleCopyRole(r, e)}
+                                title="复制角色"
+                                className="p-1 text-slate-400 hover:text-purple-600 rounded hover:bg-purple-100/50"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenEditRole(r);
+                                }}
+                                title="重命名/修改角色"
+                                className="p-1 text-slate-400 hover:text-purple-600 rounded hover:bg-purple-100/50"
+                              >
+                                <Edit3 className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteRole(r.id);
+                                }}
+                                title="删除角色"
+                                className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-100/50"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Tree Permission Grid */}
+              <div className="flex-1 pl-0 lg:pl-2 space-y-4 flex flex-col justify-between">
+                <div>
+                  {/* Header Bar */}
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <span className="text-sm font-black text-purple-700 pb-1 inline-block">
+                          角色菜单权限配置
+                        </span>
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600 rounded-full" />
+                      </div>
+                      <span className="text-xs text-slate-400 font-medium">
+                        当前选中岗位: <strong className="text-slate-800 font-bold">{selectedRole?.name}</strong>
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSelectAllTree}
+                        className="px-3 py-1 bg-slate-100 hover:bg-purple-100 text-slate-700 hover:text-purple-700 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                      >
+                        全选
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleClearAllTree}
+                        className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                      >
+                        清空
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Two Column Grid matching user screenshot */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                    {/* Left Column: 用户端 */}
+                    <div className="space-y-3 border-r-0 md:border-r border-slate-100 pr-0 md:pr-4">
+                      <div className="pb-2 border-b border-slate-200/80">
+                        <h3 className="text-sm font-extrabold text-slate-900">用户端</h3>
+                      </div>
+                      <div className="py-1 max-h-[520px] overflow-y-auto scrollbar-thin pr-2">
+                        {renderPermissionTreeNodes(USER_CLIENT_PERMISSION_TREE)}
+                      </div>
+                    </div>
+
+                    {/* Right Column: 管理后台 */}
+                    <div className="space-y-3">
+                      <div className="pb-2 border-b border-slate-200/80 flex items-center justify-between">
+                        <h3 className="text-sm font-extrabold text-slate-900">管理后台</h3>
+
+                        {/* Top Right Toggle Switch matching screenshot: 关闭 [ Switch ] 开启 */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-600">关闭</span>
+                          <button
+                            type="button"
+                            onClick={handleToggleRoleEnabled}
+                            className={`w-11 h-6 rounded-full transition-all p-0.5 cursor-pointer flex items-center ${
+                              (selectedRole?.enabled ?? true)
+                                ? "bg-[#7C3AED] justify-end"
+                                : "bg-slate-300 justify-start"
+                            }`}
+                          >
+                            <div className="w-5 h-5 bg-white rounded-full shadow-md" />
+                          </button>
+                          <span className={`text-xs font-bold ${
+                            (selectedRole?.enabled ?? true) ? "text-[#7C3AED]" : "text-slate-400"
+                          }`}>
+                            开启
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="py-1 max-h-[520px] overflow-y-auto scrollbar-thin pr-2">
+                        {renderPermissionTreeNodes(ADMIN_BACKEND_PERMISSION_TREE)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Save Action Bar matching red box in screenshot */}
+                <div className="pt-6 mt-4 border-t border-slate-100 flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSaveRolePermissions}
+                    className="px-10 py-2 bg-[#7C3AED] hover:bg-purple-700 text-white font-extrabold text-sm rounded-lg shadow-sm hover:shadow-md transition-all active:scale-98 cursor-pointer border border-purple-600"
+                  >
+                    保存
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --------------------------------------------------------------------------- */}
+        {/* TAB 2: 操作记录                                                              */}
+        {/* --------------------------------------------------------------------------- */}
+        {activeTab === "audit" && (
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
+            {/* Top Toolbar matching screenshots */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* 今日数据 / 历史数据 Switcher */}
+              <div className="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200/80">
+                <button
+                  type="button"
+                  onClick={() => handleSwitchAuditTab("today")}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                    auditTab === "today"
+                      ? "bg-[#7C3AED] text-white shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  今日数据
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSwitchAuditTab("history")}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                    auditTab === "history"
+                      ? "bg-[#7C3AED] text-white shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  历史数据
+                </button>
+              </div>
+
+              {/* Date Range Selector (Only shown when 历史数据 is active) */}
+              {auditTab === "history" && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
+                    className="flex items-center gap-2 px-3.5 py-1.5 bg-white border border-purple-300 rounded-lg text-xs text-slate-700 font-medium hover:border-[#7C3AED] focus:outline-none shadow-2xs cursor-pointer"
+                  >
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{auditStartDate} &nbsp;至&nbsp; {auditEndDate}</span>
+                  </button>
+
+                  {/* Dual Month Calendar Popover matching screenshot 2 */}
+                  {isDatePickerOpen && (
+                    <div className="absolute left-0 top-full mt-2 z-50 bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 w-[520px] animate-in fade-in slide-in-from-top-1">
+                      <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                        <span className="text-xs font-extrabold text-slate-900">选择历史时间跨度</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAuditStartDate("2025-05-15");
+                              setAuditEndDate("2025-05-22");
+                            }}
+                            className="text-[11px] text-[#7C3AED] hover:underline font-bold"
+                          >
+                            近7天
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAuditStartDate("2025-04-22");
+                              setAuditEndDate("2025-05-21");
+                            }}
+                            className="text-[11px] text-[#7C3AED] hover:underline font-bold"
+                          >
+                            近30天
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsDatePickerOpen(false)}
+                            className="p-1 hover:bg-slate-100 rounded-full text-slate-400"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Month 1: 2025年 4月 */}
+                        <div className="space-y-2">
+                          <div className="text-center text-xs font-extrabold text-slate-800">2025 年 4 月</div>
+                          <div className="grid grid-cols-7 text-center text-[10px] text-slate-400 font-bold py-1">
+                            <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+                          </div>
+                          <div className="grid grid-cols-7 text-center text-xs gap-y-1">
+                            <span className="text-slate-300">30</span><span className="text-slate-300">31</span>
+                            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+                            <span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span>
+                            <span>13</span><span>14</span><span>15</span><span>16</span><span>17</span><span>18</span><span>19</span>
+                            <span>20</span><span>21</span>
+                            <span className="bg-[#7C3AED] text-white rounded-full font-bold shadow-2xs">22</span>
+                            <span className="bg-purple-100 text-purple-800">23</span>
+                            <span className="bg-purple-100 text-purple-800">24</span>
+                            <span className="bg-purple-100 text-purple-800">25</span>
+                            <span className="bg-purple-100 text-purple-800">26</span>
+                            <span className="bg-purple-100 text-purple-800">27</span>
+                            <span className="bg-purple-100 text-purple-800">28</span>
+                            <span className="bg-purple-100 text-purple-800">29</span>
+                            <span className="bg-purple-100 text-purple-800">30</span>
+                          </div>
+                        </div>
+
+                        {/* Month 2: 2025年 5月 */}
+                        <div className="space-y-2">
+                          <div className="text-center text-xs font-extrabold text-slate-800">2025 年 5 月</div>
+                          <div className="grid grid-cols-7 text-center text-[10px] text-slate-400 font-bold py-1">
+                            <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+                          </div>
+                          <div className="grid grid-cols-7 text-center text-xs gap-y-1">
+                            <span className="bg-purple-100 text-purple-800">27</span>
+                            <span className="bg-purple-100 text-purple-800">28</span>
+                            <span className="bg-purple-100 text-purple-800">29</span>
+                            <span className="bg-purple-100 text-purple-800">30</span>
+                            <span className="bg-purple-100 text-purple-800">1</span>
+                            <span className="bg-purple-100 text-purple-800">2</span>
+                            <span className="bg-purple-100 text-purple-800">3</span>
+                            <span className="bg-purple-100 text-purple-800">4</span>
+                            <span className="bg-purple-100 text-purple-800">5</span>
+                            <span className="bg-purple-100 text-purple-800">6</span>
+                            <span className="bg-purple-100 text-purple-800">7</span>
+                            <span className="bg-purple-100 text-purple-800">8</span>
+                            <span className="bg-purple-100 text-purple-800">9</span>
+                            <span className="bg-purple-100 text-purple-800">10</span>
+                            <span className="bg-purple-100 text-purple-800">11</span>
+                            <span className="bg-purple-100 text-purple-800">12</span>
+                            <span className="bg-purple-100 text-purple-800">13</span>
+                            <span className="bg-purple-100 text-purple-800">14</span>
+                            <span className="bg-purple-100 text-purple-800">15</span>
+                            <span className="bg-purple-100 text-purple-800">16</span>
+                            <span className="bg-purple-100 text-purple-800">17</span>
+                            <span className="bg-purple-100 text-purple-800">18</span>
+                            <span className="bg-purple-100 text-purple-800">19</span>
+                            <span className="bg-purple-100 text-purple-800">20</span>
+                            <span className="bg-[#7C3AED] text-white rounded-full font-bold shadow-2xs">21</span>
+                            <span>22</span><span>23</span><span>24</span><span>25</span><span>26</span><span>27</span><span>28</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="date"
+                            value={auditStartDate}
+                            onChange={(e) => setAuditStartDate(e.target.value)}
+                            className="px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs text-slate-700"
+                          />
+                          <span className="text-slate-400 text-xs">至</span>
+                          <input
+                            type="date"
+                            value={auditEndDate}
+                            onChange={(e) => setAuditEndDate(e.target.value)}
+                            className="px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs text-slate-700"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsDatePickerOpen(false)}
+                          className="px-4 py-1.5 bg-[#7C3AED] text-white font-bold rounded-lg text-xs hover:bg-purple-700 cursor-pointer"
+                        >
+                          确认日期
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 操作类型 Select Dropdown */}
+              <div className="w-48">
+                <select
+                  value={auditActionType}
+                  onChange={(e) => setAuditActionType(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-600 font-medium focus:outline-none focus:border-[#7C3AED]"
+                >
+                  <option value="">请选择操作类型</option>
+                  <option value="上传">上传</option>
+                  <option value="下载">下载</option>
+                  <option value="编辑">编辑</option>
+                  <option value="移动到回收站">移动到回收站</option>
+                  <option value="从回收站恢复">从回收站恢复</option>
+                  <option value="彻底删除">彻底删除</option>
+                  <option value="推送">推送</option>
+                  <option value="登录">登录</option>
+                  <option value="账号删除">账号删除</option>
+                </select>
+              </div>
+
+              {/* 姓名 Input */}
+              <div className="w-48">
+                <input
+                  type="text"
+                  placeholder="请输入姓名"
+                  value={auditNameInput}
+                  onChange={(e) => setAuditNameInput(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-700 font-medium focus:outline-none focus:border-[#7C3AED]"
+                />
+              </div>
+
+              {/* 搜索 Button */}
+              <button
+                type="button"
+                onClick={handleAuditSearch}
+                className="px-5 py-1.5 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer shadow-2xs"
+              >
+                搜索
+              </button>
+
+              {/* 导出 ∨ Dropdown Button */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+                  className="px-4 py-1.5 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                >
+                  <span>导出</span>
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Dropdown Menu */}
+                {isExportDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-1.5 z-50 bg-white border border-slate-200 rounded-xl shadow-xl py-2 w-32 text-xs font-medium text-slate-700 animate-in fade-in slide-in-from-top-1">
+                    <button
+                      type="button"
+                      onClick={() => handleExportFile("csv")}
+                      className="w-full text-center py-2 hover:bg-purple-50 hover:text-[#7C3AED] transition-colors cursor-pointer"
+                    >
+                      导出csv
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleExportFile("excel")}
+                      className="w-full text-center py-2 hover:bg-purple-50 hover:text-[#7C3AED] transition-colors cursor-pointer"
+                    >
+                      导出excel
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Audit Logs Table matching Screenshots */}
+            <div className="overflow-x-auto border border-slate-100 rounded-xl">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold">
+                    <th className="py-3 px-4">账号</th>
+                    <th className="py-3 px-4">姓名</th>
+                    <th className="py-3 px-4">时间</th>
+                    <th className="py-3 px-4">操作端</th>
+                    <th className="py-3 px-4">操作IP</th>
+                    <th className="py-3 px-4">操作类型</th>
+                    <th className="py-3 px-4">关联ID</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
+                  {filteredAuditLogs.length > 0 ? (
+                    filteredAuditLogs.map((log) => (
+                      <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-4 font-mono text-slate-800">{log.account}</td>
+                        <td className="py-3 px-4 text-slate-900 font-bold">{log.name}</td>
+                        <td className="py-3 px-4 text-slate-500 font-mono">{log.time}</td>
+                        <td className="py-3 px-4 text-slate-600">{log.client}</td>
+                        <td className="py-3 px-4 font-mono text-slate-500">{log.ip}</td>
+                        <td className="py-3 px-4">{renderActionBadge(log.actionType)}</td>
+                        <td className="py-3 px-4 font-mono text-slate-500">{log.relatedId}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <FileText className="w-8 h-8 text-slate-300" />
+                          <span>暂无符合条件的操作记录</span>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* --------------------------------------------------------------------------- */}
+        {/* TAB 3: 水印                                                                  */}
+        {/* --------------------------------------------------------------------------- */}
+        {activeTab === "watermark" && (
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-6 space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">全局暗水印与视频防盗贴图设置</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  开启后将在AI渲染成片、导出的高清视频及素材中强制嵌入版块标识
+                </p>
+              </div>
+              <label className="inline-flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={watermarkEnabled}
+                  onChange={(e) => {
+                    setWatermarkEnabled(e.target.checked);
+                    showToast(`全局水印已${e.target.checked ? "开启" : "停用"}`);
+                  }}
+                  className="accent-[#7C3AED] rounded"
+                />
+                <span className="text-xs font-bold text-slate-700">
+                  {watermarkEnabled ? "已启用全局水印" : "全局水印已关闭"}
+                </span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">水印类型</label>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-1.5 text-xs text-slate-700 font-medium cursor-pointer">
+                      <input
+                        type="radio"
+                        name="wmType"
+                        checked={watermarkType === "text"}
+                        onChange={() => setWatermarkType("text")}
+                        className="accent-[#7C3AED]"
+                      />
+                      <span>文字版权水印</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-slate-700 font-medium cursor-pointer">
+                      <input
+                        type="radio"
+                        name="wmType"
+                        checked={watermarkType === "image"}
+                        onChange={() => setWatermarkType("image")}
+                        className="accent-[#7C3AED]"
+                      />
+                      <span>透明PNG Logo防伪贴图</span>
+                    </label>
+                  </div>
+                </div>
+
+                {watermarkType === "text" ? (
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">水印文本内容</label>
+                    <input
+                      type="text"
+                      value={watermarkText}
+                      onChange={(e) => setWatermarkText(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-[#7C3AED]"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">防伪Logo图片</label>
+                    <div className="border border-dashed border-slate-300 rounded-xl p-4 text-center cursor-pointer hover:border-purple-400">
+                      <Upload className="w-5 h-5 mx-auto text-slate-400 mb-1" />
+                      <span className="text-xs text-slate-500 font-bold">点击上传 PNG 透明水印 Logo</span>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    不透明度 ({watermarkOpacity}%)
+                  </label>
+                  <input
+                    type="range"
+                    min="10"
+                    max="100"
+                    value={watermarkOpacity}
+                    onChange={(e) => setWatermarkOpacity(Number(e.target.value))}
+                    className="w-full accent-[#7C3AED]"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">九宫格落点位置</label>
+                  <select
+                    value={watermarkPosition}
+                    onChange={(e) => setWatermarkPosition(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-700 font-bold"
+                  >
+                    <option value="top-left">左上角</option>
+                    <option value="top-right">右上角</option>
+                    <option value="center">画面居中 (平铺平铺)</option>
+                    <option value="bottom-left">左下角</option>
+                    <option value="bottom-right">右下角 (推荐标准)</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => showToast("全局水印参数已成功保存")}
+                  className="px-5 py-2 bg-[#7C3AED] text-white text-xs font-bold rounded-xl shadow-xs"
+                >
+                  保存水印配置
+                </button>
+              </div>
+
+              {/* Live Canvas Mock */}
+              <div className="bg-slate-900 rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden min-h-[220px] border border-slate-800">
+                <div className="text-[10px] text-slate-400 font-mono">视频画布渲染预览 (16:9)</div>
+                <div className="text-center py-10">
+                  <span className="text-slate-600 text-xs font-bold">【视频爆款场景片段】</span>
+                </div>
+                {watermarkEnabled && (
+                  <div
+                    style={{ opacity: watermarkOpacity / 100 }}
+                    className={`absolute p-2 bg-black/40 text-white text-xs font-black rounded backdrop-blur-xs ${
+                      watermarkPosition === "bottom-right"
+                        ? "bottom-4 right-4"
+                        : watermarkPosition === "top-left"
+                        ? "top-4 left-4"
+                        : watermarkPosition === "top-right"
+                        ? "top-4 right-4"
+                        : watermarkPosition === "bottom-left"
+                        ? "bottom-4 left-4"
+                        : "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+                    }`}
+                  >
+                    {watermarkText}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --------------------------------------------------------------------------- */}
+        {/* TAB 4: 系统设置                                                              */}
+        {/* --------------------------------------------------------------------------- */}
+        {activeTab === "system_settings" && (
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-6 space-y-6">
+            <h3 className="text-sm font-bold text-slate-900 pb-2 border-b border-slate-100">
+              基础站点与渲染引擎参数配置
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">系统空间名称</label>
+                <input
+                  type="text"
+                  value={sysName}
+                  onChange={(e) => setSysName(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-[#7C3AED]"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">主站安全访问域名</label>
+                <input
+                  type="text"
+                  value={sysDomain}
+                  onChange={(e) => setSysDomain(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-[#7C3AED]"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">默认存储引擎驱动</label>
+                <select
+                  value={sysStorageEngine}
+                  onChange={(e) => setSysStorageEngine(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white text-slate-700 font-bold"
+                >
+                  <option value="aliyun_oss">阿里云 OSS 存储驱动 (华东1)</option>
+                  <option value="tencent_cos">腾讯云 COS 对象存储</option>
+                  <option value="aws_s3">AWS S3 国际海外节点</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">最大并行渲染并发数</label>
+                <input
+                  type="number"
+                  value={sysMaxRenderTasks}
+                  onChange={(e) => setSysMaxRenderTasks(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-[#7C3AED]"
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => showToast("系统基础参数已成功更新")}
+              className="px-5 py-2 bg-[#7C3AED] text-white text-xs font-bold rounded-xl shadow-xs"
+            >
+              更新系统配置
+            </button>
+          </div>
+        )}
+
+        {/* --------------------------------------------------------------------------- */}
+        {/* TAB 5: 系统自动化标签                                                       */}
+        {/* --------------------------------------------------------------------------- */}
+        {activeTab === "auto_tags" && (
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">AI智能触发打标与指标规则配置</h3>
+                <p className="text-xs text-slate-500 mt-0.5">根据视频播放数据、画质参数或投放ROI自动挂载业务标签</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => showToast("已新增打标条件规则模板")}
+                className="px-3 py-1.5 bg-[#7C3AED] text-white text-xs font-bold rounded-xl flex items-center gap-1 shadow-2xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>新增打标规则</span>
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {tagRules.map((r) => (
+                <div key={r.id} className="p-4 border border-slate-200/80 rounded-2xl bg-slate-50/50 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs text-slate-800">{r.name}</span>
+                      <span className="px-2 py-0.5 bg-purple-100 text-[#7C3AED] font-black text-[10px] rounded-md">
+                        {r.targetTag}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-500 font-mono mt-1">触发表达式: {r.condition}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleTagRule(r.id)}
+                    className={`px-3 py-1 text-xs font-bold rounded-xl transition-colors ${
+                      r.enabled ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
+                    }`}
+                  >
+                    {r.enabled ? "规则生效中" : "已暂停"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* --------------------------------------------------------------------------- */}
+        {/* TAB 6: 广告组管理                                                           */}
+        {/* --------------------------------------------------------------------------- */}
+        {activeTab === "ad_groups" && (
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-sm font-bold text-slate-900">跨平台绑定的千川/广点通广告组</h3>
+              <button
+                type="button"
+                onClick={() => showToast("已触发与广告主平台同步接口")}
+                className="px-3 py-1.5 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-1"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>一键同步最新消耗</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {adGroups.map((ad) => (
+                <div key={ad.id} className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded">
+                      {ad.platform}
+                    </span>
+                    <span className="text-xs font-bold text-emerald-600">{ad.status}</span>
+                  </div>
+                  <h4 className="font-bold text-xs text-slate-800">{ad.name}</h4>
+                  <div className="text-[11px] text-slate-400 font-mono">绑账号: {ad.account}</div>
+                  <div className="text-xs font-extrabold text-purple-700 pt-2 border-t border-slate-100">
+                    预算限制: {ad.budget}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* --------------------------------------------------------------------------- */}
+        {/* TAB 7: 登录记录                                                              */}
+        {/* --------------------------------------------------------------------------- */}
+        {activeTab === "login_logs" && (
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
+            <h3 className="text-sm font-bold text-slate-900 pb-2 border-b border-slate-100">
+              全员登录历史、终端与安全预警记录
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
+                    <th className="py-2.5 px-3">用户</th>
+                    <th className="py-2.5 px-3">IP地址</th>
+                    <th className="py-2.5 px-3">归属地</th>
+                    <th className="py-2.5 px-3">登录终端设备</th>
+                    <th className="py-2.5 px-3">登录时间</th>
+                    <th className="py-2.5 px-3">状态预警</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {loginLogs.map((l) => (
+                    <tr key={l.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-2.5 px-3 font-bold text-slate-800">{l.user}</td>
+                      <td className="py-2.5 px-3 font-mono text-slate-500">{l.ip}</td>
+                      <td className="py-2.5 px-3 text-slate-600">{l.location}</td>
+                      <td className="py-2.5 px-3 text-slate-500 font-mono">{l.device}</td>
+                      <td className="py-2.5 px-3 text-slate-400 font-mono">{l.time}</td>
+                      <td className="py-2.5 px-3">
+                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${l.status === "正常" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
+                          {l.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* --------------------------------------------------------------------------- */}
+        {/* TAB 8: 多站点异步同步                                                        */}
+        {/* --------------------------------------------------------------------------- */}
+        {activeTab === "async_sync" && (
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
+            <h3 className="text-sm font-bold text-slate-900 pb-2 border-b border-slate-100">
+              集群分布式节点与增量队列同步
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {syncNodes.map((node) => (
+                <div key={node.id} className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-slate-800">{node.name}</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 bg-slate-100 text-slate-600 rounded">
+                      {node.type}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-500">积压队列: <strong className="text-purple-700">{node.queueLength}</strong> 条</div>
+                  <div className="text-xs text-slate-400">上次同步时间: {node.lastSync}</div>
+                  <button
+                    type="button"
+                    onClick={() => handleManualSync(node.id)}
+                    className="w-full py-1.5 bg-[#7C3AED] text-white text-xs font-bold rounded-xl shadow-2xs"
+                  >
+                    手动触发增量同步
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* --------------------------------------------------------------------------- */}
+        {/* TAB 9: 消息通知 (MESSAGE NOTIFICATIONS)                                     */}
+        {/* --------------------------------------------------------------------------- */}
+        {activeTab === "notifications" && (
+          <div className="space-y-4 animate-fade-in pb-12">
+            {notifications.map((cat) => {
+              const isCollapsed = collapsedCategoryIds.includes(cat.id);
+              return (
+                <div 
+                  key={cat.id} 
+                  className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden transition-all"
+                >
+                  {/* Category Header */}
+                  <div 
+                    onClick={() => toggleCollapseCategory(cat.id)}
+                    className="p-4 bg-white hover:bg-slate-50/80 cursor-pointer flex items-center justify-between border-b border-slate-100 transition-colors select-none"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-1 h-4 bg-purple-600 rounded-full" />
+                      <span className="font-extrabold text-slate-800 text-sm">{cat.title}</span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isCollapsed ? "rotate-180" : ""}`} />
+                  </div>
+
+                  {/* Category Table Content */}
+                  {!isCollapsed && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50/70 border-b border-slate-100 text-slate-500 font-extrabold text-[11px]">
+                            <th className="py-3 px-5 w-56">消息类型</th>
+                            <th className="py-3 px-5">场景说明</th>
+                            <th className="py-3 px-5 w-36 text-center">是否接收</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100/80 font-medium text-slate-700">
+                          {cat.items.map((item) => {
+                            const isActionInReceiveCol = ["video_status_change", "booked_by_others", "cancel_booking"].includes(item.id);
+                            const isDailySpendGrowth = item.id === "daily_spend_growth";
+
+                            return (
+                              <tr key={item.id} className="hover:bg-purple-50/20 transition-colors">
+                                <td className="py-3.5 px-5 font-bold text-slate-900">{item.title}</td>
+                                <td className="py-3.5 px-5 text-slate-500 text-xs">
+                                  <span>{item.description}</span>
+                                  {isDailySpendGrowth && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenSpendModal(cat.id, item)}
+                                      className="text-purple-600 hover:text-purple-700 font-extrabold text-xs ml-2 cursor-pointer inline-flex items-center gap-0.5 hover:underline"
+                                    >
+                                      修改
+                                    </button>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-5 text-center">
+                                  {isActionInReceiveCol ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenConfigModal(cat.id, item)}
+                                      className="text-purple-600 hover:text-purple-700 font-extrabold text-xs cursor-pointer inline-flex items-center gap-0.5 hover:underline"
+                                    >
+                                      修改
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleEnable(cat.id, item.id)}
+                                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                        item.enabled ? "bg-purple-600" : "bg-slate-200"
+                                      }`}
+                                    >
+                                      <span
+                                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
+                                          item.enabled ? "translate-x-4" : "translate-x-0"
+                                        }`}
+                                      />
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Bottom Floating/Sticky Actions */}
+            <div className="sticky bottom-4 z-10 bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-slate-200/90 shadow-lg flex items-center justify-between text-xs mt-6">
+              <span className="text-slate-400 font-medium">
+                修改后，点击右侧【保存设置】即可生效
+              </span>
+              <button
+                type="button"
+                onClick={handleSaveNotificationSettings}
+                className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-2 active:scale-95"
+              >
+                <span>保存设置</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* --------------------------------------------------------------------------- */}
+        {/* TAB 10: 用户                                                                 */}
+        {/* --------------------------------------------------------------------------- */}
+        {activeTab === "users" && (
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="relative flex-1 sm:w-64">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="搜索成员姓名 / 手机号 / 角色..."
+                  value={userSearchKey}
+                  onChange={(e) => setUserSearchKey(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-[#7C3AED]"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddUserModalOpen(true)}
+                className="px-4 py-2 bg-[#7C3AED] text-white text-xs font-bold rounded-xl flex items-center gap-1 shadow-2xs"
+              >
+                <Plus className="w-4 h-4" />
+                <span>新增系统用户</span>
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
+                    <th className="py-2.5 px-3">用户</th>
+                    <th className="py-2.5 px-3">手机号</th>
+                    <th className="py-2.5 px-3">所属部门</th>
+                    <th className="py-2.5 px-3">分配角色</th>
+                    <th className="py-2.5 px-3">注册日期</th>
+                    <th className="py-2.5 px-3">账号状态</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {filteredUsers.map((u) => (
+                    <tr key={u.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-2">
+                          <img src={u.avatar} alt={u.name} className="w-7 h-7 rounded-full object-cover" />
+                          <span className="font-bold text-slate-800">{u.name}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 font-mono text-slate-500">{u.phone}</td>
+                      <td className="py-3 px-3 text-slate-600">{u.dept}</td>
+                      <td className="py-3 px-3 font-bold text-purple-700">{u.role}</td>
+                      <td className="py-3 px-3 text-slate-400">{u.time}</td>
+                      <td className="py-3 px-3">
+                        <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={u.status}
+                            onChange={() => toggleUserStatus(u.id)}
+                            className="accent-[#7C3AED] rounded"
+                          />
+                          <span className={u.status ? "text-emerald-600 font-bold" : "text-slate-400"}>
+                            {u.status ? "启用" : "已禁用"}
+                          </span>
+                        </label>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* --------------------------------------------------------------------------- */}
+      {/* MODAL: 新增/修改角色                                                         */}
+      {/* --------------------------------------------------------------------------- */}
+      {isRoleModalOpen && (
+        <div className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800">
+                {editingRoleId ? "修改角色" : "新增角色"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsRoleModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">角色名称</label>
+                <input
+                  type="text"
+                  value={roleFormName}
+                  onChange={(e) => setRoleFormName(e.target.value)}
+                  placeholder="如：特效高级剪辑师"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#7C3AED]"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">角色描述</label>
+                <textarea
+                  value={roleFormDesc}
+                  onChange={(e) => setRoleFormDesc(e.target.value)}
+                  placeholder="说明该角色的业务定位与使用场景..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#7C3AED]"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsRoleModalOpen(false)}
+                  className="px-4 py-1.5 border border-slate-200 text-slate-600 text-xs font-bold rounded-lg"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveRole}
+                  className="px-4 py-1.5 bg-[#7C3AED] text-white text-xs font-bold rounded-lg shadow-2xs"
+                >
+                  确认保存
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --------------------------------------------------------------------------- */}
+      {/* MODAL: 提醒规则修改模态框                                                   */}
+      {/* --------------------------------------------------------------------------- */}
+      {configModalItem && (
+        <div className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800">
+                修改场景提醒规则【{configModalItem.title}】
+              </h3>
+              <button
+                type="button"
+                onClick={() => setConfigModalItem(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveConfigModal} className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">场景提醒描述</label>
+                <textarea
+                  value={customDescInput}
+                  onChange={(e) => setCustomDescInput(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-purple-600"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setConfigModalItem(null)}
+                  className="px-4 py-1.5 border border-slate-200 text-slate-600 text-xs font-bold rounded-lg"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-lg shadow-2xs"
+                >
+                  保存更新
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --------------------------------------------------------------------------- */}
+      {/* MODAL: 当日消耗增长规则修改                                                 */}
+      {/* --------------------------------------------------------------------------- */}
+      {spendModalOpen && (
+        <div className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800">修改【当日消耗增长】提醒阈值</h3>
+              <button
+                type="button"
+                onClick={() => setSpendModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">当日消耗金额大于 (¥)</label>
+                <input
+                  type="number"
+                  value={spendValue}
+                  onChange={(e) => setSpendValue(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-purple-600"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">并且涨幅大于 (%)</label>
+                <input
+                  type="number"
+                  value={growthValue}
+                  onChange={(e) => setGrowthValue(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-purple-600"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSpendModalOpen(false)}
+                  className="px-4 py-1.5 border border-slate-200 text-slate-600 text-xs font-bold rounded-lg"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveSpendConfig}
+                  className="px-4 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-lg shadow-2xs"
+                >
+                  确认修改
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --------------------------------------------------------------------------- */}
+      {/* MODAL: 新增用户                                                             */}
+      {/* --------------------------------------------------------------------------- */}
+      {isAddUserModalOpen && (
+        <div className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800">新增系统用户</h3>
+              <button
+                type="button"
+                onClick={() => setIsAddUserModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">成员姓名</label>
+                <input
+                  type="text"
+                  value={userFormName}
+                  onChange={(e) => setUserFormName(e.target.value)}
+                  placeholder="请输入真实姓名"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#7C3AED]"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">手机号码</label>
+                <input
+                  type="text"
+                  value={userFormPhone}
+                  onChange={(e) => setUserFormPhone(e.target.value)}
+                  placeholder="请输入11位手机号"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#7C3AED]"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">所属部门</label>
+                  <select
+                    value={userFormDept}
+                    onChange={(e) => setUserFormDept(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs bg-white text-slate-700"
+                  >
+                    <option value="剪辑1组">剪辑1组</option>
+                    <option value="电商1组">电商1组</option>
+                    <option value="品牌2组">品牌2组</option>
+                    <option value="服装部">服装部</option>
+                    <option value="家电部">家电部</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">分配角色</label>
+                  <select
+                    value={userFormRole}
+                    onChange={(e) => setUserFormRole(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs bg-white text-slate-700"
+                  >
+                    <option value="超级管理员">超级管理员</option>
+                    <option value="剪辑总监">剪辑总监</option>
+                    <option value="普通剪辑师">普通剪辑师</option>
+                    <option value="广告投放员">广告投放员</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddUserModalOpen(false)}
+                  className="px-4 py-1.5 border border-slate-200 text-slate-600 text-xs font-bold rounded-lg"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddUser}
+                  className="px-4 py-1.5 bg-[#7C3AED] text-white text-xs font-bold rounded-lg shadow-2xs"
+                >
+                  提交新增
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

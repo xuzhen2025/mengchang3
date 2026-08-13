@@ -2917,27 +2917,40 @@ export default function TaskCollaborationView({
                       <div className="flex items-center justify-center gap-2">
                         {/* Display existing associated works */}
                         {task.associatedWorks && task.associatedWorks.length > 0 && (
-                          <div className="flex items-center gap-1.5">
-                            {task.associatedWorks.map((work) => (
-                              <div key={work.id} className="flex items-center gap-1 bg-purple-50/80 border border-purple-100 rounded-md px-1.5 py-0.5 text-[11px] max-w-[180px]">
-                                <span className={`px-1 py-0.2 rounded text-[10px] font-extrabold text-white shrink-0 ${
-                                  work.type === 'video' ? 'bg-purple-600' :
-                                  work.type === 'image' ? 'bg-emerald-600' :
-                                  work.type === 'text' ? 'bg-amber-600' : 'bg-blue-600'
-                                }`}>
-                                  {work.type === 'video' ? '素' : work.type === 'image' ? '图' : work.type === 'text' ? '文' : '音'}
-                                </span>
-                                <span className="font-medium text-slate-700 truncate max-w-[100px]" title={work.name}>
-                                  {work.name}
-                                </span>
-                                {work.status && (
-                                  <span className="px-1 py-0.2 bg-[#FF5722] text-white text-[9px] font-bold rounded shrink-0">
-                                    {work.status}
-                                  </span>
-                                )}
+                          (() => {
+                            const scripts = task.associatedScripts && task.associatedScripts.length > 0
+                              ? task.associatedScripts
+                              : (task.associatedScript ? [task.associatedScript] : []);
+                            const worksCount = task.associatedWorks.length;
+                            const scriptsCount = scripts.length;
+                            const canExpand = worksCount > 1 || scriptsCount > 1;
+                            const isExpanded = canExpand && expandedTaskIds.has(task.id);
+                            const worksToDisplay = isExpanded ? task.associatedWorks : [task.associatedWorks[0]];
+
+                            return (
+                              <div className={isExpanded ? "flex flex-col gap-1.5 items-start text-left py-1" : "flex items-center gap-1.5"}>
+                                {worksToDisplay.map((work) => (
+                                  <div key={work.id} className="flex items-center gap-1 bg-purple-50/80 border border-purple-100 rounded-md px-1.5 py-0.5 text-[11px] max-w-[180px]">
+                                    <span className={`px-1 py-0.2 rounded text-[10px] font-extrabold text-white shrink-0 ${
+                                      work.type === 'video' ? 'bg-purple-600' :
+                                      work.type === 'image' ? 'bg-emerald-600' :
+                                      work.type === 'text' ? 'bg-amber-600' : 'bg-blue-600'
+                                    }`}>
+                                      {work.type === 'video' ? '素' : work.type === 'image' ? '图' : work.type === 'text' ? '文' : '音'}
+                                    </span>
+                                    <span className="font-medium text-slate-700 truncate max-w-[100px]" title={work.name}>
+                                      {work.name}
+                                    </span>
+                                    {work.status && (
+                                      <span className="px-1 py-0.2 bg-[#FF5722] text-white text-[9px] font-bold rounded shrink-0">
+                                        {work.status}
+                                      </span>
+                                    )}
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
+                            );
+                          })()
                         )}
 
                         {/* Plus Button with Dropdown Popover */}
@@ -2997,33 +3010,40 @@ export default function TaskCollaborationView({
                         const scripts = task.associatedScripts && task.associatedScripts.length > 0
                           ? task.associatedScripts
                           : (task.associatedScript ? [task.associatedScript] : []);
-                        const isExpanded = expandedTaskIds.has(task.id);
+                        const worksCount = task.associatedWorks ? task.associatedWorks.length : 0;
+                        const scriptsCount = scripts.length;
+                        const canExpand = worksCount > 1 || scriptsCount > 1;
+                        const isExpanded = canExpand && expandedTaskIds.has(task.id);
 
                         return (
                           <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                             {/* 左侧：关联脚本列表 (展开时：有几个就竖着排列显示几个；未展开时：只显示第1个) */}
-                            {isExpanded ? (
-                              <div className="flex flex-col gap-2 text-left py-1">
-                                {scripts.map((sc, sIdx) => (
-                                  <div key={sc.id || sIdx} className="flex items-center gap-1.5 whitespace-nowrap">
-                                    <span className="font-bold text-slate-800 text-xs shrink-0 max-w-[140px] truncate" title={sc.title}>
-                                      {sc.title}
-                                    </span>
-                                    <span className="px-2 py-0.5 bg-[#FF5722] text-white text-[10px] font-extrabold rounded shadow-2xs shrink-0 whitespace-nowrap">
-                                      {sc.status || "待审核"}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
+                            {scripts.length > 0 ? (
+                              isExpanded ? (
+                                <div className="flex flex-col gap-2 text-left py-1">
+                                  {scripts.map((sc, sIdx) => (
+                                    <div key={sc.id || sIdx} className="flex items-center gap-1.5 whitespace-nowrap">
+                                      <span className="font-bold text-slate-800 text-xs shrink-0 max-w-[140px] truncate" title={sc.title}>
+                                        {sc.title}
+                                      </span>
+                                      <span className="px-2 py-0.5 bg-[#FF5722] text-white text-[10px] font-extrabold rounded shadow-2xs shrink-0 whitespace-nowrap">
+                                        {sc.status || "待审核"}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1.5 whitespace-nowrap">
+                                  <span className="font-bold text-slate-800 text-xs shrink-0 max-w-[140px] truncate" title={scripts[0]?.title || "改写"}>
+                                    {scripts[0]?.title || "改写"}
+                                  </span>
+                                  <span className="px-2 py-0.5 bg-[#FF5722] text-white text-[10px] font-extrabold rounded shadow-2xs shrink-0 whitespace-nowrap">
+                                    {scripts[0]?.status || "待审核"}
+                                  </span>
+                                </div>
+                              )
                             ) : (
-                              <div className="flex items-center gap-1.5 whitespace-nowrap">
-                                <span className="font-bold text-slate-800 text-xs shrink-0 max-w-[140px] truncate" title={scripts[0]?.title || "改写"}>
-                                  {scripts[0]?.title || "改写"}
-                                </span>
-                                <span className="px-2 py-0.5 bg-[#FF5722] text-white text-[10px] font-extrabold rounded shadow-2xs shrink-0 whitespace-nowrap">
-                                  {scripts[0]?.status || "待审核"}
-                                </span>
-                              </div>
+                              <span className="text-slate-400 text-xs font-normal">暂无关联脚本</span>
                             )}
 
                             {/* 右侧：3个关联操作按钮 (关联脚本、编辑脚本、向下/向上展开) */}
@@ -3058,16 +3078,26 @@ export default function TaskCollaborationView({
                                 </div>
                               </div>
 
-                              {/* 3. 向下/向上展开按钮 */}
+                              {/* 3. 向下/向上展开按钮 (如果关联作品或关联脚本里面有不止一个内容时可点击展开，否则置灰无法点击) */}
                               <div className="relative group/expand inline-block">
                                 <button
-                                  onClick={() => toggleExpandTask(task.id)}
-                                  className={`p-1.5 rounded-md transition-all cursor-pointer shadow-2xs flex items-center justify-center shrink-0 ${
-                                    isExpanded
-                                      ? "bg-[#7C3AED] text-white"
-                                      : "bg-purple-50 hover:bg-purple-100 text-[#7C3AED]"
+                                  type="button"
+                                  disabled={!canExpand}
+                                  onClick={() => canExpand && toggleExpandTask(task.id)}
+                                  className={`p-1.5 rounded-md transition-all flex items-center justify-center shrink-0 ${
+                                    !canExpand
+                                      ? "bg-slate-100 text-slate-300 cursor-not-allowed border border-slate-200/50 shadow-none opacity-60"
+                                      : isExpanded
+                                      ? "bg-[#7C3AED] text-white cursor-pointer shadow-2xs"
+                                      : "bg-purple-50 hover:bg-purple-100 text-[#7C3AED] cursor-pointer shadow-2xs"
                                   }`}
-                                  title={isExpanded ? "收起" : "展开已关联脚本"}
+                                  title={
+                                    canExpand
+                                      ? isExpanded
+                                        ? "收起"
+                                        : "展开已关联数据"
+                                      : "暂无多条关联内容，不可展开"
+                                  }
                                 >
                                   <ChevronDown
                                     className={`w-3.5 h-3.5 transition-transform duration-200 ${
@@ -3075,10 +3105,12 @@ export default function TaskCollaborationView({
                                     }`}
                                   />
                                 </button>
-                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/expand:flex items-center gap-1 z-50 bg-slate-800 text-white text-[10px] py-1 px-2 rounded-md whitespace-nowrap shadow-md pointer-events-none">
-                                  <span>{isExpanded ? "收起" : "展开已关联数据"}</span>
-                                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
-                                </div>
+                                {canExpand && (
+                                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/expand:flex items-center gap-1 z-50 bg-slate-800 text-white text-[10px] py-1 px-2 rounded-md whitespace-nowrap shadow-md pointer-events-none">
+                                    <span>{isExpanded ? "收起" : "展开已关联数据"}</span>
+                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>

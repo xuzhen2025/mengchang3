@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import FinishedVideoDetailModal from "./FinishedVideoDetailModal";
+import { PublicTagFilter } from "./PublicTagFilter";
 import { Pagination } from "./Pagination";
 import { 
   Film, 
@@ -1275,53 +1276,12 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
         </div>
 
         {/* ROW 5: 公共标签 */}
-        <div className="flex items-start gap-2 border-t border-slate-100 pt-3">
-          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2 mt-1">公共标签：</span>
-          <div className="flex-1 flex flex-wrap items-center gap-2">
-            <div className="relative border border-slate-200 rounded-lg px-2.5 py-1 flex items-center gap-1.5 bg-white w-32 shrink-0 focus-within:border-purple-400 mr-1">
-              <Search className="w-3.5 h-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="搜索标签"
-                value={publicTagSearch}
-                onChange={(e) => setPublicTagSearch(e.target.value)}
-                className="text-xs focus:outline-none w-full placeholder:text-slate-400 font-normal"
-              />
-            </div>
-
-            <button
-              onClick={() => setSelectedPublicTag("全部")}
-              className={`transition-colors cursor-pointer text-xs mr-2 ${
-                selectedPublicTag === "全部" ? "text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded" : "text-slate-600 font-normal"
-              }`}
-            >
-              全部
-            </button>
-
-            {PUBLIC_TAGS.map(tg => (
-              <button
-                key={tg}
-                onClick={() => setSelectedPublicTag(selectedPublicTag === tg ? "全部" : tg)}
-                className={`transition-colors cursor-pointer text-xs px-1.5 py-0.5 rounded ${
-                  selectedPublicTag === tg 
-                    ? "text-purple-600 font-bold bg-purple-100/70 border border-purple-200" 
-                    : "text-slate-600 hover:text-purple-600 hover:bg-slate-50 font-normal"
-                }`}
-              >
-                {tg}
-              </button>
-            ))}
-
-            <button
-              onClick={() => {
-                setPublicTagSearch("");
-                setSelectedPublicTag("全部");
-              }}
-              className="text-slate-400 hover:text-purple-600 text-xs ml-2 cursor-pointer font-normal"
-            >
-              重置公共标签
-            </button>
-          </div>
+        <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
+          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">公共标签：</span>
+          <PublicTagFilter
+            selectedTag={selectedPublicTag}
+            onSelectTag={(tag) => setSelectedPublicTag(tag)}
+          />
         </div>
 
         {/* ROW 6: 个人标签 */}

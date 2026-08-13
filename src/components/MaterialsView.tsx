@@ -1,5 +1,7 @@
 import React, { useState } from "react";
+import { PublicTagFilter } from "./PublicTagFilter";
 import FinishedVideoDetailModal from "./FinishedVideoDetailModal";
+import { Pagination } from "./Pagination";
 import { 
   Film, 
   Play, 
@@ -633,6 +635,8 @@ export default function MaterialsView({ onTriggerTask, onNavigateToDelivery, onD
   const [selectAllPage, setSelectAllPage] = useState(false);
   const [selectedVideoIds, setSelectedVideoIds] = useState<string[]>([]);
   const [isSelectionActive, setIsSelectionActive] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [hoveredVideoId, setHoveredVideoId] = useState<string | null>(null);
   const [activeCardMenu, setActiveCardMenu] = useState<{
@@ -766,13 +770,23 @@ export default function MaterialsView({ onTriggerTask, onNavigateToDelivery, onD
     return 0;
   });
 
+  // Pagination calculations
+  const totalCount = filteredVideos.length;
+  const totalPages = Math.ceil(totalCount / pageSize) || 1;
+  const paginatedVideos = filteredVideos.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
   const handleSelectAllPageToggle = () => {
     if (selectAllPage) {
-      setSelectedVideoIds([]);
+      const currentIds = paginatedVideos.map(v => v.id);
+      setSelectedVideoIds(prev => prev.filter(id => !currentIds.includes(id)));
       setSelectAllPage(false);
     } else {
       setIsSelectionActive(true);
-      setSelectedVideoIds(filteredVideos.map(v => v.id));
+      const currentIds = paginatedVideos.map(v => v.id);
+      setSelectedVideoIds(prev => Array.from(new Set([...prev, ...currentIds])));
       setSelectAllPage(true);
     }
   };
@@ -1242,53 +1256,12 @@ export default function MaterialsView({ onTriggerTask, onNavigateToDelivery, onD
         </div>
 
         {/* ROW 5: 公共标签 */}
-        <div className="flex items-start gap-2 border-t border-slate-100 pt-3">
-          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2 mt-1">公共标签：</span>
-          <div className="flex-1 flex flex-wrap items-center gap-2">
-            <div className="relative border border-slate-200 rounded-lg px-2.5 py-1 flex items-center gap-1.5 bg-white w-32 shrink-0 focus-within:border-purple-400 mr-1">
-              <Search className="w-3.5 h-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="搜索标签"
-                value={publicTagSearch}
-                onChange={(e) => setPublicTagSearch(e.target.value)}
-                className="text-xs focus:outline-none w-full placeholder:text-slate-400 font-normal"
-              />
-            </div>
-
-            <button
-              onClick={() => setSelectedPublicTag("全部")}
-              className={`transition-colors cursor-pointer text-xs mr-2 ${
-                selectedPublicTag === "全部" ? "text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded" : "text-slate-600 font-normal"
-              }`}
-            >
-              全部
-            </button>
-
-            {PUBLIC_TAGS.map(tg => (
-              <button
-                key={tg}
-                onClick={() => setSelectedPublicTag(selectedPublicTag === tg ? "全部" : tg)}
-                className={`transition-colors cursor-pointer text-xs px-1.5 py-0.5 rounded ${
-                  selectedPublicTag === tg 
-                    ? "text-purple-600 font-bold bg-purple-100/70 border border-purple-200" 
-                    : "text-slate-600 hover:text-purple-600 hover:bg-slate-50 font-normal"
-                }`}
-              >
-                {tg}
-              </button>
-            ))}
-
-            <button
-              onClick={() => {
-                setPublicTagSearch("");
-                setSelectedPublicTag("全部");
-              }}
-              className="text-slate-400 hover:text-purple-600 text-xs ml-2 cursor-pointer font-normal"
-            >
-              重置公共标签
-            </button>
-          </div>
+        <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
+          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">公共标签：</span>
+          <PublicTagFilter
+            selectedTag={selectedPublicTag}
+            onSelectTag={(tag) => setSelectedPublicTag(tag)}
+          />
         </div>
 
         {/* ROW 6: 个人标签 */}
@@ -1844,7 +1817,7 @@ export default function MaterialsView({ onTriggerTask, onNavigateToDelivery, onD
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredVideos.map((video) => (
+              {paginatedVideos.map((video) => (
                 <tr key={video.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="p-3">
                     <input
@@ -1915,7 +1888,7 @@ export default function MaterialsView({ onTriggerTask, onNavigateToDelivery, onD
       ) : (
         /* GRID VIEW MODE matching reference screenshot style */
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5">
-          {filteredVideos.map((video) => {
+          {paginatedVideos.map((video) => {
             const getStatusBadgeStyle = (st?: string) => {
               switch (st) {
                 case "待审核": return "bg-[#f08080] text-white";
@@ -2318,6 +2291,19 @@ export default function MaterialsView({ onTriggerTask, onNavigateToDelivery, onD
           })}
         </div>
       )}
+
+      {/* 底部标准翻页模块 */}
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        pageSize={pageSize}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(newSize) => {
+          setPageSize(newSize);
+          setCurrentPage(1);
+        }}
+      />
       </>
       )}
 

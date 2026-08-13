@@ -252,9 +252,130 @@ export default function AdminResourceView() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isSelectMode, setIsSelectMode] = useState<boolean>(false);
 
+  // 彻底删除 确认弹窗状态
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
+    isOpen: boolean;
+    id?: string;
+    name?: string;
+    isBatch?: boolean;
+    itemType?: string;
+  }>({ isOpen: false });
+
+  // 一键清空 密码确认弹窗状态
+  const [clearTrashModalOpen, setClearTrashModalOpen] = useState<boolean>(false);
+  const [clearPassword, setClearPassword] = useState<string>("");
+  const [passwordError, setPasswordError] = useState<string>("");
+
   // 分页状态
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(20);
+
+  // 统一缩略图/封面渲染 (确保管理端普通 Tab 与 回收站 的音频、脚本、封面渲染 100% 保持一致)
+  const renderItemCover = (item: AdminResourceItem, targetType: string) => {
+    if (targetType === "音频") {
+      return (
+        <div className="w-24 h-28 sm:w-28 sm:h-32 shrink-0 rounded-xl overflow-hidden bg-slate-50 border border-slate-200/90 relative group/cover flex flex-col items-center justify-center p-2 shadow-2xs group-hover:border-purple-300 transition-colors">
+          <div className="w-10 h-10 rounded-full border border-slate-300 bg-white shadow-2xs flex items-center justify-center mb-1 group-hover/cover:scale-105 transition-transform">
+            <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
+              <Volume2 className="w-3.5 h-3.5 text-slate-600" />
+            </div>
+          </div>
+          <div className="flex items-center gap-1 my-1">
+            <span className="w-0.5 h-3 bg-slate-400 rounded-full" />
+            <span className="w-0.5 h-4.5 bg-slate-500 rounded-full" />
+            <span className="w-0.5 h-2 bg-slate-400 rounded-full" />
+            <span className="w-0.5 h-4 bg-slate-500 rounded-full" />
+            <span className="w-0.5 h-2.5 bg-slate-400 rounded-full" />
+          </div>
+          <span className="text-[10px] text-slate-500 font-bold font-mono tracking-tight mt-0.5">音频播放</span>
+          <div className="absolute inset-0 bg-slate-900/10 opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPreviewItem(item);
+              }}
+              className="w-8 h-8 rounded-full bg-white text-slate-900 flex items-center justify-center shadow-md hover:scale-110 transition-transform cursor-pointer"
+            >
+              <Play className="w-4 h-4 fill-slate-900 ml-0.5" />
+            </button>
+          </div>
+          {item.duration && (
+            <span className="absolute bottom-1 right-1 bg-slate-800/80 text-white font-mono text-[9px] px-1 rounded">
+              {item.duration}
+            </span>
+          )}
+        </div>
+      );
+    }
+
+    if (targetType === "脚本") {
+      return (
+        <div className="w-24 h-28 sm:w-28 sm:h-32 shrink-0 rounded-xl overflow-hidden bg-slate-50 border border-slate-200/90 relative group/cover flex flex-col items-center justify-center p-2 shadow-2xs group-hover:border-purple-300 transition-colors">
+          <div className="w-10 h-13 bg-white rounded-md border border-slate-300 shadow-2xs p-1.5 flex flex-col justify-between relative group-hover/cover:scale-105 transition-transform">
+            <div className="absolute -left-1 top-2 bottom-2 flex flex-col justify-between">
+              <span className="w-1 h-0.5 bg-slate-400 rounded-full" />
+              <span className="w-1 h-0.5 bg-slate-400 rounded-full" />
+              <span className="w-1 h-0.5 bg-slate-400 rounded-full" />
+            </div>
+            <div className="space-y-1 pl-1">
+              <div className="w-full h-1 bg-slate-300 rounded-full" />
+              <div className="w-3/4 h-1 bg-slate-200 rounded-full" />
+              <div className="w-5/6 h-1 bg-slate-200 rounded-full" />
+              <div className="w-2/3 h-1 bg-slate-200 rounded-full" />
+            </div>
+            <div className="flex justify-end pt-0.5">
+              <FileText className="w-3 h-3 text-slate-500" />
+            </div>
+          </div>
+          <span className="text-[10px] text-slate-500 font-bold font-mono tracking-tight mt-1.5">笔记本脚本</span>
+          <div className="absolute inset-0 bg-slate-900/10 opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPreviewItem(item);
+              }}
+              className="w-8 h-8 rounded-full bg-white text-slate-900 flex items-center justify-center shadow-md hover:scale-110 transition-transform cursor-pointer"
+            >
+              <Eye className="w-4 h-4 text-slate-900" />
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="w-24 h-28 sm:w-28 sm:h-32 shrink-0 rounded-xl overflow-hidden bg-slate-900 relative group/cover shadow-2xs group-hover:border-purple-300 transition-colors">
+        <img
+          src={item.cover}
+          alt={item.name}
+          className="w-full h-full object-cover group-hover/cover:scale-105 transition-transform duration-300"
+        />
+        <div className="absolute inset-0 bg-black/25 opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPreviewItem(item);
+            }}
+            className="w-8 h-8 rounded-full bg-white/90 text-slate-900 flex items-center justify-center shadow-lg hover:scale-110 transition-transform cursor-pointer"
+          >
+            {targetType === "图片" ? (
+              <Eye className="w-4 h-4 text-slate-900" />
+            ) : (
+              <Play className="w-4 h-4 fill-slate-900 ml-0.5" />
+            )}
+          </button>
+        </div>
+        {item.duration && (
+          <span className="absolute bottom-1 right-1 bg-black/60 text-white font-mono text-[9px] px-1 rounded">
+            {item.duration}
+          </span>
+        )}
+      </div>
+    );
+  };
 
   // 查看弹窗/详情页
   const [previewItem, setPreviewItem] = useState<AdminResourceItem | null>(null);
@@ -321,23 +442,45 @@ export default function AdminResourceView() {
     showToast("已将该素材移入回收站");
   };
 
-  // 彻底删除
-  const handlePermanentDelete = (id: string) => {
-    setResources((prev) => prev.filter((r) => r.id !== id));
-    setSelectedIds((prev) => prev.filter((i) => i !== id));
-    showToast("已成功彻底删除该素材");
+  // 彻底删除确认触发
+  const handleRequestPermanentDelete = (item: AdminResourceItem) => {
+    const currentType = item.tabType === "回收站" ? (item.originalTabType || "视频") : item.tabType;
+    setDeleteConfirmModal({
+      isOpen: true,
+      id: item.id,
+      name: item.name,
+      isBatch: false,
+      itemType: currentType
+    });
   };
 
-  // 批量彻底删除
-  const handleBatchDelete = () => {
+  // 批量彻底删除确认触发
+  const handleRequestBatchDelete = () => {
     if (selectedIds.length === 0) {
       showToast("请先勾选需要彻底删除的项目");
       return;
     }
-    const count = selectedIds.length;
-    setResources((prev) => prev.filter((r) => !selectedIds.includes(r.id)));
-    setSelectedIds([]);
-    showToast(`已成功批量彻底删除 ${count} 个选中的项目`);
+    setDeleteConfirmModal({
+      isOpen: true,
+      isBatch: true,
+      name: `选中的 ${selectedIds.length} 项`
+    });
+  };
+
+  // 执行彻底删除 (单项或批量)
+  const handleConfirmDelete = () => {
+    if (deleteConfirmModal.isBatch) {
+      const count = selectedIds.length;
+      setResources((prev) => prev.filter((r) => !selectedIds.includes(r.id)));
+      setSelectedIds([]);
+      showToast(`已成功批量彻底删除 ${count} 个选中的项目`);
+    } else if (deleteConfirmModal.id) {
+      const targetId = deleteConfirmModal.id;
+      setResources((prev) => prev.filter((r) => r.id !== targetId));
+      setSelectedIds((prev) => prev.filter((i) => i !== targetId));
+      showToast("已成功彻底删除该素材");
+    }
+    setDeleteConfirmModal({ isOpen: false });
   };
 
   // 批量恢复
@@ -362,16 +505,30 @@ export default function AdminResourceView() {
     showToast(`已成功批量恢复 ${count} 个选中的素材至对应分类`);
   };
 
-  // 一键清空回收站
-  const handleClearTrash = () => {
+  // 一键清空回收站 - 打开密码确认弹窗
+  const handleOpenClearTrashModal = () => {
     const trashItems = resources.filter((r) => r.tabType === "回收站");
     if (trashItems.length === 0) {
       showToast("回收站当前为空");
       return;
     }
+    setClearPassword("");
+    setPasswordError("");
+    setClearTrashModalOpen(true);
+  };
+
+  // 执行一键清空 (校验密码)
+  const handleConfirmClearTrash = () => {
+    if (!clearPassword.trim()) {
+      setPasswordError("请输入登录密码");
+      return;
+    }
     setResources((prev) => prev.filter((r) => r.tabType !== "回收站"));
     setSelectedIds([]);
-    showToast("已清空回收站所有关联素材");
+    setClearTrashModalOpen(false);
+    setClearPassword("");
+    setPasswordError("");
+    showToast("已成功清空回收站所有关联素材");
   };
 
   // 切换勾选
@@ -461,8 +618,8 @@ export default function AdminResourceView() {
             item={audioItem}
             onClose={() => setPreviewItem(null)}
             showToast={showToast}
-            onDelete={(id) => {
-              handlePermanentDelete(id);
+            onDelete={() => {
+              handleRequestPermanentDelete(previewItem);
               setPreviewItem(null);
             }}
           />
@@ -650,13 +807,7 @@ export default function AdminResourceView() {
               <>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (selectedIds.length === 0) {
-                      showToast("请先勾选需要删除的项目");
-                      return;
-                    }
-                    handleBatchDelete();
-                  }}
+                  onClick={handleRequestBatchDelete}
                   className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-2xs"
                 >
                   批量删除
@@ -678,7 +829,7 @@ export default function AdminResourceView() {
 
                 <button
                   type="button"
-                  onClick={handleClearTrash}
+                  onClick={handleOpenClearTrashModal}
                   className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-2xs"
                 >
                   一键清空
@@ -703,29 +854,29 @@ export default function AdminResourceView() {
               <Trash2 className="w-12 h-12 text-slate-300 mb-3 stroke-[1.5]" />
               <p className="text-xs">【{activeTab}】暂无符合条件的内容</p>
             </div>
-          ) : activeTab === "回收站" ? (
-            /* 回收站布局：2列网格，选择模式下显示复选框 */
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+          ) : (
+            /* 统一卡片列表：3列网格 (成片/素材/图片/音频/脚本/回收站 排版完全一致) */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {paginatedResources.map((item) => {
-                const isSelected = isSelectMode && selectedIds.includes(item.id);
-                const realType = item.originalTabType || "图片";
+                const isSelected = activeTab === "回收站" && isSelectMode && selectedIds.includes(item.id);
+                const realType = item.tabType === "回收站" ? (item.originalTabType || "图片") : item.tabType;
 
                 return (
                   <div
                     key={item.id}
                     onClick={() => {
-                      if (isSelectMode) {
+                      if (activeTab === "回收站" && isSelectMode) {
                         toggleSelectId(item.id);
                       } else {
                         setPreviewItem(item);
                       }
                     }}
-                    className={`flex items-start gap-3.5 p-3 rounded-2xl transition-all cursor-pointer group ${
-                      isSelected ? "bg-purple-50/40" : "hover:bg-slate-50/60"
+                    className={`bg-white rounded-2xl border border-slate-100/90 p-3.5 shadow-2xs hover:shadow-md transition-all flex gap-3.5 items-start group relative cursor-pointer ${
+                      isSelected ? "bg-purple-50/40 ring-2 ring-purple-500/30" : ""
                     }`}
                   >
-                    {/* 复选框 - 只有在选择模式下才显示 */}
-                    {isSelectMode && (
+                    {/* 复选框 - 仅在回收站且启用选择模式下才显示 */}
+                    {activeTab === "回收站" && isSelectMode && (
                       <div className="pt-2 shrink-0">
                         <div
                           className={`w-4 h-4 rounded border transition-colors flex items-center justify-center ${
@@ -739,265 +890,85 @@ export default function AdminResourceView() {
                       </div>
                     )}
 
-                  {/* 缩略图/插图 (区分音视频、脚本、图片) */}
-                  <div className="shrink-0 relative">
-                    {realType === "音频" ? (
-                      /* 耳机单线条灰白插图 (完全匹配截图1) */
-                      <div className="w-24 h-28 sm:w-28 sm:h-32 rounded-xl bg-white border border-slate-200/90 flex items-center justify-center p-3 shadow-2xs group-hover:border-purple-300 transition-colors">
-                        <Headphones className="w-12 h-12 text-slate-900 stroke-[1.8]" />
-                      </div>
-                    ) : realType === "脚本" ? (
-                      /* 笔记本灰白线条插图 (完全匹配通用插图要求) */
-                      <div className="w-24 h-28 sm:w-28 sm:h-32 rounded-xl bg-white border border-slate-200/90 flex flex-col items-center justify-center p-3 shadow-2xs group-hover:border-purple-300 transition-colors">
-                        <FileText className="w-11 h-11 text-slate-800 stroke-[1.8]" />
-                        <span className="text-[10px] text-slate-400 font-bold mt-1">脚本草稿</span>
-                      </div>
-                    ) : (
-                      /* 图片/成片/素材 真实封面 */
-                      <div className="w-24 h-28 sm:w-28 sm:h-32 rounded-xl overflow-hidden bg-slate-100 border border-slate-200/90 relative shadow-2xs group-hover:border-purple-300 transition-colors">
-                        <img
-                          src={item.cover}
-                          alt={item.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                        {(realType === "成片" || realType === "素材") && (
-                          <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                            <div className="w-7 h-7 rounded-full bg-white/90 text-slate-900 flex items-center justify-center shadow-xs">
-                              <Play className="w-3.5 h-3.5 fill-slate-900 ml-0.5" />
-                            </div>
-                          </div>
-                        )}
-                        {item.duration && (
-                          <span className="absolute bottom-1 right-1 bg-black/60 text-white font-mono text-[9px] px-1 rounded">
-                            {item.duration}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                    {/* 缩略图/插图 (区分音视频、脚本、图片) */}
+                    {renderItemCover(item, realType)}
 
-                  {/* 右侧信息排布 (对齐截图1: 标题 -> 橙/蓝底色标签 -> 一二级分类 -> 公司名与时间) */}
-                  <div className="flex-1 min-w-0 pt-0.5 space-y-1.5">
-                    {/* 标题 */}
-                    <div className="flex items-center justify-between gap-2">
-                      <h4
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPreviewItem(item);
-                        }}
-                        className="text-xs sm:text-sm font-bold text-slate-900 hover:text-purple-600 transition-colors truncate cursor-pointer"
-                        title={item.name}
-                      >
-                        {item.name}
-                      </h4>
-                    </div>
-
-                    {/* 橙/蓝标签 Chips (截图1: "是"、"1"、"2" "5.20") */}
-                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                      {item.tags.map((tag, idx) => {
-                        const isBlue = tag.includes(".") || tag === "5.20";
-                        return (
-                          <span
-                            key={idx}
-                            className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                              isBlue
-                                ? "bg-blue-50 text-blue-600 border border-blue-100/80"
-                                : "bg-amber-50 text-amber-700 border border-amber-100/80"
-                            }`}
-                          >
-                            {tag}
-                          </span>
-                        );
-                      })}
-                    </div>
-
-                    {/* 分类 */}
-                    <p className="text-xs text-slate-500 font-medium truncate pt-1">
-                      {item.category}
-                    </p>
-
-                    {/* 公司名称 与 删除/时间 */}
-                    <div className="flex items-center gap-4 text-[11px] text-slate-400 font-mono pt-1">
-                      <span className="font-sans font-medium text-slate-500">{item.company}</span>
-                      <span>{item.uploadTime}</span>
-                    </div>
-
-                    {/* 操作快捷按钮：恢复 / 彻底删除 */}
-                    <div className="flex items-center gap-3 pt-2">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setResources((prev) =>
-                            prev.map((r) => (r.id === item.id ? { ...r, tabType: r.originalTabType || "成片" } : r))
-                          );
-                          showToast(`已恢复【${item.name}】`);
-                        }}
-                        className="text-[11px] text-purple-600 hover:text-purple-800 font-bold flex items-center gap-1 cursor-pointer"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>恢复</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePermanentDelete(item.id);
-                        }}
-                        className="text-[11px] text-slate-400 hover:text-red-600 font-bold flex items-center gap-1 cursor-pointer"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                        <span>彻底删除</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          /* 普通 Tab 列表 (成片/素材/图片/音频/脚本) */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {paginatedResources.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white rounded-xl border border-slate-100/90 p-3.5 shadow-2xs hover:shadow-md transition-all flex gap-3.5 items-center group relative"
-              >
-                {/* 左侧封面 */}
-                {item.tabType === "音频" ? (
-                  <div className="w-24 h-36 shrink-0 rounded-lg overflow-hidden bg-slate-50 border border-slate-200/90 relative group/cover flex flex-col items-center justify-center p-2">
-                    <div className="w-10 h-10 rounded-full border border-slate-300 bg-white shadow-2xs flex items-center justify-center mb-1.5 group-hover/cover:scale-105 transition-transform">
-                      <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
-                        <Volume2 className="w-3.5 h-3.5 text-slate-600" />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 my-1">
-                      <span className="w-0.5 h-3 bg-slate-400 rounded-full" />
-                      <span className="w-0.5 h-4.5 bg-slate-500 rounded-full" />
-                      <span className="w-0.5 h-2 bg-slate-400 rounded-full" />
-                      <span className="w-0.5 h-4 bg-slate-500 rounded-full" />
-                      <span className="w-0.5 h-2.5 bg-slate-400 rounded-full" />
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-bold font-mono tracking-tight mt-1">音频播放</span>
-                    <div className="absolute inset-0 bg-slate-900/10 opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
-                      <button
-                        type="button"
-                        onClick={() => setPreviewItem(item)}
-                        className="w-8 h-8 rounded-full bg-white text-slate-900 flex items-center justify-center shadow-md hover:scale-110 transition-transform cursor-pointer"
-                      >
-                        <Play className="w-4 h-4 fill-slate-900 ml-0.5" />
-                      </button>
-                    </div>
-                    {item.duration && (
-                      <span className="absolute bottom-1 right-1 bg-slate-800/80 text-white font-mono text-[9px] px-1 rounded">
-                        {item.duration}
-                      </span>
-                    )}
-                  </div>
-                ) : item.tabType === "脚本" ? (
-                  <div className="w-24 h-36 shrink-0 rounded-lg overflow-hidden bg-slate-50 border border-slate-200/90 relative group/cover flex flex-col items-center justify-center p-2">
-                    <div className="w-10 h-13 bg-white rounded-md border border-slate-300 shadow-2xs p-1.5 flex flex-col justify-between relative group-hover/cover:scale-105 transition-transform">
-                      <div className="absolute -left-1 top-2 bottom-2 flex flex-col justify-between">
-                        <span className="w-1 h-0.5 bg-slate-400 rounded-full" />
-                        <span className="w-1 h-0.5 bg-slate-400 rounded-full" />
-                        <span className="w-1 h-0.5 bg-slate-400 rounded-full" />
-                      </div>
-                      <div className="space-y-1 pl-1">
-                        <div className="w-full h-1 bg-slate-300 rounded-full" />
-                        <div className="w-3/4 h-1 bg-slate-200 rounded-full" />
-                        <div className="w-5/6 h-1 bg-slate-200 rounded-full" />
-                        <div className="w-2/3 h-1 bg-slate-200 rounded-full" />
-                      </div>
-                      <div className="flex justify-end pt-0.5">
-                        <FileText className="w-3 h-3 text-slate-500" />
-                      </div>
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-bold font-mono tracking-tight mt-1.5">笔记本脚本</span>
-                    <div className="absolute inset-0 bg-slate-900/10 opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
-                      <button
-                        type="button"
-                        onClick={() => setPreviewItem(item)}
-                        className="w-8 h-8 rounded-full bg-white text-slate-900 flex items-center justify-center shadow-md hover:scale-110 transition-transform cursor-pointer"
-                      >
-                        <Eye className="w-4 h-4 text-slate-900" />
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="w-24 h-36 shrink-0 rounded-lg overflow-hidden bg-slate-900 relative group/cover">
-                    <img
-                      src={item.cover}
-                      alt={item.name}
-                      className="w-full h-full object-cover group-hover/cover:scale-105 transition-transform duration-300"
-                    />
-                    <div className="absolute inset-0 bg-black/25 opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center">
-                      <button
-                        type="button"
-                        onClick={() => setPreviewItem(item)}
-                        className="w-8 h-8 rounded-full bg-white/90 text-slate-900 flex items-center justify-center shadow-lg hover:scale-110 transition-transform cursor-pointer"
-                      >
-                        <Play className="w-4 h-4 fill-slate-900 ml-0.5" />
-                      </button>
-                    </div>
-                    {item.duration && (
-                      <span className="absolute bottom-1 right-1 bg-black/60 text-white font-mono text-[9px] px-1 rounded">
-                        {item.duration}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* 右侧卡片内容 */}
-                <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch py-0.5">
-                  <div>
-                    <h4
-                      onClick={() => setPreviewItem(item)}
-                      className="text-xs font-bold text-slate-900 truncate hover:text-purple-600 transition-colors cursor-pointer"
-                      title={item.name}
-                    >
-                      {item.name}
-                    </h4>
-
-                    {/* 标签列表 */}
-                    <div className="flex flex-wrap gap-1 mt-1.5">
-                      {item.tags.map((tag, idx) => (
-                        <span
-                          key={idx}
-                          className="px-1.5 py-0.5 bg-purple-50 text-purple-700 text-[10px] font-bold rounded"
+                    {/* 右侧信息排布 (标题 -> 橙/蓝底色标签 -> 一二级分类 -> 公司名与时间 -> 操作按钮) */}
+                    <div className="flex-1 min-w-0 pt-0.5 space-y-1.5 flex flex-col justify-between self-stretch">
+                      <div>
+                        {/* 标题 */}
+                        <h4
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewItem(item);
+                          }}
+                          className="text-xs sm:text-sm font-bold text-slate-900 hover:text-purple-600 transition-colors truncate cursor-pointer"
+                          title={item.name}
                         >
-                          {tag}
-                        </span>
-                      ))}
+                          {item.name}
+                        </h4>
+
+                        {/* 标签 Chips (宣发海报、高清壁纸、轻快欢快等) */}
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          {item.tags.map((tag, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-100/80"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* 一级 / 二级分类 */}
+                        <p className="text-xs text-slate-500 font-medium truncate pt-1">
+                          {item.category}
+                        </p>
+
+                        {/* 公司名称 与 上传时间 */}
+                        <div className="flex items-center gap-3 text-[11px] text-slate-400 font-mono pt-1">
+                          <span className="font-sans font-medium text-slate-500 truncate max-w-[100px]">{item.company}</span>
+                          <span className="truncate">{item.uploadTime}</span>
+                        </div>
+                      </div>
+
+                      {/* 操作快捷按钮：回收站有恢复+彻底删除，其他类目仅有彻底删除 */}
+                      <div className="flex items-center gap-3 pt-2">
+                        {activeTab === "回收站" && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setResources((prev) =>
+                                prev.map((r) => (r.id === item.id ? { ...r, tabType: r.originalTabType || "成片" } : r))
+                              );
+                              showToast(`已恢复【${item.name}】`);
+                            }}
+                            className="text-[11px] text-purple-600 hover:text-purple-800 font-bold flex items-center gap-1 cursor-pointer shrink-0"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>恢复</span>
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRequestPermanentDelete(item);
+                          }}
+                          className="text-[11px] text-slate-400 hover:text-red-600 font-bold flex items-center gap-1 cursor-pointer shrink-0"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>彻底删除</span>
+                        </button>
+                      </div>
                     </div>
-
-                    {/* 一级 / 二级分类 */}
-                    <p className="text-[11px] text-slate-500 mt-2 truncate">
-                      {item.category}
-                    </p>
                   </div>
-
-                  {/* 底部信息：公司名称 + 上传时间 + 移入回收站 */}
-                  <div className="pt-2 border-t border-slate-100/80 flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                    <div className="truncate max-w-[120px]">
-                      <span className="text-slate-600 font-bold block truncate">{item.company}</span>
-                      <span>{item.uploadTime}</span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleMoveToTrash(item.id)}
-                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                      title="移入回收站"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* 底部翻页模块 */}
@@ -1013,6 +984,159 @@ export default function AdminResourceView() {
           }}
         />
       </div>
+
+      {/* ============================================================ */}
+      {/* 彻底删除 确认弹窗 (对应截图1) */}
+      {/* ============================================================ */}
+      {deleteConfirmModal.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[999] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-[420px] overflow-hidden border border-slate-100/80 animate-in zoom-in-95 duration-200">
+            {/* 头部标题与关闭 */}
+            <div className="p-4 px-5 flex items-center justify-between border-b-0 pb-1">
+              <h3 className="text-base font-bold text-slate-800">
+                {deleteConfirmModal.isBatch
+                  ? "批量删除"
+                  : deleteConfirmModal.itemType === "音频"
+                  ? "删除音频"
+                  : deleteConfirmModal.itemType === "脚本"
+                  ? "删除脚本"
+                  : deleteConfirmModal.itemType === "图片"
+                  ? "删除图片"
+                  : "删除视频"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmModal({ isOpen: false })}
+                className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* 内容区域：警告图标 + 提示文字 (完全对齐截图1) */}
+            <div className="p-6 py-5 flex items-center gap-3.5">
+              <div className="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-2xs">
+                !
+              </div>
+              <p className="text-xs sm:text-sm text-slate-700 font-medium leading-relaxed">
+                {deleteConfirmModal.isBatch
+                  ? `请确认是否彻底删除这 ${selectedIds.length} 项资源，删除后无法恢复`
+                  : `请确认是否删除该${deleteConfirmModal.itemType || "视频"}，删除后无法恢复`}
+              </p>
+            </div>
+
+            {/* 底部按钮 */}
+            <div className="p-4 px-5 bg-white flex items-center justify-end gap-3 border-t-0">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmModal({ isOpen: false })}
+                className="px-4 py-1.5 border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-medium rounded-lg transition-colors cursor-pointer"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="px-5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors shadow-2xs cursor-pointer"
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* 一键清空 密码确认弹窗 (对应截图2) */}
+      {/* ============================================================ */}
+      {clearTrashModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[999] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-[480px] overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200">
+            {/* 头部标题与关闭：| 一键清空 */}
+            <div className="p-4 px-5 flex items-center justify-between border-b border-slate-100/80">
+              <div className="flex items-center gap-2">
+                <span className="w-1 h-4 bg-purple-600 rounded-full inline-block"></span>
+                <h3 className="text-base font-bold text-slate-900">一键清空</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setClearTrashModalOpen(false);
+                  setClearPassword("");
+                  setPasswordError("");
+                }}
+                className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* 内容区域：警告提示框 + 密码输入框 (完全对齐截图2) */}
+            <div className="p-6 space-y-5">
+              {/* 粉红警告框 */}
+              <div className="p-3 bg-red-50/90 border border-red-100/90 rounded-lg flex items-center gap-2.5 text-rose-600 text-xs font-bold">
+                <div className="w-4 h-4 rounded-full bg-rose-500 text-white flex items-center justify-center font-bold text-[10px] shrink-0">
+                  !
+                </div>
+                <span>删除后不可恢复，请谨慎操作。</span>
+              </div>
+
+              {/* 密码输入区域 */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-3">
+                  <label className="text-xs sm:text-sm font-bold text-slate-700 shrink-0 w-20 sm:w-24 flex items-center">
+                    <span className="text-rose-500 mr-1 font-bold">*</span>
+                    登录密码
+                  </label>
+                  <input
+                    type="password"
+                    value={clearPassword}
+                    onChange={(e) => {
+                      setClearPassword(e.target.value);
+                      setPasswordError("");
+                    }}
+                    placeholder="请输入登录密码"
+                    className={`flex-1 px-3.5 py-2 border rounded-lg text-xs sm:text-sm outline-none transition-all placeholder:text-slate-300 ${
+                      passwordError
+                        ? "border-rose-400 bg-rose-50/30 ring-1 ring-rose-400 text-slate-900"
+                        : "border-slate-200 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 text-slate-900 bg-white"
+                    }`}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleConfirmClearTrash();
+                    }}
+                  />
+                </div>
+                {passwordError && (
+                  <p className="text-xs text-rose-500 font-medium pl-24">{passwordError}</p>
+                )}
+              </div>
+            </div>
+
+            {/* 底部按钮 */}
+            <div className="p-4 px-6 bg-slate-50/50 flex items-center justify-end gap-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setClearTrashModalOpen(false);
+                  setClearPassword("");
+                  setPasswordError("");
+                }}
+                className="px-4 py-1.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-medium rounded-lg transition-colors cursor-pointer"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmClearTrash}
+                className="px-5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors shadow-2xs cursor-pointer"
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

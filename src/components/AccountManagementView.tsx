@@ -51,9 +51,7 @@ import {
   Gift,
   ArrowRight,
   ChevronLeft,
-  FolderTree
 } from "lucide-react";
-import CategoryManagementSubView from "./CategoryManagementSubView";
 
 // --- Notification Interfaces ---
 export interface NotificationItem {
@@ -1149,7 +1147,7 @@ const INITIAL_LOGS: AuditLog[] = [
 
 export default function AccountManagementView() {
   // Navigation Tabs
-  const [activeTab, setActiveTab] = useState<"depts" | "members" | "roles" | "notifications" | "credits" | "categories" | "audit">("depts");
+  const [activeTab, setActiveTab] = useState<"depts" | "members" | "credits" | "audit">("depts");
 
   // --- Credits / Points Management State ---
   const [creditMode, setCreditMode] = useState<"quota" | "wallet">("quota");
@@ -2404,16 +2402,8 @@ export default function AccountManagementView() {
             <Building2 className="w-7 h-7" />
           </div>
           <div>
-            <div className="flex items-center gap-2 text-slate-400 text-xs">
+            <h1 className="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-2">
               <span>系统管理</span>
-              <span>/</span>
-              <span className="text-purple-600 font-bold">组织部门架构、人员与角色权限管理</span>
-            </div>
-            <h1 className="text-lg sm:text-xl font-black text-slate-900 mt-0.5 flex items-center gap-2">
-              <span>系统管理 · 梦畅AIGC企业空间</span>
-              <span className="bg-purple-100 text-purple-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border border-purple-200">
-                1级公司: 梦畅AIGC (28/50人)
-              </span>
             </h1>
           </div>
         </div>
@@ -2456,30 +2446,6 @@ export default function AccountManagementView() {
         </button>
 
         <button
-          onClick={() => setActiveTab("roles")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === "roles"
-              ? "bg-purple-600 text-white shadow-xs"
-              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-          }`}
-        >
-          <ShieldCheck className="w-4 h-4" />
-          <span>角色与权限矩阵 ({roles.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("notifications")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === "notifications"
-              ? "bg-purple-600 text-white shadow-xs"
-              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-          }`}
-        >
-          <Bell className="w-4 h-4" />
-          <span>消息通知</span>
-        </button>
-
-        <button
           onClick={() => setActiveTab("credits")}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "credits"
@@ -2489,18 +2455,6 @@ export default function AccountManagementView() {
         >
           <Coins className="w-4 h-4" />
           <span>积分管理</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("categories")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === "categories"
-              ? "bg-purple-600 text-white shadow-xs"
-              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-          }`}
-        >
-          <FolderTree className="w-4 h-4" />
-          <span>分类管理</span>
         </button>
 
         <button
@@ -3133,311 +3087,7 @@ export default function AccountManagementView() {
         </div>
       )}
 
-      {/* TAB 3: 角色与权限矩阵 (ROLES & PERMISSION MATRIX) */}
-      {activeTab === "roles" && (
-        <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
-          {/* Top Banner / Description */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-            <div>
-              <h2 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-purple-600" />
-                <span>系统菜单与功能权限矩阵</span>
-              </h2>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                根据系统已有菜单和功能合理规划角色权限，左侧选择岗位角色，右侧配置树形控制权限
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 font-mono">已配置角色: <strong className="text-purple-700 font-bold">{roles.length}</strong> 个</span>
-            </div>
-          </div>
 
-          {/* Split View Container */}
-          <div className="flex flex-col lg:flex-row gap-5 min-h-[580px]">
-            {/* Left Column: Role List Sidebar */}
-            <div className="w-full lg:w-64 border-r-0 lg:border-r border-slate-200/80 pr-0 lg:pr-4 space-y-4 shrink-0">
-              {/* Default Roles Section */}
-              <div className="space-y-1.5">
-                <div className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-2">
-                  默认角色
-                </div>
-                <div className="space-y-1">
-                  {roles.filter(r => r.category === "default").map(r => {
-                    const isSelected = r.id === selectedRoleId;
-                    return (
-                      <div
-                        key={r.id}
-                        onClick={() => setSelectedRoleId(r.id)}
-                        className={`group flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          isSelected
-                            ? "bg-purple-100/80 text-purple-800 font-black border-l-4 border-purple-600 shadow-2xs"
-                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                        }`}
-                      >
-                        <div className="flex items-center gap-1.5 truncate">
-                          <span className="truncate">{r.name}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Other Roles Section */}
-              <div className="space-y-1.5 pt-2 border-t border-slate-100">
-                <div className="flex items-center justify-between px-2">
-                  <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
-                    其他角色
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleOpenAddRole}
-                    className="text-purple-600 hover:text-purple-800 text-[11px] font-extrabold flex items-center gap-0.5 cursor-pointer"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>新增角色</span>
-                  </button>
-                </div>
-
-                <div className="space-y-1 max-h-[460px] overflow-y-auto pr-1 scrollbar-thin">
-                  {roles.filter(r => r.category !== "default").map(r => {
-                    const isSelected = r.id === selectedRoleId;
-                    return (
-                      <div
-                        key={r.id}
-                        onClick={() => setSelectedRoleId(r.id)}
-                        className={`group flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          isSelected
-                            ? "bg-purple-100/80 text-purple-800 font-black border-l-4 border-purple-600 shadow-2xs"
-                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                        }`}
-                      >
-                        <div className="flex items-center gap-1.5 truncate">
-                          <span className="truncate">{r.name}</span>
-                        </div>
-
-                        <div className="flex items-center gap-1">
-                          <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
-                            <button
-                              type="button"
-                              onClick={(e) => handleCopyRole(r, e)}
-                              title="复制角色"
-                              className="p-1 text-slate-400 hover:text-purple-600 rounded hover:bg-purple-100/50"
-                            >
-                              <Copy className="w-3 h-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenEditRole(r);
-                              }}
-                              title="重命名/修改角色"
-                              className="p-1 text-slate-400 hover:text-purple-600 rounded hover:bg-purple-100/50"
-                            >
-                              <Edit3 className="w-3 h-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteRole(r.id);
-                              }}
-                              title="删除角色"
-                              className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-100/50"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column: Tree Permission Grid */}
-            <div className="flex-1 pl-0 lg:pl-2 space-y-4 flex flex-col justify-between">
-              <div>
-                {/* Header Bar */}
-                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <span className="text-sm font-black text-purple-700 pb-1 inline-block">
-                        用户端
-                      </span>
-                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600 rounded-full" />
-                    </div>
-                    <span className="text-xs text-slate-400 font-medium">
-                      当前选中: <strong className="text-slate-800 font-bold">{selectedRole?.name}</strong>
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    {/* Role Enabled Switch */}
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
-                      <span>状态:</span>
-                      <button
-                        type="button"
-                        onClick={handleToggleRoleEnabled}
-                        className={`w-11 h-6 rounded-full transition-colors p-0.5 cursor-pointer flex items-center ${
-                          (selectedRole?.enabled ?? true) ? "bg-purple-600 justify-end" : "bg-slate-300 justify-start"
-                        }`}
-                      >
-                        <div className="w-5 h-5 bg-white rounded-full shadow-md" />
-                      </button>
-                      <span className={(selectedRole?.enabled ?? true) ? "text-purple-700 font-black" : "text-slate-400"}>
-                        {(selectedRole?.enabled ?? true) ? "开启" : "关闭"}
-                      </span>
-                    </div>
-
-                    {/* Quick Selection Buttons */}
-                    <div className="flex items-center gap-1 border-l border-slate-200 pl-3">
-                      <button
-                        type="button"
-                        onClick={handleSelectAllTree}
-                        className="px-2.5 py-1 bg-slate-100 hover:bg-purple-100 text-slate-700 hover:text-purple-700 text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
-                      >
-                        全选
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleClearAllTree}
-                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
-                      >
-                        清空
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Tree View Container */}
-                <div className="py-3 max-h-[500px] overflow-y-auto scrollbar-thin pr-2 space-y-1">
-                  {APP_PERMISSION_TREE.map(node => renderTreeNode(node))}
-                </div>
-              </div>
-
-              {/* Bottom Save Action Bar */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-center">
-                <button
-                  type="button"
-                  onClick={handleSaveRolePermissions}
-                  className="px-10 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs rounded-xl shadow-md hover:shadow-lg transition-all active:scale-95 cursor-pointer flex items-center gap-2"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>保存</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB: 消息通知 (MESSAGE NOTIFICATIONS) */}
-      {activeTab === "notifications" && (
-        <div className="space-y-4 animate-fade-in pb-12">
-          {notifications.map((cat) => {
-            const isCollapsed = collapsedCategoryIds.includes(cat.id);
-            return (
-              <div 
-                key={cat.id} 
-                className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden transition-all"
-              >
-                {/* Category Header */}
-                <div 
-                  onClick={() => toggleCollapseCategory(cat.id)}
-                  className="p-4 bg-white hover:bg-slate-50/80 cursor-pointer flex items-center justify-between border-b border-slate-100 transition-colors select-none"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="w-1 h-4 bg-purple-600 rounded-full" />
-                    <span className="font-extrabold text-slate-800 text-sm">{cat.title}</span>
-                  </div>
-                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isCollapsed ? "rotate-180" : ""}`} />
-                </div>
-
-                {/* Category Table Content */}
-                {!isCollapsed && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50/70 border-b border-slate-100 text-slate-500 font-extrabold text-[11px]">
-                          <th className="py-3 px-5 w-56">消息类型</th>
-                          <th className="py-3 px-5">场景说明</th>
-                          <th className="py-3 px-5 w-36 text-center">是否接收</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100/80 font-medium text-slate-700">
-                        {cat.items.map((item) => {
-                          const isActionInReceiveCol = ["video_status_change", "booked_by_others", "cancel_booking"].includes(item.id);
-                          const isDailySpendGrowth = item.id === "daily_spend_growth";
-
-                          return (
-                            <tr key={item.id} className="hover:bg-purple-50/20 transition-colors">
-                              <td className="py-3.5 px-5 font-bold text-slate-900">{item.title}</td>
-                              <td className="py-3.5 px-5 text-slate-500 text-xs">
-                                <span>{item.description}</span>
-                                {isDailySpendGrowth && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenSpendModal(cat.id, item)}
-                                    className="text-purple-600 hover:text-purple-700 font-extrabold text-xs ml-2 cursor-pointer inline-flex items-center gap-0.5 hover:underline"
-                                  >
-                                    修改
-                                  </button>
-                                )}
-                              </td>
-                              <td className="py-3.5 px-5 text-center">
-                                {isActionInReceiveCol ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenConfigModal(cat.id, item)}
-                                    className="text-purple-600 hover:text-purple-700 font-extrabold text-xs cursor-pointer inline-flex items-center gap-0.5 hover:underline"
-                                  >
-                                    修改
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleToggleEnable(cat.id, item.id)}
-                                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                      item.enabled ? "bg-purple-600" : "bg-slate-200"
-                                    }`}
-                                  >
-                                    <span
-                                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
-                                        item.enabled ? "translate-x-4" : "translate-x-0"
-                                      }`}
-                                    />
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          {/* Bottom Floating/Sticky Actions */}
-          <div className="sticky bottom-4 z-10 bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-slate-200/90 shadow-lg flex items-center justify-between text-xs mt-6">
-            <span className="text-slate-400 font-medium">
-              修改后，点击右侧【保存设置】即可生效
-            </span>
-            <button
-              type="button"
-              onClick={handleSaveNotificationSettings}
-              className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-2 active:scale-95"
-            >
-              <span>保存设置</span>
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* TAB 5: 积分管理 (CREDITS MANAGEMENT) */}
       {activeTab === "credits" && (
@@ -3958,11 +3608,6 @@ export default function AccountManagementView() {
             </div>
           )}
         </div>
-      )}
-
-      {/* TAB 6: 分类管理 (CATEGORY MANAGEMENT) */}
-      {activeTab === "categories" && (
-        <CategoryManagementSubView />
       )}
 
       {/* TAB 4: 系统操作安全日志 (AUDIT LOGS) */}
