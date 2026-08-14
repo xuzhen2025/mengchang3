@@ -388,7 +388,7 @@ const DEFAULT_ACTIONS: PermissionActions = {
 };
 
 // INITIAL MOCK DATA
-const INITIAL_DEPTS: DeptNode[] = [
+export const INITIAL_DEPTS: DeptNode[] = [
   {
     id: "dept_root",
     name: "梦畅AIGC",
@@ -961,7 +961,7 @@ const INITIAL_ROLES: RolePermission[] = [
   }
 ];
 
-const INITIAL_MEMBERS: AccountMember[] = [
+export const INITIAL_MEMBERS: AccountMember[] = [
   {
     id: "mem_1001",
     employeeNo: "ZS-001",
@@ -1147,7 +1147,7 @@ const INITIAL_LOGS: AuditLog[] = [
 
 export default function AccountManagementView() {
   // Navigation Tabs
-  const [activeTab, setActiveTab] = useState<"depts" | "members" | "credits" | "audit">("depts");
+  const [activeTab, setActiveTab] = useState<"depts" | "members" | "credits" | "audit">("credits");
 
   // --- Credits / Points Management State ---
   const [creditMode, setCreditMode] = useState<"quota" | "wallet">("quota");
@@ -2421,30 +2421,6 @@ export default function AccountManagementView() {
 
       {/* Navigation Sub-Tabs */}
       <div className="bg-white p-1.5 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center gap-1 overflow-x-auto text-xs font-bold">
-        <button
-          onClick={() => setActiveTab("depts")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === "depts"
-              ? "bg-purple-600 text-white shadow-xs"
-              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-          }`}
-        >
-          <Building2 className="w-4 h-4" />
-          <span>组织部门架构 ({depts.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("members")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === "members"
-              ? "bg-purple-600 text-white shadow-xs"
-              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>人员账号管理 ({members.length})</span>
-        </button>
-
         <button
           onClick={() => setActiveTab("credits")}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${

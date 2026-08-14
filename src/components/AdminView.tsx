@@ -33,6 +33,7 @@ import TaskFieldsManagementView from "./TaskFieldsManagementView";
 import TagGroupManagementView from "./TagGroupManagementView";
 import ScriptTemplateManagementView from "./ScriptTemplateManagementView";
 import AdminSystemManagementView from "./AdminSystemManagementView";
+import AdminCreditsManagementView from "./AdminCreditsManagementView";
 
 interface AdminViewProps {
   adminActiveScreen: string;
@@ -106,6 +107,10 @@ export default function AdminView({ adminActiveScreen, onTriggerTask, onOpenTask
     return <AdminSystemManagementView />;
   }
 
+  if (adminActiveScreen === "credits_management") {
+    return <AdminCreditsManagementView />;
+  }
+
   return (
     <div className="h-full flex flex-col overflow-hidden bg-slate-50 text-slate-800 font-sans relative">
       {/* Toast Notification */}
@@ -117,10 +122,10 @@ export default function AdminView({ adminActiveScreen, onTriggerTask, onOpenTask
       )}
 
       {/* 顶部一排导航栏 (与资源库页面风格完全一致) */}
-      <div className="pt-4 px-5 pb-1 bg-slate-50 shrink-0 z-30 relative">
-        <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs relative">
-          <div className="flex items-center justify-between p-1.5 bg-slate-50/70 rounded-xl overflow-x-auto">
-            <div className="flex items-center gap-1.5 min-w-max">
+      <div className="pt-4 px-5 pb-1 bg-slate-50 shrink-0 z-30 relative overflow-visible">
+        <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs relative overflow-visible">
+          <div className="flex items-center justify-between p-1.5 bg-slate-50/70 rounded-xl overflow-visible">
+            <div className="flex items-center gap-1.5 min-w-max overflow-visible">
               {navTabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -142,9 +147,9 @@ export default function AdminView({ adminActiveScreen, onTriggerTask, onOpenTask
                     </button>
 
                     {isScriptTemplates && (
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover/tab:flex items-center gap-1.5 bg-slate-900/95 text-white text-[11px] font-medium px-3 py-1.5 rounded-lg whitespace-nowrap shadow-xl z-50 pointer-events-none animate-in fade-in zoom-in-95 duration-100 border border-slate-700/50">
+                      <div className="absolute top-full right-0 mt-2 hidden group-hover/tab:flex items-center gap-1.5 bg-slate-900/95 text-white text-[11px] font-medium px-3 py-1.5 rounded-lg whitespace-nowrap shadow-2xl z-[100] pointer-events-none animate-in fade-in zoom-in-95 duration-100 border border-slate-700/50">
                         <span>该模板内容需要看云视频管家系统才能确认</span>
-                        <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900/95 rotate-45 border-l border-t border-slate-700/50" />
+                        <div className="absolute -top-1 right-5 w-2 h-2 bg-slate-900/95 rotate-45 border-l border-t border-slate-700/50" />
                       </div>
                     )}
                   </div>

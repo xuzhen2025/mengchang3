@@ -6,6 +6,7 @@ import {
   Layers, 
   FolderHeart, 
   CreditCard, 
+  Coins,
   ChevronLeft, 
   ChevronRight,
   Sparkles,
@@ -63,12 +64,12 @@ export default function Sidebar({
     { id: "task_collaboration", label: "任务协作", icon: ListTodo, badge: "协作" },
     { id: "resources", label: "资源库", icon: FolderHeart },
     { id: "ad_delivery", label: "数据分析", icon: BarChart3 },
-    { id: "account_management", label: "系统管理", icon: Settings },
   ];
 
   const adminMenuItems: { id: string; label: string; icon: any; badge?: string }[] = [
     { id: "content_management", label: "内容管理", icon: LayoutDashboard },
     { id: "system_management", label: "系统管理", icon: Settings },
+    { id: "credits_management", label: "积分管理", icon: Coins },
   ];
 
   const currentMenuItems = appMode === "admin" ? adminMenuItems : userMenuItems;
