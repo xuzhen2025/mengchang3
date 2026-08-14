@@ -111,7 +111,7 @@ export interface GalleryItem {
   tags?: string[];
 }
 
-export type ActiveScreen = "home" | "quick_creation" | "agent_creation" | "video_remake" | "ai_video" | "ai_image" | "canvas" | "assets" | "detail_set" | "enhance" | "watermark" | "subtitle" | "fission" | "credits" | "resources" | "materials" | "finished_videos" | "scripts" | "images" | "audio" | "ad_delivery" | "same_style_video" | "account_management" | "task_collaboration" | "message_center";
+export type ActiveScreen = "home" | "quick_creation" | "agent_creation" | "video_remake" | "ai_video" | "ai_image" | "canvas" | "live_management" | "assets" | "detail_set" | "enhance" | "watermark" | "subtitle" | "fission" | "credits" | "resources" | "materials" | "finished_videos" | "scripts" | "images" | "audio" | "ad_delivery" | "same_style_video" | "account_management" | "task_collaboration" | "message_center";
 
 export interface MessageDetailItem {
   label: string;

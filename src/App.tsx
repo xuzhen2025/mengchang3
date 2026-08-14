@@ -12,6 +12,7 @@ import AiVideoView from "./components/AiVideoView";
 import AiImageView from "./components/AiImageView";
 import AssetsView from "./components/AssetsView";
 import InfiniteCanvasView from "./components/InfiniteCanvasView";
+import LiveManagementView from "./components/LiveManagementView";
 import ResourcesView from "./components/ResourcesView";
 import MaterialsView from "./components/MaterialsView";
 import FinishedVideosView from "./components/FinishedVideosView";
@@ -641,6 +642,9 @@ export default function App() {
             onOpenMaterialSelector={handleOpenMaterialSelector}
           />
         );
+
+      case "live_management":
+        return <LiveManagementView />;
 
       case "task_collaboration":
         return (
