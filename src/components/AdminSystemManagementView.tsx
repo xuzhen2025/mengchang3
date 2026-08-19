@@ -534,6 +534,7 @@ export interface NotificationItem {
   id: string;
   title: string;
   description: string;
+  recipients: string;
   enabled: boolean;
   channels: {
     system?: boolean;
@@ -551,125 +552,200 @@ export interface NotificationCategory {
 
 export const INITIAL_NOTIFICATION_CATEGORIES: NotificationCategory[] = [
   {
-    id: "creation",
-    title: "创作通知",
+    id: "approval",
+    title: "审批待办",
     items: [
       {
-        id: "upload_video",
-        title: "上传视频",
-        description: "在资源库里面点击上传成片时，选择了上传并提示某人后生成的提示信息",
+        id: "credit_application",
+        title: "积分申请",
+        description: "员工提交额外积分申请后生成待办；审批人可在消息详情中选择同意或拒绝",
+        recipients: "申请人的直属部长/主管",
         enabled: true,
-        channels: { system: true, mobile: true }
-      },
-      {
-        id: "edit_video",
-        title: "编辑视频",
-        description: "编辑资源库内容的基础信息后生成的提示信息",
-        enabled: true,
-        channels: { system: true, mobile: true }
-      },
-      {
-        id: "video_status_change",
-        title: "视频状态修改",
-        description: "编辑资源库内容的基础信息或视频状态被修改后生成的提示信息",
-        enabled: true,
-        channels: { system: true, mobile: true },
-        hasCustomConfig: true
-      }
-    ]
-  },
-  {
-    id: "audit",
-    title: "卡审通知",
-    items: [
-      {
-        id: "video_audit_failed",
-        title: "视频审核不通过",
-        description: "视频审核不通过时，视频上传者收到消息提醒",
-        enabled: true,
-        channels: { system: true, mobile: true }
-      }
-    ]
-  },
-  {
-    id: "booking",
-    title: "预约通知",
-    items: [
-      {
-        id: "turn_to_book",
-        title: "轮到你预约",
-        description: "预约规则为按轮次预约，到预约时间时，可预约者收到消息提醒",
-        enabled: true,
-        channels: { system: true, mobile: true }
-      },
-      {
-        id: "booked_by_others",
-        title: "被预约",
-        description: "被预约后，预约规则设定者收到消息提醒",
-        enabled: true,
-        channels: { system: true, mobile: true },
-        hasCustomConfig: true
-      },
-      {
-        id: "cancel_booking",
-        title: "取消预约",
-        description: "预约取消后，预约规则设定者收到消息提醒",
-        enabled: true,
-        channels: { system: true, mobile: true },
-        hasCustomConfig: true
+        channels: { system: true }
       }
     ]
   },
   {
     id: "task",
-    title: "任务通知",
+    title: "任务协作",
     items: [
       {
-        id: "publish_edit_task",
-        title: "发布/编辑任务",
-        description: "任务创建成功时，下单运营和被指派者收到消息提醒",
+        id: "task_created",
+        title: "新任务",
+        description: "发布人创建任务并指派执行人后发送",
+        recipients: "被指派的执行人（A 操作通知 B）",
         enabled: true,
-        channels: { system: true, mobile: true }
+        channels: { system: true }
       },
       {
-        id: "task_link_video",
-        title: "任务关联视频",
-        description: "任务成功关联视频、图片、文案、音频时，任务创建者收到消息提醒",
+        id: "task_rescheduled",
+        title: "任务改期",
+        description: "任务的出片日期或截止时间被发布人修改后发送",
+        recipients: "任务执行人（A 操作通知 B）",
         enabled: true,
-        channels: { system: true, mobile: true }
+        channels: { system: true }
+      },
+      {
+        id: "task_work_linked",
+        title: "关联作品",
+        description: "执行人为任务新增或移除关联作品后发送，并展示当前已关联数量",
+        recipients: "任务发布人（B 操作通知 A）",
+        enabled: true,
+        channels: { system: true }
+      },
+      {
+        id: "task_script_linked",
+        title: "关联脚本",
+        description: "执行人为任务新增、替换或移除关联脚本后发送",
+        recipients: "任务发布人（B 操作通知 A）",
+        enabled: true,
+        channels: { system: true }
+      },
+      {
+        id: "task_completed",
+        title: "任务完成",
+        description: "已上传任务所需数量的作品时自动发送，并将任务标记为已达标",
+        recipients: "任务发布人（B 完成后通知 A）",
+        enabled: true,
+        channels: { system: true }
+      },
+      {
+        id: "task_overdue",
+        title: "任务逾期",
+        description: "超过任务出片时间且未达到要求数量时由系统自动发送",
+        recipients: "任务发布人和执行人",
+        enabled: true,
+        channels: { system: true }
       }
     ]
   },
   {
-    id: "account",
-    title: "账号通知",
+    id: "resource",
+    title: "内容资源",
     items: [
       {
-        id: "phone_unbind",
-        title: "手机号解绑",
-        description: "账号解绑了手机号，管理员收到消息提醒",
+        id: "upload_success",
+        title: "上传成功",
+        description: "素材或成片上传并完成转码入库后发送",
+        recipients: "上传操作人",
         enabled: true,
-        channels: { system: true, mobile: true }
+        channels: { system: true }
+      },
+      {
+        id: "upload_failed",
+        title: "上传失败",
+        description: "上传、分片校验或转码失败时发送，并给出失败阶段和重试建议",
+        recipients: "上传操作人",
+        enabled: true,
+        channels: { system: true }
+      },
+      {
+        id: "ai_generation_completed",
+        title: "AI生成完成",
+        description: "AI 图片、视频或批量裂变任务完成时发送，并展示成功数量和积分消耗",
+        recipients: "AI 任务发起人",
+        enabled: true,
+        channels: { system: true }
+      },
+      {
+        id: "resource_status_changed",
+        title: "状态修改",
+        description: "素材、成片或脚本的业务状态被其他成员修改后发送",
+        recipients: "资源上传人/负责人",
+        enabled: true,
+        channels: { system: true }
+      },
+      {
+        id: "resource_mentioned",
+        title: "批注与@提醒",
+        description: "成员新增批注、回复批注或在批注中 @ 指定人员时发送",
+        recipients: "被 @ 人；回复时同时通知原批注人",
+        enabled: true,
+        channels: { system: true }
+      }
+    ]
+  },
+  {
+    id: "live",
+    title: "直播",
+    items: [
+      {
+        id: "live_shift_created",
+        title: "新增排班",
+        description: "直播间新增场次并选择参与主播、助播和场控后发送",
+        recipients: "该直播场次关联的全部人员",
+        enabled: true,
+        channels: { system: true }
+      },
+      {
+        id: "live_shift_changed",
+        title: "排班调整",
+        description: "直播日期、时间段、直播间或参与人员发生变化后发送，并展示调整前后内容",
+        recipients: "调整前后涉及的全部人员",
+        enabled: true,
+        channels: { system: true }
+      },
+      {
+        id: "live_shift_cancelled",
+        title: "取消场次",
+        description: "直播场次被取消后发送，并展示取消人和取消原因",
+        recipients: "该直播场次关联的全部人员",
+        enabled: true,
+        channels: { system: true }
+      },
+      {
+        id: "live_start_reminder",
+        title: "开播提醒",
+        description: "按场次设定时间在开播前自动发送准备提醒",
+        recipients: "该直播场次关联的全部人员",
+        enabled: true,
+        channels: { system: true }
+      }
+    ]
+  },
+  {
+    id: "security",
+    title: "安全与系统",
+    items: [
+      {
+        id: "abnormal_login",
+        title: "异常登录",
+        description: "检测到异地 IP、新设备或高风险环境登录时发送",
+        recipients: "账号本人和安全管理员",
+        enabled: true,
+        channels: { system: true }
       },
       {
         id: "account_locked",
-        title: "账号被锁定",
-        description: "账号5次输入错误密码后被锁定，管理员收到消息提醒",
+        title: "账号锁定",
+        description: "连续多次登录失败触发账号临时锁定时发送",
+        recipients: "账号本人和管理员",
         enabled: true,
-        channels: { system: true, mobile: true }
-      }
-    ]
-  },
-  {
-    id: "export",
-    title: "导出通知",
-    items: [
+        channels: { system: true }
+      },
       {
-        id: "export_complete",
-        title: "导出完成",
-        description: "创作报表、任务报表、预约记录、计划报表、广告主报表、视频报表、投放报表、标签报表、TikTok店铺数据报表、TikTok订单数据报表、数据洞察报表导出任务生成后，操作导出者收到消息提醒",
+        id: "permission_changed",
+        title: "权限变更",
+        description: "用户角色、数据范围或功能权限被管理员调整并生效后发送",
+        recipients: "权限被调整的用户",
         enabled: true,
-        channels: { system: true, mobile: true }
+        channels: { system: true }
+      },
+      {
+        id: "data_export_audit",
+        title: "数据导出记录",
+        description: "用户导出报表或业务数据后生成审计消息；大批量、跨部门或包含敏感字段时标记为高风险",
+        recipients: "超级管理员和指定安全审计角色",
+        enabled: true,
+        channels: { system: true }
+      },
+      {
+        id: "system_notice",
+        title: "系统公告",
+        description: "系统维护、功能停用或重要平台规则调整时由平台发布",
+        recipients: "公告指定范围内的用户",
+        enabled: true,
+        channels: { system: true }
       }
     ]
   }
@@ -2183,7 +2259,7 @@ export default function AdminSystemManagementView() {
   // 9. 消息通知 STATE & HANDLERS
   // ---------------------------------------------------------------------------
   const [notifications, setNotifications] = useState<NotificationCategory[]>(() => {
-    const saved = localStorage.getItem("cloud_video_notification_settings");
+    const saved = localStorage.getItem("cloud_video_notification_settings_v2");
     if (!saved) return INITIAL_NOTIFICATION_CATEGORIES;
     try {
       return JSON.parse(saved);
@@ -2288,7 +2364,7 @@ export default function AdminSystemManagementView() {
   };
 
   const handleSaveNotificationSettings = () => {
-    localStorage.setItem("cloud_video_notification_settings", JSON.stringify(notifications));
+    localStorage.setItem("cloud_video_notification_settings_v2", JSON.stringify(notifications));
     showToast("✅ 消息通知设置保存成功！");
   };
 
@@ -5793,44 +5869,26 @@ export default function AdminSystemManagementView() {
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
                           <tr className="bg-slate-50/70 border-b border-slate-100 text-slate-500 font-extrabold text-[11px]">
-                            <th className="py-3 px-5 w-56">消息类型</th>
-                            <th className="py-3 px-5">场景说明</th>
-                            <th className="py-3 px-5 w-36 text-center">是否接收</th>
+                            <th className="py-3 px-5 w-44">消息类型</th>
+                            <th className="py-3 px-5">触发场景</th>
+                            <th className="py-3 px-5 w-64">接收对象</th>
+                            <th className="py-3 px-5 w-28 text-center">站内消息</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100/80 font-medium text-slate-700">
-                          {cat.items.map((item) => {
-                            const isActionInReceiveCol = ["video_status_change", "booked_by_others", "cancel_booking"].includes(item.id);
-                            const isDailySpendGrowth = item.id === "daily_spend_growth";
-
-                            return (
-                              <tr key={item.id} className="hover:bg-purple-50/20 transition-colors">
-                                <td className="py-3.5 px-5 font-bold text-slate-900">{item.title}</td>
-                                <td className="py-3.5 px-5 text-slate-500 text-xs">
-                                  <span>{item.description}</span>
-                                  {isDailySpendGrowth && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenSpendModal(cat.id, item)}
-                                      className="text-purple-600 hover:text-purple-700 font-extrabold text-xs ml-2 cursor-pointer inline-flex items-center gap-0.5 hover:underline"
-                                    >
-                                      修改
-                                    </button>
-                                  )}
-                                </td>
-                                <td className="py-3.5 px-5 text-center">
-                                  {isActionInReceiveCol ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenConfigModal(cat.id, item)}
-                                      className="text-purple-600 hover:text-purple-700 font-extrabold text-xs cursor-pointer inline-flex items-center gap-0.5 hover:underline"
-                                    >
-                                      修改
-                                    </button>
-                                  ) : (
+                            {cat.items.map((item) => {
+                              return (
+                                <tr key={item.id} className="hover:bg-purple-50/20 transition-colors">
+                                  <td className="py-3.5 px-5 font-bold text-slate-900">{item.title}</td>
+                                  <td className="py-3.5 px-5 text-slate-500 text-xs">
+                                    <span>{item.description}</span>
+                                  </td>
+                                  <td className="py-3.5 px-5 text-slate-600 text-xs">{item.recipients}</td>
+                                  <td className="py-3.5 px-5 text-center">
                                     <button
                                       type="button"
                                       onClick={() => handleToggleEnable(cat.id, item.id)}
+                                      title={item.enabled ? "关闭站内消息" : "开启站内消息"}
                                       className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                                         item.enabled ? "bg-purple-600" : "bg-slate-200"
                                       }`}
@@ -5841,8 +5899,7 @@ export default function AdminSystemManagementView() {
                                         }`}
                                       />
                                     </button>
-                                  )}
-                                </td>
+                                  </td>
                               </tr>
                             );
                           })}

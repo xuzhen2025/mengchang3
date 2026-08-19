@@ -23,7 +23,7 @@ import VideoRemakeView from "./components/VideoRemakeView";
 import FissionView from "./components/FissionView";
 import AccountManagementView from "./components/AccountManagementView";
 import TaskCollaborationView, { TaskItem } from "./components/TaskCollaborationView";
-import MessageCenterView from "./components/MessageCenterView";
+import MessageCenterWorkspace from "./components/MessageCenterWorkspace";
 import AdminView from "./components/AdminView";
 
 import { 
@@ -86,15 +86,23 @@ export default function App() {
     
     const newMsg: AppMessage = {
       id: `msg_credits_app_${Date.now()}`,
-      category: "审核",
-      subcategory: "积分审核",
-      type: "积分审核",
+      category: "审批待办",
+      subcategory: "积分申请",
+      type: "积分申请",
       title: `额外积分申请: ${amount} 积分`,
       detail: `申请人: 算法推荐部 - 汤小真 申请积分: ${amount} 积分 申请说明: ${reason} 审批状态: 待审核`,
       summary: `申请人: 算法推荐部 - 汤小真 申请积分: ${amount} 积分 申请说明: ${reason}`,
       status: "unread",
       time: timeStr,
       isRedDot: true,
+      eventCode: "CREDIT_APPLICATION_SUBMITTED",
+      template: "approval",
+      severity: "warning",
+      actorName: "汤小真（申请人）",
+      recipientNames: ["李部长（审批人）"],
+      sourceType: "积分申请单",
+      sourceId: `CA-${Date.now()}`,
+      businessStatus: "待审批",
       approvalType: "credits",
       approvalStatus: "pending",
       creditsAmount: amount,
@@ -155,15 +163,23 @@ export default function App() {
     // 4. Create result notification for applicant
     const resultMsg: AppMessage = {
       id: `msg_credits_res_${Date.now()}`,
-      category: "审核",
-      subcategory: "积分审核",
-      type: "积分审核",
+      category: "审批待办",
+      subcategory: "积分申请",
+      type: "积分申请",
       title: `积分申请审核结果: 通过`,
       detail: `您申请的 ${amount} 额外积分已由李部长审核通过！积分已自动存入您的账户。`,
       summary: `审核通过！+${amount} 积分已自动到账。`,
       status: "unread",
       time: timeStr,
       isRedDot: true,
+      eventCode: "CREDIT_APPLICATION_APPROVED",
+      template: "approval",
+      severity: "success",
+      actorName: "李部长（审批人）",
+      recipientNames: ["汤小真（申请人）"],
+      sourceType: "积分申请单",
+      sourceId: targetMsg.sourceId,
+      businessStatus: "已通过",
       approvalStatus: "approved",
       creditsAmount: amount,
       details: [
@@ -205,15 +221,23 @@ export default function App() {
     // 2. Create result notification for applicant
     const resultMsg: AppMessage = {
       id: `msg_credits_res_${Date.now()}`,
-      category: "审核",
-      subcategory: "积分审核",
-      type: "积分审核",
+      category: "审批待办",
+      subcategory: "积分申请",
+      type: "积分申请",
       title: `积分申请审核结果: 拒绝`,
       detail: `您申请的 ${amount} 额外积分未通过审核。拒绝原因：${rejectReason}`,
       summary: `审核驳回！原因: ${rejectReason}`,
       status: "unread",
       time: timeStr,
       isRedDot: true,
+      eventCode: "CREDIT_APPLICATION_REJECTED",
+      template: "approval",
+      severity: "warning",
+      actorName: "李部长（审批人）",
+      recipientNames: ["汤小真（申请人）"],
+      sourceType: "积分申请单",
+      sourceId: targetMsg.sourceId,
+      businessStatus: "已拒绝",
       approvalStatus: "rejected",
       rejectReason,
       creditsAmount: amount,
@@ -659,7 +683,7 @@ export default function App() {
 
       case "message_center":
         return (
-          <MessageCenterView
+          <MessageCenterWorkspace
             onBack={handleBack}
             setActiveScreen={handleNavigate}
             messages={messages}

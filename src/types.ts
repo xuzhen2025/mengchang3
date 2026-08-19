@@ -121,8 +121,8 @@ export interface MessageDetailItem {
 
 export interface AppMessage {
   id: string;
-  category: string; // 创作, 投放, 卡审, 审核, 任务, 账号, 导出
-  subcategory: string; // e.g. 积分审核, 上传视频, 视频审核不通过, etc.
+  category: string;
+  subcategory: string;
   type?: string;
   title: string;
   detail: string;
@@ -132,6 +132,18 @@ export interface AppMessage {
   categoryName?: string;
   isRedDot?: boolean;
   details: MessageDetailItem[];
+
+  // Prototype event metadata used to demonstrate source, recipient and destination.
+  eventCode?: string;
+  template?: "approval" | "task" | "resource" | "live" | "security";
+  severity?: "info" | "success" | "warning" | "danger";
+  actorName?: string;
+  recipientNames?: string[];
+  sourceType?: string;
+  sourceId?: string;
+  businessStatus?: string;
+  actionLabel?: string;
+  actionScreen?: ActiveScreen;
 
   // Approval specific fields
   approvalType?: "credits";

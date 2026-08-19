@@ -51,6 +51,7 @@ import {
   Inbox
 } from "lucide-react";
 import { ActiveScreen, AppMessage } from "../types";
+import { MESSAGE_CATEGORY_CONFIGS } from "../data";
 import ApprovalActionBox from "./ApprovalActionBox";
 
 interface HomeViewProps {
@@ -74,38 +75,11 @@ interface CategoryConfig {
   subcategories: string[];
 }
 
-const MESSAGE_CATEGORIES: CategoryConfig[] = [
-  {
-    id: "creation",
-    name: "创作",
-    subcategories: ["上传视频", "编辑视频", "视频状态被修改"]
-  },
-  {
-    id: "audit",
-    name: "卡审",
-    subcategories: ["视频审核不通过"]
-  },
-  {
-    id: "reservation",
-    name: "审核",
-    subcategories: ["积分审核"]
-  },
-  {
-    id: "task",
-    name: "任务",
-    subcategories: ["收到新任务", "任务关联新视频"]
-  },
-  {
-    id: "account",
-    name: "账号",
-    subcategories: ["手机号解绑", "账号被锁定"]
-  },
-  {
-    id: "export",
-    name: "导出",
-    subcategories: ["导出生成"]
-  }
-];
+const MESSAGE_CATEGORIES: CategoryConfig[] = MESSAGE_CATEGORY_CONFIGS.map((category) => ({
+  id: category.id,
+  name: category.name,
+  subcategories: [...category.subcategories]
+}));
 
 // Message detail item
 export interface MessageDetailItem {
@@ -157,7 +131,8 @@ export default function HomeView({
   messages: propMessages,
   onApproveCredits,
   onRejectCredits,
-  onMarkMessageRead
+  onMarkMessageRead,
+  onMarkAllMessagesRead
 }: HomeViewProps) {
   // ================= 1. SEARCH MODULE STATES =================
   const [searchType, setSearchType] = useState<SearchType>("成片");
@@ -412,16 +387,16 @@ export default function HomeView({
 
   const [drawerMessage, setDrawerMessage] = useState<any | null>(null);
 
-  const [activeMessageCategory, setActiveMessageCategory] = useState<string>("创作");
+  const [activeMessageCategory, setActiveMessageCategory] = useState<string>("审批待办");
   const [activeMessageSubcategory, setActiveMessageSubcategory] = useState<string>("all");
 
   // Helper calculation for unread counts
   const getCategoryUnreadCount = (catName: string) => {
-    return messagesList.filter(m => (m.category === catName || (catName === "审核" && (m.category === "预约" || m.category === "审核"))) && m.status === "unread").length;
+    return messagesList.filter(m => m.category === catName && m.status === "unread").length;
   };
 
   const getSubcategoryUnreadCount = (catName: string, subName: string) => {
-    return messagesList.filter(m => (m.category === catName || (catName === "审核" && (m.category === "预约" || m.category === "审核"))) && m.subcategory === subName && m.status === "unread").length;
+    return messagesList.filter(m => m.category === catName && m.subcategory === subName && m.status === "unread").length;
   };
 
   // ================= 3. TASK CENTER MODULE STATES =================
@@ -512,21 +487,23 @@ export default function HomeView({
   const [centerStatusFilter, setCenterStatusFilter] = useState<"全部" | "未读" | "已读">("全部");
   const [centerTimeFilter, setCenterTimeFilter] = useState<string>("全部时间");
 
-  const totalUnreadCount = messages.filter(m => m.status === "unread").length;
+  const totalUnreadCount = messagesList.filter(m => m.status === "unread").length;
 
   const markAllMessagesRead = () => {
-    setMessages(prev => prev.map(m => ({ ...m, status: "read" })));
+    if (onMarkAllMessagesRead) onMarkAllMessagesRead();
+    else setMessages(prev => prev.map(m => ({ ...m, status: "read" })));
   };
 
   const markSingleMessageRead = (id: string) => {
-    setMessages(prev => prev.map(m => m.id === id ? { ...m, status: "read" } : m));
+    if (onMarkMessageRead) onMarkMessageRead(id);
+    else setMessages(prev => prev.map(m => m.id === id ? { ...m, status: "read" } : m));
   };
 
   // Filter messages in Message Center modal
-  const filteredCenterMessages = messages.filter(m => {
+  const filteredCenterMessages = messagesList.filter(m => {
     // Type filter
     if (centerTypeFilter !== "全部类型") {
-      if (centerTypeFilter === "创作" || centerTypeFilter === "卡审" || centerTypeFilter === "预约" || centerTypeFilter === "任务" || centerTypeFilter === "账号" || centerTypeFilter === "导出") {
+      if (MESSAGE_CATEGORIES.some(category => category.name === centerTypeFilter)) {
         if (m.category !== centerTypeFilter) return false;
       } else {
         if (m.subcategory !== centerTypeFilter) return false;
@@ -537,8 +514,8 @@ export default function HomeView({
     if (centerStatusFilter === "已读" && m.status !== "read") return false;
     
     // Time filter
-    if (centerTimeFilter === "今天" && !m.time.includes("2026-07-31")) return false;
-    if (centerTimeFilter === "近3天" && !m.time.includes("2026-07-31") && !m.time.includes("2026-07-30") && !m.time.includes("2026-07-29")) return false;
+    if (centerTimeFilter === "今天" && !m.time.includes("2026-08-19")) return false;
+    if (centerTimeFilter === "近3天" && !["2026-08-19", "2026-08-18", "2026-08-17"].some(date => m.time.includes(date))) return false;
 
     return true;
   });
@@ -794,7 +771,7 @@ export default function HomeView({
                 </div>
                 <div>
                   <h2 className="text-sm font-black text-slate-900">消息通知</h2>
-                  <p className="text-[11px] text-slate-400">实时掌握创作、投放、卡审、预约等动态</p>
+                  <p className="text-[11px] text-slate-400">集中查看审批、任务、内容、直播与安全动态</p>
                 </div>
               </div>
 
@@ -844,7 +821,7 @@ export default function HomeView({
               if (!currentCatConfig) return null;
 
               const currentFilteredMessages = messagesList.filter(m => {
-                const catMatch = m.category === activeMessageCategory || (activeMessageCategory === "审核" && (m.category === "预约" || m.category === "审核"));
+                const catMatch = m.category === activeMessageCategory;
                 if (!catMatch) return false;
                 if (activeMessageSubcategory !== "all" && m.subcategory !== activeMessageSubcategory) return false;
                 return true;
@@ -856,7 +833,7 @@ export default function HomeView({
                   <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 p-2 rounded-2xl border border-slate-200/80">
                     <span className="text-[11px] font-bold text-slate-400 mr-0.5 shrink-0">分类细项:</span>
                     {(() => {
-                      const catUnreadAll = messagesList.filter(m => (m.category === activeMessageCategory || (activeMessageCategory === "审核" && (m.category === "预约" || m.category === "审核"))) && m.status === "unread").length;
+                      const catUnreadAll = messagesList.filter(m => m.category === activeMessageCategory && m.status === "unread").length;
                       return (
                         <button
                           onClick={() => setActiveMessageSubcategory("all")}
@@ -1249,18 +1226,10 @@ export default function HomeView({
                 >
                   <option value="全部类型">全部类型</option>
                   <optgroup label="主分类">
-                    <option value="创作">创作</option>
-                    <option value="卡审">卡审</option>
-                    <option value="预约">预约</option>
-                    <option value="任务">任务</option>
-                    <option value="账号">账号</option>
-                    <option value="导出">导出</option>
+                    {MESSAGE_CATEGORIES.map(category => <option key={category.id} value={category.name}>{category.name}</option>)}
                   </optgroup>
                   <optgroup label="具体细项">
-                    <option value="上传视频">上传视频</option>
-                    <option value="编辑视频">编辑视频</option>
-                    <option value="视频审核不通过">视频审核不通过</option>
-                    <option value="账号被锁定">账号被锁定</option>
+                    {MESSAGE_CATEGORIES.flatMap(category => category.subcategories).map(subcategory => <option key={subcategory} value={subcategory}>{subcategory}</option>)}
                   </optgroup>
                 </select>
               </div>
@@ -1756,7 +1725,7 @@ export default function HomeView({
               </div>
 
               {/* Credit Audit Approval Action Box */}
-              {(drawerMessage.approvalType === "credits" || drawerMessage.subcategory === "积分审核") && (
+              {drawerMessage.approvalType === "credits" && (
                 <ApprovalActionBox
                   message={drawerMessage}
                   onApprove={(id) => onApproveCredits && onApproveCredits(id)}
