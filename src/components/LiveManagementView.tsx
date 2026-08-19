@@ -1,1 +1,1 @@
-export { default } from "./LiveManagementWorkspace";
+export { default } from "./LiveManagementWorkspaceV2";
