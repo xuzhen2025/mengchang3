@@ -622,9 +622,6 @@ export default function HomeView({
             <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
               <span>欢迎回到梦畅 AIGC 电商平台</span>
             </h1>
-            <p className="text-xs font-bold text-slate-500 mt-1">
-              全链路 AI 智能化智能生成、批量裂变与广告投放协同工作台
-            </p>
           </div>
 
           {/* MODULE 4 ENTRY: Top Right Message Center Button */}
