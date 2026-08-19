@@ -49,7 +49,7 @@ export const INITIAL_MESSAGES: AppMessage[] = [
     id: "msg_task_new", category: "任务协作", subcategory: "新任务", type: "新任务",
     title: "王经理向你指派了新任务", detail: "任务《七夕美妆礼盒短视频》需要产出 3 条成片，请在 8 月 22 日前完成。",
     status: "unread", time: "2026-08-19 09:42:10", eventCode: "TASK_ASSIGNED", template: "task", severity: "info",
-    actorName: "王经理（发布人A）", recipientNames: ["徐振（执行人B）"], sourceType: "任务", sourceId: "TASK-20260819-018", businessStatus: "待完成",
+    actorName: "王经理（发布人）", recipientNames: ["徐振（执行人）"], sourceType: "任务", sourceId: "TASK-20260819-018", businessStatus: "待完成",
     actionLabel: "查看任务", actionScreen: "task_collaboration",
     details: [{ label: "任务名称", value: "七夕美妆礼盒短视频" }, { label: "任务要求", value: "3 条成片，比例 9:16，单条 20-30 秒" }, { label: "出片日期", value: "2026-08-22" }, { label: "优先级", value: "高" }]
   },
@@ -57,7 +57,7 @@ export const INITIAL_MESSAGES: AppMessage[] = [
     id: "msg_task_rescheduled", category: "任务协作", subcategory: "任务改期", type: "任务改期",
     title: "任务出片日期由 8 月 22 日调整为 8 月 21 日", detail: "王经理修改了《七夕美妆礼盒短视频》的出片日期，请重新安排制作计划。",
     status: "unread", time: "2026-08-19 09:18:32", eventCode: "TASK_DUE_DATE_CHANGED", template: "task", severity: "warning",
-    actorName: "王经理（发布人A）", recipientNames: ["徐振（执行人B）"], sourceType: "任务", sourceId: "TASK-20260819-018", businessStatus: "制作中",
+    actorName: "王经理（发布人）", recipientNames: ["徐振（执行人）"], sourceType: "任务", sourceId: "TASK-20260819-018", businessStatus: "制作中",
     actionLabel: "查看变更", actionScreen: "task_collaboration",
     details: [{ label: "任务名称", value: "七夕美妆礼盒短视频" }, { label: "原出片日期", value: "2026-08-22" }, { label: "新出片日期", value: "2026-08-21" }, { label: "改期说明", value: "直播预热计划提前一天" }]
   },
@@ -65,7 +65,7 @@ export const INITIAL_MESSAGES: AppMessage[] = [
     id: "msg_task_work_linked", category: "任务协作", subcategory: "关联作品", type: "关联作品",
     title: "徐振为任务关联了 2 条新成片", detail: "任务《七夕美妆礼盒短视频》当前已关联 2/3 条所需作品。",
     status: "unread", time: "2026-08-19 08:56:05", eventCode: "TASK_WORK_LINKED", template: "task", severity: "success",
-    actorName: "徐振（执行人B）", recipientNames: ["王经理（发布人A）"], sourceType: "任务", sourceId: "TASK-20260819-018", businessStatus: "2/3 条已完成",
+    actorName: "徐振（执行人）", recipientNames: ["王经理（发布人）"], sourceType: "任务", sourceId: "TASK-20260819-018", businessStatus: "2/3 条已完成",
     actionLabel: "查看关联作品", actionScreen: "task_collaboration",
     details: [{ label: "关联作品", value: "礼盒开箱口播_v3.mp4、七夕氛围展示_v2.mp4" }, { label: "作品数量", value: "新增 2 条，累计 2/3 条" }, { label: "执行人", value: "徐振" }]
   },
@@ -73,7 +73,7 @@ export const INITIAL_MESSAGES: AppMessage[] = [
     id: "msg_task_script_linked", category: "任务协作", subcategory: "关联脚本", type: "关联脚本",
     title: "徐振为任务关联了脚本", detail: "任务《七夕美妆礼盒短视频》已关联脚本《礼赠场景三段式口播》。",
     status: "read", time: "2026-08-18 18:24:46", eventCode: "TASK_SCRIPT_LINKED", template: "task", severity: "info",
-    actorName: "徐振（执行人B）", recipientNames: ["王经理（发布人A）"], sourceType: "任务", sourceId: "TASK-20260819-018", businessStatus: "制作中",
+    actorName: "徐振（执行人）", recipientNames: ["王经理（发布人）"], sourceType: "任务", sourceId: "TASK-20260819-018", businessStatus: "制作中",
     actionLabel: "查看关联脚本", actionScreen: "task_collaboration",
     details: [{ label: "脚本名称", value: "礼赠场景三段式口播" }, { label: "脚本编号", value: "SCRIPT-88216" }, { label: "关联人", value: "徐振" }]
   },
@@ -81,7 +81,7 @@ export const INITIAL_MESSAGES: AppMessage[] = [
     id: "msg_task_completed", category: "任务协作", subcategory: "任务完成", type: "任务完成",
     title: "任务所需 3 条作品已全部上传", detail: "徐振已完成《夏季防晒返场素材》的全部作品上传，任务自动标记为已达标。",
     status: "unread", time: "2026-08-18 16:35:18", eventCode: "TASK_TARGET_REACHED", template: "task", severity: "success",
-    actorName: "徐振（执行人B）", recipientNames: ["王经理（发布人A）"], sourceType: "任务", sourceId: "TASK-20260816-009", businessStatus: "已达标",
+    actorName: "徐振（执行人）", recipientNames: ["王经理（发布人）"], sourceType: "任务", sourceId: "TASK-20260816-009", businessStatus: "已达标",
     actionLabel: "验收任务", actionScreen: "task_collaboration",
     details: [{ label: "任务名称", value: "夏季防晒返场素材" }, { label: "完成情况", value: "3/3 条作品" }, { label: "完成时间", value: "2026-08-18 16:35:18" }]
   },
@@ -89,7 +89,7 @@ export const INITIAL_MESSAGES: AppMessage[] = [
     id: "msg_task_overdue", category: "任务协作", subcategory: "任务逾期", type: "任务逾期",
     title: "任务已逾期 18 小时", detail: "《家居收纳直播切片》应于 8 月 18 日 18:00 完成，目前仅上传 1/4 条作品。",
     status: "unread", time: "2026-08-19 12:00:00", eventCode: "TASK_OVERDUE", template: "task", severity: "danger",
-    actorName: "系统", recipientNames: ["陈主管（发布人A）", "李剪辑（执行人B）"], sourceType: "任务", sourceId: "TASK-20260815-006", businessStatus: "已逾期",
+    actorName: "系统", recipientNames: ["陈主管（发布人）", "李剪辑（执行人）"], sourceType: "任务", sourceId: "TASK-20260815-006", businessStatus: "已逾期",
     actionLabel: "查看任务", actionScreen: "task_collaboration",
     details: [{ label: "计划出片时间", value: "2026-08-18 18:00" }, { label: "当前进度", value: "1/4 条作品" }, { label: "逾期时长", value: "18 小时" }]
   },

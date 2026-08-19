@@ -717,7 +717,7 @@ export const INITIAL_NOTIFICATION_CATEGORIES: NotificationCategory[] = [
         id: "task_created",
         title: "新任务",
         description: "发布人创建任务并指派执行人后发送",
-        recipients: "被指派的执行人（A 操作通知 B）",
+        recipients: "被指派的执行人",
         enabled: true,
         channels: { system: true }
       },
@@ -725,7 +725,7 @@ export const INITIAL_NOTIFICATION_CATEGORIES: NotificationCategory[] = [
         id: "task_rescheduled",
         title: "任务改期",
         description: "任务的出片日期或截止时间被发布人修改后发送",
-        recipients: "任务执行人（A 操作通知 B）",
+        recipients: "任务执行人",
         enabled: true,
         channels: { system: true }
       },
@@ -733,7 +733,7 @@ export const INITIAL_NOTIFICATION_CATEGORIES: NotificationCategory[] = [
         id: "task_work_linked",
         title: "关联作品",
         description: "执行人为任务新增或移除关联作品后发送，并展示当前已关联数量",
-        recipients: "任务发布人（B 操作通知 A）",
+        recipients: "任务发布人",
         enabled: true,
         channels: { system: true }
       },
@@ -741,7 +741,7 @@ export const INITIAL_NOTIFICATION_CATEGORIES: NotificationCategory[] = [
         id: "task_script_linked",
         title: "关联脚本",
         description: "执行人为任务新增、替换或移除关联脚本后发送",
-        recipients: "任务发布人（B 操作通知 A）",
+        recipients: "任务发布人",
         enabled: true,
         channels: { system: true }
       },
@@ -749,7 +749,7 @@ export const INITIAL_NOTIFICATION_CATEGORIES: NotificationCategory[] = [
         id: "task_completed",
         title: "任务完成",
         description: "已上传任务所需数量的作品时自动发送，并将任务标记为已达标",
-        recipients: "任务发布人（B 完成后通知 A）",
+        recipients: "任务发布人",
         enabled: true,
         channels: { system: true }
       },
