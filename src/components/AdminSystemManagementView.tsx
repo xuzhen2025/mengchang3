@@ -94,113 +94,111 @@ export interface RolePermission {
 
 export const USER_CLIENT_PERMISSION_TREE: PermissionNode[] = [
   {
-    id: "uc_cheng_pian",
-    label: "成片区",
+    id: "uc_workspace",
+    label: "首页与个人工作台",
     children: [
-      { id: "uc_cp_view", label: "查看成片" },
-      { id: "uc_cp_edit", label: "修改视频信息" },
-      { id: "uc_cp_download", label: "下载成片" },
-      { id: "uc_cp_capcut", label: "复制到剪映" },
-      { id: "uc_cp_share", label: "分享" },
-      { id: "uc_cp_status", label: "修改状态" },
+      { id: "uc_home_view", label: "访问首页" },
+      { id: "uc_message_view", label: "查看消息中心" },
+      { id: "uc_credit_view", label: "查看积分账户与记录" },
+      { id: "uc_credit_apply", label: "提交积分申请" },
+      { id: "uc_credit_approve", label: "审批积分申请" },
     ]
   },
   {
-    id: "uc_su_cai",
-    label: "素材区",
+    id: "uc_ai_creation",
+    label: "AI 创作工具",
     children: [
-      { id: "uc_sc_view", label: "查看素材" },
-      { id: "uc_sc_upload", label: "上传素材" },
-      { id: "uc_sc_download", label: "下载素材" },
-      { id: "uc_sc_category", label: "批量修改分类" },
-      { id: "uc_sc_pin", label: "素材置顶" },
+      { id: "uc_quick_create", label: "使用快速创作" },
+      { id: "uc_agent_run", label: "使用 Agent 创作" },
+      { id: "uc_remake_run", label: "发起爆款复刻" },
+      { id: "uc_ai_video_generate", label: "生成 AI 视频" },
+      { id: "uc_ai_image_generate", label: "生成 AI 图片" },
+      { id: "uc_canvas_edit", label: "使用画布编辑" },
+      { id: "uc_canvas_export", label: "导出画布结果" },
     ]
   },
   {
-    id: "uc_di_san_fang",
-    label: "第三方",
+    id: "uc_resources",
+    label: "内容资源",
     children: [
-      { id: "uc_dsf_view", label: "查看第三方" },
-      { id: "uc_dsf_auth", label: "账号授权绑定" },
+      {
+        id: "uc_finished",
+        label: "成片",
+        children: [
+          { id: "uc_finished_view", label: "查看成片" },
+          { id: "uc_finished_upload", label: "上传成片" },
+          { id: "uc_finished_edit", label: "编辑基础信息" },
+          { id: "uc_finished_status", label: "修改业务状态" },
+          { id: "uc_finished_download", label: "下载成片" },
+          { id: "uc_finished_share", label: "分享成片" },
+          { id: "uc_finished_delete", label: "移入回收站" },
+        ]
+      },
+      {
+        id: "uc_material",
+        label: "素材",
+        children: [
+          { id: "uc_material_view", label: "查看素材" },
+          { id: "uc_material_upload", label: "上传素材" },
+          { id: "uc_material_edit", label: "编辑素材信息" },
+          { id: "uc_material_download", label: "下载素材" },
+          { id: "uc_material_category", label: "批量修改分类" },
+          { id: "uc_material_pin", label: "素材置顶" },
+          { id: "uc_material_delete", label: "删除素材" },
+        ]
+      },
+      {
+        id: "uc_script",
+        label: "脚本",
+        children: [
+          { id: "uc_script_view", label: "查看脚本" },
+          { id: "uc_script_create", label: "新建/AI生成脚本" },
+          { id: "uc_script_edit", label: "编辑脚本" },
+          { id: "uc_script_delete", label: "删除脚本" },
+        ]
+      },
+      { id: "uc_media_view", label: "查看图片与音频" },
+      { id: "uc_media_manage", label: "管理图片与音频" },
     ]
   },
   {
-    id: "uc_tu_pian",
-    label: "图片",
+    id: "uc_task",
+    label: "任务协作",
     children: [
-      { id: "uc_tp_view", label: "查看图片" },
-      { id: "uc_tp_gen", label: "AI生成图片" },
-      { id: "uc_tp_matting", label: "智能抠图" },
+      { id: "uc_task_view", label: "查看任务" },
+      { id: "uc_task_create", label: "新建任务" },
+      { id: "uc_task_edit", label: "编辑任务与改期" },
+      { id: "uc_task_assign", label: "指派执行人" },
+      { id: "uc_task_link", label: "关联作品与脚本" },
+      { id: "uc_task_comment", label: "评论与 @成员" },
+      { id: "uc_task_complete", label: "确认完成/验收" },
+      { id: "uc_task_delete", label: "删除任务" },
     ]
   },
   {
-    id: "uc_wen_an",
-    label: "文案",
+    id: "uc_live",
+    label: "直播管理",
     children: [
-      { id: "uc_wa_view", label: "查看文案" },
-      { id: "uc_wa_gen", label: "AI文案生成" },
+      { id: "uc_live_overview", label: "查看直播首页" },
+      { id: "uc_live_account_manage", label: "绑定/解绑直播账号" },
+      { id: "uc_live_team_view", label: "查看直播团队" },
+      { id: "uc_live_team_manage", label: "新增/编辑/删除员工" },
+      { id: "uc_live_room_data", label: "查看直播间与场次数据" },
+      { id: "uc_live_data_export", label: "导出直播数据" },
+      { id: "uc_live_schedule_view", label: "查看直播排班" },
+      { id: "uc_live_schedule_manage", label: "新增/调整/取消排班" },
     ]
   },
   {
-    id: "uc_yin_pin",
-    label: "音频",
+    id: "uc_data_analysis",
+    label: "数据分析与投放",
     children: [
-      { id: "uc_yp_view", label: "查看音频" },
-      { id: "uc_yp_tts", label: "语音合成与配音" },
+      { id: "uc_data_dashboard", label: "查看数据看板" },
+      { id: "uc_ad_account_manage", label: "管理广告账户授权" },
+      { id: "uc_ad_plan_manage", label: "管理投放计划" },
+      { id: "uc_data_export", label: "导出业务数据" },
     ]
   },
-  {
-    id: "uc_jiao_ben",
-    label: "脚本",
-    children: [
-      { id: "uc_jb_view", label: "查看脚本" },
-      { id: "uc_jb_breakdown", label: "脚本拆解" },
-    ]
-  },
-  {
-    id: "uc_shu_ju_zhong_xin",
-    label: "数据中心",
-    children: [
-      { id: "uc_sj_view", label: "查看数据看板" },
-      { id: "uc_sj_export", label: "导出数据报表" },
-    ]
-  },
-  { id: "uc_public_tags", label: "可修改公共标签" },
-  {
-    id: "uc_ren_wu",
-    label: "任务",
-    children: [
-      { id: "uc_rw_view", label: "查看任务" },
-      { id: "uc_rw_create", label: "新建指派任务" },
-    ]
-  },
-  { id: "uc_push_plan_record", label: "推送/衍生/创建计划记录" },
-  { id: "uc_fang_pin", label: "仿品" },
-  {
-    id: "uc_ai_fen_jing",
-    label: "AI分镜拆解",
-    children: [
-      { id: "uc_aifj_view", label: "查看拆解" },
-      { id: "uc_aifj_run", label: "发起拆解" },
-    ]
-  },
-  { id: "uc_ai_fang_xie", label: "AI仿写" },
-  { id: "uc_move_to_trash", label: "把视频移动到回收站" },
-  { id: "uc_qian_chuan_guard", label: "千川计划守卫" },
-  { id: "uc_ad_account_auth", label: "广告账户授权" },
-  { id: "uc_appointment_center", label: "预约中心" },
-  { id: "uc_smart_mix_cut", label: "智能混剪" },
-  { id: "uc_live_stream", label: "直播" },
-  {
-    id: "uc_daren_crm",
-    label: "达人CRM",
-    children: [
-      { id: "uc_crm_view", label: "查看达人" },
-      { id: "uc_crm_edit", label: "编辑达人" },
-    ]
-  },
-  { id: "uc_check_other_perm", label: "检测其他人的操作权限" },
-  { id: "uc_server_shutdown", label: "服务器关机" },
 ];
 
 export const ADMIN_BACKEND_PERMISSION_TREE: PermissionNode[] = [
@@ -208,40 +206,73 @@ export const ADMIN_BACKEND_PERMISSION_TREE: PermissionNode[] = [
     id: "ab_content_mgmt",
     label: "内容管理",
     children: [
-      { id: "ab_res_library", label: "资源库" },
-      { id: "ab_category", label: "分类" },
-      { id: "ab_video_status", label: "视频状态" },
-      { id: "ab_script_tpl", label: "脚本模板" },
-      { id: "ab_script_status", label: "脚本状态" },
-      { id: "ab_task", label: "任务" },
-      { id: "ab_tags", label: "标签" },
+      { id: "ab_resource_view", label: "查看资源库" },
+      { id: "ab_resource_manage", label: "管理/删除资源" },
+      { id: "ab_category_manage", label: "管理分类" },
+      { id: "ab_video_status_manage", label: "管理视频状态" },
+      { id: "ab_script_status_manage", label: "管理脚本状态" },
+      { id: "ab_task_manage", label: "管理任务字段与状态" },
+      { id: "ab_tag_manage", label: "管理标签" },
+      { id: "ab_script_template_manage", label: "管理脚本模板" },
     ]
   },
   {
-    id: "ab_system_mgmt",
-    label: "系统管理",
+    id: "ab_org_permission",
+    label: "组织、人员与权限",
     children: [
-      { id: "ab_sys_users", label: "用户" },
-      { id: "ab_sys_roles", label: "角色" },
-      { id: "ab_sys_audit", label: "操作记录" },
-      { id: "ab_sys_watermark", label: "水印" },
-      { id: "ab_sys_settings", label: "系统设置" },
-      { id: "ab_sys_appoint", label: "预约管理" },
-      { id: "ab_sys_advertiser", label: "广告主管理" },
+      { id: "ab_dept_view", label: "查看组织部门" },
+      { id: "ab_dept_manage", label: "新增/编辑/停用部门" },
+      { id: "ab_member_view", label: "查看人员账号" },
+      { id: "ab_member_invite", label: "邀请/导入人员" },
+      { id: "ab_member_manage", label: "编辑/停用/重置账号" },
+      { id: "ab_role_view", label: "查看角色权限" },
+      { id: "ab_role_manage", label: "新增/编辑/分配角色" },
     ]
   },
   {
-    id: "ab_daren_mgmt",
-    label: "达人管理",
+    id: "ab_security_audit",
+    label: "安全与审计",
     children: [
-      { id: "ab_daren_category", label: "分类" },
-      { id: "ab_daren_tags", label: "标签" },
-      { id: "ab_daren_status", label: "状态" },
-      { id: "ab_daren_settings", label: "系统设置" },
+      { id: "ab_audit_view", label: "查看操作记录" },
+      { id: "ab_audit_export", label: "导出操作记录" },
+      { id: "ab_export_audit_view", label: "查看数据导出记录" },
+      { id: "ab_export_audit_handle", label: "核查高风险导出" },
+      { id: "ab_login_log_view", label: "查看登录记录" },
     ]
   },
-  { id: "ab_cockpit", label: "驾驶舱" },
-  { id: "ab_biz_data_cockpit", label: "业务数据驾驶舱" },
+  {
+    id: "ab_system_config",
+    label: "平台配置",
+    children: [
+      { id: "ab_message_rule_manage", label: "配置消息通知规则" },
+      { id: "ab_watermark_manage", label: "配置水印" },
+      { id: "ab_system_setting_manage", label: "配置系统参数" },
+      { id: "ab_auto_tag_manage", label: "配置自动化标签" },
+      { id: "ab_ad_group_manage", label: "管理广告组" },
+      { id: "ab_async_sync_manage", label: "管理多站点同步" },
+    ]
+  },
+  {
+    id: "ab_credit_mgmt",
+    label: "积分管理",
+    children: [
+      { id: "ab_credit_account_view", label: "查看企业积分账户" },
+      { id: "ab_credit_recharge", label: "充值/调整积分" },
+      { id: "ab_credit_application_view", label: "查看积分申请" },
+      { id: "ab_credit_application_approve", label: "审批积分申请" },
+      { id: "ab_credit_record_export", label: "导出积分记录" },
+      { id: "ab_credit_rule_manage", label: "配置积分规则" },
+    ]
+  },
+  {
+    id: "ab_dashboard",
+    label: "管理驾驶舱",
+    children: [
+      { id: "ab_dashboard_view", label: "查看运营驾驶舱" },
+      { id: "ab_business_data_view", label: "查看全公司业务数据" },
+      { id: "ab_business_data_export", label: "导出全公司业务数据" },
+    ]
+  },
 ];
 
 const getLeafKeysFromNodes = (nodes: PermissionNode[]): string[] => {
@@ -256,20 +287,62 @@ const getLeafKeysFromNodes = (nodes: PermissionNode[]): string[] => {
   return keys;
 };
 
-export const ALL_PERMISSION_KEYS = [
-  ...getLeafKeysFromNodes(USER_CLIENT_PERMISSION_TREE),
-  ...getLeafKeysFromNodes(ADMIN_BACKEND_PERMISSION_TREE),
+export const USER_PERMISSION_KEYS = getLeafKeysFromNodes(USER_CLIENT_PERMISSION_TREE);
+export const ADMIN_PERMISSION_KEYS = getLeafKeysFromNodes(ADMIN_BACKEND_PERMISSION_TREE);
+export const ALL_PERMISSION_KEYS = [...USER_PERMISSION_KEYS, ...ADMIN_PERMISSION_KEYS];
+
+const BASIC_USER_KEYS = [
+  "uc_home_view", "uc_message_view", "uc_credit_view", "uc_credit_apply",
+  "uc_finished_view", "uc_material_view", "uc_script_view", "uc_media_view",
+  "uc_task_view", "uc_task_link", "uc_task_comment"
 ];
 
-const CREATION_KEYS = [
-  "uc_cp_view", "uc_cp_edit", "uc_sc_view", "uc_sc_download",
-  "uc_public_tags", "uc_fang_pin", "uc_ai_fang_xie", "uc_move_to_trash",
-  "uc_qian_chuan_guard", "uc_ad_account_auth", "uc_appointment_center",
-  "uc_check_other_perm", "uc_server_shutdown",
-  "ab_res_library", "ab_category", "ab_video_status", "ab_script_tpl",
-  "ab_script_status", "ab_task", "ab_tags",
-  "ab_sys_users", "ab_daren_category", "ab_daren_tags", "ab_daren_status",
-  "ab_cockpit", "ab_biz_data_cockpit"
+const mergePermissionKeys = (...groups: string[][]): string[] => Array.from(new Set(groups.flat()));
+
+const CONTENT_CREATOR_KEYS = [
+  ...BASIC_USER_KEYS,
+  "uc_quick_create", "uc_agent_run", "uc_remake_run", "uc_ai_video_generate", "uc_ai_image_generate", "uc_canvas_edit",
+  "uc_finished_upload", "uc_finished_edit", "uc_finished_status", "uc_finished_download", "uc_finished_share",
+  "uc_material_upload", "uc_material_edit", "uc_material_download", "uc_material_category",
+  "uc_script_create", "uc_script_edit", "uc_media_manage", "uc_task_edit", "uc_task_complete"
+];
+
+const LIVE_MEMBER_KEYS = [
+  ...BASIC_USER_KEYS,
+  "uc_live_overview", "uc_live_team_view", "uc_live_room_data", "uc_live_schedule_view"
+];
+
+const LIVE_MANAGER_KEYS = [
+  ...LIVE_MEMBER_KEYS,
+  "uc_live_account_manage", "uc_live_team_manage", "uc_live_data_export", "uc_live_schedule_manage",
+  "uc_task_create", "uc_task_edit", "uc_task_assign", "uc_task_complete"
+];
+
+const AD_OPERATOR_KEYS = [
+  ...BASIC_USER_KEYS,
+  "uc_finished_download", "uc_data_dashboard", "uc_ad_account_manage", "uc_ad_plan_manage", "uc_data_export"
+];
+
+const ADMIN_CONTENT_KEYS = [
+  "ab_resource_view", "ab_resource_manage", "ab_category_manage", "ab_video_status_manage",
+  "ab_script_status_manage", "ab_task_manage", "ab_tag_manage", "ab_script_template_manage"
+];
+
+const ADMIN_READ_KEYS = [
+  "ab_resource_view", "ab_dept_view", "ab_member_view", "ab_role_view", "ab_audit_view", "ab_dashboard_view"
+];
+
+const DEPT_MANAGER_KEYS = mergePermissionKeys(
+  CONTENT_CREATOR_KEYS,
+  LIVE_MEMBER_KEYS,
+  ["uc_task_create", "uc_task_assign", "uc_credit_approve", "uc_data_dashboard", "uc_data_export"],
+  ADMIN_READ_KEYS,
+  ["ab_credit_application_view", "ab_credit_application_approve"]
+);
+
+const SECURITY_AUDIT_KEYS = [
+  "uc_home_view", "uc_message_view", "ab_role_view", "ab_audit_view", "ab_audit_export",
+  "ab_export_audit_view", "ab_export_audit_handle", "ab_login_log_view"
 ];
 
 const INITIAL_ROLES: RolePermission[] = [
@@ -279,11 +352,11 @@ const INITIAL_ROLES: RolePermission[] = [
     code: "STAFF",
     type: "preset",
     category: "default",
-    description: "标准员工基础权限，支持剪辑、素材与爆款复刻协作",
+    description: "基础工作台、本人资源与被分配任务的最小可用权限",
     memberCount: 18,
     dataScope: "self",
     enabled: true,
-    checkedKeys: CREATION_KEYS,
+    checkedKeys: BASIC_USER_KEYS,
     permissions: [],
     updatedAt: "2026-07-24 10:00"
   },
@@ -311,7 +384,7 @@ const INITIAL_ROLES: RolePermission[] = [
     memberCount: 6,
     dataScope: "self",
     enabled: true,
-    checkedKeys: [...CREATION_KEYS, "finished_upload", "finished_edit_title", "mat_batch_category", "mat_status"],
+    checkedKeys: [...CONTENT_CREATOR_KEYS, "uc_material_pin"],
     permissions: [],
     updatedAt: "2026-07-23 15:20"
   },
@@ -325,7 +398,10 @@ const INITIAL_ROLES: RolePermission[] = [
     memberCount: 4,
     dataScope: "self",
     enabled: true,
-    checkedKeys: ["remake_view", "remake_create", "remake_mapping", "aivideo_script", "task_view", "task_update", "mat_view", "finished_view"],
+    checkedKeys: [
+      ...BASIC_USER_KEYS, "uc_agent_run", "uc_remake_run", "uc_ai_video_generate",
+      "uc_script_create", "uc_script_edit", "uc_material_edit", "uc_task_edit"
+    ],
     permissions: [],
     updatedAt: "2026-07-22 14:10"
   },
@@ -339,7 +415,7 @@ const INITIAL_ROLES: RolePermission[] = [
     memberCount: 8,
     dataScope: "self",
     enabled: true,
-    checkedKeys: CREATION_KEYS,
+    checkedKeys: CONTENT_CREATOR_KEYS,
     permissions: [],
     updatedAt: "2026-07-21 11:30"
   },
@@ -353,7 +429,7 @@ const INITIAL_ROLES: RolePermission[] = [
     memberCount: 2,
     dataScope: "dept_tree",
     enabled: true,
-    checkedKeys: [...CREATION_KEYS, "ad_view", "ad_publish", "ad_export", "finished_ad_data"],
+    checkedKeys: mergePermissionKeys(CONTENT_CREATOR_KEYS, AD_OPERATOR_KEYS),
     permissions: [],
     updatedAt: "2026-07-20 18:00"
   },
@@ -367,7 +443,7 @@ const INITIAL_ROLES: RolePermission[] = [
     memberCount: 12,
     dataScope: "dept_tree",
     enabled: true,
-    checkedKeys: ["finished_view", "finished_ad_data", "finished_export_ad", "ad_view", "ad_bind", "ad_publish", "ad_export"],
+    checkedKeys: AD_OPERATOR_KEYS,
     permissions: [],
     updatedAt: "2026-07-20 16:45"
   },
@@ -381,7 +457,7 @@ const INITIAL_ROLES: RolePermission[] = [
     memberCount: 9,
     dataScope: "self",
     enabled: true,
-    checkedKeys: CREATION_KEYS,
+    checkedKeys: CONTENT_CREATOR_KEYS,
     permissions: [],
     updatedAt: "2026-07-19 12:00"
   },
@@ -395,7 +471,9 @@ const INITIAL_ROLES: RolePermission[] = [
     memberCount: 3,
     dataScope: "self",
     enabled: true,
-    checkedKeys: ["mat_view", "mat_upload", "mat_download", "mat_pin", "asset_view", "asset_upload"],
+    checkedKeys: [
+      ...BASIC_USER_KEYS, "uc_material_upload", "uc_material_edit", "uc_material_download", "uc_material_category", "uc_material_pin"
+    ],
     permissions: [],
     updatedAt: "2026-07-18 10:20"
   },
@@ -409,7 +487,9 @@ const INITIAL_ROLES: RolePermission[] = [
     memberCount: 5,
     dataScope: "self",
     enabled: true,
-    checkedKeys: ["aivideo_script", "qc_subtitles", "finished_edit_title", "mat_edit_title", "task_view"],
+    checkedKeys: [
+      ...BASIC_USER_KEYS, "uc_agent_run", "uc_ai_video_generate", "uc_script_create", "uc_script_edit", "uc_task_edit"
+    ],
     permissions: [],
     updatedAt: "2026-07-17 15:00"
   },
@@ -423,7 +503,7 @@ const INITIAL_ROLES: RolePermission[] = [
     memberCount: 4,
     dataScope: "self",
     enabled: true,
-    checkedKeys: ["mat_view", "finished_view", "task_view"],
+    checkedKeys: [...BASIC_USER_KEYS, "uc_live_overview", "uc_live_schedule_view"],
     permissions: [],
     updatedAt: "2026-07-16 09:30"
   },
@@ -437,7 +517,9 @@ const INITIAL_ROLES: RolePermission[] = [
     memberCount: 2,
     dataScope: "dept_tree",
     enabled: true,
-    checkedKeys: ["qc_detail", "aiimg_view", "aiimg_generate", "finished_view", "mat_view"],
+    checkedKeys: [
+      ...BASIC_USER_KEYS, "uc_ai_image_generate", "uc_canvas_edit", "uc_finished_edit", "uc_script_create", "uc_script_edit", "uc_task_edit"
+    ],
     permissions: [],
     updatedAt: "2026-07-15 17:10"
   },
@@ -451,7 +533,7 @@ const INITIAL_ROLES: RolePermission[] = [
     memberCount: 3,
     dataScope: "dept_tree",
     enabled: true,
-    checkedKeys: ["tp_view", "tp_import", "tp_export", "tp_tags", "finished_view"],
+    checkedKeys: AD_OPERATOR_KEYS,
     permissions: [],
     updatedAt: "2026-07-14 11:20"
   },
@@ -465,7 +547,7 @@ const INITIAL_ROLES: RolePermission[] = [
     memberCount: 5,
     dataScope: "self",
     enabled: true,
-    checkedKeys: ["finished_view", "mat_view", "task_view", "task_update"],
+    checkedKeys: mergePermissionKeys(LIVE_MEMBER_KEYS, ["uc_material_upload", "uc_material_edit", "uc_task_edit", "uc_task_link"]),
     permissions: [],
     updatedAt: "2026-07-13 19:00"
   },
@@ -479,7 +561,7 @@ const INITIAL_ROLES: RolePermission[] = [
     memberCount: 6,
     dataScope: "self",
     enabled: true,
-    checkedKeys: ["finished_view", "mat_view"],
+    checkedKeys: LIVE_MEMBER_KEYS,
     permissions: [],
     updatedAt: "2026-07-12 16:10"
   },
@@ -493,7 +575,7 @@ const INITIAL_ROLES: RolePermission[] = [
     memberCount: 2,
     dataScope: "dept_tree",
     enabled: true,
-    checkedKeys: ["finished_view", "finished_upload", "finished_push", "mat_view", "task_view", "task_create", "ad_view"],
+    checkedKeys: [...LIVE_MANAGER_KEYS, "uc_finished_upload", "uc_finished_download", "uc_data_dashboard"],
     permissions: [],
     updatedAt: "2026-07-11 14:00"
   },
@@ -507,7 +589,15 @@ const INITIAL_ROLES: RolePermission[] = [
     memberCount: 3,
     dataScope: "all",
     enabled: true,
-    checkedKeys: ALL_PERMISSION_KEYS.filter(k => !k.startsWith("sys_")),
+    checkedKeys: mergePermissionKeys(
+      USER_PERMISSION_KEYS,
+      ADMIN_CONTENT_KEYS,
+      ADMIN_READ_KEYS,
+      [
+        "ab_export_audit_view", "ab_credit_account_view", "ab_credit_application_view", "ab_credit_application_approve",
+        "ab_dashboard_view", "ab_business_data_view", "ab_business_data_export"
+      ]
+    ),
     permissions: [],
     updatedAt: "2026-07-10 10:00"
   },
@@ -521,9 +611,63 @@ const INITIAL_ROLES: RolePermission[] = [
     memberCount: 2,
     dataScope: "all",
     enabled: true,
-    checkedKeys: ALL_PERMISSION_KEYS.filter(k => k !== "sys_roles" && k !== "sys_users"),
+    checkedKeys: mergePermissionKeys(
+      CONTENT_CREATOR_KEYS,
+      [
+        "uc_canvas_export", "uc_finished_delete", "uc_material_pin", "uc_material_delete", "uc_script_delete",
+        "uc_task_create", "uc_task_assign", "uc_task_delete", "uc_credit_approve"
+      ],
+      ADMIN_CONTENT_KEYS,
+      ["ab_dept_view", "ab_member_view", "ab_role_view", "ab_audit_view", "ab_dashboard_view"]
+    ),
     permissions: [],
     updatedAt: "2026-07-09 15:40"
+  },
+  {
+    id: "role_dept_head",
+    name: "部门负责人/主管",
+    code: "DEPT_HEAD",
+    type: "preset",
+    category: "other",
+    description: "管理本部门及下级团队的任务、内容、数据与积分审批",
+    memberCount: 5,
+    dataScope: "dept_tree",
+    enabled: true,
+    checkedKeys: DEPT_MANAGER_KEYS,
+    permissions: [],
+    updatedAt: "2026-08-19 16:20"
+  },
+  {
+    id: "role_security_auditor",
+    name: "安全审计员",
+    code: "SECURITY_AUDITOR",
+    type: "preset",
+    category: "other",
+    description: "查看操作、登录与数据导出审计记录，并核查高风险导出",
+    memberCount: 2,
+    dataScope: "all",
+    enabled: true,
+    checkedKeys: SECURITY_AUDIT_KEYS,
+    permissions: [],
+    updatedAt: "2026-08-19 16:20"
+  },
+  {
+    id: "role_finance",
+    name: "积分与财务管理员",
+    code: "FINANCE_ADMIN",
+    type: "preset",
+    category: "other",
+    description: "管理企业积分账户、审批记录及全公司业务数据只读查看",
+    memberCount: 2,
+    dataScope: "all",
+    enabled: true,
+    checkedKeys: [
+      "uc_home_view", "uc_message_view", "uc_credit_view", "uc_credit_approve", "uc_data_dashboard",
+      "ab_credit_account_view", "ab_credit_recharge", "ab_credit_application_view", "ab_credit_application_approve",
+      "ab_credit_record_export", "ab_credit_rule_manage", "ab_dashboard_view", "ab_business_data_view"
+    ],
+    permissions: [],
+    updatedAt: "2026-08-19 16:20"
   }
 ];
 
@@ -1307,7 +1451,7 @@ export default function AdminSystemManagementView() {
   // 1. 角色与权限矩阵 STATE & HANDLERS
   // ---------------------------------------------------------------------------
   const [roles, setRoles] = useState<RolePermission[]>(() => {
-    const saved = localStorage.getItem("cloud_video_roles");
+    const saved = localStorage.getItem("cloud_video_roles_v2");
     if (!saved) return INITIAL_ROLES;
     try {
       const parsed: RolePermission[] = JSON.parse(saved);
@@ -1323,7 +1467,7 @@ export default function AdminSystemManagementView() {
           memberCount: 18,
           dataScope: "self",
           enabled: true,
-          checkedKeys: CREATION_KEYS,
+          checkedKeys: BASIC_USER_KEYS,
           permissions: [],
           updatedAt: "2026-07-24 10:00"
         };
@@ -1367,7 +1511,7 @@ export default function AdminSystemManagementView() {
         const next = prev.map((r) =>
           r.id === editingRoleId ? { ...r, name: roleFormName, description: roleFormDesc, updatedAt: new Date().toISOString().replace('T', ' ').substring(0, 16) } : r
         );
-        localStorage.setItem("cloud_video_roles", JSON.stringify(next));
+        localStorage.setItem("cloud_video_roles_v2", JSON.stringify(next));
         return next;
       });
       showToast("✅ 修改角色成功");
@@ -1382,13 +1526,13 @@ export default function AdminSystemManagementView() {
         memberCount: 0,
         dataScope: "self",
         enabled: true,
-        checkedKeys: CREATION_KEYS,
+        checkedKeys: BASIC_USER_KEYS,
         permissions: [],
         updatedAt: new Date().toISOString().replace('T', ' ').substring(0, 16)
       };
       setRoles((prev) => {
         const next = [...prev, newRole];
-        localStorage.setItem("cloud_video_roles", JSON.stringify(next));
+        localStorage.setItem("cloud_video_roles_v2", JSON.stringify(next));
         return next;
       });
       setSelectedRoleId(newRole.id);
@@ -1399,14 +1543,14 @@ export default function AdminSystemManagementView() {
 
   const handleDeleteRole = (id: string) => {
     const roleToDelete = roles.find((r) => r.id === id);
-    if (roleToDelete?.category === "default") {
-      showToast("⚠️ 默认基础角色无法删除");
+    if (roleToDelete?.type === "preset") {
+      showToast("预设角色不可删除，可复制后调整为自定义角色");
       return;
     }
     if (confirm(`确定要删除角色【${roleToDelete?.name}】吗？`)) {
       setRoles((prev) => {
         const next = prev.filter((r) => r.id !== id);
-        localStorage.setItem("cloud_video_roles", JSON.stringify(next));
+        localStorage.setItem("cloud_video_roles_v2", JSON.stringify(next));
         return next;
       });
       if (selectedRoleId === id) {
@@ -1430,7 +1574,7 @@ export default function AdminSystemManagementView() {
     };
     setRoles(prev => {
       const next = [...prev, newRole];
-      localStorage.setItem("cloud_video_roles", JSON.stringify(next));
+      localStorage.setItem("cloud_video_roles_v2", JSON.stringify(next));
       return next;
     });
     setSelectedRoleId(newRole.id);
@@ -1442,6 +1586,11 @@ export default function AdminSystemManagementView() {
     const nextEnabled = !(selectedRole.enabled ?? true);
     setRoles(prev => prev.map(r => r.id === selectedRoleId ? { ...r, enabled: nextEnabled } : r));
     showToast(`⚡ 角色【${selectedRole.name}】已${nextEnabled ? '开启' : '停用'}`);
+  };
+
+  const handleChangeRoleDataScope = (dataScope: NonNullable<RolePermission["dataScope"]>) => {
+    if (!selectedRole) return;
+    setRoles(prev => prev.map(role => role.id === selectedRoleId ? { ...role, dataScope } : role));
   };
 
   const handleToggleNodeChecked = (nodeId: string, nodeChildrenKeys: string[]) => {
@@ -1482,14 +1631,14 @@ export default function AdminSystemManagementView() {
 
   const handleSaveRolePermissions = () => {
     if (!selectedRole) return;
-    localStorage.setItem("cloud_video_roles", JSON.stringify(roles));
+    localStorage.setItem("cloud_video_roles_v2", JSON.stringify(roles));
     showToast(`✅ 角色【${selectedRole.name}】权限矩阵保存成功！`);
   };
 
   // Node Expansion State
   const [expandedNodeIds, setExpandedNodeIds] = useState<string[]>([
-    "ab_content_mgmt", "ab_system_mgmt", "ab_daren_mgmt",
-    "uc_cheng_pian", "uc_su_cai"
+    "uc_workspace", "uc_resources", "uc_task", "uc_live",
+    "ab_content_mgmt", "ab_org_permission", "ab_security_audit"
   ]);
 
   const toggleExpandNode = (nodeId: string) => {
@@ -3106,7 +3255,9 @@ export default function AdminSystemManagementView() {
                           }`}
                         >
                           <div className="flex items-center gap-1.5 truncate">
+                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${r.enabled === false ? "bg-slate-300" : "bg-emerald-500"}`} />
                             <span className="truncate">{r.name}</span>
+                            <span className="shrink-0 text-[10px] font-medium text-slate-400">{r.memberCount}人</span>
                           </div>
                         </div>
                       );
@@ -3144,7 +3295,9 @@ export default function AdminSystemManagementView() {
                           }`}
                         >
                           <div className="flex items-center gap-1.5 truncate">
+                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${r.enabled === false ? "bg-slate-300" : "bg-emerald-500"}`} />
                             <span className="truncate">{r.name}</span>
+                            <span className="shrink-0 text-[10px] font-medium text-slate-400">{r.memberCount}人</span>
                           </div>
 
                           <div className="flex items-center gap-1">
@@ -3157,28 +3310,32 @@ export default function AdminSystemManagementView() {
                               >
                                 <Copy className="w-3 h-3" />
                               </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenEditRole(r);
-                                }}
-                                title="重命名/修改角色"
-                                className="p-1 text-slate-400 hover:text-purple-600 rounded hover:bg-purple-100/50"
-                              >
-                                <Edit3 className="w-3 h-3" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteRole(r.id);
-                                }}
-                                title="删除角色"
-                                className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-100/50"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
+                              {r.type === "custom" && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenEditRole(r);
+                                    }}
+                                    title="修改自定义角色"
+                                    className="p-1 text-slate-400 hover:text-purple-600 rounded hover:bg-purple-100/50"
+                                  >
+                                    <Edit3 className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteRole(r.id);
+                                    }}
+                                    title="删除自定义角色"
+                                    className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-100/50"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -3223,12 +3380,56 @@ export default function AdminSystemManagementView() {
                     </div>
                   </div>
 
+                  <div className="mb-5 grid grid-cols-1 gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 xl:grid-cols-[minmax(0,1fr)_auto_auto] xl:items-center">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-black text-slate-900">{selectedRole?.name}</span>
+                        <span className="rounded bg-white px-2 py-0.5 font-mono text-[10px] font-bold text-slate-500 ring-1 ring-slate-200">{selectedRole?.code}</span>
+                        <span className="text-[11px] text-slate-400">已关联 {selectedRole?.memberCount ?? 0} 人</span>
+                      </div>
+                      <p className="mt-1.5 text-xs leading-5 text-slate-500">{selectedRole?.description}</p>
+                    </div>
+
+                    <div>
+                      <p className="mb-1.5 text-[10px] font-bold text-slate-400">数据查看范围</p>
+                      <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+                        {([
+                          { value: "self", label: "仅本人" },
+                          { value: "dept_tree", label: "本部门及下级" },
+                          { value: "all", label: "全公司" }
+                        ] as const).map(option => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => handleChangeRoleDataScope(option.value)}
+                            className={`h-8 px-3 text-[11px] font-bold transition ${selectedRole?.dataScope === option.value ? "bg-purple-600 text-white" : "text-slate-500 hover:bg-slate-50"}`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="mb-1.5 text-[10px] font-bold text-slate-400">角色状态</p>
+                      <button
+                        type="button"
+                        onClick={handleToggleRoleEnabled}
+                        className={`inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[11px] font-bold transition ${(selectedRole?.enabled ?? true) ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-500"}`}
+                      >
+                        <span className={`h-2 w-2 rounded-full ${(selectedRole?.enabled ?? true) ? "bg-emerald-500" : "bg-slate-300"}`} />
+                        {(selectedRole?.enabled ?? true) ? "已启用" : "已停用"}
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Two Column Grid matching user screenshot */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                     {/* Left Column: 用户端 */}
                     <div className="space-y-3 border-r-0 md:border-r border-slate-100 pr-0 md:pr-4">
-                      <div className="pb-2 border-b border-slate-200/80">
+                      <div className="pb-2 border-b border-slate-200/80 flex items-center justify-between">
                         <h3 className="text-sm font-extrabold text-slate-900">用户端</h3>
+                        <span className="text-[10px] font-bold text-slate-400">已授权 {(selectedRole?.checkedKeys || []).filter(key => key.startsWith("uc_")).length}/{USER_PERMISSION_KEYS.length}</span>
                       </div>
                       <div className="py-1 max-h-[520px] overflow-y-auto scrollbar-thin pr-2">
                         {renderPermissionTreeNodes(USER_CLIENT_PERMISSION_TREE)}
@@ -3238,28 +3439,8 @@ export default function AdminSystemManagementView() {
                     {/* Right Column: 管理后台 */}
                     <div className="space-y-3">
                       <div className="pb-2 border-b border-slate-200/80 flex items-center justify-between">
-                        <h3 className="text-sm font-extrabold text-slate-900">管理后台</h3>
-
-                        {/* Top Right Toggle Switch matching screenshot: 关闭 [ Switch ] 开启 */}
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-slate-600">关闭</span>
-                          <button
-                            type="button"
-                            onClick={handleToggleRoleEnabled}
-                            className={`w-11 h-6 rounded-full transition-all p-0.5 cursor-pointer flex items-center ${
-                              (selectedRole?.enabled ?? true)
-                                ? "bg-[#7C3AED] justify-end"
-                                : "bg-slate-300 justify-start"
-                            }`}
-                          >
-                            <div className="w-5 h-5 bg-white rounded-full shadow-md" />
-                          </button>
-                          <span className={`text-xs font-bold ${
-                            (selectedRole?.enabled ?? true) ? "text-[#7C3AED]" : "text-slate-400"
-                          }`}>
-                            开启
-                          </span>
-                        </div>
+                        <h3 className="text-sm font-extrabold text-slate-900">管理端</h3>
+                        <span className="text-[10px] font-bold text-slate-400">已授权 {(selectedRole?.checkedKeys || []).filter(key => key.startsWith("ab_")).length}/{ADMIN_PERMISSION_KEYS.length}</span>
                       </div>
 
                       <div className="py-1 max-h-[520px] overflow-y-auto scrollbar-thin pr-2">
