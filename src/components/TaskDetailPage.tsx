@@ -4,6 +4,7 @@ import LinkScriptModal from "./LinkScriptModal";
 import UploadFinishedVideoModal from "./UploadFinishedVideoModal";
 import UploadImageModal from "./UploadImageModal";
 import UploadGenericResourcePage from "./UploadGenericResourcePage";
+import ResourceLibraryItem, { ResourceLibraryItemData } from "./ResourceLibraryItem";
 import {
   ArrowLeft,
   UploadCloud,
@@ -149,6 +150,28 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
     if (sortBy === "消耗最高") return (right.cost || 0) - (left.cost || 0);
     return (right.createdAt || "").localeCompare(left.createdAt || "");
   });
+  const visibleResourceItems: ResourceLibraryItemData[] = visibleWorks.map((work) => ({
+    id: work.id,
+    numericId: work.numericId,
+    type: getWorkTab(work.type),
+    title: work.name,
+    coverUrl: work.coverUrl,
+    status: work.status === "未审核" ? "待审核" : work.status,
+    author: work.author || task.assignee,
+    time: work.createdAt || `${task.deadlineDate} 12:00`,
+    cost: work.cost || 0,
+    category: work.category,
+    subtitle: work.subtitle,
+    cuts: work.cuts,
+    downloads: work.downloads,
+    shares: work.shares,
+    filesCount: work.filesCount,
+    duration: work.duration,
+    resolution: work.resolution,
+    size: work.size,
+    content: work.content,
+    scenesCount: work.scenesCount
+  }));
 
   // If user opened an upload page view, render the corresponding upload component (same as ResourcesView)
   if (uploadPageView) {
@@ -395,8 +418,9 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
         </div>
       </div>
 
+      <div className="flex flex-col gap-5">
       {/* SECTION 2: Sub-Tabs Bar & Stats */}
-      <div className="bg-white rounded-xl border border-slate-200/80 p-3 px-5 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="order-2 bg-white rounded-xl border border-slate-200/80 p-3 px-5 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         {/* Tabs */}
         <div className="flex items-center gap-6 sm:gap-8 overflow-x-auto w-full sm:w-auto">
           {(["成片", "素材", "脚本", "图片", "音频"] as const).map((tab) => (
@@ -437,7 +461,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
       </div>
 
       {/* SECTION 3: 素材数据汇总 (KPI Metric Cards) */}
-      <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs space-y-4">
+      <div className="order-1 bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-extrabold text-slate-900 tracking-tight">素材数据汇总</h2>
           <span className="text-xs text-slate-400 font-medium">数据实时同步</span>
@@ -535,6 +559,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       {/* SECTION 4: 素材筛选 Filter Board */}
@@ -787,32 +812,16 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
         </div>
 
         {visibleWorks.length > 0 ? (
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-            {visibleWorks.map((work) => {
-              const workTab = getWorkTab(work.type);
-              const WorkIcon = workTab === "成片" ? Film : workTab === "图片" ? ImageIcon : workTab === "音频" ? Music : FileText;
-              const passed = work.status === "已通过" || work.status === "审核通过" || work.status === "通过";
-              const rejected = work.status === "审核驳回";
-              return (
-                <article key={work.id} className="group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs transition-all hover:border-purple-300 hover:shadow-lg">
-                  <div className="relative aspect-video bg-slate-100">
-                    {work.coverUrl ? <img src={work.coverUrl} alt={work.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" referrerPolicy="no-referrer" /> : <div className="flex h-full items-center justify-center"><WorkIcon className="h-10 w-10 text-slate-300" /></div>}
-                    <span className="absolute left-2 top-2 rounded bg-slate-950/75 px-2 py-1 text-[10px] font-bold text-white">{workTab}</span>
-                    <span className={`absolute right-2 top-2 rounded px-2 py-1 text-[10px] font-bold text-white ${passed ? "bg-emerald-500" : rejected ? "bg-rose-500" : "bg-amber-500"}`}>{work.status || "未审核"}</span>
-                    {workTab === "成片" && <span className="absolute bottom-2 left-2 rounded bg-black/65 px-2 py-1 font-mono text-[10px] text-white">{work.duration || "00:30"}</span>}
-                  </div>
-                  <div className="p-3">
-                    <p className="line-clamp-2 min-h-9 text-xs font-bold leading-[18px] text-slate-800" title={work.name}>{work.name}</p>
-                    {workTab === "成片" && <p className="mt-1 font-mono text-[10px] text-slate-400">{work.resolution || "1080p"} · {work.size || "-- MB"}</p>}
-                    <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-slate-400"><span className="truncate">上传人：{work.author || task.assignee}</span><span className="shrink-0">{work.createdAt || `${task.deadlineDate} 12:00`}</span></div>
-                    <div className="mt-3 flex items-center justify-end gap-2 border-t border-slate-100 pt-2.5">
-                      <button title="查看" onClick={() => onShowToast(`正在查看《${work.name}》`)} className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700"><Eye className="h-3.5 w-3.5" /></button>
-                      <button title="下载" onClick={() => onShowToast(`已开始下载《${work.name}》`)} className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700"><Download className="h-3.5 w-3.5" /></button>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
+          <div className={activeTab === "脚本" ? "overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs" : activeTab === "音频" ? "grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"}>
+            {activeTab === "脚本" && <div className="grid grid-cols-[minmax(180px,1.2fr)_minmax(240px,2fr)_100px_150px_90px] gap-4 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-xs font-bold text-slate-500"><span>脚本</span><span>脚本内容</span><span>状态</span><span>分类/标签</span><span className="text-right">分镜/操作</span></div>}
+            {visibleResourceItems.map((item) => (
+              <ResourceLibraryItem
+                key={item.id}
+                item={item}
+                onOpen={() => onShowToast(`正在查看《${item.title}》`)}
+                onDownload={() => onShowToast(`已开始下载《${item.title}》`)}
+              />
+            ))}
           </div>
         ) : (
           <div className="flex min-h-[170px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/40 text-center">

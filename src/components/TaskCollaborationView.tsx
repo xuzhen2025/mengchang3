@@ -55,6 +55,13 @@ export interface AssociatedWorkItem {
   duration?: string;
   resolution?: string;
   size?: string;
+  subtitle?: string;
+  content?: string;
+  scenesCount?: number;
+  downloads?: number;
+  shares?: number;
+  cuts?: number;
+  filesCount?: number;
 }
 
 export interface AssociatedScriptItem {
@@ -113,15 +120,17 @@ const INITIAL_TASKS: TaskItem[] = [
     deadlineDate: "2026-08-20",
     assignee: "梁浩然",
     assigneeDeptPath: "天猫/拼多多组 / 天猫 / 梁浩然",
-    orderCount: 3,
-    completedCount: 3,
+    orderCount: 5,
+    completedCount: 5,
     status: "review",
     cost: 360,
     associatedScript: { title: "【秋季风衣】通勤场景三版混剪", status: "可以拍摄", versionCount: 2 },
     associatedWorks: [
-      { id: "review-w-1", type: "video", name: "风衣通勤地铁版_V1.mp4", status: "待审核", author: "梁浩然", createdAt: "2026-08-20 09:18", category: "女装", publicTags: ["场景", "产品名称"], personalTags: ["通勤系列"], duration: "00:29", resolution: "1080p", size: "32.4 MB", coverUrl: "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=480&auto=format&fit=crop&q=80" },
-      { id: "review-w-2", type: "video", name: "风衣办公室版_V2.mp4", status: "未审核", author: "梁浩然", createdAt: "2026-08-20 10:06", category: "女装", publicTags: ["场景", "模特姓名"], duration: "00:32", resolution: "1080p", size: "35.8 MB", coverUrl: "https://images.unsplash.com/photo-1551028719-00167b16eac5?w=480&auto=format&fit=crop&q=80" },
-      { id: "review-w-3", type: "video", name: "风衣面料防风细节版_V3.mp4", status: "已通过", author: "梁浩然", createdAt: "2026-08-20 10:32", category: "女装", publicTags: ["产品名称", "爆款视频"], personalTags: ["重点验收"], duration: "00:24", resolution: "2K", size: "41.6 MB", coverUrl: "https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?w=480&auto=format&fit=crop&q=80" }
+      { id: "review-w-1", numericId: "110332301", type: "video", name: "风衣通勤地铁版_V1.mp4", status: "待审核", author: "梁浩然", createdAt: "2026-08-20 09:18", category: "女装", publicTags: ["场景", "产品名称"], personalTags: ["通勤系列"], duration: "00:29", resolution: "1080p", size: "32.4 MB", downloads: 2, shares: 1, cuts: 6, coverUrl: "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=480&auto=format&fit=crop&q=80" },
+      { id: "review-w-2", numericId: "110332302", type: "素材", name: "风衣面料防风细节原始素材.mp4", status: "未审核", author: "梁浩然", createdAt: "2026-08-20 09:42", category: "商品实拍", publicTags: ["产品名称", "空镜"], duration: "00:18", resolution: "2K", size: "28.7 MB", downloads: 1, cuts: 3, coverUrl: "https://images.unsplash.com/photo-1551028719-00167b16eac5?w=480&auto=format&fit=crop&q=80" },
+      { id: "review-w-3", numericId: "110332303", type: "text", name: "秋季风衣通勤口播成稿.docx", status: "待审核", author: "梁浩然", createdAt: "2026-08-20 10:02", category: "口播种草", subtitle: "通勤场景", content: "早晚温差大的通勤季，一件轻量防风风衣即可兼顾地铁、办公室与户外场景。", scenesCount: 6, publicTags: ["脚本类型", "场景"] },
+      { id: "review-w-4", numericId: "110332304", type: "image", name: "风衣通勤场景封面图.png", status: "已通过", author: "梁浩然", createdAt: "2026-08-20 10:18", category: "封面", subtitle: "竖版视频封面", resolution: "1080x1440", size: "2.6 MB", downloads: 4, filesCount: 1, publicTags: ["场景", "产品名称"], personalTags: ["重点验收"], coverUrl: "https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?w=480&auto=format&fit=crop&q=80" },
+      { id: "review-w-5", numericId: "110332305", type: "audio", name: "风衣通勤版旁白.wav", status: "待审核", author: "梁浩然", createdAt: "2026-08-20 10:32", category: "真人配音", subtitle: "女声·轻快", duration: "00:31", size: "5.8 MB", downloads: 2, publicTags: ["场景", "合作达人"] }
     ],
     product: "秋季通勤风衣",
     scriptType: "场景混剪",
