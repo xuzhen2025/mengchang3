@@ -131,6 +131,15 @@ export interface GalleryItem {
 
 export type ActiveScreen = "home" | "quick_creation" | "agent_creation" | "video_remake" | "ai_video" | "ai_image" | "canvas" | "live_management" | "assets" | "detail_set" | "enhance" | "watermark" | "subtitle" | "fission" | "credits" | "resources" | "materials" | "finished_videos" | "scripts" | "images" | "audio" | "ad_delivery" | "same_style_video" | "account_management" | "task_collaboration" | "message_center";
 
+export type ResourceSearchType = "成片" | "素材" | "脚本" | "图片" | "音频";
+
+export interface ResourceSearchIntent {
+  type: ResourceSearchType;
+  query?: string;
+  tag?: string;
+  requestId: number;
+}
+
 export interface MessageDetailItem {
   label: string;
   value: string;

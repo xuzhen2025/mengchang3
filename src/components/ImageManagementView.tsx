@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { PublicTagFilter } from "./PublicTagFilter";
 import ImageDetailView from "./ImageDetailView";
 import { Pagination } from "./Pagination";
+import { ResourceSearchIntent } from "../types";
 import {
   Search,
   ChevronDown,
@@ -52,6 +53,7 @@ interface ImageItem {
 interface ImageManagementViewProps {
   onTriggerTask?: (type: any, name: string, inputFiles: string[], cost: number) => void;
   onDetailStateChange?: (isDetail: boolean) => void;
+  initialSearch?: ResourceSearchIntent | null;
 }
 
 const MOCK_IMAGES: ImageItem[] = [
@@ -195,7 +197,7 @@ const MOCK_IMAGES: ImageItem[] = [
   }
 ];
 
-export default function ImageManagementView({ onTriggerTask, onDetailStateChange }: ImageManagementViewProps) {
+export default function ImageManagementView({ onTriggerTask, onDetailStateChange, initialSearch }: ImageManagementViewProps) {
   // Category & Filter States
   const [selectedPrimaryCat, setSelectedPrimaryCat] = useState("全部");
   const [secondarySearch, setSecondarySearch] = useState("");
@@ -266,6 +268,11 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
 
   // Filtered list
   const filteredImages = MOCK_IMAGES.filter(item => {
+    const homeSearch = (initialSearch?.tag || initialSearch?.query || "").trim().toLowerCase();
+    const matchesHomeSearch = !homeSearch || [item.title, item.subtitle, item.primaryCategory, item.secondaryCategory, item.personalTag, item.author, ...item.publicTags]
+      .some((value) => value.toLowerCase().includes(homeSearch));
+    if (!matchesHomeSearch) return false;
+
     if (selectedPrimaryCat !== "全部" && item.primaryCategory !== selectedPrimaryCat) {
       return false;
     }

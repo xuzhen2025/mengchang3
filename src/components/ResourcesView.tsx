@@ -8,6 +8,7 @@ import UploadFinishedVideoModal from "./UploadFinishedVideoModal";
 import UploadImageModal from "./UploadImageModal";
 import UploadGenericResourcePage from "./UploadGenericResourcePage";
 import { TaskItem } from "./TaskCollaborationView";
+import { ResourceSearchIntent } from "../types";
 import { 
   ShoppingBag, 
   Film, 
@@ -22,7 +23,8 @@ import {
   Sparkles,
   Plus,
   FolderPlus,
-  File
+  File,
+  Search
 } from "lucide-react";
 
 interface ResourcesViewProps {
@@ -30,6 +32,8 @@ interface ResourcesViewProps {
   onTriggerTask?: (type: any, name: string, inputFiles: string[], cost: number) => void;
   onNavigateToDelivery?: () => void;
   onNavigateToTaskDetail?: (task: TaskItem) => void;
+  initialSearch?: ResourceSearchIntent | null;
+  onClearInitialSearch?: () => void;
 }
 
 export type UploadFileType = "成片" | "素材" | "脚本" | "图片" | "音频";
@@ -38,15 +42,33 @@ export default function ResourcesView({
   initialTab = "finished_videos",
   onTriggerTask,
   onNavigateToDelivery,
-  onNavigateToTaskDetail
+  onNavigateToTaskDetail,
+  initialSearch,
+  onClearInitialSearch
 }: ResourcesViewProps) {
-  const [activeTab, setActiveTab] = useState<"finished_videos" | "materials" | "scripts" | "images" | "audio">(initialTab);
+  const tabByType = {
+    成片: "finished_videos",
+    素材: "materials",
+    脚本: "scripts",
+    图片: "images",
+    音频: "audio"
+  } as const;
+  const [activeTab, setActiveTab] = useState<"finished_videos" | "materials" | "scripts" | "images" | "audio">(initialSearch ? tabByType[initialSearch.type] : initialTab);
+  const [activeSearch, setActiveSearch] = useState<ResourceSearchIntent | null>(initialSearch && (initialSearch.query || initialSearch.tag) ? initialSearch : null);
   
   useEffect(() => {
-    if (initialTab) {
+    if (initialSearch) {
+      setActiveSearch(initialSearch.query || initialSearch.tag ? initialSearch : null);
+      setActiveTab(tabByType[initialSearch.type]);
+    } else if (initialTab) {
       setActiveTab(initialTab);
     }
-  }, [initialTab]);
+  }, [initialSearch, initialTab]);
+
+  const clearHomeSearch = () => {
+    setActiveSearch(null);
+    onClearInitialSearch?.();
+  };
   
   // Dropdown menu state
   const [showUploadDropdown, setShowUploadDropdown] = useState(false);
@@ -189,6 +211,7 @@ export default function ResourcesView({
                       key={tab.id}
                       onClick={() => {
                         setActiveTab(tab.id);
+                        clearHomeSearch();
                         setUploadPageView(null);
                         setIsSubViewDetailOpen(false);
                       }}
@@ -254,6 +277,15 @@ export default function ResourcesView({
               </div>
 
             </div>
+            {activeSearch && (
+              <div className="mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-slate-100 px-3 py-2.5">
+                <span className="flex items-center gap-1.5 text-xs font-bold text-slate-500"><Search className="h-3.5 w-3.5" />首页搜索</span>
+                <span className="inline-flex h-7 items-center rounded-md border border-purple-200 bg-purple-50 px-2.5 text-xs font-bold text-purple-700">
+                  {activeSearch.tag ? `热门标签：${activeSearch.tag}` : `关键词：${activeSearch.query}`}
+                </span>
+                <button type="button" onClick={clearHomeSearch} className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700" title="清除首页搜索条件"><X className="h-4 w-4" /></button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -293,6 +325,7 @@ export default function ResourcesView({
           <>
             {activeTab === "finished_videos" && (
               <FinishedVideosView
+                initialSearch={activeSearch}
                 onTriggerTask={onTriggerTask}
                 onNavigateToDelivery={onNavigateToDelivery}
                 onDetailStateChange={setIsSubViewDetailOpen}
@@ -300,6 +333,7 @@ export default function ResourcesView({
             )}
             {activeTab === "materials" && (
               <MaterialsView
+                initialSearch={activeSearch}
                 onTriggerTask={onTriggerTask}
                 onNavigateToDelivery={onNavigateToDelivery}
                 onDetailStateChange={setIsSubViewDetailOpen}
@@ -307,6 +341,7 @@ export default function ResourcesView({
             )}
             {activeTab === "scripts" && (
               <ScriptManagementView
+                initialSearch={activeSearch}
                 onTriggerTask={onTriggerTask}
                 onNavigateToTaskDetail={onNavigateToTaskDetail}
                 onDetailStateChange={setIsSubViewDetailOpen}
@@ -314,12 +349,14 @@ export default function ResourcesView({
             )}
             {activeTab === "images" && (
               <ImageManagementView
+                initialSearch={activeSearch}
                 onTriggerTask={onTriggerTask}
                 onDetailStateChange={setIsSubViewDetailOpen}
               />
             )}
             {activeTab === "audio" && (
               <AudioManagementView
+                initialSearch={activeSearch}
                 onTriggerTask={onTriggerTask}
                 onDetailStateChange={setIsSubViewDetailOpen}
               />
@@ -331,4 +368,3 @@ export default function ResourcesView({
     </div>
   );
 }
-

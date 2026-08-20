@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { PublicTagFilter } from "./PublicTagFilter";
 import AudioDetailView from "./AudioDetailView";
 import { Pagination } from "./Pagination";
+import { ResourceSearchIntent } from "../types";
 import {
   Search,
   ChevronDown,
@@ -80,6 +81,7 @@ export interface AudioItem {
 interface AudioManagementViewProps {
   onTriggerTask?: (type: any, name: string, inputFiles: string[], cost: number) => void;
   onDetailStateChange?: (isDetail: boolean) => void;
+  initialSearch?: ResourceSearchIntent | null;
 }
 
 const INITIAL_AUDIO_LIST: AudioItem[] = [
@@ -215,7 +217,7 @@ const INITIAL_AUDIO_LIST: AudioItem[] = [
   }
 ];
 
-export default function AudioManagementView({ onTriggerTask, onDetailStateChange }: AudioManagementViewProps) {
+export default function AudioManagementView({ onTriggerTask, onDetailStateChange, initialSearch }: AudioManagementViewProps) {
   // Category states
   const [selectedMainCategory, setSelectedMainCategory] = useState("全部");
   const [selectedPrimaryCategory, setSelectedPrimaryCategory] = useState("全部");
@@ -370,6 +372,11 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
 
   // Filter logic
   const filteredAudios = audioList.filter((item) => {
+    const homeSearch = (initialSearch?.tag || initialSearch?.query || "").trim().toLowerCase();
+    const matchesHomeSearch = !homeSearch || [item.title, item.subtitle, item.primaryCategory, item.secondaryCategory, item.personalTag, item.author, ...item.publicTags]
+      .some((value) => value.toLowerCase().includes(homeSearch));
+    if (!matchesHomeSearch) return false;
+
     if (selectedMainCategory !== "全部" && item.primaryCategory !== selectedMainCategory) {
       // rough match or custom logic
     }

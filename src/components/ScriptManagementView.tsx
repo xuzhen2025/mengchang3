@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { PublicTagFilter } from "./PublicTagFilter";
 import ScriptDetailPage from "./ScriptDetailPage";
 import { TaskItem } from "./TaskCollaborationView";
+import { ResourceSearchIntent } from "../types";
 import {
   Search,
   Plus,
@@ -110,9 +111,10 @@ interface ScriptManagementViewProps {
   onTriggerTask?: (type: any, name: string, inputFiles: string[], cost: number) => void;
   onNavigateToTaskDetail?: (task: TaskItem) => void;
   onDetailStateChange?: (isDetail: boolean) => void;
+  initialSearch?: ResourceSearchIntent | null;
 }
 
-export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDetail, onDetailStateChange }: ScriptManagementViewProps) {
+export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDetail, onDetailStateChange, initialSearch }: ScriptManagementViewProps) {
   // Main filter states
   const [selectedMainCat, setSelectedMainCat] = useState("全部");
   const [selectedPrimaryCat, setSelectedPrimaryCat] = useState("全部");
@@ -521,6 +523,11 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
 
   // Filter logic
   const filteredScripts = scripts.filter(s => {
+    const homeSearch = (initialSearch?.tag || initialSearch?.query || "").trim().toLowerCase();
+    const matchesHomeSearch = !homeSearch || [s.title, s.content, s.mainCategory, s.primaryCategory, s.secondaryCategory, s.categoryTag, s.classTag, s.descTag, s.author]
+      .some((value) => value.toLowerCase().includes(homeSearch));
+    if (!matchesHomeSearch) return false;
+
     if (selectedMainCat !== "全部" && s.mainCategory !== selectedMainCat) return false;
     if (selectedPrimaryCat !== "全部" && s.primaryCategory !== selectedPrimaryCat) return false;
     if (selectedStatus !== "全部" && s.status !== selectedStatus) return false;

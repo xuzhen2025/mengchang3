@@ -3,6 +3,7 @@ import FinishedVideoDetailModal from "./FinishedVideoDetailModal";
 import { PublicTagFilter } from "./PublicTagFilter";
 import { Pagination } from "./Pagination";
 import ResourceLibraryItem from "./ResourceLibraryItem";
+import { ResourceSearchIntent } from "../types";
 import { 
   Film, 
   Play, 
@@ -598,9 +599,10 @@ interface FinishedVideosViewProps {
   onTriggerTask?: (type: any, name: string, inputUrls: string[], cost: number) => void;
   onNavigateToDelivery?: () => void;
   onDetailStateChange?: (isDetail: boolean) => void;
+  initialSearch?: ResourceSearchIntent | null;
 }
 
-export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery, onDetailStateChange }: FinishedVideosViewProps) {
+export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery, onDetailStateChange, initialSearch }: FinishedVideosViewProps) {
   const [videos, setVideos] = useState<FinishedVideo[]>(INITIAL_FINISHED);
   const [activeTab, setActiveTab] = useState<"all" | "secondary" | "performance">("all");
   
@@ -718,6 +720,12 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
 
   // Filter Logic
   const filteredVideos = videos.filter(v => {
+    const homeSearch = (initialSearch?.tag || initialSearch?.query || "").trim().toLowerCase();
+    const matchesHomeSearch = !homeSearch || [v.title, v.category, v.typeLabel, v.author, ...(v.tags || [])]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(homeSearch));
+    if (!matchesHomeSearch) return false;
+
     // Main category
     const matchesMain = mainCat === "全部" ? true : (v.tags?.includes(mainCat) || v.title.includes(mainCat));
     

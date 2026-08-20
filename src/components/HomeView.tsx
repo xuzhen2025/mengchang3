@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { 
   Search, 
   Bell, 
@@ -50,7 +50,7 @@ import {
   ListTodo,
   Inbox
 } from "lucide-react";
-import { ActiveScreen, AppMessage } from "../types";
+import { ActiveScreen, AppMessage, ResourceSearchIntent, ResourceSearchType } from "../types";
 import { MESSAGE_CATEGORY_CONFIGS } from "../data";
 import ApprovalActionBox from "./ApprovalActionBox";
 
@@ -63,10 +63,18 @@ interface HomeViewProps {
   onRejectCredits?: (msgId: string, rejectReason: string) => void;
   onMarkMessageRead?: (id: string) => void;
   onMarkAllMessagesRead?: () => void;
+  onSearchResources?: (intent: Omit<ResourceSearchIntent, "requestId">) => void;
 }
 
-// Search types
-type SearchType = "成片" | "素材" | "脚本" | "图片" | "音频";
+const RESOURCE_SEARCH_TYPES: ResourceSearchType[] = ["成片", "素材", "图片", "脚本", "音频"];
+
+const RESOURCE_HOT_TAGS: Record<ResourceSearchType, string[]> = {
+  成片: ["达人成片", "爆款视频", "短视频推广", "直播切片", "首发素材", "千川跑量", "美妆口播", "服装穿搭", "产品测评", "品牌宣传"],
+  素材: ["产品实拍", "模特出镜", "商品特写", "场景空镜", "口播素材", "开箱素材", "使用演示", "对比实测", "直播素材", "4K原片"],
+  图片: ["高清主图", "产品实拍", "模特出镜", "宣发海报", "详情页长图", "透明底图", "成分展示", "对比实测", "资质证明", "3D渲染图"],
+  脚本: ["美妆护肤", "个人护理", "30秒口播", "痛点转化", "KOC测评", "产品种草", "剧情反转", "开箱测评", "直播引流", "卖点拆解"],
+  音频: ["场景", "合作达人", "创新点", "模特", "带货口播", "解说旁白", "促销BGM", "卡点音效", "转场音效", "AI配音"]
+};
 
 // Notification category structure
 interface CategoryConfig {
@@ -132,35 +140,40 @@ export default function HomeView({
   onApproveCredits,
   onRejectCredits,
   onMarkMessageRead,
-  onMarkAllMessagesRead
+  onMarkAllMessagesRead,
+  onSearchResources
 }: HomeViewProps) {
   // ================= 1. SEARCH MODULE STATES =================
-  const [searchType, setSearchType] = useState<SearchType>("成片");
+  const [searchType, setSearchType] = useState<ResourceSearchType>("成片");
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[] | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
+  const [searchPanelOpen, setSearchPanelOpen] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
-  const hotKeywords: Record<SearchType, string[]> = {
-    成片: ["美妆KOC口播", "高转化服装Lookbook", "智能擦水印示范", "3D数码特效", "爆款短视频裂变", "数码产品细节特写"],
-    素材: ["4K影棚背景", "3D数码微距", "国风美妆试色图", "爆款白底图套件", "高保真音频BGM", "模特人脸特写"],
-    脚本: ["30秒三段式分镜", "痛点-方案-转化黄金脚本", "KOC真实测评剧本", "沉浸式开箱分镜表", "模特变装连贯脚本"],
-    图片: ["服装棚拍高清大图", "模特电商立姿照", "质感护肤品特写", "复古国潮海报背景", "透明玻璃背景图"],
-    音频: ["快节奏卡点音效", "国风古韵BGM", "高级轻奢背景乐", "主播亢奋带货语音", "解说风沉浸式旁白"]
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setSearchPanelOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const openResourceSearch = (type: ResourceSearchType, options?: { query?: string; tag?: string }) => {
+    setSearchType(type);
+    setSearchPanelOpen(false);
+    onSearchResources?.({ type, ...options });
   };
 
   const handleExecuteSearch = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!searchQuery.trim()) return;
-
-    setIsSearching(true);
-    setTimeout(() => {
-      setIsSearching(false);
-      setSearchResults([
-        { id: "s1", title: `【${searchType}】${searchQuery} - 热门智能生成资源 #01`, type: searchType, tags: ["推荐", "高转化"], time: "10分钟前", url: "https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=600&auto=format&fit=crop&q=80" },
-        { id: "s2", title: `【${searchType}】${searchQuery} - 商业高清晰度模版 #02`, type: searchType, tags: ["高清", "官方"], time: "25分钟前", url: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&auto=format&fit=crop&q=80" },
-        { id: "s3", title: `【${searchType}】${searchQuery} - 电商转化利器资源 #03`, type: searchType, tags: ["爆款", "AI优化"], time: "1小时前", url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80" }
-      ]);
-    }, 400);
+    const query = searchQuery.trim();
+    if (!query) {
+      setSearchPanelOpen(true);
+      return;
+    }
+    const exactTag = RESOURCE_HOT_TAGS[searchType].find((tag) => tag.toLowerCase() === query.toLowerCase());
+    openResourceSearch(searchType, exactTag ? { tag: exactTag } : { query });
   };
 
   // ================= 2. MESSAGE NOTIFICATION MODULE STATES =================
@@ -624,137 +637,103 @@ export default function HomeView({
         {/* =================================================================== */}
         {/* 1. 搜索模块 (SEARCH MODULE) - 放在最顶部                              */}
         {/* =================================================================== */}
-        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="bg-white border border-slate-200/90 rounded-lg p-6 shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
-                <Search className="w-4 h-4" />
-              </div>
               <div>
-                <h2 className="text-sm font-black text-slate-900">全平台资源精准搜索</h2>
-                <p className="text-[11px] text-slate-400">支持成片、素材、脚本、图片与音频分类检索</p>
+                <h2 className="text-base font-black text-slate-900">全平台资源精准搜索</h2>
+                <p className="mt-1 text-xs text-slate-400">支持成片、素材、脚本、图片与音频分类检索</p>
               </div>
             </div>
           </div>
 
-          {/* Search Bar with Type Selector Dropdown */}
-          <form onSubmit={handleExecuteSearch} className="flex flex-col sm:flex-row gap-2">
-            <div className="relative flex-1 flex items-center bg-slate-50 border border-slate-200 hover:border-slate-300 focus-within:border-purple-500 rounded-2xl overflow-hidden transition-all">
-              
-              {/* Dropdown Type Selector */}
-              <div className="relative border-r border-slate-200 bg-slate-100/80 shrink-0">
-                <select
-                  value={searchType}
-                  onChange={(e) => {
-                    setSearchType(e.target.value as SearchType);
-                    setSearchResults(null);
+          <div ref={searchContainerRef} className="relative">
+            <form onSubmit={handleExecuteSearch} className="flex flex-col gap-3 sm:flex-row">
+              <div className="flex min-w-0 flex-1 items-center overflow-hidden rounded-lg border border-slate-300 bg-white transition-colors focus-within:border-purple-500 focus-within:ring-2 focus-within:ring-purple-100">
+                <div className="relative shrink-0 border-r border-slate-200 bg-slate-50">
+                  <select
+                    aria-label="资源搜索分类"
+                    value={searchType}
+                    onChange={(event) => {
+                      setSearchType(event.target.value as ResourceSearchType);
+                      setSearchPanelOpen(true);
+                    }}
+                    onFocus={() => setSearchPanelOpen(true)}
+                    className="h-12 appearance-none bg-transparent pl-4 pr-10 text-sm font-bold text-slate-800 outline-none cursor-pointer"
+                  >
+                    {RESOURCE_SEARCH_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                </div>
+
+                <Search className="ml-4 h-4 w-4 shrink-0 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onFocus={() => setSearchPanelOpen(true)}
+                  onChange={(event) => {
+                    setSearchQuery(event.target.value);
+                    setSearchPanelOpen(true);
                   }}
-                  className="appearance-none bg-transparent pl-3 pr-8 py-3 text-xs font-black text-slate-800 outline-none cursor-pointer"
-                >
-                  <option value="成片">成片</option>
-                  <option value="素材">素材</option>
-                  <option value="脚本">脚本</option>
-                  <option value="图片">图片</option>
-                  <option value="音频">音频</option>
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  placeholder={`请输入${searchType}名称、分类或标签`}
+                  className="h-12 min-w-0 flex-1 bg-transparent px-3 text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400"
+                />
+                {searchQuery && (
+                  <button type="button" onClick={() => setSearchQuery("")} className="mr-3 text-slate-400 hover:text-slate-700" title="清空关键词">
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
 
-              {/* Input field */}
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={`搜寻【${searchType}】资源...输入关键词（如美妆口播、智能去水印、服装Lookbook等）`}
-                className="w-full bg-transparent pl-3 pr-4 py-3 text-xs font-semibold text-slate-800 outline-none placeholder:text-slate-400"
-              />
-
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchQuery("");
-                    setSearchResults(null);
-                  }}
-                  className="pr-3 text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSearching}
-              className="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-black text-xs rounded-2xl shadow-md shadow-purple-600/10 flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0 disabled:opacity-50"
-            >
-              {isSearching ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-              <span>搜索{searchType}</span>
-            </button>
-          </form>
-
-          {/* Hot Search Words (热搜词) */}
-          <div className="flex items-center gap-2 flex-wrap pt-1">
-            <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
-              <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-              <span>热搜词:</span>
-            </span>
-            {hotKeywords[searchType].map((kw, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => {
-                  setSearchQuery(kw);
-                  setIsSearching(true);
-                  setTimeout(() => {
-                    setIsSearching(false);
-                    setSearchResults([
-                      { id: `kw_${idx}_1`, title: `【热搜推荐】${kw} - 高转化范例`, type: searchType, tags: ["热搜", "精选"], time: "刚刚", url: "https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=600&auto=format&fit=crop&q=80" },
-                      { id: `kw_${idx}_2`, title: `【热搜推荐】${kw} - 商业特写模板`, type: searchType, tags: ["官方", "高去重"], time: "5分钟前", url: "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&auto=format&fit=crop&q=80" }
-                    ]);
-                  }, 300);
-                }}
-                className="px-2.5 py-1 bg-slate-100 hover:bg-purple-50 hover:text-purple-700 border border-slate-200/80 rounded-lg text-[11px] font-bold text-slate-600 transition-all cursor-pointer"
-              >
-                {kw}
+              <button type="submit" className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-purple-600 px-7 text-sm font-bold text-white shadow-sm transition-colors hover:bg-purple-700">
+                <Search className="h-4 w-4" />
+                搜索
               </button>
-            ))}
-          </div>
+            </form>
 
-          {/* Search Results Display */}
-          {searchResults && (
-            <div className="border-t border-slate-100 pt-4 space-y-3 animate-fade-in">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700">
-                  搜索结果 (找到 {searchResults.length} 条相关【{searchType}】)
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setSearchResults(null)}
-                  className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  清空结果
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {searchResults.map((res) => (
-                  <div key={res.id} className="bg-slate-50 border border-slate-200 p-3 rounded-2xl flex items-center gap-3 group hover:border-purple-300 transition-all">
-                    <div className="w-14 h-14 rounded-xl bg-slate-200 overflow-hidden shrink-0">
-                      <img src={res.url} className="w-full h-full object-cover" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h4 className="text-xs font-bold text-slate-800 truncate">{res.title}</h4>
-                      <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-2">
-                        <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-bold">{res.type}</span>
-                        <span>{res.time}</span>
-                      </p>
-                    </div>
-                  </div>
+            {!searchPanelOpen && (
+              <div className="mt-3 flex flex-wrap items-center gap-2 md:pl-28">
+                <Flame className="h-4 w-4 shrink-0 fill-amber-400 text-amber-500" />
+                {RESOURCE_HOT_TAGS[searchType].slice(0, 6).map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => openResourceSearch(searchType, { tag })}
+                    className="h-7 rounded-md bg-slate-100 px-3 text-xs font-medium text-slate-600 transition-colors hover:bg-purple-600 hover:text-white"
+                  >
+                    {tag}
+                  </button>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+
+            {searchPanelOpen && (
+              <div className="absolute left-0 right-0 top-full z-40 mt-2 max-h-[430px] overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 shadow-2xl">
+                <div className="space-y-1">
+                  {RESOURCE_SEARCH_TYPES.map((type) => (
+                    <div key={type} className={`grid gap-3 rounded-lg px-3 py-3 md:grid-cols-[96px_minmax(0,1fr)] ${searchType === type ? "bg-purple-50/70" : "hover:bg-slate-50"}`}>
+                      <button type="button" onClick={() => openResourceSearch(type)} className="flex h-7 items-center gap-1 text-sm font-black text-purple-600 hover:text-purple-800">
+                        {type}管理
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        {RESOURCE_HOT_TAGS[type].map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => openResourceSearch(type, { tag })}
+                            className="h-7 rounded-full bg-slate-100 px-3 text-xs font-medium text-slate-600 transition-colors hover:bg-purple-600 hover:text-white"
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* =================================================================== */}

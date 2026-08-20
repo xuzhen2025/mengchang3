@@ -33,7 +33,7 @@ import {
   INITIAL_TRANSACTIONS,
   INITIAL_MESSAGES
 } from "./data";
-import { Asset, Task, CreditTransaction, GalleryItem, ActiveScreen, AppMessage } from "./types";
+import { Asset, Task, CreditTransaction, GalleryItem, ActiveScreen, AppMessage, ResourceSearchIntent } from "./types";
 import { Sparkles, Layers, Sliders, ChevronRight, Play } from "lucide-react";
 
 export default function App() {
@@ -42,6 +42,7 @@ export default function App() {
   const activeScreen = screenHistory[screenHistory.length - 1] || "home";
   const [selectedTaskForCollaboration, setSelectedTaskForCollaboration] = useState<TaskItem | null>(null);
   const [selectedTaskTabForCollaboration, setSelectedTaskTabForCollaboration] = useState<"to_me" | "my_published" | "all">("all");
+  const [resourceSearchIntent, setResourceSearchIntent] = useState<ResourceSearchIntent | null>(null);
 
   const handleNavigate = (screen: ActiveScreen) => {
     setScreenHistory((prev) => {
@@ -60,6 +61,9 @@ export default function App() {
   };
 
   const handleSidebarNavigate = (screen: ActiveScreen) => {
+    if (screen === "resources") {
+      setResourceSearchIntent(null);
+    }
     setScreenHistory([screen]);
   };
 
@@ -622,6 +626,10 @@ export default function App() {
             onRejectCredits={handleRejectCredits}
             onMarkMessageRead={handleMarkMessageRead}
             onMarkAllMessagesRead={handleMarkAllMessagesRead}
+            onSearchResources={(intent) => {
+              setResourceSearchIntent({ ...intent, requestId: Date.now() });
+              handleNavigate("resources");
+            }}
           />
         );
       case "quick_creation":
@@ -774,6 +782,8 @@ export default function App() {
       case "scripts":
         return (
           <ResourcesView
+            initialSearch={resourceSearchIntent}
+            onClearInitialSearch={() => setResourceSearchIntent(null)}
             initialTab={
               activeScreen === "materials" ? "materials" :
               activeScreen === "scripts" ? "scripts" : "finished_videos"
