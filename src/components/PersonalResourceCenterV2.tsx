@@ -18,7 +18,6 @@ import {
 import { Asset } from "../types";
 import ResourceLibraryItem, { ResourceLibraryItemData } from "./ResourceLibraryItem";
 
-export const FAVORITES_KEY = "cloud_video_personal_favorites_v1";
 export const PERSONAL_TAGS_KEY = "cloud_video_personal_tags_v1";
 export const PERSONAL_TAG_GROUPS_KEY = "cloud_video_personal_tag_groups_v1";
 export const TASK_BINDINGS_KEY = "cloud_video_task_resource_bindings_v1";
@@ -59,7 +58,7 @@ interface PersonalTagGroup {
 }
 
 interface PersonalResourceCenterProps {
-  mode: "resources" | "favorites" | "personal_tags";
+  mode: "resources" | "personal_tags";
   assets: Asset[];
   onToast: (message: string) => void;
 }
@@ -223,7 +222,6 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name">("newest");
-  const [favoriteIds, setFavoriteIds] = useState<string[]>(() => loadJson(FAVORITES_KEY, ["a1", "a4"]));
   const [bindings, setBindings] = useState<TaskResourceBinding[]>(loadTaskBindings);
   const [tags, setTags] = useState<PersonalTagItem[]>(() => {
     const stored = loadJson<PersonalTagItem[]>(PERSONAL_TAGS_KEY, []);
@@ -263,7 +261,6 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
     .filter((asset) => {
       const query = search.trim().toLowerCase();
       const searchable = [asset.id, asset.name, asset.category, ...asset.publicTags].filter(Boolean).join(" ").toLowerCase();
-      if (mode === "favorites" && !favoriteIds.includes(asset.id)) return false;
       if (query && !searchable.includes(query)) return false;
       if (asset.resourceCategory !== resourceCategory) return false;
       if (categoryFilter !== "全部" && asset.category !== categoryFilter) return false;
@@ -278,16 +275,11 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
       if (sortBy === "oldest") return left.createdAt.localeCompare(right.createdAt);
       if (sortBy === "name") return left.name.localeCompare(right.name, "zh-CN");
       return right.createdAt.localeCompare(left.createdAt);
-    }), [categoryFilter, endDate, favoriteIds, mode, personalAssets, publicTagFilter, resourceCategory, search, sortBy, sourceFilter, startDate]);
+    }), [categoryFilter, endDate, personalAssets, publicTagFilter, resourceCategory, search, sortBy, sourceFilter, startDate]);
 
   const visualAssets = filteredAssets.filter((asset) => ["成片", "素材", "图片"].includes(asset.resourceCategory));
   const audioAssets = filteredAssets.filter((asset) => asset.resourceCategory === "音频");
   const scriptAssets = filteredAssets.filter((asset) => asset.resourceCategory === "脚本");
-
-  const persistFavorites = (next: string[]) => {
-    setFavoriteIds(next);
-    window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(next));
-  };
 
   const persistTags = (next: PersonalTagItem[]) => {
     setTags(next);
@@ -506,8 +498,6 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
 
   return (
     <div className="space-y-4">
-      {mode === "favorites" && <div className="border-b border-slate-200 pb-3"><h2 className="text-sm font-bold text-slate-900">我的收藏</h2><p className="mt-1 text-xs text-slate-500">已收藏的资源内容</p></div>}
-
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-xs" aria-label="资源筛选">
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-3">

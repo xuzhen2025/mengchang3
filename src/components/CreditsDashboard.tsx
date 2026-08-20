@@ -15,7 +15,6 @@ import {
   ShieldCheck,
   Plus,
   FolderOpen,
-  Bookmark,
   Tags
 } from "lucide-react";
 import { Asset, CreditTransaction } from "../types";
@@ -38,7 +37,7 @@ export default function CreditsDashboard({
   onAddCredits,
   onRequestCredits
 }: CreditsDashboardProps) {
-  const [activeSubTab, setActiveSubTab] = useState<"profile" | "resources" | "favorites" | "personal_tags" | "history">("profile");
+  const [activeSubTab, setActiveSubTab] = useState<"profile" | "resources" | "personal_tags" | "history">("profile");
   
   // Extra requested credits state fallback
   const [internalExtraRequestedCredits, setInternalExtraRequestedCredits] = useState<number>(350.00);
@@ -166,7 +165,6 @@ export default function CreditsDashboard({
             {([
               ["profile", "个人信息", User],
               ["resources", "我的资源", FolderOpen],
-              ["favorites", "我的收藏", Bookmark],
               ["personal_tags", "个人标签", Tags],
               ["history", "明细账单", Coins]
             ] as const).map(([value, label, Icon]) => (
@@ -244,7 +242,7 @@ export default function CreditsDashboard({
         </div>
         )}
 
-        {(activeSubTab === "resources" || activeSubTab === "favorites" || activeSubTab === "personal_tags") && (
+        {(activeSubTab === "resources" || activeSubTab === "personal_tags") && (
           <PersonalResourceCenter mode={activeSubTab} assets={assets} onToast={showToast} />
         )}
 
