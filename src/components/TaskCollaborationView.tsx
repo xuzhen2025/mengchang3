@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import LinkScriptModal from "./LinkScriptModal";
 import { TaskDetailPage } from "./TaskDetailPage";
-import { TASK_BINDINGS_KEY, TaskResourceBinding } from "./PersonalResourceCenter";
+import { TASK_BINDINGS_KEY, TaskResourceBinding } from "./PersonalResourceCenterV2";
 import {
   Search,
   Calendar,

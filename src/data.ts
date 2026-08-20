@@ -333,8 +333,13 @@ export const INITIAL_ASSETS: Asset[] = [
     type: "image",
     url: "https://images.unsplash.com/photo-1608248597481-496100c8c836?w=400&auto=format&fit=crop&q=80",
     size: "1.2 MB",
-    createdAt: "2026-07-08 14:20",
-    category: "我的素材"
+    createdAt: "2026-08-19 14:20",
+    category: "商品主图",
+    resourceCategory: "图片",
+    source: "resource_library",
+    creator: "徐振",
+    publicTags: ["美妆护肤", "产品名称", "白底图"],
+    status: "已通过"
   },
   {
     id: "a2",
@@ -342,8 +347,13 @@ export const INITIAL_ASSETS: Asset[] = [
     type: "image",
     url: "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&auto=format&fit=crop&q=80",
     size: "980 KB",
-    createdAt: "2026-07-08 15:30",
-    category: "我的素材"
+    createdAt: "2026-08-18 15:30",
+    category: "商品场景图",
+    resourceCategory: "图片",
+    source: "resource_library",
+    creator: "徐振",
+    publicTags: ["数码家电", "产品名称", "高对比度"],
+    status: "待审核"
   },
   {
     id: "a3",
@@ -351,8 +361,71 @@ export const INITIAL_ASSETS: Asset[] = [
     type: "video",
     url: "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4",
     size: "18.4 MB",
-    createdAt: "2026-07-07 11:15",
-    category: "我的素材"
+    createdAt: "2026-08-17 11:15",
+    category: "模特实拍",
+    resourceCategory: "素材",
+    source: "resource_library",
+    creator: "徐振",
+    publicTags: ["女装", "模特", "走秀"],
+    coverUrl: "https://images.unsplash.com/photo-1485462537746-965f33f7f6a7?w=600&auto=format&fit=crop&q=80",
+    status: "已通过"
+  },
+  {
+    id: "a4",
+    name: "七夕美妆礼盒_送礼场景成片_V3.mp4",
+    type: "video",
+    url: "https://assets.mixkit.co/videos/preview/mixkit-hand-holding-a-blue-glass-bottle-with-dropper-44365-large.mp4",
+    coverUrl: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=600&auto=format&fit=crop&q=80",
+    size: "42.6 MB",
+    createdAt: "2026-08-20 10:36",
+    category: "商品成片",
+    resourceCategory: "成片",
+    source: "resource_library",
+    creator: "徐振",
+    publicTags: ["美妆护肤", "七夕", "礼赠场景"],
+    status: "待审核"
+  },
+  {
+    id: "a5",
+    name: "秋季风衣通勤版女声旁白.wav",
+    type: "audio",
+    url: "https://assets.mixkit.co/music/preview/mixkit-dreaming-big-31.mp3",
+    size: "5.8 MB",
+    createdAt: "2026-08-19 16:08",
+    category: "真人配音",
+    resourceCategory: "音频",
+    source: "resource_library",
+    creator: "徐振",
+    publicTags: ["女装", "女声", "轻快"],
+    status: "已通过"
+  },
+  {
+    id: "a6",
+    name: "防晒冰袖户外实测口播脚本.docx",
+    type: "document",
+    url: "data:text/plain;charset=utf-8,%E9%98%B2%E6%99%92%E5%86%B0%E8%A2%96%E6%88%B7%E5%A4%96%E5%AE%9E%E6%B5%8B%E5%8F%A3%E6%92%AD%E8%84%9A%E6%9C%AC",
+    size: "86 KB",
+    createdAt: "2026-08-18 09:42",
+    category: "口播种草",
+    resourceCategory: "脚本",
+    source: "resource_library",
+    creator: "徐振",
+    publicTags: ["户外用品", "防晒", "实测对比"],
+    status: "可以拍摄"
+  },
+  {
+    id: "a7",
+    name: "AI生成_精华液晨间护肤场景.png",
+    type: "image",
+    url: "https://images.unsplash.com/photo-1612817288484-6f916006741a?w=600&auto=format&fit=crop&q=80",
+    size: "2.3 MB",
+    createdAt: "2026-08-20 15:10",
+    category: "AI商品场景图",
+    resourceCategory: "图片",
+    source: "ai_generation",
+    creator: "徐振",
+    publicTags: ["美妆护肤", "晨间场景", "AI生成"],
+    status: "未审核"
   }
 ];
 

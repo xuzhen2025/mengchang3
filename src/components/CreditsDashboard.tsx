@@ -19,7 +19,7 @@ import {
   Tags
 } from "lucide-react";
 import { Asset, CreditTransaction } from "../types";
-import PersonalResourceCenter from "./PersonalResourceCenter";
+import PersonalResourceCenter from "./PersonalResourceCenterV2";
 
 interface CreditsDashboardProps {
   credits: number;
@@ -150,7 +150,7 @@ export default function CreditsDashboard({
 
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Header Title Bar */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
               <User className="w-5 h-5 text-purple-600" />
@@ -162,7 +162,7 @@ export default function CreditsDashboard({
           </div>
           
           {/* Nav Tabs */}
-          <div className="flex flex-wrap bg-slate-100 border border-slate-200 p-1 rounded-lg shrink-0">
+          <div className="flex w-full flex-wrap bg-slate-100 border border-slate-200 p-1 rounded-lg lg:w-auto lg:shrink-0">
             {([
               ["profile", "个人信息", User],
               ["resources", "我的资源", FolderOpen],
@@ -177,7 +177,8 @@ export default function CreditsDashboard({
           </div>
         </div>
 
-        {/* Balance Overview Cards */}
+        {/* Balance Overview Cards: only shown with personal information. */}
+        {activeSubTab === "profile" && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Card 1: 可用积分 (主卡片 / 核心算力总额) */}
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 via-indigo-600 to-purple-800 text-white p-5 shadow-md flex flex-col justify-between">
@@ -241,6 +242,7 @@ export default function CreditsDashboard({
             </div>
           </div>
         </div>
+        )}
 
         {(activeSubTab === "resources" || activeSubTab === "favorites" || activeSubTab === "personal_tags") && (
           <PersonalResourceCenter mode={activeSubTab} assets={assets} onToast={showToast} />

@@ -326,7 +326,11 @@ export default function App() {
         url,
         size: "1.8 MB",
         createdAt: timestamp,
-        category: "生成结果"
+        category: "AI商品套图",
+        resourceCategory: "图片",
+        source: "ai_generation",
+        creator: "徐振",
+        publicTags: ["AI生成", "商品套图"]
       }));
 
       const newGalleryItem: GalleryItem = {
@@ -363,7 +367,12 @@ export default function App() {
         url: videoUrl,
         size: "14.2 MB",
         createdAt: timestamp,
-        category: "生成结果"
+        category: "AI商品成片",
+        resourceCategory: "成片",
+        source: "ai_generation",
+        creator: "徐振",
+        publicTags: ["AI生成", "商品成片"],
+        coverUrl
       };
 
       const newGalleryItem: GalleryItem = {
@@ -399,7 +408,11 @@ export default function App() {
         url: imageUrl,
         size: "2.1 MB",
         createdAt: timestamp,
-        category: "生成结果"
+        category: "AI商品场景图",
+        resourceCategory: "图片",
+        source: "ai_generation",
+        creator: "徐振",
+        publicTags: ["AI生成", "商品场景图"]
       };
 
       const newGalleryItem: GalleryItem = {
@@ -520,7 +533,11 @@ export default function App() {
       url: file.url,
       size: file.size,
       createdAt: timestamp,
-      category: "我的素材"
+      category: file.type === "image" ? "商品图片" : file.type === "audio" ? "音频素材" : "视频素材",
+      resourceCategory: file.type === "image" ? "图片" : file.type === "audio" ? "音频" : "素材",
+      source: "resource_library",
+      creator: "徐振",
+      publicTags: ["个人上传"]
     };
     setAssets((prev) => [newAsset, ...prev]);
   };
