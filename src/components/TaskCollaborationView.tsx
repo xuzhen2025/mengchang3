@@ -730,7 +730,11 @@ export default function TaskCollaborationView({
       setTasks((current) => current.map((task) => {
         if (task.status === "completed") return task;
         const taskBindings = bindings.filter((binding) => binding.taskId === task.id);
-        const existing = task.associatedWorks || [];
+        const activeBindingWorkIds = new Set(taskBindings.map((binding) => `resource-${binding.resourceId}`));
+        const previousWorks = task.associatedWorks || [];
+        const previousBindingCount = previousWorks.filter((work) => work.id.startsWith("resource-")).length;
+        const baseCompletedCount = Math.max(0, task.completedCount - previousBindingCount);
+        const existing = previousWorks.filter((work) => !work.id.startsWith("resource-") || activeBindingWorkIds.has(work.id));
         const merged = [...existing];
         taskBindings.forEach((binding) => {
           if (!merged.some((work) => work.id === `resource-${binding.resourceId}` || work.name === binding.resourceName)) {
@@ -745,7 +749,8 @@ export default function TaskCollaborationView({
             });
           }
         });
-        const completedCount = Math.min(task.orderCount, Math.max(task.completedCount, merged.length));
+        const activeBindingCount = merged.filter((work) => work.id.startsWith("resource-")).length;
+        const completedCount = Math.min(task.orderCount, baseCompletedCount + activeBindingCount);
         return {
           ...task,
           associatedWorks: merged,

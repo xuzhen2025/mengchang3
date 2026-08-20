@@ -1,27 +1,22 @@
 import React, { useMemo, useState } from "react";
 import {
-  Bookmark,
-  BriefcaseBusiness,
   CalendarDays,
   Check,
-  Download,
+  CheckCircle2,
   Edit3,
-  FileText,
-  Image as ImageIcon,
-  Library,
   Link2,
-  Music,
+  LockKeyhole,
   Plus,
   RotateCcw,
   Search,
   SlidersHorizontal,
-  Sparkles,
   Tag,
   Trash2,
-  Video,
+  Unlink,
   X
 } from "lucide-react";
 import { Asset } from "../types";
+import ResourceLibraryItem, { ResourceLibraryItemData } from "./ResourceLibraryItem";
 
 export const FAVORITES_KEY = "cloud_video_personal_favorites_v1";
 export const PERSONAL_TAGS_KEY = "cloud_video_personal_tags_v1";
@@ -69,10 +64,35 @@ interface PersonalResourceCenterProps {
   onToast: (message: string) => void;
 }
 
-const AVAILABLE_TASKS = [
-  { id: "06211055102", title: "防晒冰袖户外实测内容制作", publisher: "梁浩然", deadline: "2026-08-22", required: 4 },
-  { id: "06231146281", title: "七夕美妆礼盒短视频批量制作", publisher: "蔡卓良", deadline: "2026-08-28", required: 8 },
-  { id: "06231430099", title: "星光吊坠送礼情境短片", publisher: "孙剧本", deadline: "2026-08-25", required: 6 }
+type AvailableTaskStatus = "in_progress" | "review" | "completed";
+
+interface AvailableTask {
+  id: string;
+  title: string;
+  publisher: string;
+  deadline: string;
+  required: number;
+  submitted: number;
+  status: AvailableTaskStatus;
+}
+
+const AVAILABLE_TASKS: AvailableTask[] = [
+  { id: "06211055102", title: "防晒冰袖户外实测内容制作", publisher: "梁浩然", deadline: "2026-08-22", required: 4, submitted: 1, status: "in_progress" },
+  { id: "06231146281", title: "七夕美妆礼盒短视频批量制作", publisher: "蔡卓良", deadline: "2026-08-28", required: 8, submitted: 5, status: "in_progress" },
+  { id: "06231430099", title: "星光吊坠送礼情境短片", publisher: "孙剧本", deadline: "2026-08-25", required: 6, submitted: 0, status: "in_progress" },
+  { id: "08201150318", title: "秋季风衣通勤场景三版混剪", publisher: "徐振", deadline: "2026-08-20", required: 5, submitted: 5, status: "review" },
+  { id: "06061131660", title: "抗衰精华夜间修护口播", publisher: "蔡卓良", deadline: "2026-06-06", required: 5, submitted: 5, status: "completed" }
+];
+
+const TASK_STATUS_META: Record<AvailableTaskStatus, { label: string; className: string }> = {
+  in_progress: { label: "进行中", className: "border-blue-200 bg-blue-50 text-blue-700" },
+  review: { label: "待验收", className: "border-amber-200 bg-amber-50 text-amber-700" },
+  completed: { label: "已完成", className: "border-emerald-200 bg-emerald-50 text-emerald-700" }
+};
+
+const DEFAULT_TASK_BINDINGS: TaskResourceBinding[] = [
+  { id: "bind-example-current", taskId: "06231146281", resourceId: "a4", resourceName: "七夕美妆礼盒_送礼场景成片_V3.mp4", resourceType: "video", resourceUrl: "https://assets.mixkit.co/videos/preview/mixkit-hand-holding-a-blue-glass-bottle-with-dropper-44365-large.mp4", boundAt: "2026/8/20 10:42:00", boundBy: CURRENT_USER },
+  { id: "bind-example-locked", taskId: "06061131660", resourceId: "a4", resourceName: "七夕美妆礼盒_送礼场景成片_V3.mp4", resourceType: "video", resourceUrl: "https://assets.mixkit.co/videos/preview/mixkit-hand-holding-a-blue-glass-bottle-with-dropper-44365-large.mp4", boundAt: "2026/8/20 10:45:00", boundBy: CURRENT_USER }
 ];
 
 const TASK_UPLOAD_ASSETS: PersonalAsset[] = [
@@ -159,20 +179,6 @@ const DEFAULT_PERSONAL_TAG_GROUPS: PersonalTagGroup[] = [
   { id: "ptg-3", name: "项目归档", tagIds: ["pt-5", "pt-6", "pt-8"] }
 ];
 
-const SOURCE_META: Record<ResourceSource, { label: string; className: string; icon: React.ElementType }> = {
-  resource_library: { label: "资源库上传", className: "border-sky-200 bg-sky-50 text-sky-700", icon: Library },
-  task_collaboration: { label: "任务协作上传", className: "border-amber-200 bg-amber-50 text-amber-700", icon: BriefcaseBusiness },
-  ai_generation: { label: "AI 生成", className: "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700", icon: Sparkles }
-};
-
-const CATEGORY_META: Record<ResourceCategory, { className: string; icon: React.ElementType }> = {
-  成片: { className: "bg-violet-600 text-white", icon: Video },
-  素材: { className: "bg-cyan-600 text-white", icon: Video },
-  图片: { className: "bg-emerald-600 text-white", icon: ImageIcon },
-  音频: { className: "bg-blue-600 text-white", icon: Music },
-  脚本: { className: "bg-amber-500 text-white", icon: FileText }
-};
-
 const loadJson = <T,>(key: string, fallback: T): T => {
   try {
     const value = window.localStorage.getItem(key);
@@ -180,6 +186,16 @@ const loadJson = <T,>(key: string, fallback: T): T => {
   } catch {
     return fallback;
   }
+};
+
+const loadTaskBindings = (): TaskResourceBinding[] => {
+  const stored = loadJson<TaskResourceBinding[]>(TASK_BINDINGS_KEY, []);
+  const seedKey = `${TASK_BINDINGS_KEY}_examples_v2`;
+  if (window.localStorage.getItem(seedKey)) return stored;
+  const merged = Array.from(new Map([...DEFAULT_TASK_BINDINGS, ...stored].map((binding) => [`${binding.taskId}-${binding.resourceId}`, binding])).values());
+  window.localStorage.setItem(TASK_BINDINGS_KEY, JSON.stringify(merged));
+  window.localStorage.setItem(seedKey, "1");
+  return merged;
 };
 
 const inferResourceCategory = (asset: Asset): ResourceCategory => {
@@ -208,7 +224,7 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
   const [endDate, setEndDate] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name">("newest");
   const [favoriteIds, setFavoriteIds] = useState<string[]>(() => loadJson(FAVORITES_KEY, ["a1", "a4"]));
-  const [bindings, setBindings] = useState<TaskResourceBinding[]>(() => loadJson(TASK_BINDINGS_KEY, []));
+  const [bindings, setBindings] = useState<TaskResourceBinding[]>(loadTaskBindings);
   const [tags, setTags] = useState<PersonalTagItem[]>(() => {
     const stored = loadJson<PersonalTagItem[]>(PERSONAL_TAGS_KEY, []);
     return Array.from(new Map([...DEFAULT_PERSONAL_TAGS, ...stored].map((tagItem) => [tagItem.id, tagItem])).values());
@@ -226,7 +242,6 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [bindingAsset, setBindingAsset] = useState<PersonalAsset | null>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
-  const [taggingAsset, setTaggingAsset] = useState<PersonalAsset | null>(null);
 
   const personalAssets = useMemo(() => {
     const merged = [
@@ -264,6 +279,10 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
       if (sortBy === "name") return left.name.localeCompare(right.name, "zh-CN");
       return right.createdAt.localeCompare(left.createdAt);
     }), [categoryFilter, endDate, favoriteIds, mode, personalAssets, publicTagFilter, resourceCategory, search, sortBy, sourceFilter, startDate]);
+
+  const visualAssets = filteredAssets.filter((asset) => ["成片", "素材", "图片"].includes(asset.resourceCategory));
+  const audioAssets = filteredAssets.filter((asset) => asset.resourceCategory === "音频");
+  const scriptAssets = filteredAssets.filter((asset) => asset.resourceCategory === "脚本");
 
   const persistFavorites = (next: string[]) => {
     setFavoriteIds(next);
@@ -343,25 +362,10 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
     setSortBy("newest");
   };
 
-  const toggleFavorite = (asset: PersonalAsset) => {
-    const next = favoriteIds.includes(asset.id) ? favoriteIds.filter((id) => id !== asset.id) : [...favoriteIds, asset.id];
-    persistFavorites(next);
-    onToast(next.includes(asset.id) ? `已收藏《${asset.name}》` : `已取消收藏《${asset.name}》`);
-  };
-
-  const copyDetailLink = async (asset: PersonalAsset) => {
-    const link = `${window.location.origin}/#/resources/${asset.id}`;
-    await navigator.clipboard?.writeText(link);
-    onToast("详情链接已复制，访问时将按查看者的资源权限显示");
-  };
-
-  const downloadAsset = (asset: PersonalAsset) => {
-    const link = document.createElement("a");
-    link.href = asset.url;
-    link.download = asset.name;
-    link.target = "_blank";
-    link.click();
-    onToast(`已开始下载《${asset.name}》`);
+  const persistBindings = (next: TaskResourceBinding[]) => {
+    setBindings(next);
+    window.localStorage.setItem(TASK_BINDINGS_KEY, JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent("task-resource-bindings-changed"));
   };
 
   const confirmBinding = () => {
@@ -379,13 +383,65 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
         boundBy: CURRENT_USER
       }));
     const next = [...bindings, ...additions];
-    setBindings(next);
-    window.localStorage.setItem(TASK_BINDINGS_KEY, JSON.stringify(next));
-    window.dispatchEvent(new CustomEvent("task-resource-bindings-changed"));
+    persistBindings(next);
     onToast(additions.length > 0 ? `已将资源绑定到 ${additions.length} 个任务` : "所选任务已绑定该资源，不重复计数");
-    setBindingAsset(null);
     setSelectedTaskIds([]);
   };
+
+  const unbindTask = (task: AvailableTask) => {
+    if (!bindingAsset || task.status === "completed") return;
+    persistBindings(bindings.filter((binding) => !(binding.resourceId === bindingAsset.id && binding.taskId === task.id)));
+    onToast(`已解除与任务“${task.title}”的关联`);
+  };
+
+  const toResourceItem = (asset: PersonalAsset): ResourceLibraryItemData => ({
+    id: asset.id,
+    numericId: asset.id,
+    type: asset.resourceCategory,
+    title: asset.name,
+    coverUrl: asset.coverUrl || (asset.type === "image" ? asset.url : undefined),
+    status: asset.status,
+    author: asset.creator || CURRENT_USER,
+    time: asset.createdAt.slice(0, 10),
+    category: asset.category,
+    subtitle: asset.publicTags.slice(0, 2).join(" / "),
+    downloads: 0,
+    filesCount: 1,
+    size: asset.size,
+    content: asset.resourceCategory === "脚本" ? `${asset.category || "任务脚本"}，用于电商短视频内容制作。` : undefined,
+    scenesCount: asset.resourceCategory === "脚本" ? 6 : undefined
+  });
+
+  const bindingButton = (asset: PersonalAsset) => {
+    const bindingCount = new Set(bindings.filter((binding) => binding.resourceId === asset.id).map((binding) => binding.taskId)).size;
+    return (
+      <button
+        type="button"
+        onClick={() => { setBindingAsset(asset); setSelectedTaskIds([]); }}
+        className="flex h-7 w-full items-center justify-center gap-1.5 rounded-md bg-purple-600 px-2 text-[11px] font-bold text-white transition-colors hover:bg-purple-700"
+      >
+        <Link2 className="h-3.5 w-3.5" />
+        绑定任务{bindingCount > 0 ? `（${bindingCount}）` : ""}
+      </button>
+    );
+  };
+
+  const currentBindingRows = bindingAsset
+    ? bindings.filter((binding) => binding.resourceId === bindingAsset.id).map((binding) => ({
+      binding,
+      task: AVAILABLE_TASKS.find((task) => task.id === binding.taskId) || {
+        id: binding.taskId,
+        title: `协作任务 ${binding.taskId}`,
+        publisher: "平台成员",
+        deadline: "--",
+        required: 1,
+        submitted: 1,
+        status: "in_progress" as const
+      }
+    }))
+    : [];
+  const currentBoundTaskIds = new Set(currentBindingRows.map(({ task }) => task.id));
+  const linkableTasks = AVAILABLE_TASKS.filter((task) => task.status !== "completed" && !currentBoundTaskIds.has(task.id));
 
   if (mode === "personal_tags") {
     return (
@@ -488,57 +544,37 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
           <SlidersHorizontal className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-2 text-xs font-semibold text-slate-500">暂无符合条件的资源</p><button type="button" onClick={resetFilters} className="mt-3 text-xs font-semibold text-violet-600 hover:text-violet-700">清除筛选条件</button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
-          {filteredAssets.map((asset) => {
-            const categoryMeta = CATEGORY_META[asset.resourceCategory];
-            const sourceMeta = SOURCE_META[asset.source];
-            const SourceIcon = sourceMeta.icon;
-            const TypeIcon = categoryMeta.icon;
-            const assetTags = tags.filter((tagItem) => tagItem.resourceIds.includes(asset.id));
-            const bindingCount = new Set(bindings.filter((binding) => binding.resourceId === asset.id).map((binding) => binding.taskId)).size;
-            const isVisual = asset.resourceCategory === "成片" || asset.resourceCategory === "素材" || asset.resourceCategory === "图片";
-            return (
-              <article key={asset.id} className="group overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs transition-all hover:border-violet-200 hover:shadow-md">
-                <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-slate-100">
-                  {isVisual && (asset.coverUrl || asset.type === "image") ? <img src={asset.coverUrl || asset.url} alt={asset.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" referrerPolicy="no-referrer" /> : asset.resourceCategory === "音频" ? <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-white"><Music className="h-8 w-8 text-blue-500" /><div className="mt-3 flex h-7 items-end gap-1">{[12, 22, 16, 27, 18, 24, 14, 25, 20, 10].map((height, index) => <span key={index} className="w-1 rounded-sm bg-blue-300" style={{ height }} />)}</div></div> : <div className="flex h-full w-full flex-col items-center justify-center bg-amber-50/60 px-5 text-center"><FileText className="h-8 w-8 text-amber-500" /><p className="mt-2 line-clamp-2 text-[11px] font-semibold leading-4 text-amber-900">{asset.name.replace(/\.[^.]+$/, "")}</p></div>}
-                  <span className={`absolute left-0 top-0 flex items-center gap-1 rounded-br-md px-2.5 py-1 text-[11px] font-bold ${categoryMeta.className}`}><TypeIcon className="h-3 w-3" />{asset.resourceCategory}</span>
-                  <span className={`absolute right-2 top-2 flex items-center gap-1 rounded border px-2 py-1 text-[10px] font-semibold ${sourceMeta.className}`}><SourceIcon className="h-3 w-3" />{sourceMeta.label}</span>
-                  {asset.status && <span className="absolute bottom-2 left-2 rounded bg-slate-950/70 px-2 py-1 text-[10px] font-semibold text-white">{asset.status}</span>}
-                </div>
-
-                <div className="p-2.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0"><h3 className="truncate text-xs font-bold text-slate-900" title={asset.name}>{asset.name}</h3><p className="mt-1 truncate font-mono text-[10px] text-slate-400">ID: {asset.id}</p></div>
-                    <button type="button" title={favoriteIds.includes(asset.id) ? "取消收藏" : "收藏"} onClick={() => toggleFavorite(asset)} className={`shrink-0 rounded p-1.5 ${favoriteIds.includes(asset.id) ? "bg-amber-50 text-amber-600" : "text-slate-400 hover:bg-slate-100"}`}><Bookmark className="h-4 w-4" fill={favoriteIds.includes(asset.id) ? "currentColor" : "none"} /></button>
-                  </div>
-
-                  <div className="mt-2 flex min-h-11 content-start flex-wrap gap-1">
-                    <span className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-600">分类：{asset.category || "未分类"}</span>
-                    {asset.publicTags.slice(0, 3).map((tagName) => <span key={tagName} className="rounded border border-sky-100 bg-sky-50 px-2 py-0.5 text-[10px] text-sky-700">{tagName}</span>)}
-                    {assetTags.slice(0, 1).map((tagItem) => <span key={tagItem.id} className="rounded px-2 py-0.5 text-[10px] text-white" style={{ backgroundColor: tagItem.color }}>{tagItem.name}</span>)}
-                  </div>
-
-                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-slate-100 pt-2 text-[10px] text-slate-400">
-                    <span className="truncate">{asset.creator} · {asset.size}</span><span className="shrink-0" title={asset.createdAt}>{asset.createdAt.slice(0, 10)}</span>
-                  </div>
-                  {(asset.sourceTaskId || bindingCount > 0) && <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px]"><span className="truncate text-amber-700">{asset.sourceTaskId ? `任务 ${asset.sourceTaskId}` : ""}</span>{bindingCount > 0 && <span className="shrink-0 font-semibold text-violet-600">已绑定 {bindingCount}</span>}</div>}
-
-                  <div className="mt-2 flex items-center gap-1.5">
-                    <button type="button" title="下载" onClick={() => downloadAsset(asset)} className="rounded border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50"><Download className="h-3.5 w-3.5" /></button>
-                    <button type="button" title="复制详情链接" onClick={() => copyDetailLink(asset)} className="rounded border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50"><Link2 className="h-3.5 w-3.5" /></button>
-                    <button type="button" title="设置个人标签" onClick={() => setTaggingAsset(asset)} className="rounded border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50"><Tag className="h-3.5 w-3.5" /></button>
-                    <button type="button" onClick={() => { setBindingAsset(asset); setSelectedTaskIds([]); }} className="ml-auto flex items-center gap-1 rounded-md bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><Plus className="h-3 w-3" />绑定任务</button>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
+        <div className="space-y-5">
+          {visualAssets.length > 0 && <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">{visualAssets.map((asset) => <ResourceLibraryItem key={asset.id} item={toResourceItem(asset)} onOpen={() => onToast(`正在查看《${asset.name}》`)} footerAction={mode === "resources" ? bindingButton(asset) : undefined} />)}</div>}
+          {audioAssets.length > 0 && <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{audioAssets.map((asset) => <ResourceLibraryItem key={asset.id} item={toResourceItem(asset)} onOpen={() => onToast(`正在查看《${asset.name}》`)} footerAction={mode === "resources" ? bindingButton(asset) : undefined} />)}</div>}
+          {scriptAssets.length > 0 && <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-xs"><div className="min-w-[860px]"><div className="grid grid-cols-[minmax(180px,1.2fr)_minmax(240px,2fr)_100px_150px_90px] gap-4 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-xs font-bold text-slate-500"><span>脚本</span><span>脚本内容</span><span>状态</span><span>分类/标签</span><span className="text-right">绑定任务</span></div>{scriptAssets.map((asset) => <ResourceLibraryItem key={asset.id} item={toResourceItem(asset)} onOpen={() => onToast(`正在查看《${asset.name}》`)} footerAction={mode === "resources" ? bindingButton(asset) : undefined} />)}</div></div>}
         </div>
       )}
 
-      {bindingAsset && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/50 p-4"><div className="w-full max-w-lg rounded-lg bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><div><h3 className="text-sm font-bold text-slate-900">绑定到任务</h3><p className="mt-1 max-w-sm truncate text-xs text-slate-500">{bindingAsset.name}</p></div><button type="button" title="关闭" onClick={() => setBindingAsset(null)}><X className="h-5 w-5 text-slate-400" /></button></div><div className="p-5"><div className="mb-3 rounded bg-blue-50 p-3 text-[11px] leading-5 text-blue-700">资源可复用并绑定多个任务；同一资源在同一任务中只计数一次。</div><div className="space-y-2">{AVAILABLE_TASKS.map((task) => <label key={task.id} className="flex cursor-pointer items-start gap-3 rounded border border-slate-200 p-3 hover:bg-slate-50"><input type="checkbox" checked={selectedTaskIds.includes(task.id)} onChange={() => setSelectedTaskIds((prev) => prev.includes(task.id) ? prev.filter((id) => id !== task.id) : [...prev, task.id])} className="mt-1" /><div className="flex-1"><p className="text-xs font-semibold text-slate-800">{task.title}</p><p className="mt-1 text-[10px] text-slate-500">任务 {task.id} · 发布人 {task.publisher} · 需提交 {task.required} 个 · 截止 {task.deadline}</p></div></label>)}</div></div><div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4"><button type="button" onClick={() => setBindingAsset(null)} className="rounded border border-slate-200 px-4 py-2 text-xs text-slate-600">取消</button><button type="button" disabled={selectedTaskIds.length === 0} onClick={confirmBinding} className="rounded bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">确认绑定（{selectedTaskIds.length}）</button></div></div></div>}
+      {bindingAsset && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+              <div className="min-w-0"><h3 className="text-sm font-bold text-slate-900">任务关联</h3><p className="mt-1 truncate text-xs text-slate-500">{bindingAsset.name}</p><div className="mt-2 flex flex-wrap gap-1.5"><span className="rounded border border-purple-200 bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-700">{bindingAsset.resourceCategory}</span><span className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] text-slate-600">{bindingAsset.category || "未分类"}</span><span className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-500">{bindingAsset.status || "待审核"}</span></div></div>
+              <button type="button" title="关闭" onClick={() => setBindingAsset(null)} className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><X className="h-5 w-5" /></button>
+            </div>
 
-      {taggingAsset && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/50 p-4"><div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl"><div className="flex items-center justify-between"><h3 className="text-sm font-bold">设置个人标签</h3><button type="button" title="关闭" onClick={() => setTaggingAsset(null)}><X className="h-5 w-5 text-slate-400" /></button></div><p className="mt-1 truncate text-xs text-slate-500">{taggingAsset.name}</p><div className="mt-4 space-y-2">{tags.map((tagItem) => { const checked = tagItem.resourceIds.includes(taggingAsset.id); return <label key={tagItem.id} className="flex cursor-pointer items-center gap-2 rounded border border-slate-200 p-2.5 text-xs"><input type="checkbox" checked={checked} onChange={() => persistTags(tags.map((item) => item.id === tagItem.id ? { ...item, resourceIds: checked ? item.resourceIds.filter((id) => id !== taggingAsset.id) : [...item.resourceIds, taggingAsset.id] } : item))} /><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: tagItem.color }} />{tagItem.name}</label>; })}</div><button type="button" onClick={() => setTaggingAsset(null)} className="mt-4 w-full rounded bg-slate-900 py-2 text-xs font-semibold text-white">完成</button></div></div>}
+            <div className="overflow-y-auto p-5">
+              <section>
+                <div className="mb-2 flex items-center justify-between"><h4 className="text-xs font-bold text-slate-800">当前已绑定任务（{currentBindingRows.length}）</h4><span className="text-[10px] text-slate-400">已完成任务保留历史关联</span></div>
+                {currentBindingRows.length > 0 ? <div className="space-y-2">{currentBindingRows.map(({ binding, task }) => { const statusMeta = TASK_STATUS_META[task.status]; return <div key={binding.id} className="rounded-md border border-slate-200 bg-white p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-xs font-bold text-slate-800">{task.title}</p><span className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${statusMeta.className}`}>{statusMeta.label}</span></div><p className="mt-1 text-[10px] text-slate-500">任务 {task.id} · 发布人 {task.publisher} · 提交进度 {task.submitted}/{task.required}</p><p className="mt-1 text-[10px] text-slate-400">绑定时间 {binding.boundAt}</p></div>{task.status === "completed" ? <span className="flex shrink-0 items-center gap-1 rounded bg-slate-100 px-2 py-1.5 text-[10px] font-semibold text-slate-500" title="任务完成后保留历史快照，不可解除关联"><LockKeyhole className="h-3 w-3" />不可解除</span> : <button type="button" onClick={() => unbindTask(task)} className="flex shrink-0 items-center gap-1 rounded px-2 py-1.5 text-[10px] font-semibold text-rose-600 hover:bg-rose-50"><Unlink className="h-3 w-3" />解除关联</button>}</div></div>; })}</div> : <div className="rounded-md border border-dashed border-slate-300 bg-slate-50/60 py-7 text-center text-xs text-slate-400">该资源暂未绑定任务</div>}
+              </section>
+
+              <section className="mt-5 border-t border-slate-100 pt-5">
+                <div className="mb-2 flex items-center justify-between"><h4 className="text-xs font-bold text-slate-800">可关联任务</h4><span className="text-[10px] text-slate-400">同一资源可关联多个未完成任务</span></div>
+                {linkableTasks.length > 0 ? <div className="space-y-2">{linkableTasks.map((task) => { const statusMeta = TASK_STATUS_META[task.status]; const selected = selectedTaskIds.includes(task.id); return <label key={task.id} className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors ${selected ? "border-purple-400 bg-purple-50/50" : "border-slate-200 hover:bg-slate-50"}`}><input type="checkbox" checked={selected} onChange={() => setSelectedTaskIds((prev) => prev.includes(task.id) ? prev.filter((id) => id !== task.id) : [...prev, task.id])} className="mt-0.5 accent-purple-600" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-xs font-semibold text-slate-800">{task.title}</p><span className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${statusMeta.className}`}>{statusMeta.label}</span></div><p className="mt-1 text-[10px] text-slate-500">任务 {task.id} · 发布人 {task.publisher} · 提交进度 {task.submitted}/{task.required} · 截止 {task.deadline}</p></div></label>; })}</div> : <div className="flex items-center justify-center gap-1.5 rounded-md bg-emerald-50 py-5 text-xs font-semibold text-emerald-700"><CheckCircle2 className="h-4 w-4" />暂无其他可关联任务</div>}
+              </section>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-5 py-4"><p className="text-[10px] text-slate-400">绑定后将计入对应任务的已提交文件数量</p><div className="flex gap-2"><button type="button" onClick={() => setBindingAsset(null)} className="rounded-md border border-slate-200 px-4 py-2 text-xs text-slate-600 hover:bg-slate-50">关闭</button><button type="button" disabled={selectedTaskIds.length === 0} onClick={confirmBinding} className="rounded-md bg-purple-600 px-4 py-2 text-xs font-semibold text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-40">关联所选任务（{selectedTaskIds.length}）</button></div></div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
