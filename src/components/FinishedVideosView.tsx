@@ -4,6 +4,7 @@ import { PublicTagFilter } from "./PublicTagFilter";
 import { Pagination } from "./Pagination";
 import ResourceLibraryItem from "./ResourceLibraryItem";
 import { ResourceSearchIntent } from "../types";
+import ResourceSearchCondition from "./ResourceSearchCondition";
 import { 
   Film, 
   Play, 
@@ -600,9 +601,10 @@ interface FinishedVideosViewProps {
   onNavigateToDelivery?: () => void;
   onDetailStateChange?: (isDetail: boolean) => void;
   initialSearch?: ResourceSearchIntent | null;
+  onClearSearch?: () => void;
 }
 
-export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery, onDetailStateChange, initialSearch }: FinishedVideosViewProps) {
+export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery, onDetailStateChange, initialSearch, onClearSearch }: FinishedVideosViewProps) {
   const [videos, setVideos] = useState<FinishedVideo[]>(INITIAL_FINISHED);
   const [activeTab, setActiveTab] = useState<"all" | "secondary" | "performance">("all");
   
@@ -648,6 +650,18 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
   } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [initialTagModalType, setInitialTagModalType] = useState<"public" | "personal" | undefined>(undefined);
+
+  React.useEffect(() => {
+    const tag = initialSearch?.tag;
+    if (!tag) return;
+    if (MAIN_CATEGORIES.includes(tag)) setMainCat(tag);
+    else if (PRIMARY_CATEGORIES.includes(tag)) setPrimaryCat(tag);
+    else if (SECONDARY_CATEGORIES.includes(tag)) setSecondaryCat(tag);
+    else if (STATUS_OPTIONS.includes(tag)) setStatusVal(tag);
+    else if (AD_PLATFORM_TAG_OPTIONS.includes(tag)) setAdPlatformTag(tag);
+    else if (PUBLIC_TAGS.includes(tag)) setSelectedPublicTag(tag);
+    setCurrentPage(1);
+  }, [initialSearch?.requestId]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -720,7 +734,7 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
 
   // Filter Logic
   const filteredVideos = videos.filter(v => {
-    const homeSearch = (initialSearch?.tag || initialSearch?.query || "").trim().toLowerCase();
+    const homeSearch = (initialSearch?.query || "").trim().toLowerCase();
     const matchesHomeSearch = !homeSearch || [v.title, v.category, v.typeLabel, v.author, ...(v.tags || [])]
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(homeSearch));
@@ -1350,6 +1364,8 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
         </div>
 
       </div>
+
+      <ResourceSearchCondition query={initialSearch?.query} onClear={onClearSearch} />
 
       {/* ===== ROW 7: 高级搜索 ===== */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">

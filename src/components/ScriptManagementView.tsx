@@ -3,6 +3,7 @@ import { PublicTagFilter } from "./PublicTagFilter";
 import ScriptDetailPage from "./ScriptDetailPage";
 import { TaskItem } from "./TaskCollaborationView";
 import { ResourceSearchIntent } from "../types";
+import ResourceSearchCondition from "./ResourceSearchCondition";
 import {
   Search,
   Plus,
@@ -112,9 +113,10 @@ interface ScriptManagementViewProps {
   onNavigateToTaskDetail?: (task: TaskItem) => void;
   onDetailStateChange?: (isDetail: boolean) => void;
   initialSearch?: ResourceSearchIntent | null;
+  onClearSearch?: () => void;
 }
 
-export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDetail, onDetailStateChange, initialSearch }: ScriptManagementViewProps) {
+export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDetail, onDetailStateChange, initialSearch, onClearSearch }: ScriptManagementViewProps) {
   // Main filter states
   const [selectedMainCat, setSelectedMainCat] = useState("全部");
   const [selectedPrimaryCat, setSelectedPrimaryCat] = useState("全部");
@@ -523,7 +525,7 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
 
   // Filter logic
   const filteredScripts = scripts.filter(s => {
-    const homeSearch = (initialSearch?.tag || initialSearch?.query || "").trim().toLowerCase();
+    const homeSearch = (initialSearch?.query || "").trim().toLowerCase();
     const matchesHomeSearch = !homeSearch || [s.title, s.content, s.mainCategory, s.primaryCategory, s.secondaryCategory, s.categoryTag, s.classTag, s.descTag, s.author]
       .some((value) => value.toLowerCase().includes(homeSearch));
     if (!matchesHomeSearch) return false;
@@ -546,6 +548,14 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
     "休闲零食", "图书", "饮料冲调", "学习用品", "教育音像", "数字阅读", "家庭清洁",
     "家电好货", "美容美体", "个人护理", "化妆工具", "家居优选"
   ];
+
+  React.useEffect(() => {
+    const tag = initialSearch?.tag;
+    if (!tag) return;
+    if (mainCategories.includes(tag)) setSelectedMainCat(tag);
+    else if ([...primaryCategoriesFirstRow, ...primaryCategoriesSecondRow].includes(tag)) setSelectedPrimaryCat(tag);
+    else if (["全部", "待审核", "审核通过", "驳回-待修改"].includes(tag)) setSelectedStatus(tag);
+  }, [initialSearch?.requestId]);
 
   if (selectedScriptForDetail) {
     return (
@@ -753,6 +763,8 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
           </div>
         </div>
       </div>
+
+      <ResourceSearchCondition query={initialSearch?.query} onClear={onClearSearch} />
 
       {/* Filter Card 2: 高级搜索 Bar */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs text-slate-700">

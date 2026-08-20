@@ -3,6 +3,7 @@ import { PublicTagFilter } from "./PublicTagFilter";
 import AudioDetailView from "./AudioDetailView";
 import { Pagination } from "./Pagination";
 import { ResourceSearchIntent } from "../types";
+import ResourceSearchCondition from "./ResourceSearchCondition";
 import {
   Search,
   ChevronDown,
@@ -82,6 +83,7 @@ interface AudioManagementViewProps {
   onTriggerTask?: (type: any, name: string, inputFiles: string[], cost: number) => void;
   onDetailStateChange?: (isDetail: boolean) => void;
   initialSearch?: ResourceSearchIntent | null;
+  onClearSearch?: () => void;
 }
 
 const INITIAL_AUDIO_LIST: AudioItem[] = [
@@ -217,7 +219,7 @@ const INITIAL_AUDIO_LIST: AudioItem[] = [
   }
 ];
 
-export default function AudioManagementView({ onTriggerTask, onDetailStateChange, initialSearch }: AudioManagementViewProps) {
+export default function AudioManagementView({ onTriggerTask, onDetailStateChange, initialSearch, onClearSearch }: AudioManagementViewProps) {
   // Category states
   const [selectedMainCategory, setSelectedMainCategory] = useState("全部");
   const [selectedPrimaryCategory, setSelectedPrimaryCategory] = useState("全部");
@@ -372,7 +374,7 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
 
   // Filter logic
   const filteredAudios = audioList.filter((item) => {
-    const homeSearch = (initialSearch?.tag || initialSearch?.query || "").trim().toLowerCase();
+    const homeSearch = (initialSearch?.query || "").trim().toLowerCase();
     const matchesHomeSearch = !homeSearch || [item.title, item.subtitle, item.primaryCategory, item.secondaryCategory, item.personalTag, item.author, ...item.publicTags]
       .some((value) => value.toLowerCase().includes(homeSearch));
     if (!matchesHomeSearch) return false;
@@ -458,6 +460,17 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
   const publicTags = ["模特", "场景", "合作达人", "创新点"];
 
   const personalTags = ["全部", "无个人标签", "有个人标签", "Zs测试一", "Zs测试二", "测试分享标签"];
+
+  React.useEffect(() => {
+    const tag = initialSearch?.tag;
+    if (!tag) return;
+    if (mainCategories.includes(tag)) setSelectedMainCategory(tag);
+    else if (primaryCategories.includes(tag)) setSelectedPrimaryCategory(tag);
+    else if (secondaryCategories.includes(tag)) setSelectedSecondaryCategory(tag);
+    else if (publicTags.includes(tag)) setSelectedPublicTag(tag);
+    else if (personalTags.includes(tag)) setSelectedPersonalTag(tag);
+    setCurrentPage(1);
+  }, [initialSearch?.requestId]);
 
   const isAllPageSelected = filteredAudios.length > 0 && filteredAudios.every((a) => selectedIds.includes(a.id));
 
@@ -639,6 +652,8 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
             </button>
           </div>
         </div>
+
+        <ResourceSearchCondition query={initialSearch?.query} onClear={onClearSearch} />
 
         {/* Row 6: 高级搜索与排序 */}
         <div className="flex items-center justify-between pt-1 flex-wrap gap-2">

@@ -3,6 +3,7 @@ import { PublicTagFilter } from "./PublicTagFilter";
 import ImageDetailView from "./ImageDetailView";
 import { Pagination } from "./Pagination";
 import { ResourceSearchIntent } from "../types";
+import ResourceSearchCondition from "./ResourceSearchCondition";
 import {
   Search,
   ChevronDown,
@@ -54,6 +55,7 @@ interface ImageManagementViewProps {
   onTriggerTask?: (type: any, name: string, inputFiles: string[], cost: number) => void;
   onDetailStateChange?: (isDetail: boolean) => void;
   initialSearch?: ResourceSearchIntent | null;
+  onClearSearch?: () => void;
 }
 
 const MOCK_IMAGES: ImageItem[] = [
@@ -197,7 +199,7 @@ const MOCK_IMAGES: ImageItem[] = [
   }
 ];
 
-export default function ImageManagementView({ onTriggerTask, onDetailStateChange, initialSearch }: ImageManagementViewProps) {
+export default function ImageManagementView({ onTriggerTask, onDetailStateChange, initialSearch, onClearSearch }: ImageManagementViewProps) {
   // Category & Filter States
   const [selectedPrimaryCat, setSelectedPrimaryCat] = useState("全部");
   const [secondarySearch, setSecondarySearch] = useState("");
@@ -266,9 +268,19 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
     "对比素材"
   ];
 
+  React.useEffect(() => {
+    const tag = initialSearch?.tag;
+    if (!tag) return;
+    if (primaryCategories.includes(tag)) setSelectedPrimaryCat(tag);
+    else if (["a店铺", "b店铺"].includes(tag)) setSelectedSecondaryCat(tag);
+    else if (personalTagsList.includes(tag)) setSelectedPersonalTag(tag);
+    else setPublicTagSearch(tag);
+    setCurrentPage(1);
+  }, [initialSearch?.requestId]);
+
   // Filtered list
   const filteredImages = MOCK_IMAGES.filter(item => {
-    const homeSearch = (initialSearch?.tag || initialSearch?.query || "").trim().toLowerCase();
+    const homeSearch = (initialSearch?.query || "").trim().toLowerCase();
     const matchesHomeSearch = !homeSearch || [item.title, item.subtitle, item.primaryCategory, item.secondaryCategory, item.personalTag, item.author, ...item.publicTags]
       .some((value) => value.toLowerCase().includes(homeSearch));
     if (!matchesHomeSearch) return false;
@@ -530,6 +542,8 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
           </div>
         </div>
       </div>
+
+      <ResourceSearchCondition query={initialSearch?.query} onClear={onClearSearch} />
 
       {/* Filter Card 2: 高级搜索 Bar */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs text-slate-700">

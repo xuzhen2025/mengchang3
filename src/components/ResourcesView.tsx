@@ -23,8 +23,7 @@ import {
   Sparkles,
   Plus,
   FolderPlus,
-  File,
-  Search
+  File
 } from "lucide-react";
 
 interface ResourcesViewProps {
@@ -277,15 +276,6 @@ export default function ResourcesView({
               </div>
 
             </div>
-            {activeSearch && (
-              <div className="mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-slate-100 px-3 py-2.5">
-                <span className="flex items-center gap-1.5 text-xs font-bold text-slate-500"><Search className="h-3.5 w-3.5" />首页搜索</span>
-                <span className="inline-flex h-7 items-center rounded-md border border-purple-200 bg-purple-50 px-2.5 text-xs font-bold text-purple-700">
-                  {activeSearch.tag ? `热门标签：${activeSearch.tag}` : `关键词：${activeSearch.query}`}
-                </span>
-                <button type="button" onClick={clearHomeSearch} className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700" title="清除首页搜索条件"><X className="h-4 w-4" /></button>
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -326,6 +316,7 @@ export default function ResourcesView({
             {activeTab === "finished_videos" && (
               <FinishedVideosView
                 initialSearch={activeSearch}
+                onClearSearch={clearHomeSearch}
                 onTriggerTask={onTriggerTask}
                 onNavigateToDelivery={onNavigateToDelivery}
                 onDetailStateChange={setIsSubViewDetailOpen}
@@ -334,6 +325,7 @@ export default function ResourcesView({
             {activeTab === "materials" && (
               <MaterialsView
                 initialSearch={activeSearch}
+                onClearSearch={clearHomeSearch}
                 onTriggerTask={onTriggerTask}
                 onNavigateToDelivery={onNavigateToDelivery}
                 onDetailStateChange={setIsSubViewDetailOpen}
@@ -342,6 +334,7 @@ export default function ResourcesView({
             {activeTab === "scripts" && (
               <ScriptManagementView
                 initialSearch={activeSearch}
+                onClearSearch={clearHomeSearch}
                 onTriggerTask={onTriggerTask}
                 onNavigateToTaskDetail={onNavigateToTaskDetail}
                 onDetailStateChange={setIsSubViewDetailOpen}
@@ -350,6 +343,7 @@ export default function ResourcesView({
             {activeTab === "images" && (
               <ImageManagementView
                 initialSearch={activeSearch}
+                onClearSearch={clearHomeSearch}
                 onTriggerTask={onTriggerTask}
                 onDetailStateChange={setIsSubViewDetailOpen}
               />
@@ -357,6 +351,7 @@ export default function ResourcesView({
             {activeTab === "audio" && (
               <AudioManagementView
                 initialSearch={activeSearch}
+                onClearSearch={clearHomeSearch}
                 onTriggerTask={onTriggerTask}
                 onDetailStateChange={setIsSubViewDetailOpen}
               />
