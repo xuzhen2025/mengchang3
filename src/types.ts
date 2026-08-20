@@ -71,10 +71,22 @@ export interface Asset {
   deletedAt?: string;
 }
 
+export type GenerationTaskCategory =
+  | "agent"
+  | "quick_creation"
+  | "watermark"
+  | "subtitle"
+  | "enhance"
+  | "digital_human"
+  | "model_change"
+  | "fission"
+  | "ai_video"
+  | "ai_image";
+
 export interface Task {
   id: string;
   name: string;
-  type: "detail_set" | "watermark" | "subtitle" | "enhance" | "video_gen" | "image_gen" | "fission";
+  type: "detail_set" | "video" | "watermark" | "subtitle" | "enhance" | "digital_human" | "model_change" | "video_gen" | "image_gen" | "fission";
   status: "queue" | "generating" | "completed" | "failed" | "cancelled";
   progress: number;
   inputFiles: string[];
@@ -82,6 +94,8 @@ export interface Task {
   createdAt: string;
   creditsCost: number;
   source?: "agent" | "tool";
+  category?: GenerationTaskCategory;
+  autoProgress?: boolean;
   cancelledAt?: string;
   refundedCredits?: number;
   failureReason?: string;

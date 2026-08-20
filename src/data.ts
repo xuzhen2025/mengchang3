@@ -358,6 +358,137 @@ export const INITIAL_ASSETS: Asset[] = [
 
 export const INITIAL_TASKS: Task[] = [
   {
+    id: "t_demo_queue_model",
+    name: "秋季风衣模特换装任务",
+    type: "model_change",
+    status: "queue",
+    progress: 0,
+    inputFiles: ["秋季风衣商品图.png"],
+    createdAt: "2026-08-20 16:42",
+    creditsCost: 8,
+    source: "tool",
+    category: "model_change",
+    autoProgress: false
+  },
+  {
+    id: "t_demo_generating_quick",
+    name: "七夕礼盒商品视频制作",
+    type: "video",
+    status: "generating",
+    progress: 38,
+    inputFiles: ["七夕礼盒主图.png"],
+    createdAt: "2026-08-20 16:35",
+    creditsCost: 5,
+    source: "tool",
+    category: "quick_creation",
+    autoProgress: false
+  },
+  {
+    id: "t_demo_failed_subtitle",
+    name: "直播切片字幕擦除",
+    type: "subtitle",
+    status: "failed",
+    progress: 24,
+    inputFiles: ["直播切片_0820.mp4"],
+    createdAt: "2026-08-20 15:48",
+    creditsCost: 3,
+    refundedCredits: 2.28,
+    failureReason: "字幕区域识别失败，未消耗积分已退回",
+    source: "tool",
+    category: "subtitle"
+  },
+  {
+    id: "t_demo_agent_success",
+    name: "美妆礼盒七夕送礼场景成片",
+    type: "video_gen",
+    status: "completed",
+    progress: 100,
+    inputFiles: ["美妆礼盒参考图.png"],
+    outputFiles: ["https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=480&auto=format&fit=crop&q=80"],
+    createdAt: "2026-08-20 15:10",
+    creditsCost: 12,
+    source: "agent",
+    category: "agent"
+  },
+  {
+    id: "t_demo_digital_human",
+    name: "品牌主理人数字人分身",
+    type: "digital_human",
+    status: "completed",
+    progress: 100,
+    inputFiles: ["主理人口播样片.mp4"],
+    outputFiles: ["https://images.unsplash.com/photo-1560250097-0b93528c311a?w=480&auto=format&fit=crop&q=80"],
+    createdAt: "2026-08-20 14:25",
+    creditsCost: 40,
+    source: "tool",
+    category: "digital_human"
+  },
+  {
+    id: "t_demo_watermark",
+    name: "春季女装视频去水印",
+    type: "watermark",
+    status: "completed",
+    progress: 100,
+    inputFiles: ["女装走秀原片.mp4"],
+    createdAt: "2026-08-20 13:16",
+    creditsCost: 2.5,
+    source: "tool",
+    category: "watermark"
+  },
+  {
+    id: "t_demo_fission",
+    name: "高转化口播视频爆款复刻",
+    type: "fission",
+    status: "completed",
+    progress: 100,
+    inputFiles: ["爆款口播参考.mp4"],
+    outputFiles: ["https://images.unsplash.com/photo-1616683693504-3ea7e9ad6fec?w=480&auto=format&fit=crop&q=80"],
+    createdAt: "2026-08-20 11:40",
+    creditsCost: 15,
+    source: "tool",
+    category: "fission"
+  },
+  {
+    id: "t_demo_ai_video",
+    name: "产品旋转展示 AI 视频素材",
+    type: "video_gen",
+    status: "completed",
+    progress: 100,
+    inputFiles: ["产品白底图.png"],
+    outputFiles: ["https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=480&auto=format&fit=crop&q=80"],
+    createdAt: "2026-08-20 10:25",
+    creditsCost: 10,
+    source: "tool",
+    category: "ai_video"
+  },
+  {
+    id: "t_demo_ai_image",
+    name: "夏季防晒产品 AI 图片素材",
+    type: "image_gen",
+    status: "completed",
+    progress: 100,
+    inputFiles: ["防晒产品图.png"],
+    outputFiles: ["https://images.unsplash.com/photo-1556228720-195a672e8a03?w=480&auto=format&fit=crop&q=80"],
+    createdAt: "2026-08-20 09:30",
+    creditsCost: 6,
+    source: "tool",
+    category: "ai_image"
+  },
+  {
+    id: "t_demo_agent_cancelled",
+    name: "秋季新品整合营销视频",
+    type: "video_gen",
+    status: "cancelled",
+    progress: 0,
+    inputFiles: ["秋季新品资料包.zip"],
+    createdAt: "2026-08-19 18:04",
+    creditsCost: 18,
+    refundedCredits: 18,
+    cancelledAt: "2026-08-19 18:05",
+    source: "agent",
+    category: "agent"
+  },
+  {
     id: "t_old_1",
     name: "兰蔻小黑瓶商详套图 (4张)",
     type: "detail_set",
@@ -372,7 +503,8 @@ export const INITIAL_TASKS: Task[] = [
     ],
     createdAt: "2026-07-08 18:00",
     creditsCost: 4.0,
-    source: "agent"
+    source: "tool",
+    category: "quick_creation"
   },
   {
     id: "t_old_2",
@@ -383,7 +515,8 @@ export const INITIAL_TASKS: Task[] = [
     inputFiles: ["模特红裙走秀素材_原图.mp4"],
     createdAt: "2026-07-08 16:12",
     creditsCost: 2.5,
-    source: "tool"
+    source: "tool",
+    category: "watermark"
   },
   {
     id: "t_old_3",
@@ -396,7 +529,8 @@ export const INITIAL_TASKS: Task[] = [
     creditsCost: 10,
     refundedCredits: 3.3,
     failureReason: "生成服务连接中断，未消耗部分积分已退回",
-    source: "agent"
+    source: "agent",
+    category: "agent"
   },
   {
     id: "t_old_4",
@@ -409,7 +543,8 @@ export const INITIAL_TASKS: Task[] = [
     creditsCost: 5,
     refundedCredits: 5,
     cancelledAt: "2026-08-19 13:07",
-    source: "tool"
+    source: "tool",
+    category: "enhance"
   }
 ];
 

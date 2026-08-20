@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Sidebar from "./components/Sidebar";
-import RightQueue from "./components/GenerationTaskQueue";
+import RightQueue from "./components/TaskQueuePanel";
 import MaterialSelector from "./components/MaterialSelector";
 import CreditsDashboard from "./components/CreditsDashboard";
 import HomeView from "./components/HomeView";
@@ -279,6 +279,7 @@ export default function App() {
       setTasks((prevTasks) => {
         let updated = false;
         const next = prevTasks.map((t) => {
+          if (t.autoProgress === false) return t;
           if (t.status === "queue") {
             updated = true;
             return { ...t, status: "generating", progress: 10 };
@@ -422,10 +423,11 @@ export default function App() {
 
   // State operations
   const handleAddTask = (
-    type: "detail_set" | "watermark" | "subtitle" | "enhance" | "video_gen" | "image_gen" | "fission",
+    type: Task["type"],
     name: string,
     inputFiles: string[],
-    creditsCost: number
+    creditsCost: number,
+    source: "agent" | "tool" = "tool"
   ) => {
     if (credits < creditsCost) {
       alert("余额不足！请开通 VIP 订阅方案或在可用积分中心兑换卡密添加额度。");
@@ -447,7 +449,17 @@ export default function App() {
       inputFiles,
       createdAt: timestamp,
       creditsCost,
-      source: type === "video_gen" || type === "image_gen" ? "agent" : "tool"
+      source,
+      category: source === "agent" ? "agent" : (
+        type === "watermark" ? "watermark" :
+        type === "subtitle" ? "subtitle" :
+        type === "enhance" ? "enhance" :
+        type === "digital_human" ? "digital_human" :
+        type === "model_change" ? "model_change" :
+        type === "fission" ? "fission" :
+        type === "video_gen" ? "ai_video" :
+        type === "image_gen" ? "ai_image" : "quick_creation"
+      )
     };
 
     setTasks((prev) => [newTask, ...prev]);
@@ -458,7 +470,11 @@ export default function App() {
       type === "watermark" ? "水印擦除" :
       type === "subtitle" ? "字幕擦除" :
       type === "enhance" ? "画质增强" :
-      type === "video_gen" ? "AI视频" : "AI图片";
+      type === "digital_human" ? "数字人分身" :
+      type === "model_change" ? "模特换衣" :
+      type === "fission" ? "爆款复刻" :
+      type === "video_gen" ? (source === "agent" ? "Agent创作" : "AI视频素材") :
+      type === "image_gen" ? (source === "agent" ? "Agent创作" : "AI图片素材") : "快速创作";
 
     const newTx: CreditTransaction = {
       id: "tx_" + Date.now(),
@@ -805,7 +821,7 @@ export default function App() {
           <AgentCreationView
             credits={credits}
             onAddTask={(type, name, inputFiles, creditsCost) => {
-              handleAddTask(type, name, inputFiles, creditsCost);
+              handleAddTask(type, name, inputFiles, creditsCost, "agent");
             }}
             onBack={handleBack}
           />
