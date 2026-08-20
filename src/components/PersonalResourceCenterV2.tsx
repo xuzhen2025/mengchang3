@@ -160,7 +160,7 @@ const TASK_UPLOAD_ASSETS: PersonalAsset[] = [
   }
 ];
 
-const RESOURCE_CATEGORIES: Array<"全部" | ResourceCategory> = ["全部", "成片", "素材", "图片", "音频", "脚本"];
+const RESOURCE_CATEGORIES: ResourceCategory[] = ["成片", "素材", "图片", "音频", "脚本"];
 
 const DEFAULT_PERSONAL_TAGS: PersonalTagItem[] = [
   { id: "pt-1", name: "本周主推", color: "#7c3aed", resourceIds: ["a1", "a4"] },
@@ -216,7 +216,7 @@ const normalizeAsset = (asset: Asset): PersonalAsset => ({
 
 export default function PersonalResourceCenterV2({ mode, assets, onToast }: PersonalResourceCenterProps) {
   const [search, setSearch] = useState("");
-  const [resourceCategory, setResourceCategory] = useState<"全部" | ResourceCategory>("全部");
+  const [resourceCategory, setResourceCategory] = useState<ResourceCategory>("成片");
   const [categoryFilter, setCategoryFilter] = useState("全部");
   const [publicTagFilter, setPublicTagFilter] = useState("全部");
   const [sourceFilter, setSourceFilter] = useState<"全部" | ResourceSource>("全部");
@@ -265,7 +265,7 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
       const searchable = [asset.id, asset.name, asset.category, ...asset.publicTags].filter(Boolean).join(" ").toLowerCase();
       if (mode === "favorites" && !favoriteIds.includes(asset.id)) return false;
       if (query && !searchable.includes(query)) return false;
-      if (resourceCategory !== "全部" && asset.resourceCategory !== resourceCategory) return false;
+      if (asset.resourceCategory !== resourceCategory) return false;
       if (categoryFilter !== "全部" && asset.category !== categoryFilter) return false;
       if (publicTagFilter !== "全部" && !asset.publicTags.includes(publicTagFilter)) return false;
       if (sourceFilter !== "全部" && asset.source !== sourceFilter) return false;
@@ -353,7 +353,7 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
 
   const resetFilters = () => {
     setSearch("");
-    setResourceCategory("全部");
+    setResourceCategory("成片");
     setCategoryFilter("全部");
     setPublicTagFilter("全部");
     setSourceFilter("全部");
