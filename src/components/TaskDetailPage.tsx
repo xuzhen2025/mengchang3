@@ -33,7 +33,8 @@ import {
   Music,
   X,
   Eye,
-  Download
+  Download,
+  Grid2X2
 } from "lucide-react";
 import { TaskItem } from "./TaskCollaborationView";
 
@@ -52,7 +53,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
   canConfirmComplete = false,
   onConfirmComplete,
 }) => {
-  // Main Sub-tabs: 成片 | 素材 | 脚本 | 图片 | 音频
+  // Task deliverable types. The script tab contains submitted task files, not reference scripts.
   const [activeTab, setActiveTab] = useState<"成片" | "素材" | "脚本" | "图片" | "音频">("成片");
 
   // Upload Page View State ("成片" | "素材" | "脚本" | "图片" | "音频" | null)
@@ -113,8 +114,9 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
   const taskWorks = task.status === "completed" && task.completionSnapshot?.length
     ? task.completionSnapshot
     : task.associatedWorks || [];
-  const getWorkTab = (type: string): "成片" | "素材" | "图片" | "音频" => {
+  const getWorkTab = (type: string): "成片" | "素材" | "脚本" | "图片" | "音频" => {
     if (type === "video" || type === "成片") return "成片";
+    if (type === "text" || type === "脚本") return "脚本";
     if (type === "image" || type === "图片") return "图片";
     if (type === "audio" || type === "音频") return "音频";
     return "素材";
@@ -122,21 +124,30 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
   const tabCounts = {
     成片: taskWorks.filter((work) => getWorkTab(work.type) === "成片").length,
     素材: taskWorks.filter((work) => getWorkTab(work.type) === "素材").length,
-    脚本: associatedScripts.length,
+    脚本: taskWorks.filter((work) => getWorkTab(work.type) === "脚本").length,
     图片: taskWorks.filter((work) => getWorkTab(work.type) === "图片").length,
     音频: taskWorks.filter((work) => getWorkTab(work.type) === "音频").length
   };
-  const visibleWorks = activeTab === "脚本" ? [] : taskWorks.filter((work) => {
+  const visibleWorks = taskWorks.filter((work) => {
     if (getWorkTab(work.type) !== activeTab) return false;
     if (l2Search.trim() && !work.name.toLowerCase().includes(l2Search.trim().toLowerCase())) return false;
+    if (l1Category !== "全部" && !`${work.category || ""} ${task.product || ""}`.includes(l1Category)) return false;
     if (authorFilter.trim() && !(work.author || "").includes(authorFilter.trim())) return false;
     if (statusFilter !== "全部") {
-      const accepted = statusFilter === "审核通过" ? ["审核通过", "已通过"] : [statusFilter];
+      const accepted = statusFilter === "审核通过" ? ["审核通过", "已通过", "通过"] : [statusFilter];
       if (!accepted.includes(work.status || "")) return false;
     }
+    if (selectedPublicTags.length > 0 && !selectedPublicTags.some((tag) => work.publicTags?.includes(tag))) return false;
+    if (personalTagSearch.trim() && !work.personalTags?.some((tag) => tag.includes(personalTagSearch.trim()))) return false;
+    if (personalTagFilter === "有个人标签" && !work.personalTags?.length) return false;
+    if (personalTagFilter === "无个人标签" && work.personalTags?.length) return false;
     if (startDate && (work.createdAt || task.publishDate).slice(0, 10) < startDate) return false;
     if (endDate && (work.createdAt || task.publishDate).slice(0, 10) > endDate) return false;
     return true;
+  }).sort((left, right) => {
+    if (sortBy === "最早发布") return (left.createdAt || "").localeCompare(right.createdAt || "");
+    if (sortBy === "消耗最高") return (right.cost || 0) - (left.cost || 0);
+    return (right.createdAt || "").localeCompare(left.createdAt || "");
   });
 
   // If user opened an upload page view, render the corresponding upload component (same as ResourcesView)
@@ -223,8 +234,29 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
     onShowToast("已重置所有筛选条件");
   };
 
-  const L1_CATEGORIES = ["全部", "爆款素材", "内衣", "内裤", "吊带", "裤袜", "保暖衣", "明星素材", "通用"];
-  const STATUS_LIST = ["全部", "待审核", "审核通过", "审核驳回", "已修改", "二次修改", "已上机", "已搭", "放弃"];
+  const FILTER_OPTIONS = {
+    成片: {
+      categories: ["全部", "女装", "内衣", "美妆", "食品", "鞋靴", "箱包", "家居", "通用"],
+      statuses: ["全部", "待审核", "审核通过", "审核驳回", "已修改", "二次修改", "已上机", "已搭", "放弃"]
+    },
+    素材: {
+      categories: ["全部", "商品实拍", "模特展示", "场景空镜", "口播", "直播切片", "外部素材", "通用"],
+      statuses: ["全部", "待审核", "审核通过", "审核驳回", "未使用", "使用中", "已使用"]
+    },
+    脚本: {
+      categories: ["全部", "口播种草", "混剪卡点", "开箱测评", "痛点对比", "剧情短片", "通用"],
+      statuses: ["全部", "待审核", "审核通过", "审核驳回", "已修改"]
+    },
+    图片: {
+      categories: ["全部", "商品图", "模特图", "场景图", "海报", "封面", "套图", "通用"],
+      statuses: ["全部", "待审核", "审核通过", "审核驳回", "已修改"]
+    },
+    音频: {
+      categories: ["全部", "真人配音", "AI配音", "背景音乐", "音效", "直播录音", "通用"],
+      statuses: ["全部", "待审核", "审核通过", "审核驳回", "已修改"]
+    }
+  } as const;
+  const activeFilterOptions = FILTER_OPTIONS[activeTab];
   const PUBLIC_TAGS = [
     "模特姓名", "场景", "编导姓名", "爆款视频", "摄影姓名", "空镜", "上身",
     "剧情人设", "产品名称", "明星元素", "视觉类型", "剪辑形式", "痛点",
@@ -370,7 +402,14 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
           {(["成片", "素材", "脚本", "图片", "音频"] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => {
+                setActiveTab(tab);
+                setL1Category("全部");
+                setL2Search("");
+                setStatusFilter("全部");
+                setSelectedPublicTags([]);
+                setPersonalTagFilter("全部");
+              }}
               className={`text-sm font-extrabold relative pb-1 cursor-pointer transition-colors whitespace-nowrap ${
                 activeTab === tab ? "text-[#7C3AED]" : "text-slate-500 hover:text-slate-800"
               }`}
@@ -389,7 +428,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
         {/* Right Stats */}
         <div className="flex items-center gap-6 text-xs text-slate-500 font-medium shrink-0">
           <div>
-            任务作品数: <span className="font-mono font-bold text-slate-800">{taskWorks.length}个</span>
+            任务文件数: <span className="font-mono font-bold text-slate-800">{taskWorks.length}个</span>
           </div>
           <div>
             有权限查看: <span className="font-mono font-bold text-slate-800">{taskWorks.length}个</span>
@@ -504,7 +543,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
         <div className="flex items-start gap-4">
           <span className="w-20 font-bold text-slate-500 shrink-0 pt-1">一级分类:</span>
           <div className="flex flex-wrap items-center gap-1.5">
-            {L1_CATEGORIES.map((cat) => (
+            {activeFilterOptions.categories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setL1Category(cat)}
@@ -547,7 +586,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
         <div className="flex items-start gap-4">
           <span className="w-20 font-bold text-slate-500 shrink-0 pt-1">状 态:</span>
           <div className="flex flex-wrap items-center gap-1.5">
-            {STATUS_LIST.map((st) => (
+            {activeFilterOptions.statuses.map((st) => (
               <button
                 key={st}
                 onClick={() => setStatusFilter(st)}
@@ -608,7 +647,11 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
             ))}
 
             <button
-              onClick={() => onShowToast("重置个人标签")}
+              onClick={() => {
+                setPersonalTagSearch("");
+                setPersonalTagFilter("全部");
+                onShowToast("已重置个人标签筛选");
+              }}
               className="text-slate-400 hover:text-purple-600 font-medium flex items-center gap-1 cursor-pointer ml-1"
             >
               <span>重置个人标签</span>
@@ -737,35 +780,34 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
       <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs min-h-[220px]">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-extrabold text-slate-900">{activeTab}文件</h2>
-            <p className="mt-1 text-[11px] text-slate-400">验收以任务关联文件为准，未审核文件同样计入提交数量</p>
+            <h2 className="flex items-center gap-2 text-sm font-extrabold text-slate-900"><Grid2X2 className="h-4 w-4 text-purple-600" />任务完成文件 · {activeTab}</h2>
+            <p className="mt-1 text-[11px] text-slate-400">制作人提交的任务成果，未审核文件同样计入提交数量</p>
           </div>
-          <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">当前显示 {activeTab === "脚本" ? associatedScripts.length : visibleWorks.length} 个</span>
+          <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">当前显示 {visibleWorks.length} 个</span>
         </div>
 
-        {activeTab === "脚本" ? (
-          <div className="flex min-h-[150px] items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/60 text-center">
-            <div><FileText className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-2 text-xs font-bold text-slate-600">已关联 {associatedScripts.length} 个脚本</p><p className="mt-1 text-[11px] text-slate-400">脚本版本与审核状态请在下方“关联脚本”中查看</p></div>
-          </div>
-        ) : visibleWorks.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {visibleWorks.length > 0 ? (
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {visibleWorks.map((work) => {
               const workTab = getWorkTab(work.type);
               const WorkIcon = workTab === "成片" ? Film : workTab === "图片" ? ImageIcon : workTab === "音频" ? Music : FileText;
-              const passed = work.status === "已通过" || work.status === "审核通过";
+              const passed = work.status === "已通过" || work.status === "审核通过" || work.status === "通过";
+              const rejected = work.status === "审核驳回";
               return (
-                <article key={work.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white transition-all hover:border-purple-300 hover:shadow-md">
+                <article key={work.id} className="group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs transition-all hover:border-purple-300 hover:shadow-lg">
                   <div className="relative aspect-video bg-slate-100">
-                    {work.coverUrl ? <img src={work.coverUrl} alt={work.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : <div className="flex h-full items-center justify-center"><WorkIcon className="h-10 w-10 text-slate-300" /></div>}
+                    {work.coverUrl ? <img src={work.coverUrl} alt={work.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" referrerPolicy="no-referrer" /> : <div className="flex h-full items-center justify-center"><WorkIcon className="h-10 w-10 text-slate-300" /></div>}
                     <span className="absolute left-2 top-2 rounded bg-slate-950/75 px-2 py-1 text-[10px] font-bold text-white">{workTab}</span>
-                    <span className={`absolute right-2 top-2 rounded px-2 py-1 text-[10px] font-bold ${passed ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"}`}>{work.status || "未审核"}</span>
+                    <span className={`absolute right-2 top-2 rounded px-2 py-1 text-[10px] font-bold text-white ${passed ? "bg-emerald-500" : rejected ? "bg-rose-500" : "bg-amber-500"}`}>{work.status || "未审核"}</span>
+                    {workTab === "成片" && <span className="absolute bottom-2 left-2 rounded bg-black/65 px-2 py-1 font-mono text-[10px] text-white">{work.duration || "00:30"}</span>}
                   </div>
                   <div className="p-3">
-                    <p className="truncate text-xs font-bold text-slate-800" title={work.name}>{work.name}</p>
-                    <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400"><span>上传人：{work.author || task.assignee}</span><span>{work.createdAt || `${task.deadlineDate} 12:00`}</span></div>
+                    <p className="line-clamp-2 min-h-9 text-xs font-bold leading-[18px] text-slate-800" title={work.name}>{work.name}</p>
+                    {workTab === "成片" && <p className="mt-1 font-mono text-[10px] text-slate-400">{work.resolution || "1080p"} · {work.size || "-- MB"}</p>}
+                    <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-slate-400"><span className="truncate">上传人：{work.author || task.assignee}</span><span className="shrink-0">{work.createdAt || `${task.deadlineDate} 12:00`}</span></div>
                     <div className="mt-3 flex items-center justify-end gap-2 border-t border-slate-100 pt-2.5">
-                      <button onClick={() => onShowToast(`正在查看《${work.name}》`)} className="flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1.5 text-[11px] font-bold text-slate-600 hover:border-purple-300 hover:text-purple-700"><Eye className="h-3.5 w-3.5" />查看</button>
-                      <button onClick={() => onShowToast(`已开始下载《${work.name}》`)} className="flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1.5 text-[11px] font-bold text-slate-600 hover:border-purple-300 hover:text-purple-700"><Download className="h-3.5 w-3.5" />下载</button>
+                      <button title="查看" onClick={() => onShowToast(`正在查看《${work.name}》`)} className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700"><Eye className="h-3.5 w-3.5" /></button>
+                      <button title="下载" onClick={() => onShowToast(`已开始下载《${work.name}》`)} className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700"><Download className="h-3.5 w-3.5" /></button>
                     </div>
                   </div>
                 </article>
@@ -775,8 +817,12 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
         ) : (
           <div className="flex min-h-[170px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/40 text-center">
             <Box className="h-10 w-10 text-slate-300" />
-            <p className="mt-2 text-xs font-bold text-slate-500">{tabCounts[activeTab] > 0 ? "当前筛选条件下暂无文件" : `暂无${activeTab}文件`}</p>
-            {task.status !== "completed" && <button onClick={() => setUploadPageView(activeTab)} className="mt-3 rounded-md bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700 hover:bg-purple-100">上传{activeTab}</button>}
+            <p className="mt-2 text-xs font-bold text-slate-500">{tabCounts[activeTab] > 0 ? "当前筛选条件下暂无文件" : `暂无已提交的${activeTab}文件`}</p>
+            {tabCounts[activeTab] > 0 ? (
+              <button onClick={handleResetFilters} className="mt-3 rounded-md border border-purple-200 bg-white px-3 py-1.5 text-xs font-bold text-purple-700 hover:bg-purple-50">重置筛选</button>
+            ) : task.status !== "completed" ? (
+              <button onClick={() => setUploadPageView(activeTab)} className="mt-3 flex items-center gap-1.5 rounded-md bg-purple-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-purple-700"><Upload className="h-3.5 w-3.5" />上传任务文件</button>
+            ) : null}
           </div>
         )}
       </div>
@@ -784,9 +830,12 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
       {/* SECTION 6: 关联脚本 Section Table */}
       <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs space-y-4">
         <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-4 bg-[#7C3AED] rounded-full" />
-            <h2 className="text-sm font-extrabold text-slate-900 tracking-tight">关联脚本</h2>
+          <div className="flex items-start gap-2">
+            <div className="mt-0.5 w-1.5 h-4 bg-[#7C3AED] rounded-full" />
+            <div>
+              <h2 className="text-sm font-extrabold text-slate-900 tracking-tight">关联脚本</h2>
+              <p className="mt-1 text-[11px] text-slate-400">任务发布人提供的制作参考，不计入任务完成文件数量</p>
+            </div>
           </div>
 
           <div className="flex items-center gap-4 text-xs font-bold text-[#7C3AED]">

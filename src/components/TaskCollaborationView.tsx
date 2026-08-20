@@ -48,6 +48,13 @@ export interface AssociatedWorkItem {
   status?: string;
   author?: string;
   createdAt?: string;
+  category?: string;
+  publicTags?: string[];
+  personalTags?: string[];
+  cost?: number;
+  duration?: string;
+  resolution?: string;
+  size?: string;
 }
 
 export interface AssociatedScriptItem {
@@ -112,9 +119,9 @@ const INITIAL_TASKS: TaskItem[] = [
     cost: 360,
     associatedScript: { title: "【秋季风衣】通勤场景三版混剪", status: "可以拍摄", versionCount: 2 },
     associatedWorks: [
-      { id: "review-w-1", type: "video", name: "风衣通勤地铁版_V1.mp4", status: "待审核", author: "梁浩然", createdAt: "2026-08-20 09:18", coverUrl: "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=480&auto=format&fit=crop&q=80" },
-      { id: "review-w-2", type: "video", name: "风衣办公室版_V2.mp4", status: "未审核", author: "梁浩然", createdAt: "2026-08-20 10:06", coverUrl: "https://images.unsplash.com/photo-1551028719-00167b16eac5?w=480&auto=format&fit=crop&q=80" },
-      { id: "review-w-3", type: "video", name: "风衣面料防风细节版_V3.mp4", status: "已通过", author: "梁浩然", createdAt: "2026-08-20 10:32", coverUrl: "https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?w=480&auto=format&fit=crop&q=80" }
+      { id: "review-w-1", type: "video", name: "风衣通勤地铁版_V1.mp4", status: "待审核", author: "梁浩然", createdAt: "2026-08-20 09:18", category: "女装", publicTags: ["场景", "产品名称"], personalTags: ["通勤系列"], duration: "00:29", resolution: "1080p", size: "32.4 MB", coverUrl: "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=480&auto=format&fit=crop&q=80" },
+      { id: "review-w-2", type: "video", name: "风衣办公室版_V2.mp4", status: "未审核", author: "梁浩然", createdAt: "2026-08-20 10:06", category: "女装", publicTags: ["场景", "模特姓名"], duration: "00:32", resolution: "1080p", size: "35.8 MB", coverUrl: "https://images.unsplash.com/photo-1551028719-00167b16eac5?w=480&auto=format&fit=crop&q=80" },
+      { id: "review-w-3", type: "video", name: "风衣面料防风细节版_V3.mp4", status: "已通过", author: "梁浩然", createdAt: "2026-08-20 10:32", category: "女装", publicTags: ["产品名称", "爆款视频"], personalTags: ["重点验收"], duration: "00:24", resolution: "2K", size: "41.6 MB", coverUrl: "https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?w=480&auto=format&fit=crop&q=80" }
     ],
     product: "秋季通勤风衣",
     scriptType: "场景混剪",
