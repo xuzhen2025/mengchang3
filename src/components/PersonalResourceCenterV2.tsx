@@ -25,6 +25,7 @@ import { Asset } from "../types";
 
 export const FAVORITES_KEY = "cloud_video_personal_favorites_v1";
 export const PERSONAL_TAGS_KEY = "cloud_video_personal_tags_v1";
+export const PERSONAL_TAG_GROUPS_KEY = "cloud_video_personal_tag_groups_v1";
 export const TASK_BINDINGS_KEY = "cloud_video_task_resource_bindings_v1";
 
 export interface TaskResourceBinding {
@@ -54,6 +55,12 @@ interface PersonalTagItem {
   name: string;
   color: string;
   resourceIds: string[];
+}
+
+interface PersonalTagGroup {
+  id: string;
+  name: string;
+  tagIds: string[];
 }
 
 interface PersonalResourceCenterProps {
@@ -135,6 +142,23 @@ const TASK_UPLOAD_ASSETS: PersonalAsset[] = [
 
 const RESOURCE_CATEGORIES: Array<"全部" | ResourceCategory> = ["全部", "成片", "素材", "图片", "音频", "脚本"];
 
+const DEFAULT_PERSONAL_TAGS: PersonalTagItem[] = [
+  { id: "pt-1", name: "本周主推", color: "#7c3aed", resourceIds: ["a1", "a4"] },
+  { id: "pt-2", name: "待二创", color: "#0284c7", resourceIds: ["a3"] },
+  { id: "pt-3", name: "高转化备选", color: "#059669", resourceIds: ["task-upload-110321101"] },
+  { id: "pt-4", name: "七夕礼赠", color: "#e11d48", resourceIds: ["a4"] },
+  { id: "pt-5", name: "美妆项目", color: "#0891b2", resourceIds: ["a1", "a7"] },
+  { id: "pt-6", name: "已交付", color: "#16a34a", resourceIds: ["task-upload-110321101", "task-upload-110321104"] },
+  { id: "pt-7", name: "需补充素材", color: "#d97706", resourceIds: ["task-upload-110321102"] },
+  { id: "pt-8", name: "口播专项", color: "#4f46e5", resourceIds: ["a6", "task-upload-110321103"] }
+];
+
+const DEFAULT_PERSONAL_TAG_GROUPS: PersonalTagGroup[] = [
+  { id: "ptg-1", name: "内容排期", tagIds: ["pt-1", "pt-2", "pt-4"] },
+  { id: "ptg-2", name: "转化价值", tagIds: ["pt-3", "pt-7"] },
+  { id: "ptg-3", name: "项目归档", tagIds: ["pt-5", "pt-6", "pt-8"] }
+];
+
 const SOURCE_META: Record<ResourceSource, { label: string; className: string; icon: React.ElementType }> = {
   resource_library: { label: "资源库上传", className: "border-sky-200 bg-sky-50 text-sky-700", icon: Library },
   task_collaboration: { label: "任务协作上传", className: "border-amber-200 bg-amber-50 text-amber-700", icon: BriefcaseBusiness },
@@ -185,14 +209,21 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name">("newest");
   const [favoriteIds, setFavoriteIds] = useState<string[]>(() => loadJson(FAVORITES_KEY, ["a1", "a4"]));
   const [bindings, setBindings] = useState<TaskResourceBinding[]>(() => loadJson(TASK_BINDINGS_KEY, []));
-  const [tags, setTags] = useState<PersonalTagItem[]>(() => loadJson(PERSONAL_TAGS_KEY, [
-    { id: "pt-1", name: "本周主推", color: "#7c3aed", resourceIds: ["a1", "a4"] },
-    { id: "pt-2", name: "待二创", color: "#0284c7", resourceIds: ["a3"] },
-    { id: "pt-3", name: "高转化备选", color: "#059669", resourceIds: ["task-upload-110321101"] }
-  ]));
+  const [tags, setTags] = useState<PersonalTagItem[]>(() => {
+    const stored = loadJson<PersonalTagItem[]>(PERSONAL_TAGS_KEY, []);
+    return Array.from(new Map([...DEFAULT_PERSONAL_TAGS, ...stored].map((tagItem) => [tagItem.id, tagItem])).values());
+  });
+  const [tagGroups, setTagGroups] = useState<PersonalTagGroup[]>(() => loadJson(PERSONAL_TAG_GROUPS_KEY, DEFAULT_PERSONAL_TAG_GROUPS));
+  const [selectedTagGroupId, setSelectedTagGroupId] = useState("ptg-1");
+  const [groupSearch, setGroupSearch] = useState("");
+  const [tagSearch, setTagSearch] = useState("");
+  const [newGroupName, setNewGroupName] = useState("");
   const [newTagName, setNewTagName] = useState("");
-  const [editingTagId, setEditingTagId] = useState<string | null>(null);
-  const [editingTagName, setEditingTagName] = useState("");
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [editingGroupName, setEditingGroupName] = useState("");
+  const [showAddTagModal, setShowAddTagModal] = useState(false);
+  const [tagSelectMode, setTagSelectMode] = useState(false);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [bindingAsset, setBindingAsset] = useState<PersonalAsset | null>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [taggingAsset, setTaggingAsset] = useState<PersonalAsset | null>(null);
@@ -207,6 +238,11 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
 
   const categoryOptions = useMemo(() => Array.from(new Set(personalAssets.map((asset) => asset.category).filter(Boolean) as string[])).sort(), [personalAssets]);
   const publicTagOptions = useMemo(() => Array.from(new Set(personalAssets.flatMap((asset) => asset.publicTags))).sort(), [personalAssets]);
+  const selectedTagGroup = tagGroups.find((group) => group.id === selectedTagGroupId) || tagGroups[0];
+  const filteredTagGroups = tagGroups.filter((group) => group.name.toLowerCase().includes(groupSearch.trim().toLowerCase()));
+  const visibleGroupTags = tags.filter((tagItem) =>
+    selectedTagGroup?.tagIds.includes(tagItem.id) && tagItem.name.toLowerCase().includes(tagSearch.trim().toLowerCase())
+  );
 
   const filteredAssets = useMemo(() => personalAssets
     .filter((asset) => {
@@ -237,6 +273,63 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
   const persistTags = (next: PersonalTagItem[]) => {
     setTags(next);
     window.localStorage.setItem(PERSONAL_TAGS_KEY, JSON.stringify(next));
+  };
+
+  const persistTagGroups = (next: PersonalTagGroup[]) => {
+    setTagGroups(next);
+    window.localStorage.setItem(PERSONAL_TAG_GROUPS_KEY, JSON.stringify(next));
+  };
+
+  const addTagGroup = () => {
+    const name = newGroupName.trim();
+    if (!name) return;
+    const group: PersonalTagGroup = { id: `ptg-${Date.now()}`, name, tagIds: [] };
+    persistTagGroups([...tagGroups, group]);
+    setSelectedTagGroupId(group.id);
+    setNewGroupName("");
+    onToast(`个人标签组“${name}”已创建`);
+  };
+
+  const saveTagGroupName = (groupId: string) => {
+    const name = editingGroupName.trim();
+    if (!name) return;
+    persistTagGroups(tagGroups.map((group) => group.id === groupId ? { ...group, name } : group));
+    setEditingGroupId(null);
+    onToast("标签组名称已更新");
+  };
+
+  const deleteTagGroup = (group: PersonalTagGroup) => {
+    if (!window.confirm(`删除标签组“${group.name}”及组内标签？已标记资源不会被删除。`)) return;
+    persistTags(tags.filter((tagItem) => !group.tagIds.includes(tagItem.id)));
+    const next = tagGroups.filter((item) => item.id !== group.id);
+    persistTagGroups(next);
+    setSelectedTagGroupId(next[0]?.id || "");
+    setSelectedTagIds([]);
+    onToast(`标签组“${group.name}”已删除`);
+  };
+
+  const addTagToCurrentGroup = () => {
+    const name = newTagName.trim();
+    if (!name || !selectedTagGroup) return;
+    const tagItem: PersonalTagItem = {
+      id: `pt-${Date.now()}`,
+      name,
+      color: ["#7c3aed", "#0284c7", "#059669", "#e11d48", "#d97706"][tags.length % 5],
+      resourceIds: []
+    };
+    persistTags([...tags, tagItem]);
+    persistTagGroups(tagGroups.map((group) => group.id === selectedTagGroup.id ? { ...group, tagIds: [...group.tagIds, tagItem.id] } : group));
+    setNewTagName("");
+    setShowAddTagModal(false);
+    onToast(`个人标签“${name}”已新增`);
+  };
+
+  const removePersonalTags = (tagIds: string[]) => {
+    if (tagIds.length === 0) return;
+    persistTags(tags.filter((tagItem) => !tagIds.includes(tagItem.id)));
+    persistTagGroups(tagGroups.map((group) => ({ ...group, tagIds: group.tagIds.filter((id) => !tagIds.includes(id)) })));
+    setSelectedTagIds([]);
+    onToast(`已删除 ${tagIds.length} 个个人标签，资源本身未受影响`);
   };
 
   const resetFilters = () => {
@@ -296,43 +389,68 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
 
   if (mode === "personal_tags") {
     return (
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
-          <div><h2 className="text-base font-bold text-slate-900">个人标签管理</h2><p className="mt-1 text-xs text-slate-500">管理仅自己可见的资源标签</p></div>
-          <div className="flex items-center gap-2">
-            <input value={newTagName} onChange={(event) => setNewTagName(event.target.value)} placeholder="输入标签名称" className="w-44 rounded-md border border-slate-200 px-3 py-2 text-xs outline-none focus:border-violet-400" />
-            <button type="button" onClick={() => { const name = newTagName.trim(); if (!name) return; persistTags([...tags, { id: `pt-${Date.now()}`, name, color: ["#7c3aed", "#0284c7", "#059669", "#e11d48"][tags.length % 4], resourceIds: [] }]); setNewTagName(""); onToast("个人标签已创建"); }} className="flex items-center gap-1 rounded-md bg-violet-600 px-3 py-2 text-xs font-semibold text-white"><Plus className="h-3.5 w-3.5" />新建标签</button>
+      <div className="flex min-h-[560px] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs" style={{ height: "calc(100vh - 160px)" }}>
+        <aside className="flex w-72 shrink-0 flex-col border-r border-slate-200 bg-white xl:w-80">
+          <div className="space-y-3 border-b border-slate-200 p-4">
+            <div className="flex gap-2">
+              <input value={newGroupName} onChange={(event) => setNewGroupName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addTagGroup(); }} placeholder="请输入标签组名称" className="min-w-0 flex-1 rounded-md border border-slate-200 px-3 py-2 text-xs outline-none focus:border-violet-400" />
+              <button type="button" onClick={addTagGroup} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-bold text-white hover:bg-violet-700">添加</button>
+            </div>
+            <div className="relative"><Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" /><input value={groupSearch} onChange={(event) => setGroupSearch(event.target.value)} placeholder="筛选已有标签组" className="w-full rounded-md border border-slate-200 py-2 pl-8 pr-3 text-xs outline-none focus:border-violet-400" /></div>
           </div>
-        </div>
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-500"><tr><th className="px-4 py-3">标签名称</th><th className="px-4 py-3">已标记资源</th><th className="px-4 py-3">创建人</th><th className="px-4 py-3 text-right">操作</th></tr></thead>
-            <tbody className="divide-y divide-slate-100">
-              {tags.map((tagItem) => <tr key={tagItem.id}>
-                <td className="px-4 py-3">{editingTagId === tagItem.id ? <input autoFocus value={editingTagName} onChange={(event) => setEditingTagName(event.target.value)} className="rounded border border-violet-300 px-2 py-1 outline-none" /> : <span className="flex items-center gap-2 font-semibold text-slate-800"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: tagItem.color }} />{tagItem.name}</span>}</td>
-                <td className="px-4 py-3 text-slate-500">{tagItem.resourceIds.length} 个</td><td className="px-4 py-3 text-slate-500">{CURRENT_USER}（个人）</td>
-                <td className="px-4 py-3"><div className="flex justify-end gap-1">{editingTagId === tagItem.id ? <button type="button" title="保存" onClick={() => { const value = editingTagName.trim(); if (value) persistTags(tags.map((item) => item.id === tagItem.id ? { ...item, name: value } : item)); setEditingTagId(null); }} className="rounded p-1.5 text-emerald-600 hover:bg-emerald-50"><Check className="h-4 w-4" /></button> : <button type="button" title="编辑" onClick={() => { setEditingTagId(tagItem.id); setEditingTagName(tagItem.name); }} className="rounded p-1.5 text-slate-500 hover:bg-slate-100"><Edit3 className="h-4 w-4" /></button>}<button type="button" title="删除" onClick={() => { if (window.confirm(`删除个人标签“${tagItem.name}”？资源本身不会被删除。`)) persistTags(tags.filter((item) => item.id !== tagItem.id)); }} className="rounded p-1.5 text-rose-500 hover:bg-rose-50"><Trash2 className="h-4 w-4" /></button></div></td>
-              </tr>)}
-            </tbody>
-          </table>
-        </div>
+
+          <div className="flex-1 overflow-y-auto py-2">
+            {filteredTagGroups.map((group) => {
+              const groupTags = tags.filter((tagItem) => group.tagIds.includes(tagItem.id));
+              const markedResources = new Set(groupTags.flatMap((tagItem) => tagItem.resourceIds)).size;
+              const active = selectedTagGroup?.id === group.id;
+              return <div key={group.id} onClick={() => { setSelectedTagGroupId(group.id); setTagSearch(""); setSelectedTagIds([]); }} className={`group flex min-h-16 cursor-pointer items-center gap-2 border-l-4 px-4 py-3 transition-colors ${active ? "border-violet-600 bg-violet-50/70" : "border-transparent hover:bg-slate-50"}`}>
+                <div className="min-w-0 flex-1">
+                  {editingGroupId === group.id ? <input autoFocus value={editingGroupName} onClick={(event) => event.stopPropagation()} onChange={(event) => setEditingGroupName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") saveTagGroupName(group.id); }} className="w-full rounded border border-violet-300 bg-white px-2 py-1 text-xs font-semibold outline-none" /> : <div className="flex items-center gap-1.5"><span className={`truncate text-xs font-bold ${active ? "text-violet-700" : "text-slate-800"}`}>{group.name} ({groupTags.length})</span><span className="text-[10px] text-slate-400">{markedResources} 个资源</span></div>}
+                  <div className="mt-1.5 flex gap-1">{[["成", "bg-violet-500"], ["素", "bg-cyan-500"], ["图", "bg-emerald-500"], ["音", "bg-amber-500"], ["脚", "bg-blue-500"]].map(([label, color]) => <span key={label} className={`flex h-4 w-4 items-center justify-center rounded-sm text-[9px] font-bold text-white ${color}`}>{label}</span>)}</div>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {editingGroupId === group.id ? <><button type="button" title="保存" onClick={(event) => { event.stopPropagation(); saveTagGroupName(group.id); }} className="rounded p-1.5 text-emerald-600 hover:bg-emerald-50"><Check className="h-4 w-4" /></button><button type="button" title="取消" onClick={(event) => { event.stopPropagation(); setEditingGroupId(null); }} className="rounded p-1.5 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></> : <button type="button" title="修改标签组" onClick={(event) => { event.stopPropagation(); setEditingGroupId(group.id); setEditingGroupName(group.name); }} className="rounded p-1.5 text-violet-500 hover:bg-violet-100"><Edit3 className="h-4 w-4" /></button>}
+                  <button type="button" title="删除标签组" onClick={(event) => { event.stopPropagation(); deleteTagGroup(group); }} className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-500"><Trash2 className="h-4 w-4" /></button>
+                </div>
+              </div>;
+            })}
+          </div>
+        </aside>
+
+        <section className="flex min-w-0 flex-1 flex-col">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" disabled={!selectedTagGroup} onClick={() => setShowAddTagModal(true)} className="flex items-center gap-1 rounded-md bg-violet-600 px-4 py-2 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-40"><Plus className="h-3.5 w-3.5" />新增</button>
+              <button type="button" onClick={() => { setTagSelectMode(!tagSelectMode); setSelectedTagIds([]); }} className="rounded-md border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">{tagSelectMode ? "取消选择" : "选择"}</button>
+              <label className="flex cursor-pointer items-center gap-2 px-1 text-xs font-semibold text-slate-600"><input type="checkbox" disabled={!tagSelectMode || visibleGroupTags.length === 0} checked={tagSelectMode && visibleGroupTags.length > 0 && visibleGroupTags.every((tagItem) => selectedTagIds.includes(tagItem.id))} onChange={(event) => setSelectedTagIds(event.target.checked ? visibleGroupTags.map((tagItem) => tagItem.id) : [])} />选中本页</label>
+              <button type="button" disabled={!selectedTagGroup} onClick={() => { if (selectedTagGroup) { setEditingGroupId(selectedTagGroup.id); setEditingGroupName(selectedTagGroup.name); } }} className="rounded-md border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40">修改标签组</button>
+              {selectedTagIds.length > 0 && <button type="button" onClick={() => { if (window.confirm(`删除选中的 ${selectedTagIds.length} 个个人标签？`)) removePersonalTags(selectedTagIds); }} className="rounded-md border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-600">批量删除 ({selectedTagIds.length})</button>}
+            </div>
+            <div className="relative w-64"><Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" /><input value={tagSearch} onChange={(event) => setTagSearch(event.target.value)} placeholder="请输入标签名称进行搜索" className="w-full rounded-md border border-slate-200 py-2 pl-8 pr-3 text-xs outline-none focus:border-violet-400" /></div>
+          </div>
+
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3 text-xs"><strong className="text-slate-900">{selectedTagGroup?.name || "暂无标签组"}</strong><span className="text-slate-400">共 {visibleGroupTags.length} 个标签</span></div>
+          <div className="flex flex-1 content-start flex-wrap gap-3 overflow-y-auto p-5">
+            {visibleGroupTags.map((tagItem) => {
+              const selected = selectedTagIds.includes(tagItem.id);
+              return <button type="button" key={tagItem.id} onClick={() => { if (tagSelectMode) setSelectedTagIds((prev) => selected ? prev.filter((id) => id !== tagItem.id) : [...prev, tagItem.id]); }} className={`flex h-11 min-w-36 items-center justify-between gap-3 rounded-md border px-4 text-xs font-semibold transition-colors ${selected ? "border-violet-500 bg-violet-50 text-violet-700" : "border-slate-200 bg-slate-50 text-slate-700 hover:border-violet-300"}`}>
+                <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: tagItem.color }} />{tagItem.name}<span className="font-normal text-slate-400">{tagItem.resourceIds.length}</span></span>
+                {tagSelectMode ? <span className={`flex h-4 w-4 items-center justify-center rounded border ${selected ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300 bg-white"}`}>{selected && <Check className="h-3 w-3" />}</span> : <span title="删除标签" onClick={(event) => { event.stopPropagation(); if (window.confirm(`删除个人标签“${tagItem.name}”？`)) removePersonalTags([tagItem.id]); }} className="rounded p-0.5 text-slate-400 hover:bg-white hover:text-rose-500"><X className="h-3.5 w-3.5" /></span>}
+              </button>;
+            })}
+            {selectedTagGroup && visibleGroupTags.length === 0 && <div className="flex w-full flex-col items-center justify-center py-20 text-xs text-slate-400"><Tag className="mb-2 h-8 w-8 text-slate-300" />暂无符合条件的个人标签</div>}
+          </div>
+        </section>
+
+        {showAddTagModal && <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/50 p-4"><div className="w-full max-w-sm rounded-lg bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><div><h3 className="text-sm font-bold text-slate-900">新增个人标签</h3><p className="mt-1 text-xs text-slate-500">添加到“{selectedTagGroup?.name}”</p></div><button type="button" title="关闭" onClick={() => setShowAddTagModal(false)}><X className="h-5 w-5 text-slate-400" /></button></div><div className="p-5"><label className="text-xs font-semibold text-slate-600">标签名称</label><input autoFocus value={newTagName} onChange={(event) => setNewTagName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addTagToCurrentGroup(); }} placeholder="请输入标签名称" className="mt-2 w-full rounded-md border border-slate-200 px-3 py-2.5 text-xs outline-none focus:border-violet-400" /></div><div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4"><button type="button" onClick={() => setShowAddTagModal(false)} className="rounded-md border border-slate-200 px-4 py-2 text-xs text-slate-600">取消</button><button type="button" onClick={addTagToCurrentGroup} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white">确认新增</button></div></div></div>}
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <h2 className="text-base font-bold text-slate-900">{mode === "favorites" ? "我的收藏" : "我的资源"}</h2>
-          <p className="mt-1 text-xs text-slate-500">{mode === "favorites" ? "已收藏的资源内容" : "资源库上传、任务协作上传与 AI 生成的个人资源"}</p>
-        </div>
-        <div className="flex items-center gap-5 text-xs">
-          <div><span className="text-slate-400">资源总数</span><strong className="ml-2 font-mono text-base text-slate-800">{personalAssets.length}</strong></div>
-          <div><span className="text-slate-400">任务文件</span><strong className="ml-2 font-mono text-base text-amber-600">{personalAssets.filter((asset) => asset.source === "task_collaboration").length}</strong></div>
-          <div><span className="text-slate-400">已绑定任务</span><strong className="ml-2 font-mono text-base text-violet-600">{new Set(bindings.map((item) => item.taskId)).size}</strong></div>
-        </div>
-      </div>
+      {mode === "favorites" && <div className="border-b border-slate-200 pb-3"><h2 className="text-sm font-bold text-slate-900">我的收藏</h2><p className="mt-1 text-xs text-slate-500">已收藏的资源内容</p></div>}
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-xs" aria-label="资源筛选">
         <div className="flex flex-col gap-3">
@@ -370,7 +488,7 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
           <SlidersHorizontal className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-2 text-xs font-semibold text-slate-500">暂无符合条件的资源</p><button type="button" onClick={resetFilters} className="mt-3 text-xs font-semibold text-violet-600 hover:text-violet-700">清除筛选条件</button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
           {filteredAssets.map((asset) => {
             const categoryMeta = CATEGORY_META[asset.resourceCategory];
             const sourceMeta = SOURCE_META[asset.source];
@@ -380,33 +498,32 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
             const bindingCount = new Set(bindings.filter((binding) => binding.resourceId === asset.id).map((binding) => binding.taskId)).size;
             const isVisual = asset.resourceCategory === "成片" || asset.resourceCategory === "素材" || asset.resourceCategory === "图片";
             return (
-              <article key={asset.id} className="group overflow-hidden rounded-lg border border-slate-200 bg-white transition-colors hover:border-slate-300">
-                <div className="relative flex aspect-[16/10] items-center justify-center overflow-hidden bg-slate-100">
-                  {isVisual && (asset.coverUrl || asset.type === "image") ? <img src={asset.coverUrl || asset.url} alt={asset.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : asset.resourceCategory === "音频" ? <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-white"><Music className="h-9 w-9 text-blue-500" /><div className="mt-4 flex h-8 items-end gap-1">{[14, 24, 18, 30, 20, 26, 16, 28, 22, 12].map((height, index) => <span key={index} className="w-1 rounded-sm bg-blue-300" style={{ height }} />)}</div></div> : <div className="flex h-full w-full flex-col items-center justify-center bg-amber-50/60 px-6 text-center"><FileText className="h-9 w-9 text-amber-500" /><p className="mt-3 line-clamp-2 text-xs font-semibold leading-5 text-amber-900">{asset.name.replace(/\.[^.]+$/, "")}</p></div>}
+              <article key={asset.id} className="group overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs transition-all hover:border-violet-200 hover:shadow-md">
+                <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-slate-100">
+                  {isVisual && (asset.coverUrl || asset.type === "image") ? <img src={asset.coverUrl || asset.url} alt={asset.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" referrerPolicy="no-referrer" /> : asset.resourceCategory === "音频" ? <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-white"><Music className="h-8 w-8 text-blue-500" /><div className="mt-3 flex h-7 items-end gap-1">{[12, 22, 16, 27, 18, 24, 14, 25, 20, 10].map((height, index) => <span key={index} className="w-1 rounded-sm bg-blue-300" style={{ height }} />)}</div></div> : <div className="flex h-full w-full flex-col items-center justify-center bg-amber-50/60 px-5 text-center"><FileText className="h-8 w-8 text-amber-500" /><p className="mt-2 line-clamp-2 text-[11px] font-semibold leading-4 text-amber-900">{asset.name.replace(/\.[^.]+$/, "")}</p></div>}
                   <span className={`absolute left-0 top-0 flex items-center gap-1 rounded-br-md px-2.5 py-1 text-[11px] font-bold ${categoryMeta.className}`}><TypeIcon className="h-3 w-3" />{asset.resourceCategory}</span>
                   <span className={`absolute right-2 top-2 flex items-center gap-1 rounded border px-2 py-1 text-[10px] font-semibold ${sourceMeta.className}`}><SourceIcon className="h-3 w-3" />{sourceMeta.label}</span>
                   {asset.status && <span className="absolute bottom-2 left-2 rounded bg-slate-950/70 px-2 py-1 text-[10px] font-semibold text-white">{asset.status}</span>}
                 </div>
 
-                <div className="p-3">
+                <div className="p-2.5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0"><h3 className="truncate text-xs font-bold text-slate-900" title={asset.name}>{asset.name}</h3><p className="mt-1 truncate font-mono text-[10px] text-slate-400">ID: {asset.id}</p></div>
                     <button type="button" title={favoriteIds.includes(asset.id) ? "取消收藏" : "收藏"} onClick={() => toggleFavorite(asset)} className={`shrink-0 rounded p-1.5 ${favoriteIds.includes(asset.id) ? "bg-amber-50 text-amber-600" : "text-slate-400 hover:bg-slate-100"}`}><Bookmark className="h-4 w-4" fill={favoriteIds.includes(asset.id) ? "currentColor" : "none"} /></button>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap gap-1.5">
+                  <div className="mt-2 flex min-h-11 content-start flex-wrap gap-1">
                     <span className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-600">分类：{asset.category || "未分类"}</span>
-                    {asset.publicTags.map((tagName) => <span key={tagName} className="rounded border border-sky-100 bg-sky-50 px-2 py-0.5 text-[10px] text-sky-700">{tagName}</span>)}
-                    {assetTags.map((tagItem) => <span key={tagItem.id} className="rounded px-2 py-0.5 text-[10px] text-white" style={{ backgroundColor: tagItem.color }}>{tagItem.name}</span>)}
+                    {asset.publicTags.slice(0, 3).map((tagName) => <span key={tagName} className="rounded border border-sky-100 bg-sky-50 px-2 py-0.5 text-[10px] text-sky-700">{tagName}</span>)}
+                    {assetTags.slice(0, 1).map((tagItem) => <span key={tagItem.id} className="rounded px-2 py-0.5 text-[10px] text-white" style={{ backgroundColor: tagItem.color }}>{tagItem.name}</span>)}
                   </div>
 
-                  <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5 text-[10px] text-slate-400">
-                    <span>{asset.creator} · {asset.size}</span><span>{asset.createdAt}</span>
+                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-slate-100 pt-2 text-[10px] text-slate-400">
+                    <span className="truncate">{asset.creator} · {asset.size}</span><span className="shrink-0" title={asset.createdAt}>{asset.createdAt.slice(0, 10)}</span>
                   </div>
-                  {asset.sourceTaskId && <p className="mt-2 truncate rounded bg-amber-50 px-2 py-1.5 text-[10px] text-amber-700">来源任务：{asset.sourceTaskId}</p>}
-                  {bindingCount > 0 && <p className="mt-2 text-[10px] font-semibold text-violet-600">已绑定 {bindingCount} 个协作任务</p>}
+                  {(asset.sourceTaskId || bindingCount > 0) && <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px]"><span className="truncate text-amber-700">{asset.sourceTaskId ? `任务 ${asset.sourceTaskId}` : ""}</span>{bindingCount > 0 && <span className="shrink-0 font-semibold text-violet-600">已绑定 {bindingCount}</span>}</div>}
 
-                  <div className="mt-3 flex items-center gap-1.5">
+                  <div className="mt-2 flex items-center gap-1.5">
                     <button type="button" title="下载" onClick={() => downloadAsset(asset)} className="rounded border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50"><Download className="h-3.5 w-3.5" /></button>
                     <button type="button" title="复制详情链接" onClick={() => copyDetailLink(asset)} className="rounded border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50"><Link2 className="h-3.5 w-3.5" /></button>
                     <button type="button" title="设置个人标签" onClick={() => setTaggingAsset(asset)} className="rounded border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50"><Tag className="h-3.5 w-3.5" /></button>

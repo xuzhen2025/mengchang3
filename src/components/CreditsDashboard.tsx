@@ -148,7 +148,7 @@ export default function CreditsDashboard({
         </div>
       )}
 
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className="mx-auto w-full max-w-none space-y-6">
         {/* Header Title Bar */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
