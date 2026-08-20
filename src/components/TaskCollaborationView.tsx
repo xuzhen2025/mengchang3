@@ -169,6 +169,19 @@ const COMPLETED_REPAIR_CREAM_WORKS: AssociatedWorkItem[] = [
   createTaskVideo("cream-w-10", "110329310", "修护霜对比成片_终版.mp4", "王剪辑", "2026-06-23 18:16", { status: "已通过", category: "美妆护肤" })
 ];
 
+const getTaskResultWorks = (task: TaskItem): AssociatedWorkItem[] =>
+  task.status === "completed" && task.completionSnapshot?.length
+    ? task.completionSnapshot
+    : task.associatedWorks || [];
+
+const getWorkTypeMeta = (type: AssociatedWorkItem["type"]) => {
+  if (type === "video" || type === "成片") return { label: "成", className: "bg-purple-600" };
+  if (type === "素材") return { label: "素", className: "bg-cyan-600" };
+  if (type === "image" || type === "图片") return { label: "图", className: "bg-emerald-600" };
+  if (type === "text") return { label: "脚", className: "bg-amber-600" };
+  return { label: "音", className: "bg-blue-600" };
+};
+
 const INITIAL_TASKS: TaskItem[] = [
   {
     id: "08201150318",
@@ -1966,7 +1979,7 @@ export default function TaskCollaborationView({
         selectedWorkTypeFilter === "关联文案" ? "text" :
         selectedWorkTypeFilter === "关联音频" ? "audio" : null;
       if (targetType) {
-        if (!task.associatedWorks || !task.associatedWorks.some(w => w.type === targetType)) {
+        if (!getTaskResultWorks(task).some(w => w.type === targetType)) {
           return false;
         }
       }
@@ -3154,38 +3167,38 @@ export default function TaskCollaborationView({
                     <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap relative">
                       <div className="flex items-center justify-center gap-2">
                         {/* Display existing associated works */}
-                        {task.associatedWorks && task.associatedWorks.length > 0 && (
+                        {getTaskResultWorks(task).length > 0 && (
                           (() => {
+                            const taskResultWorks = getTaskResultWorks(task);
                             const scripts = task.associatedScripts && task.associatedScripts.length > 0
                               ? task.associatedScripts
                               : (task.associatedScript ? [task.associatedScript] : []);
-                            const worksCount = task.associatedWorks.length;
+                            const worksCount = taskResultWorks.length;
                             const scriptsCount = scripts.length;
                             const canExpand = worksCount > 1 || scriptsCount > 1;
                             const isExpanded = canExpand && expandedTaskIds.has(task.id);
-                            const worksToDisplay = isExpanded ? task.associatedWorks : [task.associatedWorks[0]];
+                            const worksToDisplay = isExpanded ? taskResultWorks : [taskResultWorks[0]];
 
                             return (
                               <div className={isExpanded ? "flex flex-col gap-1.5 items-start text-left py-1" : "flex items-center gap-1.5"}>
-                                {worksToDisplay.map((work) => (
-                                  <div key={work.id} className="flex items-center gap-1 bg-purple-50/80 border border-purple-100 rounded-md px-1.5 py-0.5 text-[11px] max-w-[180px]">
-                                    <span className={`px-1 py-0.2 rounded text-[10px] font-extrabold text-white shrink-0 ${
-                                      work.type === 'video' ? 'bg-purple-600' :
-                                      work.type === 'image' ? 'bg-emerald-600' :
-                                      work.type === 'text' ? 'bg-amber-600' : 'bg-blue-600'
-                                    }`}>
-                                      {work.type === 'video' ? '素' : work.type === 'image' ? '图' : work.type === 'text' ? '文' : '音'}
-                                    </span>
-                                    <span className="font-medium text-slate-700 truncate max-w-[100px]" title={work.name}>
-                                      {work.name}
-                                    </span>
-                                    {work.status && (
-                                      <span className="px-1 py-0.2 bg-[#FF5722] text-white text-[9px] font-bold rounded shrink-0">
-                                        {work.status}
+                                {worksToDisplay.map((work) => {
+                                  const typeMeta = getWorkTypeMeta(work.type);
+                                  return (
+                                    <div key={work.id} className="flex items-center gap-1 bg-purple-50/80 border border-purple-100 rounded-md px-1.5 py-0.5 text-[11px] max-w-[180px]">
+                                      <span className={`px-1 py-0.2 rounded text-[10px] font-extrabold text-white shrink-0 ${typeMeta.className}`}>
+                                        {typeMeta.label}
                                       </span>
-                                    )}
-                                  </div>
-                                ))}
+                                      <span className="font-medium text-slate-700 truncate max-w-[100px]" title={work.name}>
+                                        {work.name}
+                                      </span>
+                                      {work.status && (
+                                        <span className="px-1 py-0.2 bg-[#FF5722] text-white text-[9px] font-bold rounded shrink-0">
+                                          {work.status}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             );
                           })()
@@ -3194,12 +3207,18 @@ export default function TaskCollaborationView({
                         {/* Plus Button with Dropdown Popover */}
                         <div className="relative inline-block">
                           <button
+                            disabled={task.status === "completed"}
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (task.status === "completed") return;
                               setOpenWorkPopoverTaskId(openWorkPopoverTaskId === task.id ? null : task.id);
                             }}
-                            className="w-6 h-6 rounded-md bg-[#7C3AED] hover:bg-purple-700 text-white flex items-center justify-center cursor-pointer transition-all active:scale-90"
-                            title="添加关联作品"
+                            className={`w-6 h-6 rounded-md flex items-center justify-center transition-all ${
+                              task.status === "completed"
+                                ? "bg-slate-100 text-slate-300 cursor-not-allowed"
+                                : "bg-[#7C3AED] hover:bg-purple-700 text-white cursor-pointer active:scale-90"
+                            }`}
+                            title={task.status === "completed" ? "已完成任务已保存成果快照，不可修改" : "添加任务文件"}
                           >
                             <Plus className="w-4 h-4" />
                           </button>
@@ -3248,7 +3267,7 @@ export default function TaskCollaborationView({
                         const scripts = task.associatedScripts && task.associatedScripts.length > 0
                           ? task.associatedScripts
                           : (task.associatedScript ? [task.associatedScript] : []);
-                        const worksCount = task.associatedWorks ? task.associatedWorks.length : 0;
+                        const worksCount = getTaskResultWorks(task).length;
                         const scriptsCount = scripts.length;
                         const canExpand = worksCount > 1 || scriptsCount > 1;
                         const isExpanded = canExpand && expandedTaskIds.has(task.id);
@@ -3333,7 +3352,7 @@ export default function TaskCollaborationView({
                                     canExpand
                                       ? isExpanded
                                         ? "收起"
-                                        : "展开已关联数据"
+                                        : "展开全部任务文件与关联脚本"
                                       : "暂无多条关联内容，不可展开"
                                   }
                                 >
@@ -3345,7 +3364,7 @@ export default function TaskCollaborationView({
                                 </button>
                                 {canExpand && (
                                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/expand:flex items-center gap-1 z-50 bg-slate-800 text-white text-[10px] py-1 px-2 rounded-md whitespace-nowrap shadow-md pointer-events-none">
-                                    <span>{isExpanded ? "收起" : "展开已关联数据"}</span>
+                                    <span>{isExpanded ? "收起" : "展开全部任务文件与关联脚本"}</span>
                                     <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
                                   </div>
                                 )}
