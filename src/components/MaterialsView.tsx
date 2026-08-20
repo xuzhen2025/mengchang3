@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { PublicTagFilter } from "./PublicTagFilter";
 import FinishedVideoDetailModal from "./FinishedVideoDetailModal";
 import { Pagination } from "./Pagination";
-import ResourceLibraryItem from "./ResourceLibraryItem";
 import { ResourceSearchIntent } from "../types";
 import ResourceSearchCondition from "./ResourceSearchCondition";
 import { 
@@ -1816,44 +1815,6 @@ export default function MaterialsView({ onTriggerTask, onNavigateToDelivery, onD
           >
             重置所有筛选条件
           </button>
-        </div>
-      ) : viewMode === "grid" ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5">
-          {paginatedVideos.map((video) => (
-            <ResourceLibraryItem
-              key={video.id}
-              item={{
-                id: video.id,
-                numericId: video.numericId,
-                type: "素材",
-                title: video.title,
-                coverUrl: video.coverUrl,
-                status: video.status,
-                author: video.author?.replace(/ \(.*\)/, "") || "刘弯",
-                time: video.relativeTime || video.createdAt,
-                todayCost: video.todayCost,
-                cost: video.cost,
-                category: video.typeLabel || video.category,
-                cuts: video.cuts,
-                downloads: video.downloads,
-                shares: video.shares,
-                duration: video.duration,
-                resolution: video.resolution,
-                size: video.size
-              }}
-              selected={selectedVideoIds.includes(video.id)}
-              selectionActive={isSelectionActive || selectedVideoIds.length > 0}
-              onToggleSelect={() => {
-                setIsSelectionActive(true);
-                setSelectedVideoIds((previous) => {
-                  const next = previous.includes(video.id) ? previous.filter((id) => id !== video.id) : [...previous, video.id];
-                  setSelectAllPage(next.length === paginatedVideos.length && paginatedVideos.length > 0);
-                  return next;
-                });
-              }}
-              onOpen={() => isSelectionActive || selectedVideoIds.length > 0 ? undefined : setDetailModalVideo(video)}
-            />
-          ))}
         </div>
       ) : viewMode === "list" ? (
         /* LIST VIEW MODE */
