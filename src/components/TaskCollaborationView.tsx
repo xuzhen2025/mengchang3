@@ -112,6 +112,63 @@ interface TaskCollaborationViewProps {
   initialTab?: "to_me" | "my_published" | "all";
 }
 
+const createTaskVideo = (
+  id: string,
+  numericId: string,
+  name: string,
+  author: string,
+  createdAt: string,
+  overrides: Partial<AssociatedWorkItem> = {}
+): AssociatedWorkItem => ({
+  id,
+  numericId,
+  type: "video",
+  name,
+  status: "待审核",
+  author,
+  createdAt,
+  category: "商品成片",
+  publicTags: ["产品名称", "场景"],
+  duration: "00:30",
+  resolution: "1080p",
+  size: "36.8 MB",
+  downloads: 1,
+  shares: 0,
+  cuts: 2,
+  coverUrl: "https://images.unsplash.com/photo-1612817288484-6f916006741a?w=480&auto=format&fit=crop&q=80",
+  ...overrides
+});
+
+const COMPLETED_SERUM_WORKS: AssociatedWorkItem[] = [
+  createTaskVideo("serum-w-1", "110321101", "抗衰精华夜间修护口播_V1.mp4", "徐振", "2026-06-05 10:12", { status: "已通过", category: "美妆护肤", duration: "00:32" }),
+  createTaskVideo("serum-w-2", "110321102", "A醇精油质地特写_V2.mp4", "徐振", "2026-06-05 11:08", { status: "已通过", category: "美妆护肤", duration: "00:24" }),
+  createTaskVideo("serum-w-3", "110321103", "早晚护肤步骤演示_V1.mp4", "徐振", "2026-06-05 13:26", { status: "已通过", category: "美妆护肤", duration: "00:35" }),
+  createTaskVideo("serum-w-4", "110321104", "抗衰精华成分卖点混剪_V3.mp4", "徐振", "2026-06-05 15:04", { status: "已通过", category: "美妆护肤", duration: "00:28" }),
+  createTaskVideo("serum-w-5", "110321105", "夜间修护前后对比_终版.mp4", "徐振", "2026-06-05 17:18", { status: "已通过", category: "美妆护肤", duration: "00:31" })
+];
+
+const COMPLETED_COAT_WORKS: AssociatedWorkItem[] = [
+  createTaskVideo("coat-w-1", "110325201", "风衣走秀快切成片_V3.mp4", "徐振", "2026-06-17 09:20", { status: "已通过", category: "女装" }),
+  createTaskVideo("coat-w-2", "110325202", "风衣防风卖点口播_V2.mp4", "徐振", "2026-06-17 10:16", { status: "已通过", category: "女装", duration: "00:26" }),
+  createTaskVideo("coat-w-3", "110325203", "通勤穿搭三场景混剪_V1.mp4", "徐振", "2026-06-17 11:42", { status: "已通过", category: "女装", duration: "00:34" }),
+  createTaskVideo("coat-w-4", "110325204", "加绒内里细节展示_V2.mp4", "徐振", "2026-06-17 14:05", { status: "已通过", category: "女装", duration: "00:22" }),
+  createTaskVideo("coat-w-5", "110325205", "显瘦版型对比成片_V1.mp4", "徐振", "2026-06-17 15:38", { status: "已通过", category: "女装", duration: "00:29" }),
+  createTaskVideo("coat-w-6", "110325206", "秋装风衣高爆Hook_终版.mp4", "徐振", "2026-06-17 17:02", { status: "已通过", category: "女装", duration: "00:27" })
+];
+
+const COMPLETED_REPAIR_CREAM_WORKS: AssociatedWorkItem[] = [
+  createTaskVideo("cream-w-1", "110329301", "修护霜泛红痛点口播01.mp4", "王剪辑", "2026-06-23 09:12", { status: "已通过", category: "美妆护肤" }),
+  createTaskVideo("cream-w-2", "110329302", "修护霜屏障修护对比02.mp4", "王剪辑", "2026-06-23 10:05", { status: "已通过", category: "美妆护肤" }),
+  createTaskVideo("cream-w-3", "110329303", "敏感肌使用体验03.mp4", "王剪辑", "2026-06-23 11:18", { status: "已通过", category: "美妆护肤" }),
+  createTaskVideo("cream-w-4", "110329304", "修护霜质地吸收特写04.mp4", "王剪辑", "2026-06-23 13:42", { status: "已通过", category: "美妆护肤" }),
+  createTaskVideo("cream-w-5", "110329305", "换季干痒场景演绎05.mp4", "王剪辑", "2026-06-23 14:36", { status: "已通过", category: "美妆护肤" }),
+  createTaskVideo("cream-w-6", "110329306", "成分卖点快切06.mp4", "王剪辑", "2026-06-23 15:20", { status: "已通过", category: "美妆护肤" }),
+  createTaskVideo("cream-w-7", "110329307", "熬夜肌急救口播07.mp4", "王剪辑", "2026-06-23 16:08", { status: "已通过", category: "美妆护肤" }),
+  createTaskVideo("cream-w-8", "110329308", "护肤步骤植入08.mp4", "王剪辑", "2026-06-23 16:54", { status: "已通过", category: "美妆护肤" }),
+  createTaskVideo("cream-w-9", "110329309", "修护霜用户证言09.mp4", "王剪辑", "2026-06-23 17:31", { status: "已通过", category: "美妆护肤" }),
+  createTaskVideo("cream-w-10", "110329310", "修护霜对比成片_终版.mp4", "王剪辑", "2026-06-23 18:16", { status: "已通过", category: "美妆护肤" })
+];
+
 const INITIAL_TASKS: TaskItem[] = [
   {
     id: "08201150318",
@@ -183,7 +240,9 @@ const INITIAL_TASKS: TaskItem[] = [
       { id: "S-202", title: "【爆款改写】软支撑穿搭体验分镜", status: "可以拍摄", versionCount: 1, template: "信息流种草", product: "6017无钢圈内衣", scriptType: "开箱测评" }
     ],
     associatedWorks: [
-      { id: "w_250319", type: "video", name: "250319定卖点混剪视频", status: "待审核" }
+      createTaskVideo("underwear-w-1", "110322101", "无钢圈内衣舒适度实测01.mp4", "莫钦全", "2026-06-13 09:18", { category: "内衣" }),
+      createTaskVideo("underwear-w-2", "110322102", "软支撑结构对比02.mp4", "莫钦全", "2026-06-13 10:26", { category: "内衣", status: "未审核" }),
+      createTaskVideo("underwear-w-3", "110322103", "通勤久坐穿着体验03.mp4", "莫钦全", "2026-06-13 11:42", { category: "内衣", status: "已通过" })
     ],
     product: "6017无钢圈内衣",
     scriptType: "痛点对比",
@@ -209,9 +268,10 @@ const INITIAL_TASKS: TaskItem[] = [
     associatedScripts: [
       { id: "S-301", title: "【抗衰精华】A醇精油夜间修复种草", status: "可以拍摄", versionCount: 1, template: "口播种草", product: "抗衰精华液", scriptType: "口播种草" }
     ],
-    associatedWorks: [
-      { id: "w_20250328", type: "video", name: "抗衰精华实测特写01.mp4", status: "通过" }
-    ],
+    associatedWorks: COMPLETED_SERUM_WORKS,
+    completionSnapshot: COMPLETED_SERUM_WORKS.map((work) => ({ ...work })),
+    completedAt: "2026-06-06 17:36:00",
+    completedBy: "蔡卓良",
     product: "抗衰精华液",
     scriptType: "口播种草",
     scriptDeconstruction: "已拆解",
@@ -235,6 +295,10 @@ const INITIAL_TASKS: TaskItem[] = [
     },
     associatedScripts: [
       { id: "S-401", title: "【补水面膜】夏季晒后修护混剪", status: "待审核", versionCount: 2, template: "混剪模板", product: "补水面膜", scriptType: "特写展示" }
+    ],
+    associatedWorks: [
+      createTaskVideo("mask-w-1", "110324101", "晒后补水即时效果01.mp4", "蔡卓良", "2026-06-19 10:08", { category: "美妆护肤" }),
+      createTaskVideo("mask-w-2", "110324102", "面膜精华液质地特写02.mp4", "蔡卓良", "2026-06-19 14:22", { category: "美妆护肤", status: "未审核" })
     ],
     product: "补水面膜",
     scriptType: "特写展示",
@@ -262,9 +326,10 @@ const INITIAL_TASKS: TaskItem[] = [
       { id: "S-502", title: "【秋装风衣】加绒防风细节质感展示", status: "可以拍摄", versionCount: 1, template: "通用模板", product: "加绒风衣", scriptType: "特写展示" },
       { id: "S-503", title: "【秋装风衣】二创短视频走秀卡点", status: "待审核", versionCount: 1, template: "混剪模板", product: "加绒风衣", scriptType: "混剪卡点" }
     ],
-    associatedWorks: [
-      { id: "w_061801", type: "video", name: "风衣走秀快切成片_V3.mp4", status: "通过" }
-    ],
+    associatedWorks: COMPLETED_COAT_WORKS,
+    completionSnapshot: COMPLETED_COAT_WORKS.map((work) => ({ ...work })),
+    completedAt: "2026-06-18 18:20:00",
+    completedBy: "蔡卓良",
     product: "加绒风衣",
     scriptType: "混剪卡点",
     scriptDeconstruction: "已拆解",
@@ -279,13 +344,16 @@ const INITIAL_TASKS: TaskItem[] = [
     assigneeDeptPath: "天猫/拼多多组 / 天猫 / 徐振",
     orderCount: 4,
     completedCount: 1,
-    status: "pending",
+    status: "in_progress",
     cost: 200,
     associatedScript: {
       title: "【防晒冰袖】户外骑行冰凉感实测",
       status: "可以拍摄",
       versionCount: 1
     },
+    associatedWorks: [
+      createTaskVideo("sleeve-w-1", "110326101", "防晒冰袖骑行冰凉感实测01.mp4", "徐振", "2026-06-21 16:08", { category: "户外用品", status: "未审核" })
+    ],
     product: "防晒冰袖",
     scriptType: "开箱测评",
     scriptDeconstruction: "填写拆解表",
@@ -307,9 +375,10 @@ const INITIAL_TASKS: TaskItem[] = [
       status: "可以拍摄",
       versionCount: 4
     },
-    associatedWorks: [
-      { id: "w_062402", type: "video", name: "修护霜对比成片_终版.mp4", status: "通过" }
-    ],
+    associatedWorks: COMPLETED_REPAIR_CREAM_WORKS,
+    completionSnapshot: COMPLETED_REPAIR_CREAM_WORKS.map((work) => ({ ...work })),
+    completedAt: "2026-06-24 18:42:00",
+    completedBy: "徐振",
     product: "修护霜",
     scriptType: "痛点对比",
     scriptDeconstruction: "已拆解",
@@ -377,7 +446,9 @@ const INITIAL_TASKS: TaskItem[] = [
       versionCount: 2
     },
     associatedWorks: [
-      { id: "w_062501", type: "video", name: "马丁靴上脚卡点01.mp4", status: "待审核" }
+      createTaskVideo("boots-w-1", "110331101", "马丁靴上脚卡点01.mp4", "周洋", "2026-06-25 09:48", { category: "鞋靴" }),
+      createTaskVideo("boots-w-2", "110331102", "马丁靴鞋底防滑实测02.mp4", "周洋", "2026-06-25 11:16", { category: "鞋靴", status: "未审核" }),
+      createTaskVideo("boots-w-3", "110331103", "三套复古穿搭展示03.mp4", "周洋", "2026-06-25 15:32", { category: "鞋靴", status: "已通过" })
     ],
     product: "复古马丁靴",
     scriptType: "混剪卡点",
@@ -401,7 +472,10 @@ const INITIAL_TASKS: TaskItem[] = [
       versionCount: 3
     },
     associatedWorks: [
-      { id: "w_062608", type: "video", name: "早C晚A抗衰精油切片.mp4", status: "待审核" }
+      createTaskVideo("routine-w-1", "110332101", "早C晚A抗衰精油切片01.mp4", "徐振", "2026-06-26 09:22", { category: "美妆护肤" }),
+      createTaskVideo("routine-w-2", "110332102", "晨间VC使用步骤02.mp4", "徐振", "2026-06-26 10:40", { category: "美妆护肤", status: "未审核" }),
+      createTaskVideo("routine-w-3", "110332103", "夜间A醇搭配口播03.mp4", "徐振", "2026-06-26 13:08", { category: "美妆护肤" }),
+      createTaskVideo("routine-w-4", "110332104", "精华吸收效果对比04.mp4", "徐振", "2026-06-26 16:26", { category: "美妆护肤", status: "已通过" })
     ],
     product: "抗衰精华液",
     scriptType: "口播种草",
