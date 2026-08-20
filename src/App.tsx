@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Sidebar from "./components/Sidebar";
-import RightQueue from "./components/RightQueue";
+import RightQueue from "./components/GenerationTaskQueue";
 import MaterialSelector from "./components/MaterialSelector";
 import CreditsDashboard from "./components/CreditsDashboard";
 import HomeView from "./components/HomeView";
@@ -446,7 +446,8 @@ export default function App() {
       progress: 0,
       inputFiles,
       createdAt: timestamp,
-      creditsCost
+      creditsCost,
+      source: type === "video_gen" || type === "image_gen" ? "agent" : "tool"
     };
 
     setTasks((prev) => [newTask, ...prev]);
@@ -519,7 +520,63 @@ export default function App() {
   };
 
   const clearCompletedTasks = () => {
-    setTasks(tasks.filter((t) => t.status !== "completed" && t.status !== "failed"));
+    setTasks(tasks.filter((t) => t.status === "queue" || t.status === "generating"));
+  };
+
+  const handleCancelGenerationTask = (taskId: string) => {
+    const target = tasks.find((task) => task.id === taskId);
+    if (!target || !["queue", "generating"].includes(target.status)) return;
+
+    const cancelledAt = new Date().toISOString().replace("T", " ").slice(0, 19);
+    const refund = target.status === "queue" ? target.creditsCost : 0;
+    setTasks((current) => current.map((task) => task.id === taskId ? {
+      ...task,
+      status: "cancelled",
+      cancelledAt,
+      refundedCredits: refund
+    } : task));
+
+    if (refund > 0) {
+      setCredits((current) => current + refund);
+      setTransactions((current) => [{
+        id: `tx_cancel_refund_${Date.now()}`,
+        type: "refund",
+        tool: "AI任务取消",
+        amount: refund,
+        time: cancelledAt,
+        remark: `排队阶段取消，退回全部积分：${target.name}`
+      }, ...current]);
+    }
+  };
+
+  const handleRestartGenerationTask = (taskId: string) => {
+    const target = tasks.find((task) => task.id === taskId);
+    if (!target || !["failed", "cancelled"].includes(target.status)) return;
+    if (credits < target.creditsCost) {
+      alert("积分不足，无法重新生成");
+      return;
+    }
+
+    const restartedAt = new Date().toISOString().replace("T", " ").slice(0, 19);
+    setCredits((current) => current - target.creditsCost);
+    setTasks((current) => current.map((task) => task.id === taskId ? {
+      ...task,
+      status: "queue",
+      progress: 0,
+      createdAt: restartedAt.slice(0, 16),
+      cancelledAt: undefined,
+      refundedCredits: undefined,
+      failureReason: undefined,
+      outputFiles: undefined
+    } : task));
+    setTransactions((current) => [{
+      id: `tx_restart_${Date.now()}`,
+      type: "consume",
+      tool: "重新生成",
+      amount: -target.creditsCost,
+      time: restartedAt,
+      remark: `重新提交任务：${target.name}`
+    }, ...current]);
   };
 
   // Rendering screen router
@@ -654,6 +711,7 @@ export default function App() {
             credits={credits}
             extraRequestedCredits={extraRequestedCredits}
             transactions={transactions}
+            assets={assets}
             onAddCredits={handleAddCredits}
             onRequestCredits={handleRequestCredits}
           />
@@ -805,7 +863,9 @@ export default function App() {
           tasks={tasks}
           isOpen={isQueueOpen}
           setIsOpen={setIsQueueOpen}
-          clearCompleted={clearCompletedTasks}
+          cancelTask={handleCancelGenerationTask}
+          restartTask={handleRestartGenerationTask}
+          viewResult={() => handleNavigate("resources")}
         />
       )}
 

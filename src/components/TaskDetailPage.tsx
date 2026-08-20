@@ -279,6 +279,13 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
         </div>
       </div>
 
+      {task.status === "completed" && (
+        <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-800">
+          <div><span className="font-bold">任务已由发布人确认完成</span><span className="ml-2 text-emerald-700">当前展示确认时保存的历史快照，原资源后续删除、解绑或状态变化均不影响本任务结果。</span></div>
+          <span className="shrink-0 font-mono text-[11px]">{task.completedBy || task.publisher} · {task.completedAt || "历史记录"}</span>
+        </div>
+      )}
+
       {/* SECTION 1: 任务信息 Grid Table */}
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-slate-200 text-xs border-b border-slate-200">
@@ -340,24 +347,26 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
           </div>
           <div className="px-4 py-3 flex items-center justify-between grow">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white font-black text-[11px] shadow-2xs">
-                !
+              <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-white font-black text-[11px] shadow-2xs ${task.status === "completed" ? "bg-emerald-500" : task.status === "review" ? "bg-amber-500" : "bg-blue-500"}`}>
+                {task.status === "completed" ? "✓" : "!"}
               </span>
-              <span className="font-bold text-amber-600">
-                未完成
+              <span className={`font-bold ${task.status === "completed" ? "text-emerald-600" : task.status === "review" ? "text-amber-600" : "text-blue-600"}`}>
+                {task.status === "completed" ? "已完成" : task.status === "review" ? "待发布人验收" : task.status === "in_progress" ? "进行中" : "未开始"}
               </span>
               <span className="font-mono text-slate-500 font-bold ml-1">
                 ({task.completedCount || 0} / {task.orderCount || 8})
               </span>
             </div>
 
-            <button
-              onClick={() => setIsUploadTypeSelectModalOpen(true)}
-              className="px-4 py-1.5 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold rounded-lg shadow-2xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
-            >
-              <UploadCloud className="w-4 h-4" />
-              <span>去上传作品</span>
-            </button>
+            {task.status !== "completed" && (
+              <button
+                onClick={() => setIsUploadTypeSelectModalOpen(true)}
+                className="px-4 py-1.5 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold rounded-lg shadow-2xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+              >
+                <UploadCloud className="w-4 h-4" />
+                <span>去上传作品</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

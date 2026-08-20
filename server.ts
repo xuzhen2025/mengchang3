@@ -70,6 +70,7 @@ async function startServer() {
   // Vite development middleware vs Static Production server
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
+      configLoader: "runner",
       server: { middlewareMode: true },
       appType: "spa",
     });

@@ -371,7 +371,8 @@ export const INITIAL_TASKS: Task[] = [
       "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400&q=80"
     ],
     createdAt: "2026-07-08 18:00",
-    creditsCost: 4.0
+    creditsCost: 4.0,
+    source: "agent"
   },
   {
     id: "t_old_2",
@@ -381,7 +382,34 @@ export const INITIAL_TASKS: Task[] = [
     progress: 100,
     inputFiles: ["模特红裙走秀素材_原图.mp4"],
     createdAt: "2026-07-08 16:12",
-    creditsCost: 2.5
+    creditsCost: 2.5,
+    source: "tool"
+  },
+  {
+    id: "t_old_3",
+    name: "七夕美妆礼盒 AI 视频",
+    type: "video_gen",
+    status: "failed",
+    progress: 67,
+    inputFiles: ["七夕美妆礼盒主图.png"],
+    createdAt: "2026-08-19 14:32",
+    creditsCost: 10,
+    refundedCredits: 3.3,
+    failureReason: "生成服务连接中断，未消耗部分积分已退回",
+    source: "agent"
+  },
+  {
+    id: "t_old_4",
+    name: "秋季风衣素材画质增强",
+    type: "enhance",
+    status: "cancelled",
+    progress: 0,
+    inputFiles: ["秋季风衣原片.mp4"],
+    createdAt: "2026-08-19 13:06",
+    creditsCost: 5,
+    refundedCredits: 5,
+    cancelledAt: "2026-08-19 13:07",
+    source: "tool"
   }
 ];
 

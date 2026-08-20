@@ -81,6 +81,13 @@ export default function ImageDetailView({
   onClose,
   showToast
 }: ImageDetailViewProps) {
+  const [isFavorite, setIsFavorite] = useState(() => {
+    try {
+      return (JSON.parse(window.localStorage.getItem("cloud_video_personal_favorites_v1") || "[]") as string[]).includes(item.id);
+    } catch {
+      return false;
+    }
+  });
   // Lightbox
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [selectedDetailThumbIndex, setSelectedDetailThumbIndex] = useState<number>(0);
@@ -386,15 +393,25 @@ export default function ImageDetailView({
               </button>
 
               <button
-                onClick={() => showToast("已将图片标记为星标收藏")}
-                className="p-2 rounded-xl border border-purple-200 bg-purple-50/60 hover:bg-purple-100 text-purple-600 cursor-pointer transition-colors"
-                title="收藏"
+                onClick={() => {
+                  let ids: string[] = [];
+                  try { ids = JSON.parse(window.localStorage.getItem("cloud_video_personal_favorites_v1") || "[]") as string[]; } catch { ids = []; }
+                  const next = isFavorite ? ids.filter((id) => id !== item.id) : Array.from(new Set([...ids, item.id]));
+                  window.localStorage.setItem("cloud_video_personal_favorites_v1", JSON.stringify(next));
+                  setIsFavorite(!isFavorite);
+                  showToast(isFavorite ? "已取消收藏" : "已收藏，可在个人中心查看");
+                }}
+                className={`p-2 rounded-xl border cursor-pointer transition-colors ${isFavorite ? "border-amber-300 bg-amber-50 text-amber-600" : "border-purple-200 bg-purple-50/60 hover:bg-purple-100 text-purple-600"}`}
+                title={isFavorite ? "取消收藏" : "收藏"}
               >
-                <Star className="w-4 h-4" />
+                <Star className="w-4 h-4" fill={isFavorite ? "currentColor" : "none"} />
               </button>
 
               <button
-                onClick={() => showToast("已复制图片链接至剪贴板")}
+                onClick={async () => {
+                  await navigator.clipboard?.writeText(`${window.location.origin}/#/resources/${item.id}`);
+                  showToast("详情链接已复制，访问时将按查看者登录状态与资源权限显示");
+                }}
                 className="p-2 rounded-xl border border-purple-200 bg-purple-50/60 hover:bg-purple-100 text-purple-600 cursor-pointer transition-colors"
                 title="分享"
               >
@@ -450,7 +467,7 @@ export default function ImageDetailView({
             </div>
 
             {/* 4. Primary Solid Action Buttons */}
-            <div className="grid grid-cols-2 gap-3 pt-1">
+            <div className="grid grid-cols-1 gap-3 pt-1">
               <button
                 onClick={() => showToast(`正在下载无水印原图: ${titleText}`)}
                 className="bg-[#7C3AED] hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl text-center shadow-xs cursor-pointer transition-colors text-xs active:scale-95"
@@ -459,7 +476,7 @@ export default function ImageDetailView({
               </button>
               <button
                 onClick={() => showToast(`已将图片【${titleText}】发送至剪映`)}
-                className="bg-[#7C3AED] hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl text-center shadow-xs cursor-pointer transition-colors text-xs active:scale-95"
+                className="hidden bg-[#7C3AED] hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl text-center shadow-xs cursor-pointer transition-colors text-xs active:scale-95"
               >
                 复制到剪映
               </button>

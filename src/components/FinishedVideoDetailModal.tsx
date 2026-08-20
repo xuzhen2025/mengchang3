@@ -2944,11 +2944,13 @@ export default function FinishedVideoDetailModal({
                         {/* Share Button with Hover Menu (PC & Mobile links) */}
                         <div
                           className="relative group"
-                          onMouseEnter={() => setShowShareDropdown(true)}
-                          onMouseLeave={() => setShowShareDropdown(false)}
                         >
                           <button
-                            onClick={() => setShowShareDropdown(!showShareDropdown)}
+                            onClick={async () => {
+                              const link = `${window.location.origin}/#/resources/${video.id}`;
+                              await navigator.clipboard?.writeText(link);
+                              showToast("详情链接已复制，访问时将按查看者登录状态与资源权限显示");
+                            }}
                             className="p-2 border border-purple-300 bg-purple-50 hover:bg-purple-100 rounded-xl text-purple-700 transition-all cursor-pointer shadow-2xs flex items-center gap-1 text-xs font-bold"
                             title="分享链接"
                           >
@@ -2958,9 +2960,7 @@ export default function FinishedVideoDetailModal({
 
                           {/* Hover Dropdown with seamless padding bridge */}
                           <div
-                            className={`absolute bottom-full left-0 pb-1.5 z-50 transition-all duration-150 ${
-                              showShareDropdown ? "block" : "hidden group-hover:block"
-                            }`}
+                            className="hidden"
                           >
                             <div className="bg-white border border-slate-200 shadow-xl rounded-xl p-1.5 w-44 animate-in fade-in zoom-in-95 duration-100">
                               <button
@@ -3059,7 +3059,9 @@ export default function FinishedVideoDetailModal({
                                 <button
                                   onClick={() => {
                                     setShowMoreMenu(false);
-                                    showToast("🗑️ 视频已移至回收站");
+                                    if (window.confirm("删除后将移入回收站，可在回收站恢复。确认继续吗？")) {
+                                      showToast("视频已移至回收站");
+                                    }
                                   }}
                                   className="w-full py-2 px-3 text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer text-center font-medium"
                                 >
@@ -3079,15 +3081,11 @@ export default function FinishedVideoDetailModal({
                         {/* 1. 下载转码视频 Dropdown Button */}
                         <div className="relative w-full">
                           <button
-                            onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+                            onClick={() => showToast("已通过权限校验，开始直接下载原文件")}
                             className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center overflow-hidden cursor-pointer active:scale-98"
                           >
                             <span className="flex-1 py-3 px-3 text-center font-bold">
-                              下载转码视频
-                            </span>
-                            <div className="w-px h-5 bg-purple-400/50"></div>
-                            <span className="py-3 px-3 flex items-center justify-center">
-                              <ChevronDown className={`w-4 h-4 text-purple-200 transition-transform duration-200 ${showDownloadMenu ? "rotate-180" : ""}`} />
+                              下载
                             </span>
                           </button>
 
@@ -4631,13 +4629,13 @@ export default function FinishedVideoDetailModal({
                           <CheckCircle2 className="w-4 h-4 text-emerald-500 fill-emerald-100" />
                         </div>
                       </th>
-                      <th className="py-3 px-4 bg-emerald-50/40 text-slate-800 font-bold">
+                      <th className="hidden py-3 px-4 bg-emerald-50/40 text-slate-800 font-bold">
                         <div className="inline-flex items-center gap-1 text-slate-800">
                           <span>复制到剪映</span>
                           <CheckCircle2 className="w-4 h-4 text-emerald-500 fill-emerald-100" />
                         </div>
                       </th>
-                      <th className="py-3 px-4 bg-emerald-50/40 text-slate-800 font-bold">
+                      <th className="hidden py-3 px-4 bg-emerald-50/40 text-slate-800 font-bold">
                         <div className="inline-flex items-center gap-1 text-slate-800">
                           <span>推送</span>
                           <CheckCircle2 className="w-4 h-4 text-emerald-500 fill-emerald-100" />
@@ -4669,12 +4667,12 @@ export default function FinishedVideoDetailModal({
                           <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
                         ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}
                       </td>
-                      <td className="py-3.5 px-4 bg-emerald-50/20">
+                      <td className="hidden py-3.5 px-4 bg-emerald-50/20">
                         {selectedEmployee.permissions.role.copyToCapCut ? (
                           <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
                         ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}
                       </td>
-                      <td className="py-3.5 px-4 bg-emerald-50/20">
+                      <td className="hidden py-3.5 px-4 bg-emerald-50/20">
                         {selectedEmployee.permissions.role.push ? (
                           <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
                         ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}
@@ -4704,12 +4702,12 @@ export default function FinishedVideoDetailModal({
                           <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
                         ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}
                       </td>
-                      <td className="py-3.5 px-4 bg-emerald-50/20">
+                      <td className="hidden py-3.5 px-4 bg-emerald-50/20">
                         {selectedEmployee.permissions.category.copyToCapCut ? (
                           <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
                         ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}
                       </td>
-                      <td className="py-3.5 px-4 bg-emerald-50/20">
+                      <td className="hidden py-3.5 px-4 bg-emerald-50/20">
                         {selectedEmployee.permissions.category.push ? (
                           <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
                         ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}
@@ -4739,12 +4737,12 @@ export default function FinishedVideoDetailModal({
                           <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
                         ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}
                       </td>
-                      <td className="py-3.5 px-4 bg-emerald-50/20">
+                      <td className="hidden py-3.5 px-4 bg-emerald-50/20">
                         {selectedEmployee.permissions.video.copyToCapCut ? (
                           <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
                         ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}
                       </td>
-                      <td className="py-3.5 px-4 bg-emerald-50/20">
+                      <td className="hidden py-3.5 px-4 bg-emerald-50/20">
                         {selectedEmployee.permissions.video.push ? (
                           <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
                         ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}

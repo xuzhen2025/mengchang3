@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import LinkScriptModal from "./LinkScriptModal";
 import { TaskDetailPage } from "./TaskDetailPage";
+import { TASK_BINDINGS_KEY, TaskResourceBinding } from "./PersonalResourceCenter";
 import {
   Search,
   Calendar,
@@ -69,7 +70,7 @@ export interface TaskItem {
   assigneeDeptPath?: string;
   orderCount: number;
   completedCount: number;
-  status: "pending" | "completed" | "in_progress"; // 未完成, 已达标, 进行中
+  status: "pending" | "in_progress" | "review" | "completed";
   cost: number;
   associatedScript?: AssociatedScriptItem;
   associatedScripts?: AssociatedScriptItem[];
@@ -84,6 +85,9 @@ export interface TaskItem {
   specifiedPerson?: string;
   publicDate?: string;
   remark?: string;
+  completionSnapshot?: AssociatedWorkItem[];
+  completedAt?: string;
+  completedBy?: string;
 }
 
 interface TaskCollaborationViewProps {
@@ -95,6 +99,28 @@ interface TaskCollaborationViewProps {
 }
 
 const INITIAL_TASKS: TaskItem[] = [
+  {
+    id: "08201150318",
+    publisher: "徐振",
+    publishDate: "2026-08-18",
+    deadlineDate: "2026-08-20",
+    assignee: "梁浩然",
+    assigneeDeptPath: "天猫/拼多多组 / 天猫 / 梁浩然",
+    orderCount: 3,
+    completedCount: 3,
+    status: "review",
+    cost: 360,
+    associatedScript: { title: "【秋季风衣】通勤场景三版混剪", status: "可以拍摄", versionCount: 2 },
+    associatedWorks: [
+      { id: "review-w-1", type: "video", name: "风衣通勤地铁版_V1.mp4", status: "待审核", author: "梁浩然" },
+      { id: "review-w-2", type: "video", name: "风衣办公室版_V2.mp4", status: "未审核", author: "梁浩然" },
+      { id: "review-w-3", type: "image", name: "风衣面料防风细节图.png", status: "已通过", author: "梁浩然" }
+    ],
+    product: "秋季通勤风衣",
+    scriptType: "场景混剪",
+    scriptDeconstruction: "已拆解",
+    remark: "资源数量已达标，等待任务发布人验收确认"
+  },
   {
     id: "06131146256",
     publisher: "徐振",
@@ -272,6 +298,30 @@ const INITIAL_TASKS: TaskItem[] = [
     scriptType: "痛点对比",
     scriptDeconstruction: "已拆解",
     remark: "投放千川大盘，消耗突破5万"
+  },
+  {
+    id: "06231146281",
+    publisher: "蔡卓良",
+    publishDate: "2026-08-18",
+    deadlineDate: "2026-08-28",
+    assignee: "徐振",
+    assigneeDeptPath: "快手投流组 / 磁力引擎 / 徐振",
+    orderCount: 8,
+    completedCount: 5,
+    status: "in_progress",
+    cost: 680,
+    associatedScript: { title: "【七夕礼盒】开箱与送礼场景混剪", status: "可以拍摄", versionCount: 2 },
+    associatedWorks: [
+      { id: "w-gift-1", type: "video", name: "七夕礼盒开箱口播01.mp4", status: "待审核" },
+      { id: "w-gift-2", type: "image", name: "礼盒丝带细节特写.png", status: "未审核" },
+      { id: "w-gift-3", type: "audio", name: "七夕氛围配音.wav", status: "已通过" },
+      { id: "w-gift-4", type: "text", name: "送礼场景口播文案.docx", status: "待审核" },
+      { id: "w-gift-5", type: "video", name: "情侣赠礼场景02.mp4", status: "待审核" }
+    ],
+    product: "七夕美妆礼盒",
+    scriptType: "开箱测评",
+    scriptDeconstruction: "已拆解",
+    remark: "所有已上传资源均可计数，数量达标后等待发布人验收"
   },
   {
     id: "06231430099",
@@ -557,7 +607,54 @@ export default function TaskCollaborationView({
   onClearInitialDetailTask,
   initialTab = "all"
 }: TaskCollaborationViewProps) {
-  const [tasks, setTasks] = useState<TaskItem[]>(INITIAL_TASKS);
+  const [tasks, setTasks] = useState<TaskItem[]>(() => {
+    try {
+      const snapshots = JSON.parse(window.localStorage.getItem("cloud_video_task_completion_snapshots_v1") || "{}") as Record<string, Partial<TaskItem>>;
+      return INITIAL_TASKS.map((task) => snapshots[task.id] ? { ...task, ...snapshots[task.id] } : task);
+    } catch {
+      return INITIAL_TASKS;
+    }
+  });
+
+  useEffect(() => {
+    const syncBindings = () => {
+      let bindings: TaskResourceBinding[] = [];
+      try {
+        bindings = JSON.parse(window.localStorage.getItem(TASK_BINDINGS_KEY) || "[]") as TaskResourceBinding[];
+      } catch {
+        bindings = [];
+      }
+      setTasks((current) => current.map((task) => {
+        if (task.status === "completed") return task;
+        const taskBindings = bindings.filter((binding) => binding.taskId === task.id);
+        const existing = task.associatedWorks || [];
+        const merged = [...existing];
+        taskBindings.forEach((binding) => {
+          if (!merged.some((work) => work.id === `resource-${binding.resourceId}` || work.name === binding.resourceName)) {
+            merged.push({
+              id: `resource-${binding.resourceId}`,
+              type: binding.resourceType === "document" ? "text" : binding.resourceType === "template" ? "image" : binding.resourceType,
+              name: binding.resourceName,
+              coverUrl: binding.resourceUrl,
+              status: "未审核",
+              author: binding.boundBy,
+              createdAt: binding.boundAt
+            });
+          }
+        });
+        const completedCount = Math.min(task.orderCount, Math.max(task.completedCount, merged.length));
+        return {
+          ...task,
+          associatedWorks: merged,
+          completedCount,
+          status: completedCount >= task.orderCount ? "review" : completedCount > 0 ? "in_progress" : "pending"
+        };
+      }));
+    };
+    syncBindings();
+    window.addEventListener("task-resource-bindings-changed", syncBindings);
+    return () => window.removeEventListener("task-resource-bindings-changed", syncBindings);
+  }, []);
 
   // Top Scope Tab: "to_me" (给我的任务), "my_published" (我发布的任务), "all" (全部任务)
   const [activeTab, setActiveTab] = useState<"to_me" | "my_published" | "all">(initialTab);
@@ -859,17 +956,21 @@ export default function TaskCollaborationView({
             showToast(`⚠️ 作品【${chosen.title}】已关联`);
             return t;
           }
+          const updatedWorks: AssociatedWorkItem[] = [
+            ...existing,
+            {
+              id: `w_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+              type: chosen.type === "script" ? "video" : (chosen.type as AssociatedWorkItem["type"]),
+              name: chosen.title,
+              status: chosen.status
+            }
+          ];
+          const completedCount = Math.min(t.orderCount, Math.max(t.completedCount, updatedWorks.length));
           return {
             ...t,
-            associatedWorks: [
-              ...existing,
-              {
-                id: `w_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
-                type: chosen.type === "script" ? "video" : (chosen.type as any),
-                name: chosen.title,
-                status: chosen.status as any
-              }
-            ]
+            associatedWorks: updatedWorks,
+            completedCount,
+            status: completedCount >= t.orderCount ? "review" : "in_progress"
           };
         }
         return t;
@@ -979,7 +1080,7 @@ export default function TaskCollaborationView({
   };
 
   // Third Row Sub-Filters & Sort
-  const [statusSubFilter, setStatusSubFilter] = useState<"all" | "pending" | "completed">("all");
+  const [statusSubFilter, setStatusSubFilter] = useState<"all" | "pending" | "review" | "completed">("all");
   const [sortOrder, setSortOrder] = useState<"publish_desc" | "publish_asc" | "deadline">("publish_desc");
 
   // Pagination State
@@ -1179,9 +1280,12 @@ export default function TaskCollaborationView({
         if (t.id === taskId) {
           const existing = t.associatedWorks || [];
           const updated = existing.filter((w) => w.id !== workId);
+          const completedCount = Math.min(t.completedCount, updated.length);
           return {
             ...t,
-            associatedWorks: updated
+            associatedWorks: updated,
+            completedCount,
+            status: completedCount >= t.orderCount ? "review" : completedCount > 0 ? "in_progress" : "pending"
           };
         }
         return t;
@@ -1635,13 +1739,38 @@ export default function TaskCollaborationView({
   // Filter Tasks
   const currentUser = "徐振";
 
+  const handleConfirmTaskCompletion = (task: TaskItem) => {
+    if (task.publisher !== currentUser || task.status !== "review") return;
+    if (!window.confirm(`确认任务 ${task.id} 已完成？确认后将固化当前 ${task.associatedWorks?.length || 0} 个资源的历史快照，后续不再自动回退。`)) return;
+    const completedAt = new Date().toLocaleString("zh-CN", { hour12: false });
+    const completedTask: TaskItem = {
+      ...task,
+      status: "completed",
+      completedCount: task.orderCount,
+      completionSnapshot: (task.associatedWorks || []).map((work) => ({ ...work })),
+      completedAt,
+      completedBy: currentUser
+    };
+    setTasks((prev) => prev.map((item) => item.id === task.id ? completedTask : item));
+    try {
+      const key = "cloud_video_task_completion_snapshots_v1";
+      const existing = JSON.parse(window.localStorage.getItem(key) || "{}") as Record<string, Partial<TaskItem>>;
+      existing[task.id] = completedTask;
+      window.localStorage.setItem(key, JSON.stringify(existing));
+    } catch {
+      // The in-memory snapshot still demonstrates the completed-state flow.
+    }
+    showToast(`任务 ${task.id} 已确认完成，历史快照已保留`);
+  };
+
   const filteredTasks = tasks.filter((task) => {
     // Top Scope Tab Filter
     if (activeTab === "to_me" && task.assignee !== currentUser) return false;
     if (activeTab === "my_published" && task.publisher !== currentUser) return false;
 
     // Sub Status Filter
-    if (statusSubFilter === "pending" && task.status !== "pending") return false;
+    if (statusSubFilter === "pending" && task.status !== "pending" && task.status !== "in_progress") return false;
+    if (statusSubFilter === "review" && task.status !== "review") return false;
     if (statusSubFilter === "completed" && task.status !== "completed") return false;
 
     // Second Row Filters (团队 / 分组 / 发布人)
@@ -2625,6 +2754,7 @@ export default function TaskCollaborationView({
               <option value="all">请选择视频状态</option>
               <option value="pending">未完成</option>
               <option value="in_progress">进行中</option>
+              <option value="review">待验收</option>
               <option value="completed">已完成</option>
             </select>
           </div>
@@ -2705,6 +2835,17 @@ export default function TaskCollaborationView({
           </button>
 
           <button
+            onClick={() => setStatusSubFilter("review")}
+            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 ${
+              statusSubFilter === "review"
+                ? "bg-[#7C3AED] text-white shadow-xs"
+                : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            待验收
+          </button>
+
+          <button
             onClick={() => setStatusSubFilter("completed")}
             className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 ${
               statusSubFilter === "completed"
@@ -2712,7 +2853,7 @@ export default function TaskCollaborationView({
                 : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
             }`}
           >
-            已达标
+            已完成
           </button>
 
           <select
@@ -2736,7 +2877,7 @@ export default function TaskCollaborationView({
           </button>
 
           <button
-            onClick={() => showToast("📥 任务列表 Excel 已开始导出")}
+            onClick={() => showToast(`已按当前筛选条件导出 ${filteredTasks.length} 条任务数据（包含全部筛选结果，不限当前页）`)}
             className="px-3.5 py-1.5 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold text-xs rounded-lg shadow-2xs transition-all cursor-pointer flex items-center gap-1 active:scale-95"
           >
             <span>批量导出</span>
@@ -2858,9 +2999,9 @@ export default function TaskCollaborationView({
                     <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
                       <div className="flex flex-col items-center justify-center gap-1">
                         <div className="flex items-center justify-center gap-1.5 font-bold">
-                          <span className={`w-2 h-2 rounded-full ${task.status === "completed" ? "bg-emerald-500" : "bg-rose-500"}`} />
-                          <span className={task.status === "completed" ? "text-emerald-600" : "text-rose-600"}>
-                            {task.status === "completed" ? "已达标" : "未完成"}
+                          <span className={`w-2 h-2 rounded-full ${task.status === "completed" ? "bg-emerald-500" : task.status === "review" ? "bg-amber-500" : task.status === "in_progress" ? "bg-blue-500" : "bg-slate-400"}`} />
+                          <span className={task.status === "completed" ? "text-emerald-600" : task.status === "review" ? "text-amber-600" : task.status === "in_progress" ? "text-blue-600" : "text-slate-500"}>
+                            {task.status === "completed" ? "已完成" : task.status === "review" ? "待验收" : task.status === "in_progress" ? "进行中" : "未开始"}
                           </span>
                         </div>
                         <div className="font-mono text-xs font-bold text-slate-500">
@@ -2875,6 +3016,15 @@ export default function TaskCollaborationView({
                     {/* 4. 操作 (详情, 编辑, 复制, 删除) */}
                     <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
                       <div className="flex items-center justify-center gap-2.5 font-medium text-purple-600">
+                        {task.status === "review" && task.publisher === currentUser && (
+                          <button
+                            onClick={() => handleConfirmTaskCompletion(task)}
+                            className="rounded bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-emerald-700"
+                            title="确认后保存历史快照，任务不再自动回退"
+                          >
+                            确认完成
+                          </button>
+                        )}
                         <button
                           onClick={() => setDetailModalTask(task)}
                           className="hover:underline cursor-pointer"
@@ -2910,6 +3060,11 @@ export default function TaskCollaborationView({
                           </button>
                         )}
                       </div>
+                      {task.status === "completed" && task.completedAt && (
+                        <p className="mt-1 text-[9px] text-slate-400" title={`由 ${task.completedBy} 确认，已保存 ${task.completionSnapshot?.length || 0} 个资源快照`}>
+                          已留存历史快照
+                        </p>
+                      )}
                     </td>
 
                     {/* 5. 关联作品 (+) */}

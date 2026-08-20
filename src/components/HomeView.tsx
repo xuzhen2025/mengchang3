@@ -1091,7 +1091,7 @@ export default function HomeView({
                 {/* 3. 意见反馈 */}
                 <button
                   onClick={() => setActiveHelpModal("feedback")}
-                  className="bg-slate-50 hover:bg-amber-50/70 border border-slate-200/80 hover:border-amber-300 p-2.5 rounded-xl flex flex-col items-center justify-center text-center space-y-1 transition-all cursor-pointer group shadow-2xs"
+                  className="hidden bg-slate-50 hover:bg-amber-50/70 border border-slate-200/80 hover:border-amber-300 p-2.5 rounded-xl flex-col items-center justify-center text-center space-y-1 transition-all cursor-pointer group shadow-2xs"
                 >
                   <MessageSquare className="w-4 h-4 text-amber-600 group-hover:scale-110 transition-transform" />
                   <span className="text-[11px] font-black text-slate-800 group-hover:text-amber-700">意见反馈</span>

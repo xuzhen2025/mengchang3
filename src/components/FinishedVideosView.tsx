@@ -801,6 +801,7 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
     }
     
     if (option === "放入回收站") {
+      if (!window.confirm(`删除后将把选中的 ${count} 个成片移入回收站，可在回收站恢复。确认继续吗？`)) return;
       setVideos(prev => prev.filter(v => !selectedVideoIds.includes(v.id)));
       setSelectedVideoIds([]);
       setSelectAllPage(false);
@@ -893,7 +894,7 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
   };
 
   const handleDeleteVideo = (id: string) => {
-    if (confirm("确定要删除此成片吗？这将移除相关的投放状态与回传关联。")) {
+    if (confirm("删除后将移入回收站，可在回收站恢复。确认继续吗？")) {
       setVideos(prev => prev.filter(v => v.id !== id));
     }
   };
@@ -1470,11 +1471,10 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
             {/* 1. 下载转码视频 ∨ */}
             <div className="relative shrink-0">
               <button
-                onClick={() => setOpenDropdown(openDropdown === "download" ? null : "download")}
+                onClick={() => handleBatchOptionSelect("下载", "按当前权限直接下载原文件")}
                 className="border border-slate-200 hover:border-purple-300 bg-white text-slate-700 font-normal px-2.5 py-1.5 rounded-lg shadow-2xs cursor-pointer flex items-center gap-1.5 transition-all text-xs"
               >
-                <span>下载转码视频</span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>下载</span>
               </button>
               {openDropdown === "download" && (
                 <div className="absolute top-full left-0 mt-1 w-44 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
@@ -1496,7 +1496,7 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
             </div>
 
             {/* 2. 推送 ∨ */}
-            <div className="relative shrink-0">
+            <div className="relative hidden shrink-0">
               <button
                 onClick={() => setOpenDropdown(openDropdown === "push" ? null : "push")}
                 className="border border-slate-200 hover:border-purple-300 bg-white text-slate-700 font-normal px-2.5 py-1.5 rounded-lg shadow-2xs cursor-pointer flex items-center gap-1.5 transition-all text-xs"
@@ -1523,7 +1523,7 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
             </div>
 
             {/* 3. 复制到剪映 ∨ */}
-            <div className="relative shrink-0">
+            <div className="relative hidden shrink-0">
               <button
                 onClick={() => setOpenDropdown(openDropdown === "jianying" ? null : "jianying")}
                 className="border border-slate-200 hover:border-purple-300 bg-white text-slate-700 font-normal px-2.5 py-1.5 rounded-lg shadow-2xs cursor-pointer flex items-center gap-1.5 transition-all text-xs"
@@ -1552,7 +1552,7 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
             {/* 4. 添加到工作台 */}
             <button
               onClick={() => handleBatchOptionSelect("工作台", "添加到工作台")}
-              className="border border-slate-200 hover:border-purple-300 bg-white text-slate-700 font-normal px-2.5 py-1.5 rounded-lg shadow-2xs cursor-pointer hover:text-purple-600 transition-all text-xs shrink-0"
+              className="hidden border border-slate-200 hover:border-purple-300 bg-white text-slate-700 font-normal px-2.5 py-1.5 rounded-lg shadow-2xs cursor-pointer hover:text-purple-600 transition-all text-xs shrink-0"
             >
               添加到工作台
             </button>
@@ -1894,7 +1894,7 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
                       </button>
                       <button
                         onClick={() => handleSyncToAd(video)}
-                        className="bg-purple-600 hover:bg-purple-700 text-white text-[10px] px-2.5 py-1 rounded-lg font-bold shadow-xs cursor-pointer"
+                        className="hidden bg-purple-600 hover:bg-purple-700 text-white text-[10px] px-2.5 py-1 rounded-lg font-bold shadow-xs cursor-pointer"
                       >
                         同步投放
                       </button>

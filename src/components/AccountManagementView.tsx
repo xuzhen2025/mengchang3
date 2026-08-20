@@ -611,7 +611,6 @@ export const APP_PERMISSION_TREE: PermissionNode[] = [
       { id: "mat_view", label: "查看素材列表" },
       { id: "mat_upload", label: "上传素材" },
       { id: "mat_download", label: "下载素材" },
-      { id: "mat_capcut", label: "复制到剪映" },
       { id: "mat_batch_category", label: "批量修改分类" },
       { id: "mat_edit_title", label: "修改标题与标签" },
       { id: "mat_status", label: "画面利用与状态标记" },
@@ -625,7 +624,6 @@ export const APP_PERMISSION_TREE: PermissionNode[] = [
     children: [
       { id: "finished_edit_info", label: "修改视频信息" },
       { id: "finished_download_transcode", label: "下载转码视频" },
-      { id: "finished_capcut", label: "复制到剪映" },
       { id: "finished_audit_log", label: "查看操作记录" },
       { id: "finished_share", label: "分享" },
       { id: "finished_interaction_data", label: "查看互动数据" },
@@ -636,7 +634,6 @@ export const APP_PERMISSION_TREE: PermissionNode[] = [
       { id: "finished_batch_category", label: "批量修改分类" },
       { id: "finished_status", label: "修改状态" },
       { id: "finished_pin", label: "合集置顶" },
-      { id: "finished_push", label: "一键推送投放" },
     ]
   },
   {
@@ -680,8 +677,8 @@ export const ALL_PERMISSION_KEYS = [
   "aiimg_view", "aiimg_generate", "aiimg_matting", "aiimg_enhance",
   "canvas_view", "canvas_edit", "canvas_export",
   "task_view", "task_create", "task_update", "task_comment",
-  "mat_view", "mat_upload", "mat_download", "mat_capcut", "mat_batch_category", "mat_edit_title", "mat_status", "mat_pin", "mat_export_excel",
-  "finished_edit_info", "finished_download_transcode", "finished_capcut", "finished_audit_log", "finished_share", "finished_interaction_data", "finished_download_project", "finished_upload_project", "finished_mat_data", "finished_referenced_shots", "finished_batch_category", "finished_status", "finished_pin", "finished_push",
+  "mat_view", "mat_upload", "mat_download", "mat_batch_category", "mat_edit_title", "mat_status", "mat_pin", "mat_export_excel",
+  "finished_edit_info", "finished_download_transcode", "finished_audit_log", "finished_share", "finished_interaction_data", "finished_download_project", "finished_upload_project", "finished_mat_data", "finished_referenced_shots", "finished_batch_category", "finished_status", "finished_pin",
   "asset_view", "asset_upload", "asset_category", "asset_delete",
   "ad_view", "ad_bind", "ad_publish", "ad_export",
   "sys_users", "sys_roles", "sys_audit", "sys_auth"
@@ -696,8 +693,8 @@ const CREATION_KEYS = [
   "aiimg_view", "aiimg_generate",
   "canvas_view", "canvas_edit",
   "task_view", "task_update", "task_comment",
-  "mat_view", "mat_upload", "mat_download", "mat_capcut",
-  "finished_edit_info", "finished_download_transcode", "finished_capcut", "finished_share", "finished_mat_data", "finished_referenced_shots",
+  "mat_view", "mat_upload", "mat_download",
+  "finished_edit_info", "finished_download_transcode", "finished_share", "finished_mat_data", "finished_referenced_shots",
   "asset_view", "asset_upload"
 ];
 
@@ -927,7 +924,7 @@ const INITIAL_ROLES: RolePermission[] = [
     memberCount: 2,
     dataScope: "dept_tree",
     enabled: true,
-    checkedKeys: ["finished_view", "finished_upload", "finished_push", "mat_view", "task_view", "task_create", "ad_view"],
+    checkedKeys: ["finished_view", "finished_upload", "mat_view", "task_view", "task_create", "ad_view"],
     permissions: [],
     updatedAt: "2026-07-11 14:00"
   },

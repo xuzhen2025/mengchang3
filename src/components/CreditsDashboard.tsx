@@ -13,14 +13,19 @@ import {
   Sparkles,
   FileText,
   ShieldCheck,
-  Plus
+  Plus,
+  FolderOpen,
+  Bookmark,
+  Tags
 } from "lucide-react";
-import { CreditTransaction } from "../types";
+import { Asset, CreditTransaction } from "../types";
+import PersonalResourceCenter from "./PersonalResourceCenter";
 
 interface CreditsDashboardProps {
   credits: number;
   extraRequestedCredits?: number;
   transactions: CreditTransaction[];
+  assets: Asset[];
   onAddCredits: (amount: number, remark: string) => void;
   onRequestCredits?: (amount: number, manager: string, reason: string, project?: string) => void;
 }
@@ -29,11 +34,11 @@ export default function CreditsDashboard({
   credits,
   extraRequestedCredits: propExtraRequestedCredits,
   transactions,
+  assets,
   onAddCredits,
   onRequestCredits
 }: CreditsDashboardProps) {
-  // Tabs: profile (个人信息) and history (明细账单)
-  const [activeSubTab, setActiveSubTab] = useState<"profile" | "history">("profile");
+  const [activeSubTab, setActiveSubTab] = useState<"profile" | "resources" | "favorites" | "personal_tags" | "history">("profile");
   
   // Extra requested credits state fallback
   const [internalExtraRequestedCredits, setInternalExtraRequestedCredits] = useState<number>(350.00);
@@ -157,30 +162,18 @@ export default function CreditsDashboard({
           </div>
           
           {/* Nav Tabs */}
-          <div className="flex bg-slate-100 border border-slate-200 p-1 rounded-xl shrink-0">
-            <button
-              onClick={() => setActiveSubTab("profile")}
-              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeSubTab === "profile" 
-                  ? "bg-purple-600 text-white shadow-xs" 
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              <User className="w-3.5 h-3.5" />
-              <span>个人信息</span>
-            </button>
-
-            <button
-              onClick={() => setActiveSubTab("history")}
-              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeSubTab === "history" 
-                  ? "bg-purple-600 text-white shadow-xs" 
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              <Coins className="w-3.5 h-3.5" />
-              <span>明细账单</span>
-            </button>
+          <div className="flex flex-wrap bg-slate-100 border border-slate-200 p-1 rounded-lg shrink-0">
+            {([
+              ["profile", "个人信息", User],
+              ["resources", "我的资源", FolderOpen],
+              ["favorites", "我的收藏", Bookmark],
+              ["personal_tags", "个人标签", Tags],
+              ["history", "明细账单", Coins]
+            ] as const).map(([value, label, Icon]) => (
+              <button key={value} onClick={() => setActiveSubTab(value)} className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${activeSubTab === value ? "bg-purple-600 text-white shadow-xs" : "text-slate-500 hover:text-slate-800"}`}>
+                <Icon className="w-3.5 h-3.5" /><span>{label}</span>
+              </button>
+            ))}
           </div>
         </div>
 
@@ -248,6 +241,10 @@ export default function CreditsDashboard({
             </div>
           </div>
         </div>
+
+        {(activeSubTab === "resources" || activeSubTab === "favorites" || activeSubTab === "personal_tags") && (
+          <PersonalResourceCenter mode={activeSubTab} assets={assets} onToast={showToast} />
+        )}
 
         {/* TAB 1: 个人信息 (PROFILE TAB) */}
         {activeSubTab === "profile" && (

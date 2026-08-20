@@ -75,12 +75,16 @@ export interface Task {
   id: string;
   name: string;
   type: "detail_set" | "watermark" | "subtitle" | "enhance" | "video_gen" | "image_gen" | "fission";
-  status: "queue" | "generating" | "completed" | "failed";
+  status: "queue" | "generating" | "completed" | "failed" | "cancelled";
   progress: number;
   inputFiles: string[];
   outputFiles?: string[];
   createdAt: string;
   creditsCost: number;
+  source?: "agent" | "tool";
+  cancelledAt?: string;
+  refundedCredits?: number;
+  failureReason?: string;
 }
 
 export interface CreditTransaction {

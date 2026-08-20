@@ -3902,7 +3902,7 @@ export default function AdminSystemManagementView() {
         {activeTab === "system_settings" && (
           <div className="space-y-6 pb-12">
             {/* 1. 视频下载/推送/复制到剪映 */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
+            <div className="hidden bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
               <div className="flex items-center gap-2 border-l-4 border-[#7C3AED] pl-2.5">
                 <h3 className="text-sm font-extrabold text-slate-900">视频下载/推送/复制到剪映</h3>
               </div>
@@ -4090,7 +4090,7 @@ export default function AdminSystemManagementView() {
             </div>
 
             {/* 5. 发布多少天后开放下载/复制到剪映 */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
+            <div className="hidden bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
               <div className="flex items-center justify-between border-l-4 border-[#7C3AED] pl-2.5">
                 <h3 className="text-sm font-extrabold text-slate-900">发布多少天后开放下载/复制到剪映</h3>
                 <span className="text-xs text-slate-400 font-normal">设置成片、素材、第三方、图片、文案、音频发布后多久可以下载/复制到剪映</span>
@@ -4253,7 +4253,7 @@ export default function AdminSystemManagementView() {
             </div>
 
             {/* 7. 发布多少天后支持推送 */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
+            <div className="hidden bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
               <div className="flex items-center justify-between border-l-4 border-[#7C3AED] pl-2.5">
                 <h3 className="text-sm font-extrabold text-slate-900">发布多少天后支持推送</h3>
                 <span className="text-xs text-slate-400 font-normal">设置多少天后可以推送至广告账户</span>
@@ -4601,7 +4601,7 @@ export default function AdminSystemManagementView() {
             </div>
 
             {/* 11. 下载+复制到剪映报警 */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
+            <div className="hidden bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
               <div className="flex items-center gap-2 border-l-4 border-[#7C3AED] pl-2.5">
                 <h3 className="text-sm font-extrabold text-slate-900">下载+复制到剪映报警</h3>
               </div>
