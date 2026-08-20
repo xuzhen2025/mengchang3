@@ -656,9 +656,9 @@ export default function HomeView({
                     value={searchType}
                     onChange={(event) => {
                       setSearchType(event.target.value as ResourceSearchType);
-                      setSearchPanelOpen(true);
+                      setSearchPanelOpen(false);
                     }}
-                    onFocus={() => setSearchPanelOpen(true)}
+                    onFocus={() => setSearchPanelOpen(false)}
                     className="h-12 appearance-none bg-transparent pl-4 pr-10 text-sm font-bold text-slate-800 outline-none cursor-pointer"
                   >
                     {RESOURCE_SEARCH_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
