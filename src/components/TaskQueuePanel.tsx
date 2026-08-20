@@ -218,7 +218,7 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
       </div>
 
       <footer className="border-t border-slate-200 bg-slate-50 px-4 py-3 text-center text-[11px] text-slate-500">
-        {tab === "recent" ? <>近期任务按时间倒序展示最近 {Math.min(20, sortedTasks.length)} 条，更多请查看 <button onClick={() => setTab("all")} className="font-bold text-violet-700 hover:underline">全部任务</button></> : <>当前共 {visibleTasks.length} 条任务，全部历史任务长期保留</>}
+        {tab === "recent" ? <>近期任务仅展示最近20条，更多请查看 <button onClick={() => setTab("all")} className="font-bold text-violet-700 hover:underline">全部任务</button></> : <>当前共 {visibleTasks.length} 条任务，全部历史任务长期保留</>}
       </footer>
     </aside>
   );
