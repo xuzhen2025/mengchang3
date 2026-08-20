@@ -182,7 +182,7 @@ const getWorkTypeMeta = (type: AssociatedWorkItem["type"]) => {
   return { label: "音", className: "bg-blue-600" };
 };
 
-const INITIAL_TASKS: TaskItem[] = [
+export const INITIAL_TASKS: TaskItem[] = [
   {
     id: "08201150318",
     publisher: "徐振",

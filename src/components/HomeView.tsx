@@ -53,6 +53,7 @@ import {
 import { ActiveScreen, AppMessage, ResourceSearchIntent, ResourceSearchType } from "../types";
 import { MESSAGE_CATEGORY_CONFIGS } from "../data";
 import ApprovalActionBox from "./ApprovalActionBox";
+import { INITIAL_TASKS as COLLABORATION_TASKS, type TaskItem as CollaborationTaskItem } from "./TaskCollaborationView";
 
 interface HomeViewProps {
   setActiveScreen: (screen: ActiveScreen) => void;
@@ -117,20 +118,6 @@ interface MessageItem {
 }
 
 // Task Item
-interface TaskItem {
-  id: string;
-  title: string;
-  ownerType: "assigned" | "published"; // 给我的, 我发布的
-  status: "pending" | "completed"; // 待完成, 已达标
-  creatorOrAssignee: string;
-  targetMetric: string;
-  currentProgress: number;
-  totalProgress: number;
-  deadline: string;
-  priority: "high" | "medium" | "low";
-  category: string;
-}
-
 // Update Log
 interface UpdateLogItem {
   version: string;
@@ -421,86 +408,13 @@ export default function HomeView({
   };
 
   // ================= 3. TASK CENTER MODULE STATES =================
-  const [allTasks] = useState<TaskItem[]>([
-    {
-      id: "tk1",
-      title: "制作 3 条冬季女装微距质感短片",
-      ownerType: "assigned",
-      status: "pending",
-      creatorOrAssignee: "运营主管·张姐",
-      targetMetric: "转化率目标 > 3.8%",
-      currentProgress: 2,
-      totalProgress: 3,
-      deadline: "今日 20:00",
-      priority: "high",
-      category: "爆款视频"
-    },
-    {
-      id: "tk2",
-      title: "对 10 条高曝光原片进行字幕擦除与去水印",
-      ownerType: "assigned",
-      status: "pending",
-      creatorOrAssignee: "投放总监·王经理",
-      targetMetric: "高清晰度极速提审",
-      currentProgress: 6,
-      totalProgress: 10,
-      deadline: "明日 12:00",
-      priority: "high",
-      category: "视频处理"
-    },
-    {
-      id: "tk3",
-      title: "产出美妆护肤品多场景商详套图",
-      ownerType: "assigned",
-      status: "completed",
-      creatorOrAssignee: "品牌设计·Mark",
-      targetMetric: "详情页停留时长提升20%",
-      currentProgress: 5,
-      totalProgress: 5,
-      deadline: "已达标",
-      priority: "medium",
-      category: "套图分析"
-    },
-    {
-      id: "tk4",
-      title: "AI数字人口播视频套件 (5组)",
-      ownerType: "published",
-      status: "completed",
-      creatorOrAssignee: "短视频创作组·小李",
-      targetMetric: "完成口播录制与渲染",
-      currentProgress: 5,
-      totalProgress: 5,
-      deadline: "已达标",
-      priority: "high",
-      category: "数字人"
-    },
-    {
-      id: "tk5",
-      title: "针对数码新品进行爆款裂变重组",
-      ownerType: "published",
-      status: "pending",
-      creatorOrAssignee: "内容运营·陈晨",
-      targetMetric: "产出12条高去重裂变成品",
-      currentProgress: 8,
-      totalProgress: 12,
-      deadline: "明日 18:00",
-      priority: "medium",
-      category: "爆款裂变"
-    },
-    {
-      id: "tk6",
-      title: "自动化千川投放链路推流测试",
-      ownerType: "published",
-      status: "pending",
-      creatorOrAssignee: "技术对接·老张",
-      targetMetric: "API 响应耗时 < 200ms",
-      currentProgress: 1,
-      totalProgress: 4,
-      deadline: "后天 12:00",
-      priority: "low",
-      category: "投放对接"
-    }
-  ]);
+  const currentUser = "徐振";
+  const assignedTasks = COLLABORATION_TASKS.filter((task) => task.assignee === currentUser);
+  const publishedTasks = COLLABORATION_TASKS.filter((task) => task.publisher === currentUser);
+  const pendingTaskCount = (tasks: CollaborationTaskItem[]) =>
+    tasks.filter((task) => task.status === "pending" || task.status === "in_progress").length;
+  const achievedTaskCount = (tasks: CollaborationTaskItem[]) =>
+    tasks.filter((task) => task.status === "review" || task.status === "completed").length;
 
   // ================= 4. MESSAGE CENTER MODAL STATES (右上角消息中心) =================
   const [isMessageCenterOpen, setIsMessageCenterOpen] = useState(false);
@@ -961,17 +875,17 @@ export default function HomeView({
                     </div>
                     <div className="flex items-center gap-2 text-[11px]">
                       <span className="px-2 py-0.5 rounded-md bg-amber-100/80 text-amber-800 font-bold">
-                        待完成 <strong className="font-black">{allTasks.filter(t => t.ownerType === "assigned" && t.status === "pending").length}</strong>
+                        待完成 <strong className="font-black">{pendingTaskCount(assignedTasks)}</strong>
                       </span>
                       <span className="px-2 py-0.5 rounded-md bg-emerald-100/80 text-emerald-800 font-bold">
-                        已达标 <strong className="font-black">{allTasks.filter(t => t.ownerType === "assigned" && t.status === "completed").length}</strong>
+                        已达标 <strong className="font-black">{achievedTaskCount(assignedTasks)}</strong>
                       </span>
                     </div>
                   </div>
 
                   <div className="text-right shrink-0">
                     <div className="text-xl font-black text-purple-700 group-hover:scale-110 transition-transform">
-                      {allTasks.filter(t => t.ownerType === "assigned").length} <span className="text-xs font-bold text-slate-500">项</span>
+                      {assignedTasks.length} <span className="text-xs font-bold text-slate-500">项</span>
                     </div>
                     <span className="text-[10px] text-purple-600 font-bold group-hover:underline">点击进入 →</span>
                   </div>
@@ -992,17 +906,17 @@ export default function HomeView({
                     </div>
                     <div className="flex items-center gap-2 text-[11px]">
                       <span className="px-2 py-0.5 rounded-md bg-amber-100/80 text-amber-800 font-bold">
-                        待完成 <strong className="font-black">{allTasks.filter(t => t.ownerType === "published" && t.status === "pending").length}</strong>
+                        待完成 <strong className="font-black">{pendingTaskCount(publishedTasks)}</strong>
                       </span>
                       <span className="px-2 py-0.5 rounded-md bg-emerald-100/80 text-emerald-800 font-bold">
-                        已达标 <strong className="font-black">{allTasks.filter(t => t.ownerType === "published" && t.status === "completed").length}</strong>
+                        已达标 <strong className="font-black">{achievedTaskCount(publishedTasks)}</strong>
                       </span>
                     </div>
                   </div>
 
                   <div className="text-right shrink-0">
                     <div className="text-xl font-black text-blue-700 group-hover:scale-110 transition-transform">
-                      {allTasks.filter(t => t.ownerType === "published").length} <span className="text-xs font-bold text-slate-500">项</span>
+                      {publishedTasks.length} <span className="text-xs font-bold text-slate-500">项</span>
                     </div>
                     <span className="text-[10px] text-blue-600 font-bold group-hover:underline">点击进入 →</span>
                   </div>
@@ -1023,17 +937,17 @@ export default function HomeView({
                     </div>
                     <div className="flex items-center gap-2 text-[11px]">
                       <span className="px-2 py-0.5 rounded-md bg-amber-100/80 text-amber-800 font-bold">
-                        待完成 <strong className="font-black">{allTasks.filter(t => t.status === "pending").length}</strong>
+                        待完成 <strong className="font-black">{pendingTaskCount(COLLABORATION_TASKS)}</strong>
                       </span>
                       <span className="px-2 py-0.5 rounded-md bg-emerald-100/80 text-emerald-800 font-bold">
-                        已达标 <strong className="font-black">{allTasks.filter(t => t.status === "completed").length}</strong>
+                        已达标 <strong className="font-black">{achievedTaskCount(COLLABORATION_TASKS)}</strong>
                       </span>
                     </div>
                   </div>
 
                   <div className="text-right shrink-0">
                     <div className="text-xl font-black text-slate-900 group-hover:scale-110 transition-transform">
-                      {allTasks.length} <span className="text-xs font-bold text-slate-500">项</span>
+                      {COLLABORATION_TASKS.length} <span className="text-xs font-bold text-slate-500">项</span>
                     </div>
                     <span className="text-[10px] text-slate-600 font-bold group-hover:underline">点击进入 →</span>
                   </div>

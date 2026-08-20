@@ -260,6 +260,7 @@ export default function AdminResourceView() {
     isBatch?: boolean;
     itemType?: string;
   }>({ isOpen: false });
+  const [moveToTrashItem, setMoveToTrashItem] = useState<AdminResourceItem | null>(null);
 
   // 一键清空 密码确认弹窗状态
   const [clearTrashModalOpen, setClearTrashModalOpen] = useState<boolean>(false);
@@ -827,14 +828,6 @@ export default function AdminResourceView() {
                   批量恢复
                 </button>
 
-                <button
-                  type="button"
-                  onClick={handleOpenClearTrashModal}
-                  className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-2xs"
-                >
-                  一键清空
-                </button>
-
                 {selectedIds.length > 0 && (
                   <span className="text-xs font-extrabold text-purple-600 ml-1">
                     已选中 {selectedIds.length} 项
@@ -842,6 +835,14 @@ export default function AdminResourceView() {
                 )}
               </>
             )}
+
+            <button
+              type="button"
+              onClick={handleOpenClearTrashModal}
+              className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-2xs"
+            >
+              一键清空
+            </button>
           </div>
         )}
       </div>
@@ -932,7 +933,7 @@ export default function AdminResourceView() {
                         </div>
                       </div>
 
-                      {/* 操作快捷按钮：回收站有恢复+彻底删除，其他类目仅有彻底删除 */}
+                      {/* 普通资源删除后进入回收站；回收站内才允许恢复或彻底删除 */}
                       <div className="flex items-center gap-3 pt-2">
                         {activeTab === "回收站" && (
                           <button
@@ -955,12 +956,13 @@ export default function AdminResourceView() {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleRequestPermanentDelete(item);
+                            if (activeTab === "回收站") handleRequestPermanentDelete(item);
+                            else setMoveToTrashItem(item);
                           }}
                           className="text-[11px] text-slate-400 hover:text-red-600 font-bold flex items-center gap-1 cursor-pointer shrink-0"
                         >
                           <Trash2 className="w-3 h-3" />
-                          <span>彻底删除</span>
+                          <span>{activeTab === "回收站" ? "彻底删除" : "删除"}</span>
                         </button>
                       </div>
                     </div>
@@ -984,6 +986,39 @@ export default function AdminResourceView() {
           }}
         />
       </div>
+
+      {moveToTrashItem && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px] animate-in fade-in duration-200">
+          <div className="w-full max-w-[420px] overflow-hidden rounded-xl border border-slate-100/80 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-5 pb-1 pt-4">
+              <h3 className="text-base font-bold text-slate-800">删除资源</h3>
+              <button type="button" onClick={() => setMoveToTrashItem(null)} className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex items-center gap-3.5 px-6 py-5">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500 text-sm font-bold text-white shadow-2xs">!</div>
+              <div>
+                <p className="text-sm font-medium text-slate-700">确认删除《{moveToTrashItem.name}》？</p>
+                <p className="mt-1 text-xs text-slate-500">删除后将移入回收站，可在回收站中恢复。</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 px-5 pb-4">
+              <button type="button" onClick={() => setMoveToTrashItem(null)} className="rounded-lg border border-slate-300 px-4 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50">取消</button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleMoveToTrash(moveToTrashItem.id);
+                  setMoveToTrashItem(null);
+                }}
+                className="rounded-lg bg-purple-600 px-5 py-1.5 text-sm font-medium text-white shadow-2xs transition-colors hover:bg-purple-700"
+              >
+                确认删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ============================================================ */}
       {/* 彻底删除 确认弹窗 (对应截图1) */}
