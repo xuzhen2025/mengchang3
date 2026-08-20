@@ -112,9 +112,9 @@ const INITIAL_TASKS: TaskItem[] = [
     cost: 360,
     associatedScript: { title: "【秋季风衣】通勤场景三版混剪", status: "可以拍摄", versionCount: 2 },
     associatedWorks: [
-      { id: "review-w-1", type: "video", name: "风衣通勤地铁版_V1.mp4", status: "待审核", author: "梁浩然" },
-      { id: "review-w-2", type: "video", name: "风衣办公室版_V2.mp4", status: "未审核", author: "梁浩然" },
-      { id: "review-w-3", type: "image", name: "风衣面料防风细节图.png", status: "已通过", author: "梁浩然" }
+      { id: "review-w-1", type: "video", name: "风衣通勤地铁版_V1.mp4", status: "待审核", author: "梁浩然", createdAt: "2026-08-20 09:18", coverUrl: "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=480&auto=format&fit=crop&q=80" },
+      { id: "review-w-2", type: "video", name: "风衣办公室版_V2.mp4", status: "未审核", author: "梁浩然", createdAt: "2026-08-20 10:06", coverUrl: "https://images.unsplash.com/photo-1551028719-00167b16eac5?w=480&auto=format&fit=crop&q=80" },
+      { id: "review-w-3", type: "video", name: "风衣面料防风细节版_V3.mp4", status: "已通过", author: "梁浩然", createdAt: "2026-08-20 10:32", coverUrl: "https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?w=480&auto=format&fit=crop&q=80" }
     ],
     product: "秋季通勤风衣",
     scriptType: "场景混剪",
@@ -1741,7 +1741,6 @@ export default function TaskCollaborationView({
 
   const handleConfirmTaskCompletion = (task: TaskItem) => {
     if (task.publisher !== currentUser || task.status !== "review") return;
-    if (!window.confirm(`确认任务 ${task.id} 已完成？确认后将固化当前 ${task.associatedWorks?.length || 0} 个资源的历史快照，后续不再自动回退。`)) return;
     const completedAt = new Date().toLocaleString("zh-CN", { hour12: false });
     const completedTask: TaskItem = {
       ...task,
@@ -1760,6 +1759,7 @@ export default function TaskCollaborationView({
     } catch {
       // The in-memory snapshot still demonstrates the completed-state flow.
     }
+    setDetailModalTask(completedTask);
     showToast(`任务 ${task.id} 已确认完成，历史快照已保留`);
   };
 
@@ -2040,6 +2040,8 @@ export default function TaskCollaborationView({
     return (
       <TaskDetailPage
         task={detailModalTask}
+        canConfirmComplete={detailModalTask.status === "review" && detailModalTask.publisher === currentUser}
+        onConfirmComplete={() => handleConfirmTaskCompletion(detailModalTask)}
         onBack={() => {
           setDetailModalTask(null);
           if (onClearInitialDetailTask) {
@@ -3016,15 +3018,6 @@ export default function TaskCollaborationView({
                     {/* 4. 操作 (详情, 编辑, 复制, 删除) */}
                     <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
                       <div className="flex items-center justify-center gap-2.5 font-medium text-purple-600">
-                        {task.status === "review" && task.publisher === currentUser && (
-                          <button
-                            onClick={() => handleConfirmTaskCompletion(task)}
-                            className="rounded bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-emerald-700"
-                            title="确认后保存历史快照，任务不再自动回退"
-                          >
-                            确认完成
-                          </button>
-                        )}
                         <button
                           onClick={() => setDetailModalTask(task)}
                           className="hover:underline cursor-pointer"

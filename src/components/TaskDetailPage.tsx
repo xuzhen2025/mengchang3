@@ -31,7 +31,9 @@ import {
   Film,
   Image as ImageIcon,
   Music,
-  X
+  X,
+  Eye,
+  Download
 } from "lucide-react";
 import { TaskItem } from "./TaskCollaborationView";
 
@@ -39,12 +41,16 @@ interface TaskDetailPageProps {
   task: TaskItem;
   onBack: () => void;
   onShowToast: (msg: string) => void;
+  canConfirmComplete?: boolean;
+  onConfirmComplete?: () => void;
 }
 
 export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
   task,
   onBack,
   onShowToast,
+  canConfirmComplete = false,
+  onConfirmComplete,
 }) => {
   // Main Sub-tabs: 成片 | 素材 | 脚本 | 图片 | 音频
   const [activeTab, setActiveTab] = useState<"成片" | "素材" | "脚本" | "图片" | "音频">("成片");
@@ -81,82 +87,57 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
   const [isUploadTypeSelectModalOpen, setIsUploadTypeSelectModalOpen] = useState(false);
   const [isAssociateScriptModalOpen, setIsAssociateScriptModalOpen] = useState(false);
   const [isUploadScriptModalOpen, setIsUploadScriptModalOpen] = useState(false);
+  const [showConfirmCompleteModal, setShowConfirmCompleteModal] = useState(false);
 
-  // Mock Associated Scripts List
-  const [associatedScripts, setAssociatedScripts] = useState([
-    {
-      id: "SCR-001",
-      title: task.associatedScript?.title || "改写",
-      template: task.associatedScript?.template || "二创衍生",
-      tag: "二创/爆款",
-      status: task.associatedScript?.status || "待审核",
-      publisher: task.publisher || "莫钦全",
-      publishTime: "2026-06-20 20:11:08",
-    },
-    {
-      id: "SCR-002",
-      title: "改写",
-      template: "二创衍生",
-      tag: "二创",
-      status: "待审核",
-      publisher: "莫钦全",
-      publishTime: "2026-06-20 20:11:21",
-    },
-    {
-      id: "SCR-003",
-      title: "改写",
-      template: "二创衍生",
-      tag: "二创",
-      status: "待审核",
-      publisher: "莫钦全",
-      publishTime: "2026-06-20 20:11:36",
-    },
-    {
-      id: "SCR-004",
-      title: "改写",
-      template: "二创衍生",
-      tag: "二创",
-      status: "待审核",
-      publisher: "莫钦全",
-      publishTime: "2026-06-20 20:11:48",
-    },
-    {
-      id: "SCR-005",
-      title: "改写",
-      template: "二创衍生",
-      tag: "二创",
-      status: "待审核",
-      publisher: "莫钦全",
-      publishTime: "2026-06-20 20:12:00",
-    },
-    {
-      id: "SCR-006",
-      title: "改写",
-      template: "二创衍生",
-      tag: "二创",
-      status: "待审核",
-      publisher: "莫钦全",
-      publishTime: "2026-06-20 20:12:12",
-    },
-    {
-      id: "SCR-007",
-      title: "改写",
-      template: "二创衍生",
-      tag: "二创",
-      status: "待审核",
-      publisher: "莫钦全",
-      publishTime: "2026-06-20 20:12:27",
-    },
-    {
-      id: "SCR-008",
-      title: "改写",
-      template: "二创衍生",
-      tag: "二创",
-      status: "待审核",
-      publisher: "莫钦全",
-      publishTime: "2026-06-20 20:12:39",
+  const [associatedScripts, setAssociatedScripts] = useState<Array<{
+    id: string;
+    title: string;
+    template: string;
+    tag: string;
+    status: string;
+    publisher: string;
+    publishTime: string;
+  }>>(() => {
+    const scripts = task.associatedScripts?.length ? task.associatedScripts : task.associatedScript ? [task.associatedScript] : [];
+    return scripts.map((script, index) => ({
+      id: script.id || `SCR-${task.id}-${index + 1}`,
+      title: script.title,
+      template: script.template || "通用模板",
+      tag: script.scriptType || task.scriptType || "任务脚本",
+      status: script.status,
+      publisher: task.publisher,
+      publishTime: script.publishTime || `${task.publishDate} 10:00:00`
+    }));
+  });
+
+  const taskWorks = task.status === "completed" && task.completionSnapshot?.length
+    ? task.completionSnapshot
+    : task.associatedWorks || [];
+  const getWorkTab = (type: string): "成片" | "素材" | "图片" | "音频" => {
+    if (type === "video" || type === "成片") return "成片";
+    if (type === "image" || type === "图片") return "图片";
+    if (type === "audio" || type === "音频") return "音频";
+    return "素材";
+  };
+  const tabCounts = {
+    成片: taskWorks.filter((work) => getWorkTab(work.type) === "成片").length,
+    素材: taskWorks.filter((work) => getWorkTab(work.type) === "素材").length,
+    脚本: associatedScripts.length,
+    图片: taskWorks.filter((work) => getWorkTab(work.type) === "图片").length,
+    音频: taskWorks.filter((work) => getWorkTab(work.type) === "音频").length
+  };
+  const visibleWorks = activeTab === "脚本" ? [] : taskWorks.filter((work) => {
+    if (getWorkTab(work.type) !== activeTab) return false;
+    if (l2Search.trim() && !work.name.toLowerCase().includes(l2Search.trim().toLowerCase())) return false;
+    if (authorFilter.trim() && !(work.author || "").includes(authorFilter.trim())) return false;
+    if (statusFilter !== "全部") {
+      const accepted = statusFilter === "审核通过" ? ["审核通过", "已通过"] : [statusFilter];
+      if (!accepted.includes(work.status || "")) return false;
     }
-  ]);
+    if (startDate && (work.createdAt || task.publishDate).slice(0, 10) < startDate) return false;
+    if (endDate && (work.createdAt || task.publishDate).slice(0, 10) > endDate) return false;
+    return true;
+  });
 
   // If user opened an upload page view, render the corresponding upload component (same as ResourcesView)
   if (uploadPageView) {
@@ -358,15 +339,26 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
               </span>
             </div>
 
-            {task.status !== "completed" && (
-              <button
-                onClick={() => setIsUploadTypeSelectModalOpen(true)}
-                className="px-4 py-1.5 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold rounded-lg shadow-2xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
-              >
-                <UploadCloud className="w-4 h-4" />
-                <span>去上传作品</span>
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {canConfirmComplete && (
+                <button
+                  onClick={() => setShowConfirmCompleteModal(true)}
+                  className="px-4 py-2 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold rounded-lg shadow-2xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>验收并确认完成</span>
+                </button>
+              )}
+              {task.status !== "completed" && !canConfirmComplete && (
+                <button
+                  onClick={() => setIsUploadTypeSelectModalOpen(true)}
+                  className="px-4 py-2 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold rounded-lg shadow-2xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                >
+                  <UploadCloud className="w-4 h-4" />
+                  <span>去上传作品</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -383,7 +375,10 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
                 activeTab === tab ? "text-[#7C3AED]" : "text-slate-500 hover:text-slate-800"
               }`}
             >
-              {tab}
+              <span>{tab}</span>
+              <span className={`ml-1.5 rounded px-1.5 py-0.5 text-[10px] ${activeTab === tab ? "bg-purple-100 text-purple-700" : "bg-slate-100 text-slate-400"}`}>
+                {tabCounts[tab]}
+              </span>
               {activeTab === tab && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#7C3AED] rounded-full" />
               )}
@@ -394,10 +389,10 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
         {/* Right Stats */}
         <div className="flex items-center gap-6 text-xs text-slate-500 font-medium shrink-0">
           <div>
-            任务作品数: <span className="font-mono font-bold text-slate-800">0个</span>
+            任务作品数: <span className="font-mono font-bold text-slate-800">{taskWorks.length}个</span>
           </div>
           <div>
-            有权限查看: <span className="font-mono font-bold text-slate-800">0个</span>
+            有权限查看: <span className="font-mono font-bold text-slate-800">{taskWorks.length}个</span>
           </div>
         </div>
       </div>
@@ -738,18 +733,52 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
         </div>
       </div>
 
-      {/* SECTION 5: Media Content Area (Empty State) */}
-      <div className="bg-white rounded-xl border border-slate-200/80 p-12 shadow-2xs flex flex-col items-center justify-center text-center space-y-3 min-h-[220px]">
-        <div className="w-24 h-24 rounded-2xl bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-300 shadow-inner">
-          <Box className="w-12 h-12 stroke-[1.2]" />
+      {/* SECTION 5: Task Resource Results */}
+      <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs min-h-[220px]">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-extrabold text-slate-900">{activeTab}文件</h2>
+            <p className="mt-1 text-[11px] text-slate-400">验收以任务关联文件为准，未审核文件同样计入提交数量</p>
+          </div>
+          <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">当前显示 {activeTab === "脚本" ? associatedScripts.length : visibleWorks.length} 个</span>
         </div>
-        <p className="text-slate-400 font-bold text-sm">暂无数据</p>
-        <button
-          onClick={() => setUploadPageView(activeTab)}
-          className="mt-1 px-4 py-1.5 bg-purple-50 text-[#7C3AED] hover:bg-purple-100 font-bold rounded-lg text-xs transition-colors cursor-pointer"
-        >
-          上传此分类作品/素材 ({activeTab})
-        </button>
+
+        {activeTab === "脚本" ? (
+          <div className="flex min-h-[150px] items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/60 text-center">
+            <div><FileText className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-2 text-xs font-bold text-slate-600">已关联 {associatedScripts.length} 个脚本</p><p className="mt-1 text-[11px] text-slate-400">脚本版本与审核状态请在下方“关联脚本”中查看</p></div>
+          </div>
+        ) : visibleWorks.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {visibleWorks.map((work) => {
+              const workTab = getWorkTab(work.type);
+              const WorkIcon = workTab === "成片" ? Film : workTab === "图片" ? ImageIcon : workTab === "音频" ? Music : FileText;
+              const passed = work.status === "已通过" || work.status === "审核通过";
+              return (
+                <article key={work.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white transition-all hover:border-purple-300 hover:shadow-md">
+                  <div className="relative aspect-video bg-slate-100">
+                    {work.coverUrl ? <img src={work.coverUrl} alt={work.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : <div className="flex h-full items-center justify-center"><WorkIcon className="h-10 w-10 text-slate-300" /></div>}
+                    <span className="absolute left-2 top-2 rounded bg-slate-950/75 px-2 py-1 text-[10px] font-bold text-white">{workTab}</span>
+                    <span className={`absolute right-2 top-2 rounded px-2 py-1 text-[10px] font-bold ${passed ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"}`}>{work.status || "未审核"}</span>
+                  </div>
+                  <div className="p-3">
+                    <p className="truncate text-xs font-bold text-slate-800" title={work.name}>{work.name}</p>
+                    <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400"><span>上传人：{work.author || task.assignee}</span><span>{work.createdAt || `${task.deadlineDate} 12:00`}</span></div>
+                    <div className="mt-3 flex items-center justify-end gap-2 border-t border-slate-100 pt-2.5">
+                      <button onClick={() => onShowToast(`正在查看《${work.name}》`)} className="flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1.5 text-[11px] font-bold text-slate-600 hover:border-purple-300 hover:text-purple-700"><Eye className="h-3.5 w-3.5" />查看</button>
+                      <button onClick={() => onShowToast(`已开始下载《${work.name}》`)} className="flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1.5 text-[11px] font-bold text-slate-600 hover:border-purple-300 hover:text-purple-700"><Download className="h-3.5 w-3.5" />下载</button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex min-h-[170px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/40 text-center">
+            <Box className="h-10 w-10 text-slate-300" />
+            <p className="mt-2 text-xs font-bold text-slate-500">{tabCounts[activeTab] > 0 ? "当前筛选条件下暂无文件" : `暂无${activeTab}文件`}</p>
+            {task.status !== "completed" && <button onClick={() => setUploadPageView(activeTab)} className="mt-3 rounded-md bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700 hover:bg-purple-100">上传{activeTab}</button>}
+          </div>
+        )}
       </div>
 
       {/* SECTION 6: 关联脚本 Section Table */}
@@ -839,6 +868,51 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
           </table>
         </div>
       </div>
+
+      {/* MODAL: 发布人验收确认 */}
+      {showConfirmCompleteModal && (
+        <div className="fixed inset-0 z-[220] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">确认任务验收完成</h3>
+                <p className="mt-1 text-xs text-slate-500">请确认已查看本任务提交的全部文件</p>
+              </div>
+              <button onClick={() => setShowConfirmCompleteModal(false)} title="关闭" className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="h-5 w-5" /></button>
+            </div>
+
+            <div className="space-y-4 p-5">
+              <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-center">
+                <div className="border-r border-slate-200 px-3 py-3"><p className="text-[10px] text-slate-400">提交人</p><p className="mt-1 text-xs font-bold text-slate-800">{task.assignee}</p></div>
+                <div className="border-r border-slate-200 px-3 py-3"><p className="text-[10px] text-slate-400">完成数量</p><p className="mt-1 font-mono text-xs font-bold text-emerald-600">{task.completedCount}/{task.orderCount}</p></div>
+                <div className="px-3 py-3"><p className="text-[10px] text-slate-400">历史快照</p><p className="mt-1 text-xs font-bold text-slate-800">{taskWorks.length} 个文件</p></div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200">
+                <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5"><span className="text-xs font-bold text-slate-700">本次验收内容</span><span className="text-[10px] text-slate-400">任务 ID：{task.id}</span></div>
+                <div className="max-h-48 divide-y divide-slate-100 overflow-y-auto">
+                  {taskWorks.map((work) => (
+                    <div key={work.id} className="flex items-center gap-3 px-3 py-2.5">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded bg-slate-100">{work.coverUrl ? <img src={work.coverUrl} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : <FileText className="h-4 w-4 text-slate-400" />}</div>
+                      <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-slate-800">{work.name}</p><p className="mt-0.5 text-[10px] text-slate-400">{getWorkTab(work.type)} · {work.author || task.assignee}</p></div>
+                      <span className={`rounded px-2 py-1 text-[10px] font-bold ${work.status === "已通过" || work.status === "审核通过" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{work.status || "未审核"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3 text-[11px] leading-5 text-amber-800">
+                确认后任务进入“已完成”，系统将保存当前文件及状态快照。后续原资源被修改、解绑或移入回收站时，本任务历史结果不再自动回退。
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
+              <button onClick={() => setShowConfirmCompleteModal(false)} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100">继续查看</button>
+              <button onClick={() => { onConfirmComplete?.(); setShowConfirmCompleteModal(false); }} className="flex items-center gap-1.5 rounded-md bg-[#7C3AED] px-4 py-2 text-xs font-bold text-white hover:bg-purple-700"><Check className="h-4 w-4" />确认完成</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL: 选择作品/素材上传类型 */}
       {isUploadTypeSelectModalOpen && (
