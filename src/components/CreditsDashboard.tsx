@@ -1,15 +1,12 @@
 import React, { useState } from "react";
 import { 
   User, 
-  Building2, 
   Coins, 
   Filter, 
-  Clock, 
   Key, 
   Send, 
   CheckCircle, 
   X, 
-  Lock, 
   Sparkles,
   FileText,
   ShieldCheck,
@@ -19,6 +16,8 @@ import {
 } from "lucide-react";
 import { Asset, CreditTransaction } from "../types";
 import PersonalResourceCenter from "./PersonalResourceCenterV2";
+import ChangePasswordModal from "./ChangePasswordModal";
+import PersonalInformationPanel from "./PersonalInformationPanel";
 
 interface CreditsDashboardProps {
   credits: number;
@@ -61,14 +60,6 @@ export default function CreditsDashboard({
   });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Change Password Form
-  const [passwordForm, setPasswordForm] = useState({
-    oldPassword: "",
-    newPassword: "",
-    confirmPassword: ""
-  });
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
@@ -103,29 +94,6 @@ export default function CreditsDashboard({
       reason: "",
       project: ""
     });
-  };
-
-  // Submit Password Change
-  const handleChangePasswordSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPasswordError(null);
-
-    if (!passwordForm.oldPassword) {
-      setPasswordError("请输入当前原密码");
-      return;
-    }
-    if (!passwordForm.newPassword || passwordForm.newPassword.length < 6) {
-      setPasswordError("新密码长度不能少于 6 位");
-      return;
-    }
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setPasswordError("两次输入的新密码不一致");
-      return;
-    }
-
-    showToast("🔒 密码修改成功！请妥善保管您的新登录密码。");
-    setShowChangePasswordModal(false);
-    setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
   };
 
   // Filter logic
@@ -248,48 +216,20 @@ export default function CreditsDashboard({
 
         {/* TAB 1: 个人信息 (PROFILE TAB) */}
         {activeSubTab === "profile" && (
-          <div className="space-y-6">
-            {/* Header User Profile Card */}
-            <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-purple-100/40 to-pink-100/20 rounded-full blur-3xl pointer-events-none" />
-
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative z-10">
-                <div className="flex items-center gap-5">
-                  <div className="relative">
-                    <img
-                      src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&h=120&fit=crop"
-                      alt="User Avatar"
-                      className="w-20 h-20 rounded-2xl border-2 border-purple-500/30 object-cover shadow-md"
-                      referrerPolicy="no-referrer"
-                    />
-                    <span className="absolute -bottom-1 -right-1 bg-emerald-500 border-2 border-white w-4 h-4 rounded-full" title="当前在线" />
-                  </div>
-
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className="text-lg font-black text-slate-900">徐振</h2>
-                      <span className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full shadow-xs">
-                        剪辑师
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-slate-500 mt-1 flex items-center gap-3 flex-wrap">
-                      <span className="font-mono">工号: ZS-008</span>
-                      <span>•</span>
-                      <span>手机号: 138****8888</span>
-                      <span>•</span>
-                      <span>邮箱: xuzhen@dreamchang.com</span>
-                    </p>
-
-                    <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-400">
-                      <Clock className="w-3.5 h-3.5 text-purple-500" />
-                      <span>最近登录: 2026-08-05 23:20 (IP: 110.88.24.18 - 本地局域网)</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto flex-wrap">
+          <PersonalInformationPanel
+            name="徐振"
+            role="剪辑师"
+            employeeId="ZS-008"
+            phone="138****8888"
+            email="xuzhen@dreamchang.com"
+            recentLogin="最近登录: 2026-08-05 23:20 (IP: 110.88.24.18 - 本地局域网)"
+            company="梦畅AIGC"
+            companyLevel="1级公司 (HQ-001)"
+            parentNode="最高公司节点 (无上级)"
+            structureType="公司 > 部门 > 分组 > 人员"
+            hierarchySummary="电商投放一部 (女装千川放量组、美妆珠宝爆款组)、品牌效果投放部、AIGC爆款内容拆解部 (千川剧本拆解小组)、视频智能剪辑中心"
+            actions={(
+              <>
                   <button
                     onClick={() => setShowChangePasswordModal(true)}
                     className="flex-1 sm:flex-none px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer text-center flex items-center justify-center gap-1.5"
@@ -304,49 +244,9 @@ export default function CreditsDashboard({
                     <Send className="w-3.5 h-3.5" />
                     <span>申请积分</span>
                   </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Department Hierarchy */}
-            <div className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-xs space-y-4">
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                <Building2 className="w-4 h-4 text-purple-600" />
-                <h3 className="text-sm font-extrabold text-slate-800">所属部门与分组架构</h3>
-              </div>
-
-              <div className="space-y-3 text-xs">
-                <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between">
-                  <div>
-                    <p className="text-[10px] text-slate-400 font-medium">所属主体/公司</p>
-                    <p className="font-bold text-slate-800 text-sm mt-0.5">梦畅AIGC</p>
-                  </div>
-                  <span className="bg-purple-100 text-purple-800 text-[10px] font-bold px-2.5 py-1 rounded-lg">
-                    1级公司 (HQ-001)
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl">
-                    <p className="text-[10px] text-slate-400 font-medium">上级节点</p>
-                    <p className="font-semibold text-slate-700 mt-0.5">最高公司节点 (无上级)</p>
-                  </div>
-
-                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl">
-                    <p className="text-[10px] text-slate-400 font-medium">架构类型</p>
-                    <p className="font-semibold text-slate-700 mt-0.5">公司 &gt; 部门 &gt; 分组 &gt; 人员</p>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl">
-                  <p className="text-[10px] text-slate-400 font-medium">下辖部门与分组</p>
-                  <p className="font-semibold text-slate-700 mt-0.5">
-                    电商投放一部 (女装千川放量组、美妆珠宝爆款组)、品牌效果投放部、AIGC爆款内容拆解部 (千川剧本拆解小组)、视频智能剪辑中心
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+              </>
+            )}
+          />
         )}
 
         {/* TAB 2: 明细账单 (BILLING HISTORY TAB) */}
@@ -559,96 +459,11 @@ export default function CreditsDashboard({
       )}
 
       {/* ================= MODAL: 修改密码 ================= */}
-      {showChangePasswordModal && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-4 font-sans">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden text-slate-800 animate-fade-in">
-            <div className="p-4 bg-slate-900 text-white flex justify-between items-center">
-              <span className="text-sm font-black flex items-center gap-2">
-                <Key className="w-4 h-4 text-amber-400" />
-                <span>修改个人登录密码</span>
-              </span>
-              <button 
-                onClick={() => setShowChangePasswordModal(false)}
-                className="p-1 hover:bg-slate-800 rounded-xl cursor-pointer"
-              >
-                <X className="w-5 h-5 text-slate-400" />
-              </button>
-            </div>
-
-            <form onSubmit={handleChangePasswordSubmit} className="p-6 space-y-4 text-xs">
-              {passwordError && (
-                <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-2xl text-[11px] font-bold">
-                  ⚠️ {passwordError}
-                </div>
-              )}
-
-              <div>
-                <label className="text-slate-700 font-bold block mb-1">
-                  当前原密码 <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={passwordForm.oldPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })}
-                  placeholder="请输入您当前的登录密码"
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-purple-600 focus:bg-white font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="text-slate-700 font-bold block mb-1">
-                  设置新密码 <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={passwordForm.newPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                  placeholder="请输入至少 6 位的新密码"
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-purple-600 focus:bg-white font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="text-slate-700 font-bold block mb-1">
-                  确认新密码 <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={passwordForm.confirmPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                  placeholder="请再次输入新密码"
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-purple-600 focus:bg-white font-mono"
-                />
-              </div>
-
-              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 text-[10px] text-slate-400 space-y-1">
-                <p>• 密码需包含字母或数字，建议长度不少于 8 位。</p>
-                <p>• 修改成功后，您的全端登录状态将被安全更新。</p>
-              </div>
-
-              <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowChangePasswordModal(false)}
-                  className="px-4 py-2 font-bold text-slate-500 hover:text-slate-800 cursor-pointer"
-                >
-                  取消
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
-                >
-                  <Lock className="w-4 h-4 text-amber-400" />
-                  <span>更新修改密码</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <ChangePasswordModal
+        open={showChangePasswordModal}
+        onClose={() => setShowChangePasswordModal(false)}
+        onSuccess={() => showToast("密码修改成功，请妥善保管您的新登录密码。")}
+      />
     </div>
   );
 }

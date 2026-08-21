@@ -624,7 +624,6 @@ export default function App() {
           adminActiveScreen={adminActiveScreen} 
           onTriggerTask={handleAddTask}
           onOpenTaskQueue={() => setIsQueueOpen(true)}
-          onNavigateAdmin={setAdminActiveScreen}
         />
       );
     }
