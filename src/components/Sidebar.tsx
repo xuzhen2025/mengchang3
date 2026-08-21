@@ -34,6 +34,7 @@ interface SidebarProps {
   setCollapsed: (collapsed: boolean) => void;
   credits: number;
   openCreditsModal: () => void;
+  openAdminProfile?: () => void;
   appMode?: "user" | "admin";
   setAppMode?: (mode: "user" | "admin") => void;
   adminActiveScreen?: string;
@@ -47,6 +48,7 @@ export default function Sidebar({
   setCollapsed,
   credits,
   openCreditsModal,
+  openAdminProfile = () => {},
   appMode = "user",
   setAppMode = () => {},
   adminActiveScreen = "content_management",
@@ -218,32 +220,29 @@ export default function Sidebar({
       {/* Bottom Section */}
       <div className="p-2 space-y-2 border-t border-slate-100">
         {/* Credit details button */}
-        <button
-          onClick={openCreditsModal}
-          id="btn-sidebar-credits"
-          className={`w-full flex items-center rounded-xl transition-all ${
-            collapsed 
-              ? "p-2.5 justify-center hover:bg-slate-50 text-amber-500" 
-              : "p-3 bg-gradient-to-br from-amber-500/5 to-amber-600/2 hover:from-amber-500/10 border border-amber-500/15 text-amber-700"
-          }`}
-        >
-          <CreditCard className="w-5 h-5 flex-shrink-0" />
-          {!collapsed && (
-            <div className="ml-2 text-left flex-1 min-w-0">
-              <p className="text-[10px] text-amber-600 uppercase tracking-widest font-mono">✦ 可用积分 ✦</p>
-              <p className="text-sm font-bold text-slate-800 font-mono truncate">{credits.toFixed(2)}</p>
-            </div>
-          )}
-          {collapsed && (
-            <div className="absolute left-16 top-1/2 -translate-y-1/2 bg-slate-900 text-amber-300 text-xs px-2.5 py-1.5 rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 border border-amber-500/30 shadow-xl font-mono">
-              积分: {credits.toFixed(2)}
-            </div>
-          )}
-        </button>
+        {appMode === "user" && (
+          <button
+            onClick={openCreditsModal}
+            id="btn-sidebar-credits"
+            className={`w-full flex items-center rounded-xl transition-all ${
+              collapsed
+                ? "p-2.5 justify-center hover:bg-slate-50 text-amber-500"
+                : "p-3 bg-gradient-to-br from-amber-500/5 to-amber-600/2 hover:from-amber-500/10 border border-amber-500/15 text-amber-700"
+            }`}
+          >
+            <CreditCard className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && (
+              <div className="ml-2 text-left flex-1 min-w-0">
+                <p className="text-[10px] text-amber-600 uppercase tracking-widest font-mono">✦ 可用积分 ✦</p>
+                <p className="text-sm font-bold text-slate-800 font-mono truncate">{credits.toFixed(2)}</p>
+              </div>
+            )}
+          </button>
+        )}
 
         {/* User profile */}
         <div 
-          onClick={openCreditsModal}
+          onClick={appMode === "admin" ? openAdminProfile : openCreditsModal}
           className={`flex items-center gap-2 rounded-xl cursor-pointer ${
             collapsed ? "p-1 justify-center" : "p-2 hover:bg-slate-50"
           }`}
@@ -257,7 +256,7 @@ export default function Sidebar({
           {!collapsed && (
             <div className="text-left min-w-0">
               <p className="text-xs font-semibold text-slate-800 truncate">徐振</p>
-              <p className="text-[10px] text-slate-400 truncate">剪辑师</p>
+              <p className="text-[10px] text-slate-400 truncate">{appMode === "admin" ? "超级管理员" : "剪辑师"}</p>
             </div>
           )}
         </div>

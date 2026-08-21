@@ -624,6 +624,7 @@ export default function App() {
           adminActiveScreen={adminActiveScreen} 
           onTriggerTask={handleAddTask}
           onOpenTaskQueue={() => setIsQueueOpen(true)}
+          onNavigateAdmin={setAdminActiveScreen}
         />
       );
     }
@@ -893,6 +894,7 @@ export default function App() {
         setCollapsed={setSidebarCollapsed}
         credits={credits + extraRequestedCredits}
         openCreditsModal={() => handleNavigate("credits")}
+        openAdminProfile={() => setAdminActiveScreen("admin_profile")}
         appMode={appMode}
         setAppMode={setAppMode}
         adminActiveScreen={adminActiveScreen}

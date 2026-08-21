@@ -34,11 +34,13 @@ import TagGroupManagementView from "./TagGroupManagementView";
 import ScriptTemplateManagementView from "./ScriptTemplateManagementView";
 import AdminSystemManagementView from "./AdminSystemManagementView";
 import AdminCreditsManagementView from "./AdminCreditsManagementView";
+import AdminProfileView from "./AdminProfileView";
 
 interface AdminViewProps {
   adminActiveScreen: string;
   onTriggerTask?: (type: any, name: string, inputFiles: string[], cost: number) => void;
   onOpenTaskQueue?: () => void;
+  onNavigateAdmin?: (screen: string) => void;
 }
 
 type ContentTabType = 
@@ -50,7 +52,7 @@ type ContentTabType =
   | "categories"
   | "script_templates";
 
-export default function AdminView({ adminActiveScreen, onTriggerTask, onOpenTaskQueue }: AdminViewProps) {
+export default function AdminView({ adminActiveScreen, onTriggerTask, onOpenTaskQueue, onNavigateAdmin }: AdminViewProps) {
   const [activeTab, setActiveTab] = useState<ContentTabType>("resource_hub");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -109,6 +111,10 @@ export default function AdminView({ adminActiveScreen, onTriggerTask, onOpenTask
 
   if (adminActiveScreen === "credits_management") {
     return <AdminCreditsManagementView />;
+  }
+
+  if (adminActiveScreen === "admin_profile") {
+    return <AdminProfileView onOpenPermissionMatrix={() => onNavigateAdmin?.("system_management")} />;
   }
 
   return (
