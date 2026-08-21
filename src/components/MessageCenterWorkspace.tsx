@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock3,
+  ExternalLink,
   FileCheck2,
   FileText,
   Inbox,
@@ -19,7 +20,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { ActiveScreen, AppMessage } from "../types";
+import { ActiveScreen, AppMessage, MessageResourceLink } from "../types";
 import { INITIAL_MESSAGES, MESSAGE_CATEGORY_CONFIGS } from "../data";
 import ApprovalActionBox from "./ApprovalActionBox";
 
@@ -31,6 +32,7 @@ interface MessageCenterWorkspaceProps {
   onRejectCredits?: (msgId: string, rejectReason: string) => void;
   onMarkMessageRead?: (id: string) => void;
   onMarkAllMessagesRead?: () => void;
+  onOpenResource?: (resource: MessageResourceLink) => void;
 }
 
 const CATEGORY_META: Record<string, { icon: React.ElementType; tone: string; active: string; description: string }> = {
@@ -56,6 +58,7 @@ export default function MessageCenterWorkspace({
   onRejectCredits,
   onMarkMessageRead,
   onMarkAllMessagesRead,
+  onOpenResource,
 }: MessageCenterWorkspaceProps) {
   const [localMessages, setLocalMessages] = useState<AppMessage[]>(INITIAL_MESSAGES);
   const messagesList = propMessages ?? localMessages;
@@ -113,7 +116,7 @@ export default function MessageCenterWorkspace({
       setActiveScreen(message.actionScreen);
       return;
     }
-    setActionFeedback(message.subcategory === "数据导出记录" ? "已打开该用户本次导出的审计记录样例" : "开发时将进入对应的账号安全或系统记录页面");
+    setActionFeedback(message.subcategory === "数据导出记录" ? "已定位该用户本次导出的审计记录" : "已定位对应的安全与系统记录");
   };
 
   const resetFilters = () => {
@@ -220,8 +223,31 @@ export default function MessageCenterWorkspace({
                 <dl className="overflow-hidden rounded-lg border border-slate-200">{drawerMessage.details.map((item, index) => <div key={`${item.label}-${index}`} className="grid grid-cols-[120px_minmax(0,1fr)] border-b border-slate-100 last:border-b-0"><dt className="bg-slate-50 px-3 py-3 text-xs font-bold text-slate-500">{item.label}</dt><dd className="px-3 py-3 text-xs leading-5 text-slate-800">{item.isLink ? <a href={item.value} target="_blank" rel="noreferrer" className="text-purple-600 hover:underline">{item.value}</a> : item.value}</dd></div>)}</dl>
               </div>
 
+              {!!drawerMessage.relatedResources?.length && (
+                <div className="mt-6">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2"><ExternalLink className="h-4 w-4 text-purple-500" /><h4 className="text-xs font-black text-slate-800">关联资源</h4></div>
+                    <span className="text-[11px] text-slate-400">共 {drawerMessage.relatedResources.length} 条</span>
+                  </div>
+                  <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    {drawerMessage.relatedResources.map((resource, index) => (
+                      <button
+                        key={`${resource.id}-${index}`}
+                        onClick={() => onOpenResource?.(resource)}
+                        className="flex w-full items-center gap-3 border-b border-slate-100 px-3.5 py-3 text-left transition last:border-b-0 hover:bg-purple-50/60"
+                      >
+                        <span className="rounded bg-purple-50 px-2 py-1 text-[10px] font-black text-purple-700">{resource.type}</span>
+                        <span className="min-w-0 flex-1 truncate text-xs font-bold text-slate-800">{resource.name}</span>
+                        <span className="shrink-0 text-[11px] font-bold text-purple-600">查看详情</span>
+                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-purple-400" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {drawerMessage.approvalType === "credits" && <ApprovalActionBox message={drawerMessage} onApprove={(id) => onApproveCredits?.(id)} onReject={(id, reason) => onRejectCredits?.(id, reason)} />}
-              {drawerMessage.template === "security" && drawerMessage.severity === "danger" && <div className="mt-5 flex gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" /><div><p className="text-xs font-black text-rose-800">需要关注</p><p className="mt-1 text-xs leading-5 text-rose-700">请核对操作人和业务范围。开发时应保留完整审计记录，并提供后续处理入口。</p></div></div>}
+              {drawerMessage.template === "security" && drawerMessage.severity === "danger" && <div className="mt-5 flex gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" /><div><p className="text-xs font-black text-rose-800">需要关注</p><p className="mt-1 text-xs leading-5 text-rose-700">请核对操作人、发生时间、设备环境与业务范围，并根据审计结果及时处理。</p></div></div>}
               {actionFeedback && <div className="mt-4 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2.5 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-4 w-4" />{actionFeedback}</div>}
             </div>
             <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-200 bg-white px-5 py-4"><span className="hidden items-center gap-1 text-[11px] text-slate-400 sm:inline-flex"><MessageSquare className="h-3 w-3" />事件编号：{drawerMessage.eventCode ?? "MESSAGE_EVENT"}</span><div className="ml-auto flex gap-2"><button onClick={() => setDrawerMessageId(null)} className="h-9 rounded-lg border border-slate-200 px-4 text-xs font-bold text-slate-600 hover:bg-slate-50">关闭</button>{drawerMessage.actionLabel && drawerMessage.approvalStatus !== "pending" && <button onClick={() => handleMessageAction(drawerMessage)} className="inline-flex h-9 items-center gap-2 rounded-lg bg-purple-600 px-4 text-xs font-bold text-white hover:bg-purple-700">{drawerMessage.actionLabel}<ChevronRight className="h-3.5 w-3.5" /></button>}</div></footer>

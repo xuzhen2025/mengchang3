@@ -226,6 +226,13 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
   const [detailItem, setDetailItem] = useState<ImageItem | null>(null);
 
   React.useEffect(() => {
+    if (!initialSearch?.openDetail || !initialSearch.query) return;
+    const target = initialSearch.query.trim().toLowerCase();
+    const match = MOCK_IMAGES.find((item) => item.title.toLowerCase() === target || item.id.toLowerCase() === target);
+    if (match) setDetailItem(match);
+  }, [initialSearch?.requestId]);
+
+  React.useEffect(() => {
     onDetailStateChange?.(!!detailItem);
   }, [detailItem, onDetailStateChange]);
   const [selectedDetailThumbIndex, setSelectedDetailThumbIndex] = useState<number>(0);

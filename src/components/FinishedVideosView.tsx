@@ -672,6 +672,13 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
   const [detailModalVideo, setDetailModalVideo] = useState<FinishedVideo | null>(null);
 
   React.useEffect(() => {
+    if (!initialSearch?.openDetail || !initialSearch.query) return;
+    const target = initialSearch.query.trim().toLowerCase();
+    const match = videos.find((video) => video.title.toLowerCase() === target || video.id.toLowerCase() === target);
+    if (match) setDetailModalVideo(match);
+  }, [initialSearch?.requestId]);
+
+  React.useEffect(() => {
     onDetailStateChange?.(!!detailModalVideo);
   }, [detailModalVideo, onDetailStateChange]);
   const [showSyncModal, setShowSyncModal] = useState(false);
@@ -823,7 +830,7 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
     }
     
     if (option === "放入回收站") {
-      if (!window.confirm(`删除后将把选中的 ${count} 个成片移入回收站，可在回收站恢复。确认继续吗？`)) return;
+      if (!window.confirm(`删除后将把选中的 ${count} 个成片移入管理端集中回收站，当前用户将无法继续查看；如需恢复请联系管理员。确认继续吗？`)) return;
       setVideos(prev => prev.filter(v => !selectedVideoIds.includes(v.id)));
       setSelectedVideoIds([]);
       setSelectAllPage(false);
@@ -916,7 +923,7 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
   };
 
   const handleDeleteVideo = (id: string) => {
-    if (confirm("删除后将移入回收站，可在回收站恢复。确认继续吗？")) {
+    if (confirm("删除后将移入管理端集中回收站，当前用户将无法继续查看；如需恢复请联系管理员。确认继续吗？")) {
       setVideos(prev => prev.filter(v => v.id !== id));
     }
   };

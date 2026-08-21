@@ -142,7 +142,14 @@ export interface ResourceSearchIntent {
   type: ResourceSearchType;
   query?: string;
   tag?: string;
+  openDetail?: boolean;
   requestId: number;
+}
+
+export interface MessageResourceLink {
+  id: string;
+  name: string;
+  type: ResourceSearchType;
 }
 
 export interface MessageDetailItem {
@@ -176,6 +183,7 @@ export interface AppMessage {
   businessStatus?: string;
   actionLabel?: string;
   actionScreen?: ActiveScreen;
+  relatedResources?: MessageResourceLink[];
 
   // Approval specific fields
   approvalType?: "credits";

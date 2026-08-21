@@ -790,6 +790,10 @@ export default function App() {
             onRejectCredits={handleRejectCredits}
             onMarkMessageRead={handleMarkMessageRead}
             onMarkAllMessagesRead={handleMarkAllMessagesRead}
+            onOpenResource={(resource) => {
+              setResourceSearchIntent({ type: resource.type, query: resource.name, openDetail: true, requestId: Date.now() });
+              handleNavigate("resources");
+            }}
           />
         );
 

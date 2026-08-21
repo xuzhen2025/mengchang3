@@ -227,8 +227,9 @@ export default function AudioDetailView({
                     <button
                       onClick={() => {
                         setShowDetailMoreMenu(false);
+                        if (!window.confirm("删除后将移入管理端集中回收站，当前用户将无法继续查看；如需恢复请联系管理员。确认继续吗？")) return;
                         if (onDelete) onDelete(item.id);
-                        showToast("已放入回收站");
+                        showToast("已移入管理端集中回收站");
                         onClose();
                       }}
                       className="w-full text-left px-3.5 py-2 hover:bg-rose-50 text-rose-600 cursor-pointer"

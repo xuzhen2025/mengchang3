@@ -261,6 +261,13 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
   const [detailAudioItem, setDetailAudioItem] = useState<AudioItem | null>(null);
 
   React.useEffect(() => {
+    if (!initialSearch?.openDetail || !initialSearch.query) return;
+    const target = initialSearch.query.trim().toLowerCase();
+    const match = audioList.find((item) => item.title.toLowerCase() === target || item.id.toLowerCase() === target);
+    if (match) setDetailAudioItem(match);
+  }, [initialSearch?.requestId]);
+
+  React.useEffect(() => {
     onDetailStateChange?.(!!detailAudioItem);
   }, [detailAudioItem, onDetailStateChange]);
   const [detailCurrentTime, setDetailCurrentTime] = useState<number>(0);
@@ -868,10 +875,11 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
                   <button
                     onClick={() => {
                       setShowMoreActionsMenu(false);
+                      if (!window.confirm(`删除后将把选中的 ${selectedIds.length} 个音频移入管理端集中回收站，当前用户将无法继续查看；如需恢复请联系管理员。确认继续吗？`)) return;
                       setAudioList((prev) => prev.filter((a) => !selectedIds.includes(a.id)));
                       setSelectedIds([]);
                       setIsSelectionMode(false);
-                      showToast("已将选中音频放入回收站 ⓘ");
+                      showToast("已将选中音频移入管理端集中回收站");
                     }}
                     className="w-full text-left px-4 py-2 hover:bg-rose-50 text-rose-600 font-medium flex items-center gap-2"
                   >

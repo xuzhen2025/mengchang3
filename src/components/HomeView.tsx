@@ -9,7 +9,6 @@ import {
   HelpCircle, 
   FileText, 
   Video, 
-  MessageSquare, 
   Headphones, 
   ChevronRight, 
   Calendar, 
@@ -80,7 +79,7 @@ const RESOURCE_HOT_TAGS: Record<ResourceSearchType, string[]> = {
 const RESOURCE_FILTER_OPTIONS: Record<ResourceSearchType, string[]> = {
   成片: [...RESOURCE_HOT_TAGS.成片, "塑身衣", "保暖内衣", "少女内衣", "袜子", "男士内裤", "男士睡衣", "购买达人视频", "无钢圈", "聚拢款", "蕾丝杯面", "无痕塑形", "爆款走秀", "审核驳回", "已修改", "二次修改", "已上机", "已搭", "放弃", "首发素材", "AD优质素材"],
   素材: [...RESOURCE_HOT_TAGS.素材, "塑身衣", "保暖内衣", "少女内衣", "袜子", "男士内裤", "男士睡衣", "购买达人视频", "无钢圈", "聚拢款", "蕾丝杯面", "无痕塑形", "爆款走秀", "审核驳回", "已修改", "二次修改", "已上机", "画面利用", "放弃", "首发素材", "AD优质素材"],
-  图片: [...RESOURCE_HOT_TAGS.图片, "a店铺", "b店铺", "营销资料库", "收藏夹", "对比素材", "无个人标签", "有个人标签"],
+  图片: [...RESOURCE_HOT_TAGS.图片, "a店铺", "b店铺", "营销资料库", "重点素材", "对比素材", "无个人标签", "有个人标签"],
   脚本: [...RESOURCE_HOT_TAGS.脚本, "宠物食品", "宠物用品", "婴童尿裤", "奶粉辅食", "休闲零食", "图书", "饮料冲调", "学习用品", "教育音像", "家庭清洁", "家电好货", "待审核", "审核通过", "审核驳回"],
   音频: [...RESOURCE_HOT_TAGS.音频, "彩妆香水", "宠物食品", "宠物用品", "休闲零食", "猫粮", "狗粮", "口播切片", "品牌调性", "趣味音效", "无个人标签", "有个人标签", "Zs测试一", "Zs测试二", "测试分享标签", "场景", "合作达人", "创新点", "模特"]
 };
@@ -456,12 +455,7 @@ export default function HomeView({
   });
 
   // ================= 5. HELP CENTER MODAL STATES =================
-  const [activeHelpModal, setActiveHelpModal] = useState<"docs" | "tutorial" | "feedback" | "service" | "faq" | null>(null);
-  
-  // Feedback form state
-  const [feedbackType, setFeedbackType] = useState("功能建议");
-  const [feedbackText, setFeedbackText] = useState("");
-  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [activeHelpModal, setActiveHelpModal] = useState<"docs" | "tutorial" | "service" | "faq" | null>(null);
 
   // Video Tutorial Player
   const [playingTutorialUrl, setPlayingTutorialUrl] = useState<string | null>(null);
@@ -989,16 +983,7 @@ export default function HomeView({
                   <span className="text-[11px] font-black text-slate-800 group-hover:text-pink-700">视频教程</span>
                 </button>
 
-                {/* 3. 意见反馈 */}
-                <button
-                  onClick={() => setActiveHelpModal("feedback")}
-                  className="hidden bg-slate-50 hover:bg-amber-50/70 border border-slate-200/80 hover:border-amber-300 p-2.5 rounded-xl flex-col items-center justify-center text-center space-y-1 transition-all cursor-pointer group shadow-2xs"
-                >
-                  <MessageSquare className="w-4 h-4 text-amber-600 group-hover:scale-110 transition-transform" />
-                  <span className="text-[11px] font-black text-slate-800 group-hover:text-amber-700">意见反馈</span>
-                </button>
-
-                {/* 4. 联系客服 */}
+                {/* 3. 联系客服 */}
                 <button
                   onClick={() => setActiveHelpModal("service")}
                   className="bg-slate-50 hover:bg-emerald-50/70 border border-slate-200/80 hover:border-emerald-300 p-2.5 rounded-xl flex flex-col items-center justify-center text-center space-y-1 transition-all cursor-pointer group shadow-2xs"
@@ -1007,7 +992,7 @@ export default function HomeView({
                   <span className="text-[11px] font-black text-slate-800 group-hover:text-emerald-700">联系客服</span>
                 </button>
 
-                {/* 5. 常见问题 */}
+                {/* 4. 常见问题 */}
                 <button
                   onClick={() => setActiveHelpModal("faq")}
                   className="bg-slate-50 hover:bg-blue-50/70 border border-slate-200/80 hover:border-blue-300 p-2.5 rounded-xl flex flex-col items-center justify-center text-center space-y-1 transition-all cursor-pointer group shadow-2xs col-span-2 sm:col-span-1"
@@ -1344,77 +1329,7 @@ export default function HomeView({
         </div>
       )}
 
-      {/* 3. FEEDBACK MODAL */}
-      {activeHelpModal === "feedback" && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-amber-500" />
-                <h3 className="text-base font-black text-slate-900">意见反馈</h3>
-              </div>
-              <button onClick={() => { setActiveHelpModal(null); setFeedbackSubmitted(false); }} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {feedbackSubmitted ? (
-              <div className="text-center py-8 space-y-3">
-                <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
-                  <CheckCircle2 className="w-7 h-7" />
-                </div>
-                <h4 className="text-base font-black text-slate-900">感谢您的宝贵建议！</h4>
-                <p className="text-xs text-slate-500">产品与技术团队将优先处理您的反馈并不断提升软件品质。</p>
-                <button onClick={() => { setActiveHelpModal(null); setFeedbackSubmitted(false); }} className="px-5 py-2 bg-amber-500 text-white rounded-xl text-xs font-bold cursor-pointer">
-                  关闭
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-extrabold text-slate-700">反馈类型</label>
-                  <div className="flex gap-2">
-                    {["功能建议", "漏洞上报", "画质提升", "其他"].map(t => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setFeedbackType(t)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer ${
-                          feedbackType === t ? "bg-amber-50 border-amber-300 text-amber-700" : "border-slate-200 text-slate-600"
-                        }`}
-                      >
-                        {t}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-extrabold text-slate-700">内容描述</label>
-                  <textarea
-                    rows={4}
-                    value={feedbackText}
-                    onChange={(e) => setFeedbackText(e.target.value)}
-                    placeholder="请详细说明您遇到的使用体验问题或功能诉求..."
-                    className="w-full border border-slate-200 rounded-2xl p-3 text-xs text-slate-800 outline-none focus:border-amber-500 resize-none"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  disabled={!feedbackText.trim()}
-                  onClick={() => setFeedbackSubmitted(true)}
-                  className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer"
-                >
-                  提交意见反馈
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 4. CUSTOMER SERVICE MODAL */}
+      {/* 3. CUSTOMER SERVICE MODAL */}
       {activeHelpModal === "service" && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in">
           <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl p-6 space-y-5 text-center">
@@ -1624,6 +1539,27 @@ export default function HomeView({
                   </div>
                 ))}
               </div>
+
+              {!!drawerMessage.relatedResources?.length && (
+                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                  <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-3.5 py-2.5">
+                    <span className="font-black text-slate-800">关联资源</span>
+                    <span className="text-[11px] text-slate-400">共 {drawerMessage.relatedResources.length} 条</span>
+                  </div>
+                  {drawerMessage.relatedResources.map((resource, index) => (
+                    <button
+                      key={`${resource.id}-${index}`}
+                      onClick={() => onSearchResources?.({ type: resource.type, query: resource.name, openDetail: true })}
+                      className="flex w-full items-center gap-3 border-b border-slate-100 px-3.5 py-3 text-left last:border-b-0 hover:bg-purple-50/60"
+                    >
+                      <span className="rounded bg-purple-50 px-2 py-1 text-[10px] font-black text-purple-700">{resource.type}</span>
+                      <span className="min-w-0 flex-1 truncate font-bold text-slate-800">{resource.name}</span>
+                      <span className="font-bold text-purple-600">查看详情</span>
+                      <ChevronRight className="h-3.5 w-3.5 text-purple-400" />
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Credit Audit Approval Action Box */}
               {drawerMessage.approvalType === "credits" && (

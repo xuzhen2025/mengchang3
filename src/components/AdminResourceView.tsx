@@ -20,6 +20,10 @@ export interface AdminResourceItem {
   fileSize?: string;
   duration?: string;
   scriptContent?: string;
+  deletedAt?: string;
+  deletedBy?: string;
+  deletedSource?: "用户端" | "管理端";
+  originalLocation?: string;
 }
 
 const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
@@ -166,6 +170,10 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     category: "美妆护肤/彩妆口红",
     company: "致上互娱",
     uploadTime: "2025-06-18 15:08:03",
+    deletedAt: "2026-08-19 11:24:36",
+    deletedBy: "汤小真",
+    deletedSource: "用户端",
+    originalLocation: "资源库 / 图片管理 / 美妆护肤",
     tabType: "回收站",
     originalTabType: "图片",
     fileSize: "3.4 MB"
@@ -178,6 +186,10 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     category: "音频分类/欢快商用",
     company: "致上互娱",
     uploadTime: "2025-06-12 13:44:22",
+    deletedAt: "2026-08-19 10:18:12",
+    deletedBy: "徐振",
+    deletedSource: "用户端",
+    originalLocation: "资源库 / 音频管理 / 促销大促",
     tabType: "回收站",
     originalTabType: "音频",
     duration: "01:15",
@@ -191,6 +203,10 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     category: "音频分类/解说旁白",
     company: "致上互娱",
     uploadTime: "2025-06-11 17:53:02",
+    deletedAt: "2026-08-18 18:42:05",
+    deletedBy: "王敏（管理员）",
+    deletedSource: "管理端",
+    originalLocation: "资源库 / 音频管理 / 解说旁白",
     tabType: "回收站",
     originalTabType: "音频",
     duration: "02:05",
@@ -205,6 +221,10 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     category: "美妆护肤/防晒隔离",
     company: "梦畅网络",
     uploadTime: "2025-06-10 11:20:00",
+    deletedAt: "2026-08-18 16:08:44",
+    deletedBy: "李剪辑",
+    deletedSource: "用户端",
+    originalLocation: "资源库 / 成片管理 / 防晒隔离",
     tabType: "回收站",
     originalTabType: "成片",
     duration: "00:45",
@@ -219,6 +239,10 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     category: "服饰首饰/古法金",
     company: "云享文化",
     uploadTime: "2025-06-09 16:15:30",
+    deletedAt: "2026-08-18 14:30:27",
+    deletedBy: "徐振（管理员）",
+    deletedSource: "管理端",
+    originalLocation: "资源库 / 素材管理 / 古法金",
     tabType: "回收站",
     originalTabType: "素材",
     duration: "00:30",
@@ -232,6 +256,10 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     category: "脚本分类/电商口播",
     company: "致上互娱",
     uploadTime: "2025-06-08 09:30:15",
+    deletedAt: "2026-08-17 17:12:19",
+    deletedBy: "莫钦全",
+    deletedSource: "用户端",
+    originalLocation: "资源库 / 脚本管理 / 电商口播",
     tabType: "回收站",
     originalTabType: "脚本",
     fileSize: "65 KB",
@@ -434,7 +462,11 @@ export default function AdminResourceView() {
           return {
             ...r,
             originalTabType: r.tabType !== "回收站" ? r.tabType as any : r.originalTabType,
-            tabType: "回收站"
+            tabType: "回收站",
+            deletedAt: new Date().toLocaleString("zh-CN", { hour12: false }).replaceAll("/", "-"),
+            deletedBy: "当前管理员",
+            deletedSource: "管理端",
+            originalLocation: `资源库 / ${r.tabType}管理 / ${r.category}`
           };
         }
         return r;
@@ -753,7 +785,15 @@ export default function AdminResourceView() {
 
         {/* 3. 回收站专用批量功能操作工具栏 (完全参照截图) */}
         {activeTab === "回收站" && (
-          <div className="flex flex-wrap items-center gap-3 mt-3 pt-1">
+          <div className="mt-3 space-y-3 pt-1">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-purple-100 bg-purple-50/70 px-3.5 py-3">
+              <div>
+                <p className="text-xs font-extrabold text-purple-900">平台集中回收站</p>
+                <p className="mt-1 text-[11px] leading-5 text-purple-700">用户端和管理端删除的资源统一进入这里。仅有回收站管理权限的管理员可恢复或彻底删除，恢复后回到原分类并保留原有关联记录。</p>
+              </div>
+              <span className="rounded-md bg-white px-2.5 py-1 text-[11px] font-bold text-purple-700 shadow-2xs">当前 {filteredResources.length} 条</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
             {/* 选择 / 取消选择 按钮 */}
             <button
               type="button"
@@ -843,6 +883,7 @@ export default function AdminResourceView() {
             >
               一键清空
             </button>
+            </div>
           </div>
         )}
       </div>
@@ -926,11 +967,18 @@ export default function AdminResourceView() {
                           {item.category}
                         </p>
 
-                        {/* 公司名称 与 上传时间 */}
-                        <div className="flex items-center gap-3 text-[11px] text-slate-400 font-mono pt-1">
-                          <span className="font-sans font-medium text-slate-500 truncate max-w-[100px]">{item.company}</span>
-                          <span className="truncate">{item.uploadTime}</span>
-                        </div>
+                        {activeTab === "回收站" ? (
+                          <div className="mt-1.5 space-y-1 rounded-md bg-slate-50 px-2.5 py-2 text-[10px] text-slate-500">
+                            <div className="flex items-center justify-between gap-2"><span>删除来源</span><span className="font-bold text-slate-700">{item.deletedSource || "管理端"} · {item.deletedBy || "当前管理员"}</span></div>
+                            <div className="flex items-center justify-between gap-2"><span>删除时间</span><span className="font-mono text-slate-600">{item.deletedAt || item.uploadTime}</span></div>
+                            <div className="flex items-start justify-between gap-2"><span className="shrink-0">原位置</span><span className="text-right font-medium text-slate-600">{item.originalLocation || `资源库 / ${realType}管理`}</span></div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-3 text-[11px] text-slate-400 font-mono pt-1">
+                            <span className="font-sans font-medium text-slate-500 truncate max-w-[100px]">{item.company}</span>
+                            <span className="truncate">{item.uploadTime}</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* 普通资源删除后进入回收站；回收站内才允许恢复或彻底删除 */}

@@ -67,15 +67,20 @@ export const INITIAL_MESSAGES: AppMessage[] = [
     status: "unread", time: "2026-08-19 08:56:05", eventCode: "TASK_WORK_LINKED", template: "task", severity: "success",
     actorName: "徐振（执行人）", recipientNames: ["王经理（发布人）"], sourceType: "任务", sourceId: "TASK-20260819-018", businessStatus: "2/3 条已完成",
     actionLabel: "查看关联作品", actionScreen: "task_collaboration",
-    details: [{ label: "关联作品", value: "礼盒开箱口播_v3.mp4、七夕氛围展示_v2.mp4" }, { label: "作品数量", value: "新增 2 条，累计 2/3 条" }, { label: "执行人", value: "徐振" }]
+    details: [{ label: "关联作品", value: "水光针去黄测评、复古耳环动态奢感视频" }, { label: "作品数量", value: "新增 2 条，累计 2/3 条" }, { label: "执行人", value: "徐振" }],
+    relatedResources: [
+      { id: "110332275", name: "0730-8836-水光针去黄测评-爆款对比.mp4", type: "成片" },
+      { id: "110332274", name: "0730-8835-鲁月园-复古耳环动态奢感视频.mp4", type: "成片" }
+    ]
   },
   {
     id: "msg_task_script_linked", category: "任务协作", subcategory: "关联脚本", type: "关联脚本",
-    title: "徐振为任务关联了脚本", detail: "任务《七夕美妆礼盒短视频》已关联脚本《礼赠场景三段式口播》。",
+    title: "徐振为任务关联了脚本", detail: "任务《七夕美妆礼盒短视频》已关联脚本《脚本 1 - 口播温和洁面破圈案》。",
     status: "read", time: "2026-08-18 18:24:46", eventCode: "TASK_SCRIPT_LINKED", template: "task", severity: "info",
     actorName: "徐振（执行人）", recipientNames: ["王经理（发布人）"], sourceType: "任务", sourceId: "TASK-20260819-018", businessStatus: "制作中",
     actionLabel: "查看关联脚本", actionScreen: "task_collaboration",
-    details: [{ label: "脚本名称", value: "礼赠场景三段式口播" }, { label: "脚本编号", value: "SCRIPT-88216" }, { label: "关联人", value: "徐振" }]
+    details: [{ label: "脚本名称", value: "脚本 1 - 口播温和洁面破圈案" }, { label: "脚本编号", value: "SCRIPT-88216" }, { label: "关联人", value: "徐振" }],
+    relatedResources: [{ id: "SCRIPT-88216", name: "脚本 1 - 口播温和洁面破圈案", type: "脚本" }]
   },
   {
     id: "msg_task_completed", category: "任务协作", subcategory: "任务完成", type: "任务完成",
@@ -83,7 +88,12 @@ export const INITIAL_MESSAGES: AppMessage[] = [
     status: "unread", time: "2026-08-18 16:35:18", eventCode: "TASK_TARGET_REACHED", template: "task", severity: "success",
     actorName: "徐振（执行人）", recipientNames: ["王经理（发布人）"], sourceType: "任务", sourceId: "TASK-20260816-009", businessStatus: "已达标",
     actionLabel: "验收任务", actionScreen: "task_collaboration",
-    details: [{ label: "任务名称", value: "夏季防晒返场素材" }, { label: "完成情况", value: "3/3 条作品" }, { label: "完成时间", value: "2026-08-18 16:35:18" }]
+    details: [{ label: "任务名称", value: "夏季防晒返场素材" }, { label: "完成情况", value: "3/3 条作品" }, { label: "完成时间", value: "2026-08-18 16:35:18" }],
+    relatedResources: [
+      { id: "110332276", name: "0730-8837-防晒冰丝T恤冷感微距分镜.mp4", type: "成片" },
+      { id: "110332277", name: "0730-8838-不粘锅真实口播展示.mp4", type: "成片" },
+      { id: "IMG-42029245", name: "防晒植物提取精华液展图.jpg", type: "图片" }
+    ]
   },
   {
     id: "msg_task_overdue", category: "任务协作", subcategory: "任务逾期", type: "任务逾期",
@@ -95,11 +105,12 @@ export const INITIAL_MESSAGES: AppMessage[] = [
   },
   {
     id: "msg_upload_success", category: "内容资源", subcategory: "上传成功", type: "上传成功",
-    title: "成片《冬季风衣短视频_01.mp4》上传成功", detail: "文件已完成上传与转码，可在成片区查看和继续编辑。",
+    title: "成片《0730-8839-高弹透气提臀内裤走秀实拍.mp4》上传成功", detail: "文件已完成上传与转码，可在成片区查看和继续编辑。",
     status: "unread", time: "2026-08-19 11:28:16", eventCode: "RESOURCE_UPLOAD_SUCCEEDED", template: "resource", severity: "success",
-    actorName: "系统", recipientNames: ["徐振（上传人）"], sourceType: "成片", sourceId: "VIDEO-42021437", businessStatus: "可用",
+    actorName: "系统", recipientNames: ["徐振（上传人）"], sourceType: "成片", sourceId: "110332278", businessStatus: "可用",
     actionLabel: "查看成片", actionScreen: "resources",
-    details: [{ label: "文件名称", value: "冬季风衣短视频_01.mp4" }, { label: "文件规格", value: "1080x1920 / 24.6 MB / 00:26" }, { label: "上传位置", value: "资源库 / 成片 / 女装" }]
+    details: [{ label: "文件名称", value: "0730-8839-高弹透气提臀内裤走秀实拍.mp4" }, { label: "文件规格", value: "1080x1920 / 24.6 MB / 00:26" }, { label: "上传位置", value: "资源库 / 成片 / 女装" }],
+    relatedResources: [{ id: "110332278", name: "0730-8839-高弹透气提臀内裤走秀实拍.mp4", type: "成片" }]
   },
   {
     id: "msg_upload_failed", category: "内容资源", subcategory: "上传失败", type: "上传失败",
@@ -115,15 +126,24 @@ export const INITIAL_MESSAGES: AppMessage[] = [
     status: "unread", time: "2026-08-19 10:46:20", eventCode: "AI_GENERATION_COMPLETED", template: "resource", severity: "success",
     actorName: "AI生成服务", recipientNames: ["徐振（发起人）"], sourceType: "AI生成任务", sourceId: "AI-VIDEO-20260819-026", businessStatus: "已完成",
     actionLabel: "查看生成结果", actionScreen: "ai_video",
-    details: [{ label: "任务名称", value: "玫瑰精华七夕氛围视频" }, { label: "生成结果", value: "成功 6 条，失败 0 条" }, { label: "积分消耗", value: "60 积分" }, { label: "保存位置", value: "资源库 / 成片 / AI生成结果" }]
+    details: [{ label: "任务名称", value: "玫瑰精华七夕氛围视频" }, { label: "生成结果", value: "成功 6 条，失败 0 条" }, { label: "积分消耗", value: "60 积分" }, { label: "保存位置", value: "资源库 / 成片 / AI生成结果" }],
+    relatedResources: [
+      { id: "110332274", name: "0730-8835-鲁月园-复古耳环动态奢感视频.mp4", type: "成片" },
+      { id: "110332275", name: "0730-8836-水光针去黄测评-爆款对比.mp4", type: "成片" },
+      { id: "110332276", name: "0730-8837-防晒冰丝T恤冷感微距分镜.mp4", type: "成片" },
+      { id: "110332277", name: "0730-8838-不粘锅真实口播展示.mp4", type: "成片" },
+      { id: "110332278", name: "0730-8839-高弹透气提臀内裤走秀实拍.mp4", type: "成片" },
+      { id: "110332279", name: "0730-8840-极简美肤衣无感贴合对比镜头.mp4", type: "成片" }
+    ]
   },
   {
     id: "msg_status_changed", category: "内容资源", subcategory: "状态修改", type: "状态修改",
-    title: "成片状态由“待修改”更新为“可投放”", detail: "王编导修改了《防晒喷雾户外实测》的业务状态。",
+    title: "成片状态由“待修改”更新为“可投放”", detail: "王编导修改了《0730-8841-保暖内衣发热纤维实验展示.mp4》的业务状态。",
     status: "read", time: "2026-08-18 15:20:14", eventCode: "RESOURCE_STATUS_CHANGED", template: "resource", severity: "info",
-    actorName: "王编导", recipientNames: ["徐振（上传人）"], sourceType: "成片", sourceId: "VIDEO-42021386", businessStatus: "可投放",
+    actorName: "王编导", recipientNames: ["徐振（上传人）"], sourceType: "成片", sourceId: "110332280", businessStatus: "可投放",
     actionLabel: "查看成片", actionScreen: "resources",
-    details: [{ label: "状态变化", value: "待修改 -> 可投放" }, { label: "修改说明", value: "字幕与品牌露出已按意见调整" }, { label: "修改人", value: "王编导" }]
+    details: [{ label: "状态变化", value: "待修改 -> 可投放" }, { label: "修改说明", value: "字幕与品牌露出已按意见调整" }, { label: "修改人", value: "王编导" }],
+    relatedResources: [{ id: "110332280", name: "0730-8841-保暖内衣发热纤维实验展示.mp4", type: "成片" }]
   },
   {
     id: "msg_mention", category: "内容资源", subcategory: "批注与@提醒", type: "批注与@提醒",
@@ -131,7 +151,8 @@ export const INITIAL_MESSAGES: AppMessage[] = [
     status: "unread", time: "2026-08-19 10:08:55", eventCode: "RESOURCE_MENTIONED", template: "resource", severity: "warning",
     actorName: "王编导", recipientNames: ["徐振（被@人）"], sourceType: "成片批注", sourceId: "ANNOTATION-72018", businessStatus: "待处理",
     actionLabel: "查看批注", actionScreen: "resources",
-    details: [{ label: "关联成片", value: "玫瑰精华礼盒_口播版_v4.mp4" }, { label: "时间锚点", value: "00:08" }, { label: "批注内容", value: "商品特写再延长 1 秒，转场不要使用闪白" }]
+    details: [{ label: "关联成片", value: "0730-8842-秒缇8024前扣内衣搭扣方便性演示.mp4" }, { label: "时间锚点", value: "00:08" }, { label: "批注内容", value: "商品特写再延长 1 秒，转场不要使用闪白" }],
+    relatedResources: [{ id: "110332281", name: "0730-8842-秒缇8024前扣内衣搭扣方便性演示.mp4", type: "成片" }]
   },
   {
     id: "msg_live_schedule", category: "直播", subcategory: "新增排班", type: "新增排班",

@@ -1339,6 +1339,7 @@ export default function TaskCollaborationView({
   // MODAL STATES
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
+  const [copySourceTask, setCopySourceTask] = useState<TaskItem | null>(null);
   const [detailModalTask, setDetailModalTask] = useState<TaskItem | null>(initialDetailTask || null);
 
   useEffect(() => {
@@ -1998,6 +1999,7 @@ export default function TaskCollaborationView({
   // Handle Open Create Modal
   const handleOpenCreateModal = () => {
     setEditingTask(null);
+    setCopySourceTask(null);
     setFormState({
       assigneePath: "",
       orderCount: "",
@@ -2018,6 +2020,11 @@ export default function TaskCollaborationView({
 
   // Handle Open Edit Modal
   const handleOpenEditModal = (task: TaskItem) => {
+    if (task.status === "completed") {
+      showToast("已完成任务已保存历史快照，不可继续编辑");
+      return;
+    }
+    setCopySourceTask(null);
     setEditingTask(task);
     setFormState({
       assigneePath: task.assigneeDeptPath || `${task.assignee}`,
@@ -2039,26 +2046,38 @@ export default function TaskCollaborationView({
 
   // Handle Copy Task
   const handleCopyTask = (task: TaskItem) => {
-    const newTask: TaskItem = {
-      ...task,
-      id: `06201${Math.floor(100000 + Math.random() * 900000)}`,
-      publishDate: new Date().toISOString().slice(0, 10),
-      publisher: currentUser,
-      completedCount: 0,
-      status: "pending"
-    };
-    setTasks([newTask, ...tasks]);
-    showToast(`📋 已复制任务，新增任务 ID: ${newTask.id}`);
+    setEditingTask(null);
+    setCopySourceTask(task);
+    setFormState({
+      assigneePath: task.assigneeDeptPath || task.assignee,
+      orderCount: task.orderCount,
+      deadlineDate: task.deadlineDate,
+      visibilityType: task.visibilityType || "none",
+      visibilityRange: task.visibilityRange || "public",
+      specifiedTeam: task.specifiedTeam || "",
+      specifiedGroup: task.specifiedGroup || "",
+      specifiedPerson: task.specifiedPerson || "",
+      publicDate: task.publicDate || "",
+      remark: task.remark || "",
+      product: task.product || "",
+      scriptType: task.scriptType || ""
+    });
+    setFormErrors({});
+    setIsModalOpen(true);
   };
 
   // Handle Delete Task
-  const handleDeleteTask = (id: string, publisher?: string) => {
-    if (publisher && publisher !== currentUser) {
+  const handleDeleteTask = (task: TaskItem) => {
+    if (task.status === "completed") {
+      showToast("已完成任务属于历史记录，不可直接删除");
+      return;
+    }
+    if (task.publisher !== currentUser) {
       showToast("❌ 只有任务发布人可以删除该任务");
       return;
     }
     if (confirm("确定要删除该任务吗？")) {
-      setTasks(tasks.filter((t) => t.id !== id));
+      setTasks(tasks.filter((t) => t.id !== task.id));
       showToast("🗑️ 任务已删除");
     }
   };
@@ -2122,11 +2141,16 @@ export default function TaskCollaborationView({
         completedCount: 0,
         status: "pending",
         cost: 0,
-        associatedScript: {
+        associatedScript: copySourceTask?.associatedScripts?.[0] || copySourceTask?.associatedScript || {
           title: "待关联脚本",
           status: "待审核",
           versionCount: 1
         },
+        associatedScripts: copySourceTask?.associatedScripts
+          ? copySourceTask.associatedScripts.map((script) => ({ ...script }))
+          : copySourceTask?.associatedScript
+            ? [{ ...copySourceTask.associatedScript }]
+            : undefined,
         product: formState.product,
         scriptType: formState.scriptType,
         visibilityType: formState.visibilityType,
@@ -2138,10 +2162,11 @@ export default function TaskCollaborationView({
         remark: formState.remark
       };
       setTasks([newTask, ...tasks]);
-      showToast(`🎉 成功新增任务 ID: ${newId}`);
+      showToast(copySourceTask ? `已根据原任务要求新建任务 ID: ${newId}` : `🎉 成功新增任务 ID: ${newId}`);
     }
 
     setIsModalOpen(false);
+    setCopySourceTask(null);
   };
 
   if (detailModalTask) {
@@ -3134,7 +3159,9 @@ export default function TaskCollaborationView({
                         </button>
                         <button
                           onClick={() => handleOpenEditModal(task)}
-                          className="hover:underline cursor-pointer"
+                          disabled={task.status === "completed"}
+                          className={task.status === "completed" ? "cursor-not-allowed text-slate-300" : "hover:underline cursor-pointer"}
+                          title={task.status === "completed" ? "已完成任务不可编辑" : "编辑任务"}
                         >
                           编辑
                         </button>
@@ -3144,9 +3171,9 @@ export default function TaskCollaborationView({
                         >
                           复制
                         </button>
-                        {task.publisher === currentUser ? (
+                        {task.publisher === currentUser && task.status !== "completed" ? (
                           <button
-                            onClick={() => handleDeleteTask(task.id, task.publisher)}
+                            onClick={() => handleDeleteTask(task)}
                             className="hover:underline cursor-pointer text-purple-600 transition-colors"
                           >
                             删除
@@ -3155,7 +3182,7 @@ export default function TaskCollaborationView({
                           <button
                             disabled
                             className="text-slate-300 cursor-not-allowed select-none no-underline"
-                            title="仅任务发布人可操作删除"
+                            title={task.status === "completed" ? "已完成任务属于历史记录，不可删除" : "仅任务发布人可操作删除"}
                           >
                             删除
                           </button>
@@ -3313,9 +3340,10 @@ export default function TaskCollaborationView({
                               {/* 1. 关联脚本 (图标展示 + hover 提示) */}
                               <div className="relative group/link inline-block">
                                 <button
-                                  onClick={() => handleOpenScriptAssociationModal(task)}
-                                  className="p-1.5 rounded-md bg-purple-50 hover:bg-purple-100 text-[#7C3AED] transition-all cursor-pointer shadow-2xs flex items-center justify-center shrink-0"
-                                  title="关联脚本"
+                                  disabled={task.status === "completed"}
+                                  onClick={() => task.status !== "completed" && handleOpenScriptAssociationModal(task)}
+                                  className={`p-1.5 rounded-md transition-all shadow-2xs flex items-center justify-center shrink-0 ${task.status === "completed" ? "bg-slate-100 text-slate-300 cursor-not-allowed" : "bg-purple-50 hover:bg-purple-100 text-[#7C3AED] cursor-pointer"}`}
+                                  title={task.status === "completed" ? "已完成任务不可关联脚本" : "关联脚本"}
                                 >
                                   <Link2 className="w-3.5 h-3.5" />
                                 </button>
@@ -3328,9 +3356,10 @@ export default function TaskCollaborationView({
                               {/* 2. 编辑脚本 (图标展示 + hover 提示) */}
                               <div className="relative group/edit inline-block">
                                 <button
-                                  onClick={() => setEditAssociatedModalTask(task)}
-                                  className="p-1.5 rounded-md bg-slate-100 hover:bg-purple-50 text-slate-600 hover:text-[#7C3AED] transition-all cursor-pointer shadow-2xs flex items-center justify-center shrink-0"
-                                  title="编辑脚本"
+                                  disabled={task.status === "completed"}
+                                  onClick={() => task.status !== "completed" && setEditAssociatedModalTask(task)}
+                                  className={`p-1.5 rounded-md transition-all shadow-2xs flex items-center justify-center shrink-0 ${task.status === "completed" ? "bg-slate-100 text-slate-300 cursor-not-allowed" : "bg-slate-100 hover:bg-purple-50 text-slate-600 hover:text-[#7C3AED] cursor-pointer"}`}
+                                  title={task.status === "completed" ? "已完成任务不可编辑关联脚本" : "编辑脚本"}
                                 >
                                   <FileEdit className="w-3.5 h-3.5" />
                                 </button>
@@ -3400,8 +3429,10 @@ export default function TaskCollaborationView({
                     {/* 11. 脚本拆解表 */}
                     <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
                       <button
-                        onClick={() => handleOpenDeconstructionModal(task)}
-                        className="text-purple-600 hover:text-purple-800 font-bold hover:underline cursor-pointer text-xs"
+                        disabled={task.status === "completed"}
+                        onClick={() => task.status !== "completed" && handleOpenDeconstructionModal(task)}
+                        className={task.status === "completed" ? "cursor-not-allowed text-xs font-bold text-slate-300" : "text-purple-600 hover:text-purple-800 font-bold hover:underline cursor-pointer text-xs"}
+                        title={task.status === "completed" ? "已完成任务不可修改脚本拆解表" : "编辑脚本拆解表"}
                       >
                         {task.scriptDeconstruction || "填写拆解表"}
                       </button>
@@ -3477,11 +3508,11 @@ export default function TaskCollaborationView({
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-4 bg-[#7C3AED] rounded-full" />
                 <h3 className="text-sm font-extrabold text-slate-900">
-                  {editingTask ? "编辑任务" : "新增任务"}
+                  {editingTask ? "编辑任务" : copySourceTask ? "复制并新建任务" : "新增任务"}
                 </h3>
               </div>
               <button
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => { setIsModalOpen(false); setCopySourceTask(null); }}
                 className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -3490,6 +3521,16 @@ export default function TaskCollaborationView({
 
             {/* Form Body */}
             <form onSubmit={handleSubmitForm} className="p-6 space-y-4 overflow-y-auto text-xs">
+              {copySourceTask && (
+                <div className="rounded-lg border border-purple-200 bg-purple-50/70 px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-extrabold text-purple-800">已带入原任务要求</p>
+                    <span className="font-mono text-[10px] text-purple-500">原任务 ID：{copySourceTask.id}</span>
+                  </div>
+                  <p className="mt-1.5 leading-5 text-purple-700">请检查指派人、数量、出片日期、可见范围、产品、脚本类型和备注后再创建。关联的参考脚本将一并带入。</p>
+                  <p className="mt-1 text-[11px] text-slate-500">不会复制原任务成果、完成进度、验收结果、完成时间和历史快照。</p>
+                </div>
+              )}
               
               {/* 1. * 指派给 */}
               <div className="flex items-start gap-3 relative">
@@ -3860,7 +3901,7 @@ export default function TaskCollaborationView({
               <div className="flex justify-end gap-2 border-t border-slate-100 pt-4 mt-2">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => { setIsModalOpen(false); setCopySourceTask(null); }}
                   className="px-4 py-2 font-medium text-slate-500 hover:text-slate-800 cursor-pointer text-xs"
                 >
                   取消
@@ -3869,7 +3910,7 @@ export default function TaskCollaborationView({
                   type="submit"
                   className="px-5 py-2 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold rounded-lg shadow-2xs transition-all cursor-pointer text-xs"
                 >
-                  确定
+                  {editingTask ? "保存修改" : copySourceTask ? "创建新任务" : "确定"}
                 </button>
               </div>
             </form>

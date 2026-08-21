@@ -847,26 +847,30 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-4 text-xs font-bold text-[#7C3AED]">
-            <button
-              onClick={() => setIsAssociateScriptModalOpen(true)}
-              className="hover:underline cursor-pointer"
-            >
-              关联脚本
-            </button>
-            <button
-              onClick={() => onShowToast("正在编辑关联脚本")}
-              className="hover:underline cursor-pointer"
-            >
-              编辑关联脚本
-            </button>
-            <button
-              onClick={() => setIsUploadScriptModalOpen(true)}
-              className="hover:underline cursor-pointer"
-            >
-              上传脚本
-            </button>
-          </div>
+          {task.status === "completed" ? (
+            <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500">历史快照 · 不可修改</span>
+          ) : (
+            <div className="flex items-center gap-4 text-xs font-bold text-[#7C3AED]">
+              <button
+                onClick={() => setIsAssociateScriptModalOpen(true)}
+                className="hover:underline cursor-pointer"
+              >
+                关联脚本
+              </button>
+              <button
+                onClick={() => onShowToast("正在编辑关联脚本")}
+                className="hover:underline cursor-pointer"
+              >
+                编辑关联脚本
+              </button>
+              <button
+                onClick={() => setIsUploadScriptModalOpen(true)}
+                className="hover:underline cursor-pointer"
+              >
+                上传脚本
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Associated Scripts Table */}

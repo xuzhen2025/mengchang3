@@ -147,6 +147,13 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
   const [selectedScriptForDetail, setSelectedScriptForDetail] = useState<ScriptItem | null>(null);
 
   React.useEffect(() => {
+    if (!initialSearch?.openDetail || !initialSearch.query) return;
+    const target = initialSearch.query.trim().toLowerCase();
+    const match = scripts.find((script) => script.title.toLowerCase() === target || script.id.toLowerCase() === target);
+    if (match) setSelectedScriptForDetail(match);
+  }, [initialSearch?.requestId]);
+
+  React.useEffect(() => {
     onDetailStateChange?.(!!selectedScriptForDetail);
   }, [selectedScriptForDetail, onDetailStateChange]);
   const [showCreateScriptModal, setShowCreateScriptModal] = useState(false);
