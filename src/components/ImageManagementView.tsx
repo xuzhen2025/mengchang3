@@ -125,7 +125,7 @@ const MOCK_IMAGES: ImageItem[] = [
     primaryCategory: "美妆护肤",
     secondaryCategory: "致上旗舰店",
     publicTags: ["对比实测"],
-    personalTag: "收藏夹",
+    personalTag: "重点素材",
     size: "3.1 MB",
     resolution: "1080x1080"
   },
@@ -263,7 +263,7 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
     "精选主图",
     "品牌资质",
     "营销资料库",
-    "收藏夹",
+    "重点素材",
     "3D渲染图",
     "对比素材"
   ];

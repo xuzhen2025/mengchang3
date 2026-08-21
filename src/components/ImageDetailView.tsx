@@ -7,7 +7,6 @@ import {
   Edit3,
   Plus,
   ArrowUpDown,
-  Star,
   Share2,
   ChevronDown,
   ChevronRight,
@@ -81,13 +80,6 @@ export default function ImageDetailView({
   onClose,
   showToast
 }: ImageDetailViewProps) {
-  const [isFavorite, setIsFavorite] = useState(() => {
-    try {
-      return (JSON.parse(window.localStorage.getItem("cloud_video_personal_favorites_v1") || "[]") as string[]).includes(item.id);
-    } catch {
-      return false;
-    }
-  });
   // Lightbox
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [selectedDetailThumbIndex, setSelectedDetailThumbIndex] = useState<number>(0);
@@ -390,21 +382,6 @@ export default function ImageDetailView({
                 title="图片排序 (拖拽进行排序)"
               >
                 <ArrowUpDown className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={() => {
-                  let ids: string[] = [];
-                  try { ids = JSON.parse(window.localStorage.getItem("cloud_video_personal_favorites_v1") || "[]") as string[]; } catch { ids = []; }
-                  const next = isFavorite ? ids.filter((id) => id !== item.id) : Array.from(new Set([...ids, item.id]));
-                  window.localStorage.setItem("cloud_video_personal_favorites_v1", JSON.stringify(next));
-                  setIsFavorite(!isFavorite);
-                  showToast(isFavorite ? "已取消收藏" : "已收藏，可在个人中心查看");
-                }}
-                className={`p-2 rounded-xl border cursor-pointer transition-colors ${isFavorite ? "border-amber-300 bg-amber-50 text-amber-600" : "border-purple-200 bg-purple-50/60 hover:bg-purple-100 text-purple-600"}`}
-                title={isFavorite ? "取消收藏" : "收藏"}
-              >
-                <Star className="w-4 h-4" fill={isFavorite ? "currentColor" : "none"} />
               </button>
 
               <button

@@ -27,7 +27,6 @@ import {
   ExternalLink,
   Tag,
   Share2,
-  Star,
   ArrowUpDown,
   Play,
   Pause,
@@ -76,7 +75,6 @@ export interface AudioItem {
   publicTags: string[];
   personalTag: string;
   size: string;
-  starred?: boolean;
 }
 
 interface AudioManagementViewProps {
@@ -101,8 +99,7 @@ const INITIAL_AUDIO_LIST: AudioItem[] = [
     secondaryCategory: "医疗机构",
     publicTags: ["场景", "合作达人"],
     personalTag: "有个人标签",
-    size: "1.2 MB",
-    starred: true
+    size: "1.2 MB"
   },
   {
     id: "aud-2",
@@ -166,8 +163,7 @@ const INITIAL_AUDIO_LIST: AudioItem[] = [
     secondaryCategory: "洗护系列",
     publicTags: ["模特", "创新点"],
     personalTag: "有个人标签",
-    size: "1.1 MB",
-    starred: true
+    size: "1.1 MB"
   },
   {
     id: "aud-6",
@@ -436,14 +432,6 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
       setSelectedIds([...selectedIds, id]);
       setIsSelectionMode(true);
     }
-  };
-
-  const toggleStar = (id: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    setAudioList((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, starred: !item.starred } : item))
-    );
-    showToast("已更新收藏状态");
   };
 
   const mainCategories = ["全部", "美妆", "个护家清", "服饰内衣", "食品饮料", "母婴宠物", "图书教育", "智能家居"];
