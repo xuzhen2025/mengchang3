@@ -176,6 +176,7 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
             <div className="space-y-2.5">
               {group.tasks.map((task) => {
                 const category = getTaskCategory(task);
+                const isAgent = category === "agent";
                 const status = STATUS_META[task.status];
                 const canCancel = task.status === "queue" || task.status === "generating";
                 const canRestart = task.status === "failed" || task.status === "cancelled";
@@ -206,8 +207,9 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
 
                     <div className="mt-2.5 flex justify-end gap-1.5 border-t border-slate-100 pt-2.5">
                       {canCancel && <button onClick={() => cancelTask(task.id)} className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><X className="h-3 w-3" />取消任务</button>}
-                      {canRestart && <button onClick={() => restartTask(task.id)} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><RotateCcw className="h-3 w-3" />重新生成</button>}
-                      {task.status === "completed" && <><button onClick={() => viewResult(task.id)} className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><Eye className="h-3 w-3" />查看结果</button><button className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><Download className="h-3 w-3" />下载</button></>}
+                      {isAgent && <button onClick={() => viewResult(task.id)} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><Eye className="h-3 w-3" />{canRestart ? "继续创作" : "进入会话"}</button>}
+                      {!isAgent && canRestart && <button onClick={() => restartTask(task.id)} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><RotateCcw className="h-3 w-3" />重新生成</button>}
+                      {!isAgent && task.status === "completed" && <><button onClick={() => viewResult(task.id)} className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><Eye className="h-3 w-3" />查看结果</button><button className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><Download className="h-3 w-3" />下载</button></>}
                     </div>
                   </article>
                 );

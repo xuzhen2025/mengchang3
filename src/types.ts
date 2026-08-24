@@ -104,6 +104,7 @@ export interface Task {
   cancelledAt?: string;
   refundedCredits?: number;
   failureReason?: string;
+  agentStage?: "analysis" | "script" | "preview" | "final";
 }
 
 export interface CreditTransaction {

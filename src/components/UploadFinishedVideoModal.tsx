@@ -25,6 +25,8 @@ interface UploadFinishedVideoModalProps {
   onPublishSuccess?: (msg: string) => void;
   initialTaskCode?: string;
   isPage?: boolean;
+  initialFiles?: Array<{ name: string; type?: string }>;
+  stayOpenOnPublish?: boolean;
 }
 
 // Hierarchical Category Data (一级分类 -> 二级分类)
@@ -118,7 +120,9 @@ export default function UploadFinishedVideoModal({
   onClose,
   onPublishSuccess,
   initialTaskCode = "",
-  isPage = false
+  isPage = false,
+  initialFiles = [],
+  stayOpenOnPublish = false
 }: UploadFinishedVideoModalProps) {
   if (!isOpen) return null;
 
@@ -240,7 +244,9 @@ export default function UploadFinishedVideoModal({
   const [messageContent, setMessageContent] = useState<string>("");
 
   // Selected files
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>(() =>
+    initialFiles.map((file) => new File([""], file.name, { type: file.type || "video/mp4" }))
+  );
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -254,9 +260,9 @@ export default function UploadFinishedVideoModal({
     setIsSubmitting(true);
     setTimeout(() => {
       setIsSubmitting(false);
-      onClose();
+      if (!stayOpenOnPublish) onClose();
       if (onPublishSuccess) {
-        onPublishSuccess(`✅ 视频及相关元数据已成功${modeText}至资源库！`);
+        onPublishSuccess(`视频已成功${modeText}至资源库`);
       }
     }, 800);
   };

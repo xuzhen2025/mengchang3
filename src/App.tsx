@@ -43,6 +43,7 @@ export default function App() {
   const [selectedTaskForCollaboration, setSelectedTaskForCollaboration] = useState<TaskItem | null>(null);
   const [selectedTaskTabForCollaboration, setSelectedTaskTabForCollaboration] = useState<"to_me" | "my_published" | "all">("all");
   const [resourceSearchIntent, setResourceSearchIntent] = useState<ResourceSearchIntent | null>(null);
+  const [activeAgentSessionId, setActiveAgentSessionId] = useState<string | null>(null);
 
   const handleNavigate = (screen: ActiveScreen) => {
     setScreenHistory((prev) => {
@@ -63,6 +64,9 @@ export default function App() {
   const handleSidebarNavigate = (screen: ActiveScreen) => {
     if (screen === "resources") {
       setResourceSearchIntent(null);
+    }
+    if (screen === "agent_creation") {
+      setActiveAgentSessionId(null);
     }
     setScreenHistory([screen]);
   };
@@ -508,6 +512,27 @@ export default function App() {
     // setIsQueueOpen(true);
   };
 
+  const handleSyncAgentTask = (nextTask: Task, creditsCharge: number = 0) => {
+    setTasks((current) => {
+      const exists = current.some((task) => task.id === nextTask.id);
+      return exists
+        ? current.map((task) => task.id === nextTask.id ? { ...task, ...nextTask } : task)
+        : [nextTask, ...current];
+    });
+
+    if (creditsCharge > 0) {
+      setCredits((current) => current - creditsCharge);
+      setTransactions((current) => [{
+        id: `tx_agent_${Date.now()}`,
+        type: "consume",
+        tool: "Agent创作",
+        amount: -creditsCharge,
+        time: new Date().toISOString().replace("T", " ").slice(0, 19),
+        remark: `Agent生成：${nextTask.name}`
+      }, ...current]);
+    }
+  };
+
   const handleAddCredits = (amount: number, remark: string) => {
     setCredits((prev) => prev + amount);
 
@@ -540,6 +565,26 @@ export default function App() {
       publicTags: ["个人上传"]
     };
     setAssets((prev) => [newAsset, ...prev]);
+  };
+
+  const handleUploadAgentVideos = (videos: Array<{ name: string; cover: string }>) => {
+    const timestamp = new Date().toISOString().replace("T", " ").slice(0, 16);
+    const uploadedAssets: Asset[] = videos.map((video, index) => ({
+      id: `agent_upload_${Date.now()}_${index}`,
+      name: video.name,
+      type: "video",
+      url: video.cover,
+      coverUrl: video.cover,
+      size: "24.5 MB",
+      createdAt: timestamp,
+      category: "AI生成成片",
+      resourceCategory: "成片",
+      source: "resource_library",
+      creator: "徐振",
+      publicTags: ["AI生成", "电商营销"],
+      status: "未审核"
+    }));
+    setAssets((current) => [...uploadedAssets, ...current]);
   };
 
   const handleRemoveAsset = (id: string) => {
@@ -851,9 +896,12 @@ export default function App() {
         return (
           <AgentCreationView
             credits={credits}
-            onAddTask={(type, name, inputFiles, creditsCost) => {
-              handleAddTask(type, name, inputFiles, creditsCost, "agent");
-            }}
+            activeTask={activeAgentSessionId ? tasks.find((task) => task.id === activeAgentSessionId) : undefined}
+            onSyncTask={handleSyncAgentTask}
+            onCancelTask={handleCancelGenerationTask}
+            onOpenQueue={() => setIsQueueOpen(true)}
+            onSessionChange={setActiveAgentSessionId}
+            onUploadVideos={handleUploadAgentVideos}
             onBack={handleBack}
           />
         );
@@ -913,7 +961,16 @@ export default function App() {
           setIsOpen={setIsQueueOpen}
           cancelTask={handleCancelGenerationTask}
           restartTask={handleRestartGenerationTask}
-          viewResult={() => handleNavigate("resources")}
+          viewResult={(taskId) => {
+            const task = tasks.find((item) => item.id === taskId);
+            if (task?.source === "agent" || task?.category === "agent") {
+              setActiveAgentSessionId(taskId);
+              setScreenHistory(["agent_creation"]);
+              setIsQueueOpen(false);
+              return;
+            }
+            handleNavigate("resources");
+          }}
         />
       )}
 
