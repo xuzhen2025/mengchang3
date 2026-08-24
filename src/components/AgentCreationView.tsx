@@ -3,7 +3,7 @@ import {
   ArrowLeft, ArrowUp, Check, CheckCircle2, ChevronDown, Copy, Download, Eye,
   FileText, Film, History, Image as ImageIcon, Link2, Loader2,
   MessageSquare, MoreHorizontal, Package, Palette, Play, Plus, Search,
-  Settings, Sparkles, Square, Trash2, Upload,
+  RefreshCw, Settings, Sparkles, Square, Trash2, Upload,
   Video, WandSparkles, X
 } from "lucide-react";
 import { Task } from "../types";
@@ -80,6 +80,16 @@ interface ResultRecord {
   time: string;
   snapshot: {
     demand: string;
+    product?: ProductSelection;
+    productName: string;
+    industry: string;
+    category: string;
+    sellingPoints: string[];
+    painPoints: string[];
+    targetGroups: string[];
+    scenarios: string[];
+    specs: string[];
+    discountInfo: string;
     creatives: CreativeItem[];
     previews: PreviewItem[];
     finals: FinalVideoItem[];
@@ -98,8 +108,15 @@ interface AgentSession {
   creditsCost: number;
   updatedAt: string;
   demand: string;
+  productName: string;
+  industry: string;
+  category: string;
   sellingPoints: string[];
-  audience: string;
+  painPoints: string[];
+  targetGroups: string[];
+  scenarios: string[];
+  specs: string[];
+  discountInfo: string;
   creatives: CreativeItem[];
   previews: PreviewItem[];
   finals: FinalVideoItem[];
@@ -178,6 +195,7 @@ const STYLE_OPTIONS = [
 const nowText = () => new Date().toISOString().replace("T", " ").slice(0, 16);
 const shortTime = () => new Date().toTimeString().slice(0, 5);
 const cloneItems = <T,>(items: T[]) => items.map((item) => ({ ...item }));
+const productDisplayName = (product?: ProductSelection) => product?.name.replace(/\.(jpg|jpeg|png|webp)$/i, "") || "待补充商品名称";
 
 const createCreatives = (start: number): CreativeItem[] => [
   { id: start + 1, title: "雨天视线危机", angle: "痛点实测", script: "雨刮越刮越模糊？用真实雨天场景对比清洁前后的玻璃透光效果。" },
@@ -207,6 +225,16 @@ const recordFor = (session: AgentSession, step: StepType, title: string, version
   time: shortTime(),
   snapshot: {
     demand: session.demand,
+    product: session.product ? { ...session.product } : undefined,
+    productName: session.productName,
+    industry: session.industry,
+    category: session.category,
+    sellingPoints: [...session.sellingPoints],
+    painPoints: [...session.painPoints],
+    targetGroups: [...session.targetGroups],
+    scenarios: [...session.scenarios],
+    specs: [...session.specs],
+    discountInfo: session.discountInfo,
     creatives: cloneItems(session.creatives),
     previews: cloneItems(session.previews),
     finals: cloneItems(session.finals)
@@ -225,8 +253,15 @@ const makeBaseSession = (prompt: string, mode: AgentSession["mode"]): AgentSessi
   creditsCost: mode === "one_click" ? 5 : 0,
   updatedAt: nowText(),
   demand: "围绕雨天和夜间驾驶视线模糊的真实痛点，突出快速去油膜、操作简单和提升行车安全。",
+  productName: "玻璃油膜清洁擦",
+  industry: "汽车用品",
+  category: "汽车清洁养护 / 玻璃清洁",
   sellingPoints: ["强力去油膜", "擦拭无残留", "不伤玻璃", "自带海绵擦头"],
-  audience: "经常夜间驾驶、雨季用车及注重日常养车的车主",
+  painPoints: ["雨天玻璃油膜导致视线模糊", "夜间会车容易产生炫光", "普通清洁剂难以彻底去除油膜"],
+  targetGroups: ["经常夜间驾驶的车主", "雨季用车频繁的人群", "注重日常养车的用户"],
+  scenarios: ["雨天出行前清洁挡风玻璃", "夜间驾驶前快速去膜", "日常洗车后的玻璃养护"],
+  specs: ["自带海绵擦头", "适用于汽车前挡风玻璃", "便携瓶身设计"],
+  discountInfo: "暂无优惠信息",
   creatives: [],
   previews: [],
   finals: [],
@@ -241,26 +276,47 @@ const withProductAnalysis = (session: AgentSession, product: ProductSelection): 
     return {
       ...session,
       product,
+      productName: name,
+      industry: "3C及电器 / 个护健康电器",
+      category: "美发电器 / 高速吹风机",
       demand: "围绕快速干发、低噪护发和轻巧易握的使用体验，突出高速风力与负离子护发效果，通过日常洗发后的真实场景建立购买理由。",
-      sellingPoints: ["高速速干", "负离子护发", "低噪运行", "轻巧便携"],
-      audience: "重视干发效率与发质护理的通勤女性、长发人群及经常出差的用户"
+      sellingPoints: ["高速气流快速干发", "蓝光负离子恒温护发", "低噪运行不打扰他人", "机身轻巧长时间握持不费力", "多档风力与温度可调"],
+      painPoints: ["传统吹风机噪音大，容易吵醒身边人", "普通吹风机风力不足，长发吹干耗时长", "高温直吹容易让头发干枯毛躁", "机身过重，长时间举着吹手臂酸痛", "高端吹风机价格偏高，平价款品质难保障"],
+      targetGroups: ["注重护发的长发女性", "日常洗头频繁的学生党", "追求高性价比的租房人群", "在意吹发噪音的家庭用户", "美发从业者"],
+      scenarios: ["日常居家快速吹干头发", "宿舍日常吹发使用", "差旅行便携使用", "美发店造型吹发使用", "睡前洗头后快速吹干"],
+      specs: ["多档风力与温度可调", "蓝光负离子护发功能", "2400W 大功率", "轻量便携机身"],
+      discountInfo: "暂无优惠信息"
     };
   }
   if (/防晒|精华|护肤|面膜/.test(name)) {
     return {
       ...session,
       product,
+      productName: name,
+      industry: "美妆护肤",
+      category: "面部护理 / 功效护肤",
       demand: `围绕${name}的成分、肤感和使用前后效果，结合通勤与户外场景展示核心功效。`,
       sellingPoints: ["清爽不黏腻", "温和亲肤", "日常易用", "效果可感知"],
-      audience: "关注肤感、成分和日常护理效率的年轻消费者"
+      painPoints: ["厚重肤感影响后续上妆", "敏感肌担心成分刺激", "日常护理步骤繁琐"],
+      targetGroups: ["关注成分的年轻消费者", "通勤上班族", "追求高效护肤的人群"],
+      scenarios: ["早间通勤护肤", "户外活动前使用", "晚间日常护理"],
+      specs: ["轻盈肤感", "便携包装", "适合日常使用"],
+      discountInfo: "暂无优惠信息"
     };
   }
   return {
     ...session,
     product,
+    productName: name,
+    industry: "电商零售",
+    category: "待补充具体品类",
     demand: `围绕${name}的核心使用场景与真实痛点，展示产品功能、使用过程和效果差异，形成清晰的购买理由。`,
     sellingPoints: ["核心功能突出", "使用简单", "效果直观", "适配日常场景"],
-    audience: `有${name}相关使用需求，并关注实际效果与性价比的消费者`
+    painPoints: ["现有产品使用体验不佳", "难以直观看到使用效果", "同类商品选择成本高"],
+    targetGroups: [`有${name}相关使用需求的消费者`, "关注实际效果的人群", "重视性价比的用户"],
+    scenarios: ["日常家庭使用", "需要快速解决问题时使用", "购买同类商品前对比选择"],
+    specs: ["核心功能配置", "便携易用设计", "适配常见使用环境"],
+    discountInfo: "暂无优惠信息"
   };
 };
 
@@ -298,7 +354,20 @@ const makeDemoSession = (task: Task): AgentSession => {
 const loadStoredSession = (id: string) => {
   try {
     const sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") as Record<string, AgentSession>;
-    return sessions[id] || null;
+    const stored = sessions[id];
+    if (!stored) return null;
+    return {
+      ...stored,
+      productName: stored.productName || productDisplayName(stored.product),
+      industry: stored.industry || "待补充商品行业",
+      category: stored.category || "待补充商品品类",
+      sellingPoints: stored.sellingPoints || [],
+      painPoints: stored.painPoints || [],
+      targetGroups: stored.targetGroups || [],
+      scenarios: stored.scenarios || [],
+      specs: stored.specs || [],
+      discountInfo: stored.discountInfo || "暂无优惠信息"
+    };
   } catch {
     return null;
   }
@@ -577,6 +646,16 @@ export default function AgentCreationView({
       ...session,
       currentStep: record.step,
       demand: record.snapshot.demand,
+      product: record.snapshot.product ? { ...record.snapshot.product } : session.product,
+      productName: record.snapshot.productName || session.productName,
+      industry: record.snapshot.industry || session.industry,
+      category: record.snapshot.category || session.category,
+      sellingPoints: [...(record.snapshot.sellingPoints || session.sellingPoints)],
+      painPoints: [...(record.snapshot.painPoints || session.painPoints)],
+      targetGroups: [...(record.snapshot.targetGroups || session.targetGroups)],
+      scenarios: [...(record.snapshot.scenarios || session.scenarios)],
+      specs: [...(record.snapshot.specs || session.specs)],
+      discountInfo: record.snapshot.discountInfo || session.discountInfo,
       creatives: cloneItems(record.snapshot.creatives),
       previews: cloneItems(record.snapshot.previews),
       finals: cloneItems(record.snapshot.finals),
@@ -793,19 +872,16 @@ export default function AgentCreationView({
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[148px_minmax(0,1fr)_300px] overflow-hidden">
-        <aside className="border-r border-slate-200 bg-white p-3">
-          <p className="mb-2 px-2 text-[10px] font-semibold text-slate-400">创作阶段</p>
-          <div className="space-y-1">
-            {STEP_META.filter((item) => session.availableSteps.includes(item.id)).map((item, index) => {
-              const Icon = item.icon;
-              const active = session.currentStep === item.id;
-              return <button key={item.id} onClick={() => session.status !== "generating" && setSession({ ...session, currentStep: item.id })} className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2.5 text-left text-xs font-semibold ${active ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-slate-50"}`}><span className={`flex h-6 w-6 items-center justify-center rounded ${active ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-500"}`}><Icon className="h-3.5 w-3.5" /></span><span className="flex-1">{item.label}</span>{index < session.availableSteps.length - 1 && <Check className="h-3.5 w-3.5 text-emerald-500" />}</button>;
-            })}
-          </div>
-        </aside>
-
-        <main className="relative min-w-0 overflow-y-auto bg-slate-50 px-5 pb-24 pt-5">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <nav className="flex h-12 shrink-0 items-center gap-1 border-b border-slate-200 bg-white px-5" aria-label="创作阶段">
+          {STEP_META.filter((item) => session.availableSteps.includes(item.id)).map((item, index, items) => {
+            const Icon = item.icon;
+            const active = session.currentStep === item.id;
+            return <React.Fragment key={item.id}><button onClick={() => session.status !== "generating" && setSession({ ...session, currentStep: item.id })} className={`flex h-8 items-center gap-2 rounded-md px-3 text-xs font-semibold transition-colors ${active ? "bg-violet-600 text-white" : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"}`}><Icon className="h-3.5 w-3.5" />{item.label}</button>{index < items.length - 1 && <span className="mx-1 h-px w-5 bg-slate-200" />}</React.Fragment>;
+          })}
+        </nav>
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_300px] overflow-hidden">
+        <main className="relative min-w-0 overflow-y-auto bg-slate-50 px-5 pb-0 pt-5">
           {session.status === "generating" ? (
             <div className="flex h-full min-h-[420px] flex-col items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-violet-600" /><p className="mt-4 text-sm font-semibold text-slate-700">{generatingLabel}</p><button onClick={stopGeneration} className="mt-5 flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Square className="h-3.5 w-3.5" />停止生成</button></div>
           ) : session.status === "failed" ? (
@@ -820,7 +896,7 @@ export default function AgentCreationView({
           )}
 
           {session.status !== "generating" && session.status !== "failed" && (
-            <div className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-end gap-2 border-t border-slate-200 bg-white/95 px-5 py-3 backdrop-blur-sm">
+            <div className="sticky bottom-0 z-20 -mx-5 mt-6 flex items-center justify-end gap-2 border-t border-slate-200 bg-white/95 px-5 py-3 backdrop-blur-sm">
               {session.currentStep === "analysis" && <>
                 <button onClick={() => runGeneration("正在生成视频成片", "final", 5, (current) => { const previews = createPreviews(); const next = { ...current, availableSteps: Array.from(new Set([...current.availableSteps, "final"])) as StepType[], previews, finals: createFinals(previews) }; return { ...next, timeline: [...next.timeline, recordFor(next, "final", "视频成片")] }; })} className="rounded-md border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">一键成片</button>
                 <button onClick={generateScripts} className="rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-700">生成创意与分镜</button>
@@ -851,6 +927,7 @@ export default function AgentCreationView({
             </div>
           </div>
         </aside>
+        </div>
       </div>
 
       {detailVideo && <VideoDetail video={detailVideo} onClose={() => setDetailVideo(null)} onUpload={() => openUpload([detailVideo])} showToast={showToast} />}
@@ -868,18 +945,95 @@ function PanelHeader({ title, count, active, onChange }: { title: string; count?
 }
 
 function AnalysisPanel({ session, setSession }: { session: AgentSession; setSession: React.Dispatch<React.SetStateAction<AgentSession | null>> }) {
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
+  const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
+  const image = session.product?.image || SAMPLE_COVERS[0];
+  const updateList = (field: "sellingPoints" | "painPoints" | "targetGroups" | "scenarios" | "specs", items: string[]) => setSession({ ...session, [field]: items });
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="mx-auto max-w-5xl">
       <PanelHeader title="需求分析" count={session.versionCounts.analysis} active={session.activeVersions.analysis} onChange={(value) => setSession({ ...session, activeVersions: { ...session.activeVersions, analysis: value } })} />
-      <div className="space-y-4">
-        <section className="rounded-lg border border-slate-200 bg-white p-5"><label className="text-xs font-semibold text-slate-500">创作目标</label><textarea value={session.demand} onChange={(event) => setSession({ ...session, demand: event.target.value })} rows={4} className="mt-2 w-full resize-none rounded-md border border-slate-200 p-3 text-sm leading-6 outline-none focus:border-violet-400" /></section>
-        <div className="grid grid-cols-2 gap-4">
-          <section className="rounded-lg border border-slate-200 bg-white p-5"><h3 className="text-xs font-semibold text-slate-500">核心卖点</h3><div className="mt-3 flex flex-wrap gap-2">{session.sellingPoints.map((point) => <span key={point} className="rounded bg-slate-100 px-2.5 py-1.5 text-xs text-slate-700">{point}</span>)}</div></section>
-          <section className="rounded-lg border border-slate-200 bg-white p-5"><h3 className="text-xs font-semibold text-slate-500">目标人群</h3><textarea value={session.audience} onChange={(event) => setSession({ ...session, audience: event.target.value })} rows={3} className="mt-2 w-full resize-none border-0 p-0 text-sm leading-6 outline-none" /></section>
-        </div>
+      <div className="space-y-7">
+        <section>
+          <div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-bold text-slate-900">商品参考图</h3><p className="mt-1 text-xs text-slate-400">{session.productName}</p></div></div>
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <div className="group relative h-36 w-36 overflow-hidden rounded-md border border-slate-200 bg-slate-100">
+              <img src={image} alt={session.productName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+              <div className="absolute inset-0 hidden items-center justify-center gap-2 bg-slate-900/55 group-hover:flex">
+                <button onClick={() => setImagePreviewOpen(true)} className="flex h-8 items-center gap-1 rounded-md bg-white px-2.5 text-[11px] font-semibold text-slate-700"><Eye className="h-3.5 w-3.5" />查看大图</button>
+                <button onClick={() => setImagePickerOpen(true)} className="flex h-8 items-center gap-1 rounded-md bg-violet-600 px-2.5 text-[11px] font-semibold text-white"><ImageIcon className="h-3.5 w-3.5" />替换</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h3 className="mb-3 text-sm font-bold text-slate-900">商品详细信息</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <AnalysisTextField label="商品名称" value={session.productName} onChange={(productName) => setSession({ ...session, productName })} />
+            <AnalysisTextField label="商品行业" value={session.industry} onChange={(industry) => setSession({ ...session, industry })} />
+            <AnalysisTextField label="商品品类" value={session.category} onChange={(category) => setSession({ ...session, category })} />
+            <AnalysisTextField label="优惠信息" value={session.discountInfo} onChange={(discountInfo) => setSession({ ...session, discountInfo })} />
+          </div>
+        </section>
+
+        <section className="grid grid-cols-2 items-start gap-3">
+          <AnalysisListField label="商品卖点" items={session.sellingPoints} onChange={(items) => updateList("sellingPoints", items)} />
+          <AnalysisListField label="商品痛点" items={session.painPoints} onChange={(items) => updateList("painPoints", items)} />
+          <AnalysisListField label="目标人群" items={session.targetGroups} onChange={(items) => updateList("targetGroups", items)} />
+          <AnalysisListField label="适用人群和场景" items={session.scenarios} onChange={(items) => updateList("scenarios", items)} />
+          <AnalysisListField label="商品规格" items={session.specs} onChange={(items) => updateList("specs", items)} />
+        </section>
       </div>
+
+      {imagePickerOpen && <AnalysisImagePicker current={session.product || null} onClose={() => setImagePickerOpen(false)} onConfirm={(product) => { setSession({ ...session, product }); setImagePickerOpen(false); }} />}
+      {imagePreviewOpen && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-900/65 p-5" onMouseDown={(event) => event.target === event.currentTarget && setImagePreviewOpen(false)}>
+          <div className="relative max-h-[88vh] max-w-4xl overflow-hidden rounded-lg bg-white p-2 shadow-2xl"><img src={image} alt={session.productName} className="max-h-[82vh] max-w-full object-contain" referrerPolicy="no-referrer" /><button onClick={() => setImagePreviewOpen(false)} title="关闭" className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-md bg-slate-900/70 text-white"><X className="h-4 w-4" /></button></div>
+        </div>
+      )}
     </div>
   );
+}
+
+function AnalysisTextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return <label className="rounded-lg border border-slate-200 bg-white p-4"><span className="block text-xs font-semibold text-slate-500">{label}</span><input value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 h-8 w-full border-0 bg-transparent p-0 text-sm text-slate-800 outline-none" /></label>;
+}
+
+function AnalysisListField({ label, items, onChange }: { label: string; items: string[]; onChange: (items: string[]) => void }) {
+  const [draft, setDraft] = useState("");
+  const addItem = () => {
+    const value = draft.trim();
+    if (!value) return;
+    onChange([...items, value]);
+    setDraft("");
+  };
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <h4 className="text-xs font-bold text-slate-800">{label}</h4>
+      <div className="mt-3 space-y-1.5">
+        {items.map((item, index) => <div key={`${label}-${index}`} className="group flex min-h-8 items-center gap-2 rounded-md px-2 hover:bg-slate-50"><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" /><input value={item} onChange={(event) => onChange(items.map((value, itemIndex) => itemIndex === index ? event.target.value : value))} className="min-w-0 flex-1 border-0 bg-transparent py-1 text-xs leading-5 text-slate-700 outline-none" /><button onClick={() => onChange(items.filter((_, itemIndex) => itemIndex !== index))} title="删除" className="hidden h-7 w-7 shrink-0 items-center justify-center rounded text-slate-400 hover:bg-rose-50 hover:text-rose-600 group-hover:flex"><Trash2 className="h-3.5 w-3.5" /></button></div>)}
+      </div>
+      <div className="mt-2 flex items-center gap-2 border-t border-slate-100 pt-3"><input value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addItem(); } }} placeholder={`添加${label}`} className="h-8 min-w-0 flex-1 rounded-md border border-slate-200 px-2.5 text-xs outline-none focus:border-violet-400" /><button onClick={addItem} disabled={!draft.trim()} title="添加" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-violet-600 text-white disabled:bg-slate-200 disabled:text-slate-400"><Plus className="h-3.5 w-3.5" /></button></div>
+    </section>
+  );
+}
+
+function AnalysisImagePicker({ current, onClose, onConfirm }: { current: ProductSelection | null; onClose: () => void; onConfirm: (product: ProductSelection) => void }) {
+  const [tab, setTab] = useState<"library" | "local">("library");
+  const [selected, setSelected] = useState<ProductSelection | null>(current);
+  const uploadRef = useRef<HTMLInputElement | null>(null);
+  const localUpload = (file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setSelected({ id: `analysis-local-${Date.now()}`, name: file.name, image: String(reader.result), source: "local" });
+    reader.readAsDataURL(file);
+  };
+  return <ModalFrame title="替换参考图" onClose={onClose} width="max-w-3xl" footer={<><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!selected} onClick={() => selected && onConfirm(selected)} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">确认替换</button></>}>
+    <div className="p-5">
+      <div className="mb-5 flex items-center gap-1 border-b border-slate-200"><button onClick={() => setTab("library")} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${tab === "library" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>图片管理</button><button onClick={() => setTab("local")} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${tab === "local" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>本地上传</button></div>
+      {tab === "library" ? <div className="grid grid-cols-4 gap-3">{IMAGE_LIBRARY.map((item) => <button key={item.id} onClick={() => setSelected(item)} className={`overflow-hidden rounded-md border bg-white text-left ${selected?.id === item.id ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200 hover:border-slate-300"}`}><div className="relative aspect-square"><img src={item.image} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />{selected?.id === item.id && <span className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-white"><Check className="h-3 w-3" /></span>}</div><p className="truncate px-2 py-2 text-[11px] text-slate-600">{item.name}</p></button>)}</div> : <div><button onClick={() => uploadRef.current?.click()} className="flex h-48 w-full flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:text-violet-700"><Upload className="h-6 w-6" /><span className="mt-3 text-xs font-semibold">点击选择本地图片</span></button><input ref={uploadRef} type="file" accept="image/*" className="hidden" onChange={(event) => localUpload(event.target.files?.[0])} />{selected?.source === "local" && <div className="mt-4 flex items-center gap-3 rounded-md border border-violet-200 bg-violet-50 p-3"><img src={selected.image} alt="" className="h-14 w-14 rounded object-cover" /><p className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700">{selected.name}</p><button onClick={() => setSelected(null)} title="删除"><Trash2 className="h-4 w-4 text-slate-400" /></button></div>}</div>}
+    </div>
+  </ModalFrame>;
 }
 
 function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId, setSelectedCreativeId }: { session: AgentSession; setSession: React.Dispatch<React.SetStateAction<AgentSession | null>>; currentCreative?: CreativeItem; selectedCreativeId: number; setSelectedCreativeId: (id: number) => void }) {
