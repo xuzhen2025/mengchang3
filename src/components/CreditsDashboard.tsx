@@ -18,6 +18,7 @@ import { Asset, CreditTransaction } from "../types";
 import PersonalResourceCenter from "./PersonalResourceCenterV2";
 import ChangePasswordModal from "./ChangePasswordModal";
 import PersonalInformationPanel from "./PersonalInformationPanel";
+import AccountLogoutButton from "./AccountLogoutButton";
 
 interface CreditsDashboardProps {
   credits: number;
@@ -26,6 +27,7 @@ interface CreditsDashboardProps {
   assets: Asset[];
   onAddCredits: (amount: number, remark: string) => void;
   onRequestCredits?: (amount: number, manager: string, reason: string, project?: string) => void;
+  onLogout: () => void;
 }
 
 export default function CreditsDashboard({
@@ -34,7 +36,8 @@ export default function CreditsDashboard({
   transactions,
   assets,
   onAddCredits,
-  onRequestCredits
+  onRequestCredits,
+  onLogout
 }: CreditsDashboardProps) {
   const [activeSubTab, setActiveSubTab] = useState<"profile" | "resources" | "personal_tags" | "history">("profile");
   
@@ -237,6 +240,7 @@ export default function CreditsDashboard({
                     <Key className="w-3.5 h-3.5 text-amber-400" />
                     <span>修改密码</span>
                   </button>
+                  <AccountLogoutButton onClick={onLogout} />
                   <button
                     onClick={() => setShowApplyModal(true)}
                     className="flex-1 sm:flex-none px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer text-center flex items-center justify-center gap-1.5"

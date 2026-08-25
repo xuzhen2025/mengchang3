@@ -40,6 +40,7 @@ interface AdminViewProps {
   adminActiveScreen: string;
   onTriggerTask?: (type: any, name: string, inputFiles: string[], cost: number) => void;
   onOpenTaskQueue?: () => void;
+  onLogout: () => void;
 }
 
 type ContentTabType = 
@@ -51,7 +52,7 @@ type ContentTabType =
   | "categories"
   | "script_templates";
 
-export default function AdminView({ adminActiveScreen, onTriggerTask, onOpenTaskQueue }: AdminViewProps) {
+export default function AdminView({ adminActiveScreen, onTriggerTask, onOpenTaskQueue, onLogout }: AdminViewProps) {
   const [activeTab, setActiveTab] = useState<ContentTabType>("resource_hub");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -113,7 +114,7 @@ export default function AdminView({ adminActiveScreen, onTriggerTask, onOpenTask
   }
 
   if (adminActiveScreen === "admin_profile") {
-    return <AdminProfileView />;
+    return <AdminProfileView onLogout={onLogout} />;
   }
 
   return (

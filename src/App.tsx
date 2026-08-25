@@ -25,6 +25,8 @@ import AccountManagementView from "./components/AccountManagementView";
 import TaskCollaborationView, { TaskItem } from "./components/TaskCollaborationView";
 import MessageCenterWorkspace from "./components/MessageCenterWorkspace";
 import AdminView from "./components/AdminView";
+import LoginView, { AppMode, PrototypeAccount } from "./components/LoginView";
+import LogoutConfirmDialog from "./components/LogoutConfirmDialog";
 
 import { 
   INITIAL_GALLERY, 
@@ -36,7 +38,60 @@ import {
 import { Asset, Task, CreditTransaction, GalleryItem, ActiveScreen, AppMessage, ResourceSearchIntent } from "./types";
 import { Sparkles, Layers, Sliders, ChevronRight, Play } from "lucide-react";
 
+const AUTH_STORAGE_KEY = "mengchang_prototype_session";
+
+const PROTOTYPE_ACCOUNTS: PrototypeAccount[] = [
+  {
+    username: "chaojiguanliyuan",
+    password: "123456",
+    label: "超级管理员",
+    description: "用户端与管理端",
+    allowedModes: ["user", "admin"],
+    defaultMode: "user",
+  },
+  {
+    username: "putongyonghu",
+    password: "123456",
+    label: "普通用户",
+    description: "仅用户端",
+    allowedModes: ["user"],
+    defaultMode: "user",
+  },
+  {
+    username: "guanliyuan",
+    password: "123456",
+    label: "管理员",
+    description: "仅管理端",
+    allowedModes: ["admin"],
+    defaultMode: "admin",
+  },
+];
+
+interface PersistedSession {
+  username: string;
+  mode: AppMode;
+}
+
+const readPersistedSession = (): PersistedSession | null => {
+  try {
+    const stored = window.localStorage.getItem(AUTH_STORAGE_KEY);
+    if (!stored) return null;
+    const parsed = JSON.parse(stored) as PersistedSession;
+    const account = PROTOTYPE_ACCOUNTS.find((item) => item.username === parsed.username);
+    if (!account) return null;
+    return {
+      username: account.username,
+      mode: account.allowedModes.includes(parsed.mode) ? parsed.mode : account.defaultMode,
+    };
+  } catch {
+    return null;
+  }
+};
+
 export default function App() {
+  const initialSession = readPersistedSession();
+  const [session, setSession] = useState<PersistedSession | null>(initialSession);
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   // Navigation & UI States (supports back stack)
   const [screenHistory, setScreenHistory] = useState<ActiveScreen[]>(["home"]);
   const activeScreen = screenHistory[screenHistory.length - 1] || "home";
@@ -75,8 +130,40 @@ export default function App() {
   const [isQueueOpen, setIsQueueOpen] = useState(false);
 
   // Mode switching state (用户端 vs 管理端)
-  const [appMode, setAppMode] = useState<"user" | "admin">("user");
+  const [appMode, setAppMode] = useState<AppMode>(initialSession?.mode ?? "user");
   const [adminActiveScreen, setAdminActiveScreen] = useState<string>("content_management");
+
+  const currentAccount = session
+    ? PROTOTYPE_ACCOUNTS.find((account) => account.username === session.username) ?? null
+    : null;
+
+  const handleLogin = (account: PrototypeAccount) => {
+    const nextSession = { username: account.username, mode: account.defaultMode };
+    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextSession));
+    setSession(nextSession);
+    setAppMode(account.defaultMode);
+    setScreenHistory(["home"]);
+    setAdminActiveScreen("content_management");
+  };
+
+  const handleModeChange = (mode: AppMode) => {
+    if (!currentAccount?.allowedModes.includes(mode)) return;
+    const nextSession = { username: currentAccount.username, mode };
+    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextSession));
+    setSession(nextSession);
+    setAppMode(mode);
+    setIsQueueOpen(false);
+  };
+
+  const handleConfirmLogout = () => {
+    window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    setLogoutDialogOpen(false);
+    setSession(null);
+    setAppMode("user");
+    setScreenHistory(["home"]);
+    setAdminActiveScreen("content_management");
+    setIsQueueOpen(false);
+  };
 
   // App core states
   const [credits, setCredits] = useState(100.00);
@@ -669,6 +756,7 @@ export default function App() {
           adminActiveScreen={adminActiveScreen} 
           onTriggerTask={handleAddTask}
           onOpenTaskQueue={() => setIsQueueOpen(true)}
+          onLogout={() => setLogoutDialogOpen(true)}
         />
       );
     }
@@ -800,6 +888,7 @@ export default function App() {
             assets={assets}
             onAddCredits={handleAddCredits}
             onRequestCredits={handleRequestCredits}
+            onLogout={() => setLogoutDialogOpen(true)}
           />
         );
       
@@ -930,6 +1019,10 @@ export default function App() {
     }
   };
 
+  if (!session || !currentAccount) {
+    return <LoginView accounts={PROTOTYPE_ACCOUNTS} onLogin={handleLogin} />;
+  }
+
   return (
     <div className="w-screen h-screen flex bg-slate-50 text-slate-800 overflow-hidden font-sans">
       
@@ -943,7 +1036,8 @@ export default function App() {
         openCreditsModal={() => handleNavigate("credits")}
         openAdminProfile={() => setAdminActiveScreen("admin_profile")}
         appMode={appMode}
-        setAppMode={setAppMode}
+        setAppMode={handleModeChange}
+        allowedModes={currentAccount.allowedModes}
         adminActiveScreen={adminActiveScreen}
         setAdminActiveScreen={setAdminActiveScreen}
       />
@@ -989,6 +1083,12 @@ export default function App() {
           maxSelections={5}
         />
       )}
+
+      <LogoutConfirmDialog
+        open={logoutDialogOpen}
+        onCancel={() => setLogoutDialogOpen(false)}
+        onConfirm={handleConfirmLogout}
+      />
     </div>
   );
 }

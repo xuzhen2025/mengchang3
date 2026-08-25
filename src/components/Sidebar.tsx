@@ -37,6 +37,7 @@ interface SidebarProps {
   openAdminProfile?: () => void;
   appMode?: "user" | "admin";
   setAppMode?: (mode: "user" | "admin") => void;
+  allowedModes?: ("user" | "admin")[];
   adminActiveScreen?: string;
   setAdminActiveScreen?: (screen: string) => void;
 }
@@ -51,10 +52,12 @@ export default function Sidebar({
   openAdminProfile = () => {},
   appMode = "user",
   setAppMode = () => {},
+  allowedModes = ["user", "admin"],
   adminActiveScreen = "content_management",
   setAdminActiveScreen = () => {}
 }: SidebarProps) {
   const [modeDropdownOpen, setModeDropdownOpen] = useState(false);
+  const canSwitchModes = allowedModes.length > 1;
 
   const userMenuItems: { id: string; label: string; icon: any; badge?: string }[] = [
     { id: "home", label: "首页", icon: Home },
@@ -99,7 +102,7 @@ export default function Sidebar({
             )}
           </div>
 
-          {!collapsed && (
+          {!collapsed && canSwitchModes && (
             <div className="relative shrink-0">
               <button
                 id="btn-client-mode-dropdown"
@@ -115,39 +118,29 @@ export default function Sidebar({
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setModeDropdownOpen(false)} />
                   <div className="absolute right-0 top-full mt-1.5 w-28 bg-white border border-slate-200 rounded-xl shadow-xl py-1 z-50 animate-fade-in">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAppMode("user");
-                        setModeDropdownOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 text-xs hover:bg-purple-50 flex items-center justify-between cursor-pointer ${
-                        appMode === "user" ? "text-purple-600 font-bold bg-purple-50/60" : "text-slate-700 font-medium"
-                      }`}
-                    >
-                      <span>用户端</span>
-                      {appMode === "user" && <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAppMode("admin");
-                        setModeDropdownOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 text-xs hover:bg-purple-50 flex items-center justify-between cursor-pointer ${
-                        appMode === "admin" ? "text-purple-600 font-bold bg-purple-50/60" : "text-slate-700 font-medium"
-                      }`}
-                    >
-                      <span>管理端</span>
-                      {appMode === "admin" && <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />}
-                    </button>
+                    {allowedModes.map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => {
+                          setAppMode(mode);
+                          setModeDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-xs hover:bg-purple-50 flex items-center justify-between cursor-pointer ${
+                          appMode === mode ? "text-purple-600 font-bold bg-purple-50/60" : "text-slate-700 font-medium"
+                        }`}
+                      >
+                        <span>{mode === "user" ? "用户端" : "管理端"}</span>
+                        {appMode === mode && <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />}
+                      </button>
+                    ))}
                   </div>
                 </>
               )}
             </div>
           )}
 
-          {collapsed && (
+          {collapsed && canSwitchModes && (
             <button
               type="button"
               onClick={() => {
