@@ -182,14 +182,89 @@ const SOURCE_VIDEOS: SourceVideoSelection[] = [
   { id: "110332303", name: "不粘锅煎蛋过程原始素材.mp4", cover: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&auto=format&fit=crop&q=80", status: "审核驳回", section: "素材", category: "日用百货 / 厨房用品", author: "赵铁柱", durationSeconds: 42, duration: "00:42", size: "51.2 MB", tags: ["产品实拍", "使用过程"] }
 ];
 
+const STYLE_VIDEO_POOL = [
+  "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+  "https://videos.pexels.com/video-files/3195394/3195394-hd_1920_1080_25fps.mp4",
+  "https://videos.pexels.com/video-files/5823543/5823543-hd_1920_1080_25fps.mp4",
+  "https://media.w3.org/2010/05/sintel/trailer.mp4",
+  "https://media.w3.org/2010/05/bunny/trailer.mp4",
+  "https://media.w3.org/2010/05/video/movie_300.mp4"
+];
+
+const STYLE_COVER_POOL = [
+  "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=720&auto=format&fit=crop&q=82",
+  "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=720&auto=format&fit=crop&q=82",
+  "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=720&auto=format&fit=crop&q=82",
+  "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=720&auto=format&fit=crop&q=82",
+  "https://images.unsplash.com/photo-1460353581641-37baddab0fa2?w=720&auto=format&fit=crop&q=82",
+  "https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=720&auto=format&fit=crop&q=82",
+  "https://images.unsplash.com/photo-1531058020387-3be344556be6?w=720&auto=format&fit=crop&q=82",
+  "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?w=720&auto=format&fit=crop&q=82"
+];
+
+const styleDirection = (name: string, index: number) => ({
+  name,
+  video: STYLE_VIDEO_POOL[index % STYLE_VIDEO_POOL.length],
+  cover: STYLE_COVER_POOL[index % STYLE_COVER_POOL.length]
+});
+
 const STYLE_OPTIONS = [
-  { name: "品牌高级质感风", items: ["轻奢极简风", "院线专业风", "高端商务风", "侘寂质感风"] },
-  { name: "街拍生活氛围感", items: ["都市通勤风", "美式复古街拍", "Citywalk 日常感", "日系治愈街景"] },
-  { name: "居家原生生活感", items: ["温馨治愈居家风", "沉浸式宅家风", "厨房烟火气", "浴室洗漱日常"] },
-  { name: "硬核实测真实感", items: ["暴力测试风", "原相机测评风", "实验室专业风", "户外硬核风"] },
-  { name: "口播原生纪实感", items: ["素人分享风", "博主种草风", "专家科普风", "办公室闲聊风"] },
-  { name: "国潮东方美学风", items: ["新中式轻奢风", "古风意境风", "非遗国风", "禅意茶系风"] },
-  { name: "科技未来工业风", items: ["冷光科技风", "未来实验室", "金属工业风", "智能产品演示"] }
+  {
+    name: "品牌高级质感风",
+    visual: "精致柔光 + 低饱和统一色调 + 极简构图 + 大量留白，重点突出产品肌理与质感，画面干净无冗余元素。光影考究（常用蝴蝶光、侧逆光勾勒轮廓），多采用慢镜头、电影级运镜，整体精致度与高级感拉满。",
+    directions: ["轻奢极简风", "院线专业风", "高端商务风", "侘寂质感风"].map((name, index) => styleDirection(name, index)),
+    categories: "高客单价护肤 / 美妆、珠宝腕表、高端家电、轻奢服饰、香氛、奢侈品",
+    positioning: "用于品牌形象塑造、高净值人群破圈、拉升产品溢价，适合品牌广告与精准人群千川投放；缺点是硬广感较强，泛流量下完播率偏低。"
+  },
+  {
+    name: "街拍生活氛围感",
+    visual: "户外自然光影 + 动态抓拍感 + 城市 / 自然街景，画面松弛有呼吸感，色调多为暖调胶片感或清透日系感。不刻意摆拍，主打“随手拍的日常美感”，人物状态自然松弛。",
+    directions: ["都市通勤风", "美式复古街拍", "Citywalk 日常感", "日系治愈街景", "户外露营风"].map((name, index) => styleDirection(name, index + 1)),
+    categories: "服饰鞋包、配饰墨镜、防晒用品、便携数码、茶饮、户外装备",
+    positioning: "穿搭、生活类种草素材的核心风格，用户代入感强、完播率高，是服饰、配饰类目的跑量主力风格。"
+  },
+  {
+    name: "居家原生生活感",
+    visual: "真实居家场景（客厅、厨房、卧室、浴室）+ 自然光为主 + 生活化细节痕迹，构图随意自然，无刻意精致布景，画面“不完美但真实”，主打普通人的日常代入感。",
+    directions: ["温馨治愈居家风", "沉浸式宅家风", "厨房烟火气", "浴室洗漱日常", "租房改造风"].map((name, index) => styleDirection(name, index + 2)),
+    categories: "家居清洁、日用百货、小家电、食品零食、母婴用品、洗护用品",
+    positioning: "全品类通用的跑量风格，生活化场景天然降低广告感，用户信任度高、转化稳定，是剧情种草、好物分享类素材的首选。"
+  },
+  {
+    name: "硬核实测真实感",
+    visual: "近距离怼拍产品 + 原相机直出质感 + 无多余修饰，光线直白甚至略显“粗糙”，全程无明显剪辑感。画面优先级完全让位于效果展示，主打“眼见为实”的说服力。",
+    directions: ["暴力测试风", "原相机测评风", "实验室专业风", "工地 / 户外硬核风"].map((name, index) => styleDirection(name, index + 3)),
+    categories: "功能性清洁品、美妆遮瑕 / 底妆、五金工具、汽车用品、防水耐磨产品、建材",
+    positioning: "高转化、高 ROI 的核心素材风格，用直观效果戳中痛点，信任度极强；缺点是开头钩子弱时完播率偏低，需配合强痛点文案。"
+  },
+  {
+    name: "口播原生纪实感",
+    visual: "近景大头构图 + 普通背景（白墙 / 居家 / 办公室）+ 自然打光，无精致妆造与专业布景，接近普通人随手拍的分享视频，“素人感”“真实感”拉满。",
+    directions: ["素人分享风", "博主种草风", "专家科普风", "办公室闲聊风", "宝妈真实反馈"].map((name, index) => styleDirection(name, index + 4)),
+    categories: "全品类通吃，尤其美妆护肤、食品保健品、知识付费、日用百货",
+    positioning: "最低成本、最高产能的铺量风格，制作周期短、可批量复制，是千川矩阵号、多账号跑量的核心素材；缺点是同质化严重，需强话术钩子留人。"
+  },
+  {
+    name: "国潮东方美学风",
+    visual: "中式传统元素 + 对称构图 + 柔和漫射光，色调以赭石、青灰、朱砂等传统色系为主，搭配水墨、木纹、瓷器、宣纸等道具，主打东方雅致意境与文化氛围感。",
+    directions: ["新中式轻奢风", "古风意境风", "非遗国风", "禅意茶系风"].map((name, index) => styleDirection(name, index + 5)),
+    categories: "国风美妆、草本护肤、茶叶茶具、中式家居、汉服配饰、滋补养生品",
+    positioning: "精准触达国风人群，强化品牌文化调性，适合差异化竞争；泛流量下受众面较窄，更适合定向投放。"
+  },
+  {
+    name: "科技未来工业风",
+    visual: "冷色调金属质感 + 暗调环境光 + 科技蓝 / 紫光点缀，线条硬朗锐利，多实验室、工业场景，突出技术感与专业属性，运镜多为机械感推拉、环绕。",
+    directions: ["赛博科技风", "实验室专业风", "工业硬核风", "数码极简风"].map((name, index) => styleDirection(name, index + 6)),
+    categories: "数码 3C、智能家电、男士护肤、汽车用品、黑科技产品、功能性保健品",
+    positioning: "强化产品技术背书，触达男性、科技爱好者人群，适合突出成分、技术、功能的产品。"
+  },
+  {
+    name: "复古怀旧年代感",
+    visual: "胶片颗粒质感 + 暖黄复古色调 + 年代感场景道具，主打情怀共鸣，画面自带故事感，常用 80 / 90 年代老街、老房子、旧物件等场景元素。",
+    directions: ["港风复古", "90 年代怀旧风", "美式复古", "民国复古风"].map((name, index) => styleDirection(name, index + 7)),
+    categories: "怀旧零食、老国货、复古服饰、文创周边、情怀类产品",
+    positioning: "靠情怀拉升完播率与记忆点，适合老品牌翻新、怀旧向产品，差异化竞争优势明显。"
+  }
 ];
 
 const nowText = () => new Date().toISOString().replace("T", " ").slice(0, 16);
@@ -1242,10 +1317,45 @@ function SettingsModal({ duration, ratio, removeWatermark, onClose, onConfirm }:
 }
 
 function StyleModal({ value, onClose, onConfirm }: { value: string; onClose: () => void; onConfirm: (value: string) => void }) {
-  const initialCategory = Math.max(0, STYLE_OPTIONS.findIndex((category) => category.items.includes(value)));
+  const initialCategory = Math.max(0, STYLE_OPTIONS.findIndex((category) => category.directions.some((direction) => direction.name === value)));
   const [active, setActive] = useState(initialCategory);
   const [draft, setDraft] = useState(value);
-  return <ModalFrame title="视频营销视觉风格库" onClose={onClose} width="max-w-4xl" footer={<><button disabled={!draft} onClick={() => setDraft("")} className="mr-auto rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-500 disabled:opacity-40">清除已选风格</button><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button onClick={() => onConfirm(draft)} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white">确认应用</button></>}>
-    <div className="grid min-h-[480px] grid-cols-[220px_minmax(0,1fr)]"><div className="border-r border-slate-200 bg-slate-50 p-3">{STYLE_OPTIONS.map((category, index) => <button key={category.name} onClick={() => setActive(index)} className={`mb-1 w-full rounded-md px-3 py-3 text-left text-xs font-semibold ${active === index ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-white"}`}>{category.name}</button>)}</div><div className="p-6"><div className="mb-6"><p className="text-[10px] font-semibold text-violet-600">核心视觉风格</p><h4 className="mt-1 text-lg font-bold text-slate-900">{STYLE_OPTIONS[active].name}</h4><p className="mt-2 text-xs leading-6 text-slate-500">选择适合商品调性和视频表达方向的细分风格。</p></div><div className="grid grid-cols-2 gap-3">{STYLE_OPTIONS[active].items.map((item, index) => <button key={item} onClick={() => setDraft(item)} className={`overflow-hidden rounded-md border text-left ${draft === item ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200 hover:border-slate-300"}`}><div className="relative aspect-video"><img src={SAMPLE_COVERS[index % SAMPLE_COVERS.length]} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />{draft === item && <span className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-white"><Check className="h-3 w-3" /></span>}</div><p className="px-3 py-2.5 text-xs font-semibold text-slate-700">{item}</p></button>)}</div></div></div>
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const category = STYLE_OPTIONS[active];
+  const selectCategory = (index: number) => {
+    setActive(index);
+    window.requestAnimationFrame(() => contentRef.current?.scrollTo({ top: 0 }));
+  };
+  return <ModalFrame title="视频营销视觉风格库" onClose={onClose} width="max-w-6xl" footer={<><button disabled={!draft} onClick={() => setDraft("")} className="mr-auto rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-500 disabled:opacity-40">清除已选风格</button>{draft && <span className="text-xs text-slate-500">已选：<b className="text-violet-700">{draft}</b></span>}<button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button onClick={() => onConfirm(draft)} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white">确认应用</button></>}>
+    <div className="grid h-[min(560px,calc(86vh-124px))] min-h-0 grid-cols-[210px_minmax(0,1fr)] overflow-hidden">
+      <div className="overflow-y-auto border-r border-slate-200 bg-slate-50 p-3">{STYLE_OPTIONS.map((item, index) => { const selected = item.directions.some((direction) => direction.name === draft); return <button key={item.name} onClick={() => selectCategory(index)} className={`mb-1 flex w-full items-center gap-2 rounded-md px-3 py-3 text-left text-xs font-semibold ${active === index ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-white"}`}><span className="min-w-0 flex-1">{item.name}</span>{selected && <Check className={`h-3.5 w-3.5 shrink-0 ${active === index ? "text-white" : "text-violet-600"}`} />}</button>; })}</div>
+      <div ref={contentRef} className="overflow-y-auto p-5">
+        <div className="border-b border-slate-200 pb-5">
+          <h4 className="text-lg font-bold text-slate-900">{category.name}</h4>
+          <div className="mt-4 space-y-3 text-xs leading-6">
+            <div className="grid grid-cols-[76px_minmax(0,1fr)] gap-3"><span className="font-semibold text-slate-500">核心视觉</span><p className="text-slate-600">{category.visual}</p></div>
+          </div>
+        </div>
+        <div className="pt-5"><div className="mb-3 flex items-center justify-between"><h5 className="text-sm font-bold text-slate-900">细分方向</h5><span className="text-[11px] text-slate-400">{category.directions.length} 个方向</span></div><div className="grid grid-cols-2 gap-3 xl:grid-cols-3">{category.directions.map((direction) => <StyleDirectionCard key={direction.name} direction={direction} selected={draft === direction.name} onSelect={() => setDraft(direction.name)} />)}</div></div>
+      </div>
+    </div>
   </ModalFrame>;
+}
+
+function StyleDirectionCard({ direction, selected, onSelect }: { direction: { name: string; video: string; cover: string }; selected: boolean; onSelect: () => void }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const play = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+  };
+  const stop = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.pause();
+    video.currentTime = 0;
+    setPlaying(false);
+  };
+  return <button onClick={onSelect} onMouseEnter={play} onMouseLeave={stop} onFocus={play} onBlur={stop} className={`overflow-hidden rounded-md border bg-white text-left transition-colors ${selected ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200 hover:border-violet-300"}`}><div className="relative aspect-video overflow-hidden bg-slate-900"><video ref={videoRef} src={direction.video} poster={direction.cover} muted loop playsInline preload="metadata" className="h-full w-full object-cover" />{!playing && <span className="absolute inset-0 flex items-center justify-center bg-slate-900/15"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-violet-700 shadow"><Play className="ml-0.5 h-4 w-4 fill-current" /></span></span>}{selected && <span className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-white"><Check className="h-3 w-3" /></span>}</div><p className="px-3 py-2.5 text-xs font-semibold text-slate-700">{direction.name}</p></button>;
 }
