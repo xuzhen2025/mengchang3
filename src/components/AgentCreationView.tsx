@@ -11,6 +11,15 @@ import UploadFinishedVideoModal from "./UploadFinishedVideoModal";
 
 type StepType = "analysis" | "script" | "preview" | "final";
 type SessionStatus = "queue" | "generating" | "completed" | "failed" | "cancelled";
+type HomePromptPart = "product" | "reference" | "script" | "sources" | "style";
+
+interface HomePromptPartValue {
+  lead: string;
+  label: string;
+  prefix?: string;
+  image?: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
 
 interface ProductSelection {
   id: string;
@@ -141,6 +150,7 @@ interface AgentCreationViewProps {
 
 const STORAGE_KEY = "mengchang_agent_sessions_v2";
 const REFERENCE_STORAGE_KEY = "mengchang_agent_reference_videos";
+const HOME_PROMPT_PREFIX = "请结合使用已投放素材和原料库为我生成一个短视频广告，";
 const STEP_META: Array<{ id: StepType; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: "analysis", label: "需求分析", icon: FileText },
   { id: "script", label: "创意与分镜", icon: WandSparkles },
@@ -472,6 +482,7 @@ export default function AgentCreationView({
   const [videoRatio, setVideoRatio] = useState<"9:16" | "16:9">("9:16");
   const [removeWatermark, setRemoveWatermark] = useState(true);
   const [selectedStyle, setSelectedStyle] = useState("");
+  const [homePromptOrder, setHomePromptOrder] = useState<HomePromptPart[]>([]);
   const [referenceHistory, setReferenceHistory] = useState<ReferenceVideoSelection[]>(() => {
     try {
       const stored = JSON.parse(localStorage.getItem(REFERENCE_STORAGE_KEY) || "[]") as ReferenceVideoSelection[];
@@ -501,6 +512,19 @@ export default function AgentCreationView({
   const showToast = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(null), 2400);
+  };
+
+  const appendPromptPart = (part: HomePromptPart) => {
+    setHomePromptOrder((current) => current.includes(part) ? current : [...current, part]);
+  };
+
+  const removePromptPart = (part: HomePromptPart) => {
+    setHomePromptOrder((current) => current.filter((item) => item !== part));
+    if (part === "product") setSelectedProduct(null);
+    if (part === "reference") setSelectedReference(null);
+    if (part === "script") setSelectedScript(null);
+    if (part === "sources") setSelectedSources([]);
+    if (part === "style") setSelectedStyle("");
   };
 
   useEffect(() => {
@@ -573,8 +597,49 @@ export default function AgentCreationView({
     }, 1200);
   };
 
+  const getHomePromptPart = (part: HomePromptPart): HomePromptPartValue | null => {
+    if (part === "product" && selectedProduct) {
+      return { lead: "商品是", label: selectedProduct.name, image: selectedProduct.image, icon: Package };
+    }
+    if (part === "reference" && selectedReference) {
+      return { lead: "用上参考视频", label: selectedReference.name, image: selectedReference.cover, icon: Video };
+    }
+    if (part === "script" && selectedScript) {
+      return { lead: "脚本是", label: selectedScript.name, icon: FileText };
+    }
+    if (part === "sources" && selectedSources.length > 0) {
+      return {
+        lead: "用上上传原料",
+        label: selectedSources.length === 1
+          ? selectedSources[0].name
+          : `等 ${selectedSources.length} 个原料`,
+        prefix: selectedSources.length === 1 ? undefined : "原料包：",
+        image: selectedSources[0].cover,
+        icon: Film,
+      };
+    }
+    if (part === "style" && selectedStyle) {
+      return { lead: "视频风格是", label: selectedStyle, icon: Palette };
+    }
+    return null;
+  };
+
+  const activeHomePromptParts = homePromptOrder
+    .map((part) => ({ part, value: getHomePromptPart(part) }))
+    .filter((item): item is { part: HomePromptPart; value: NonNullable<ReturnType<typeof getHomePromptPart>> } => Boolean(item.value));
+
+  const buildHomePrompt = () => {
+    if (activeHomePromptParts.length === 0) return idea.trim();
+    let value = `${HOME_PROMPT_PREFIX}${idea.trim()}`;
+    activeHomePromptParts.forEach(({ value: part }) => {
+      value += /[，,。；;!?！？]\s*$/.test(value) ? " " : "，";
+      value += `${part.lead}${part.prefix || ""}${part.label}`;
+    });
+    return value.trim();
+  };
+
   const startCreation = () => {
-    const prompt = idea.trim() || (selectedProduct ? `用${selectedProduct.name}拍一条营销视频` : selectedReference ? "参考样片写一份分镜脚本" : "开始 Agent 创作");
+    const prompt = buildHomePrompt() || "开始 Agent 创作";
     const initial = makeBaseSession(prompt, "step");
     const base = selectedProduct ? withProductAnalysis(initial, selectedProduct) : initial;
     onSessionChange(base.id);
@@ -796,12 +861,13 @@ export default function AgentCreationView({
     setSelectedScript(null);
     setSelectedSources([]);
     setSelectedStyle("");
+    setHomePromptOrder([]);
     setHomeMenu(null);
     onSessionChange(null);
   };
 
   const selectedFinals = useMemo(() => session?.finals.filter((item) => item.selected) || [], [session?.finals]);
-  const canStart = Boolean(idea.trim() || selectedProduct || selectedReference || selectedScript || selectedSources.length);
+  const canStart = Boolean(idea.trim() || selectedProduct || selectedReference || selectedScript || selectedSources.length || selectedStyle);
 
   if (uploadOpen) {
     return (
@@ -839,16 +905,24 @@ export default function AgentCreationView({
             </div>
 
             <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-colors focus-within:border-violet-400">
-              {(selectedProduct || selectedReference || selectedScript || selectedSources.length > 0 || selectedStyle) && (
-                <div className="mb-3 flex flex-wrap gap-2">
-                  {selectedProduct && <SelectionChip icon={Package} label={selectedProduct.name} image={selectedProduct.image} onRemove={() => setSelectedProduct(null)} />}
-                  {selectedReference && <SelectionChip icon={Video} label={selectedReference.name} image={selectedReference.cover} onRemove={() => setSelectedReference(null)} />}
-                  {selectedScript && <SelectionChip icon={FileText} label={selectedScript.name} onRemove={() => setSelectedScript(null)} />}
-                  {selectedSources.length > 0 && <SelectionChip icon={Film} label={`视频原料 ${selectedSources.length} 个`} onRemove={() => setSelectedSources([])} />}
-                  {selectedStyle && <SelectionChip icon={Palette} label={selectedStyle} onRemove={() => setSelectedStyle("")} />}
-                </div>
-              )}
-              <textarea value={idea} onChange={(event) => setIdea(event.target.value)} rows={5} placeholder="发送给 Agent" className="w-full resize-none border-0 bg-transparent text-sm leading-6 text-slate-800 outline-none placeholder:text-slate-400" />
+              <div className="flex min-h-[120px] flex-wrap content-start items-center gap-x-1 gap-y-2 text-sm leading-7 text-slate-800">
+                {activeHomePromptParts.length > 0 && <span>{HOME_PROMPT_PREFIX}</span>}
+                <EditablePromptText
+                  value={idea}
+                  onChange={setIdea}
+                  inline={activeHomePromptParts.length > 0}
+                  placeholder={activeHomePromptParts.length > 0 ? "" : "发送给 Agent"}
+                />
+                {activeHomePromptParts.map(({ part, value }, index) => {
+                  const needsSeparator = index > 0 || (Boolean(idea.trim()) && !/[，,。；;!?！？]\s*$/.test(idea));
+                  return (
+                    <React.Fragment key={part}>
+                      <span className="whitespace-nowrap">{needsSeparator ? "，" : ""}{value.lead}</span>
+                      <SelectionChip compact icon={value.icon} prefix={value.prefix} label={value.label} image={value.image} onRemove={() => removePromptPart(part)} />
+                    </React.Fragment>
+                  );
+                })}
+              </div>
               <div className="mt-3 flex items-end justify-between gap-3 border-t border-slate-100 pt-3">
                 <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
                   <HomeMenuButton icon={Package} label="商品" active={homeMenu === "product" || !!selectedProduct} onClick={() => setHomeMenu(homeMenu === "product" ? null : "product")}>
@@ -857,21 +931,21 @@ export default function AgentCreationView({
                       <MenuAction icon={ImageIcon} label="添加商品图" disabled={!!selectedProduct} onClick={() => { setHomeMenu(null); setHomeModal("product_image"); }} />
                     </MenuPopup>}
                   </HomeMenuButton>
-                  <HomeMenuButton icon={Video} label="参考" active={homeMenu === "reference" || !!selectedReference} onClick={() => setHomeMenu(homeMenu === "reference" ? null : "reference")}>
+                  <HomeMenuButton icon={Video} label="参考" active={homeMenu === "reference"} disabled={!!selectedReference} disabledHint="已添加参考视频" onClick={() => setHomeMenu(homeMenu === "reference" ? null : "reference")}>
                     {homeMenu === "reference" && <MenuPopup>
                       <MenuAction icon={History} label="历史投放素材" disabled={!!selectedReference} onClick={() => { setHomeMenu(null); setHomeModal("reference"); }} />
-                      <LocalReferenceAction disabled={!!selectedReference} onUploaded={(item) => { setReferenceHistory((items) => [item, ...items]); setSelectedReference(item); setHomeMenu(null); }} showToast={showToast} />
+                      <LocalReferenceAction disabled={!!selectedReference} onUploaded={(item) => { setReferenceHistory((items) => [item, ...items]); setSelectedReference(item); appendPromptPart("reference"); setHomeMenu(null); }} showToast={showToast} />
                     </MenuPopup>}
                   </HomeMenuButton>
                   <HomeMenuButton icon={FileText} label="脚本/原料" active={homeMenu === "source" || !!selectedScript || selectedSources.length > 0} onClick={() => setHomeMenu(homeMenu === "source" ? null : "source")}>
                     {homeMenu === "source" && <MenuPopup>
                       <MenuAction icon={FileText} label="从脚本管理选择" disabled={!!selectedScript} onClick={() => { setHomeMenu(null); setHomeModal("script"); }} />
                       <MenuAction icon={Film} label="从资源库选择原料" onClick={() => { setHomeMenu(null); setHomeModal("sources"); }} />
-                      <LocalSourceAction onUploaded={(items) => { setSelectedSources((current) => [...current, ...items].slice(0, 100)); setHomeMenu(null); }} showToast={showToast} />
+                      <LocalSourceAction onUploaded={(items) => { setSelectedSources((current) => [...current, ...items].slice(0, 100)); appendPromptPart("sources"); setHomeMenu(null); }} showToast={showToast} />
                     </MenuPopup>}
                   </HomeMenuButton>
                   <HomeMenuButton icon={Settings} label={`${videoDuration}秒 · ${videoRatio}`} active={homeModal === "settings"} onClick={() => { setHomeMenu(null); setHomeModal("settings"); }} />
-                  <HomeMenuButton icon={Palette} label={selectedStyle || "风格"} active={homeModal === "style" || !!selectedStyle} onClick={() => { setHomeMenu(null); setHomeModal("style"); }} />
+                  <HomeMenuButton icon={Palette} label="风格" active={homeModal === "style" || !!selectedStyle} onClick={() => { setHomeMenu(null); setHomeModal("style"); }} />
                 </div>
                 <button onClick={startCreation} disabled={!canStart} title="发送" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-600 text-white hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400"><ArrowUp className="h-4 w-4" /></button>
               </div>
@@ -884,13 +958,13 @@ export default function AgentCreationView({
           </div>
         </main>
 
-        {homeModal === "product_link" && <ProductLinkModal onClose={() => setHomeModal(null)} onConfirm={(product) => { setSelectedProduct(product); setHomeModal(null); }} />}
-        {homeModal === "product_image" && <ProductImageModal onClose={() => setHomeModal(null)} onConfirm={(product) => { setSelectedProduct(product); setHomeModal(null); }} />}
-        {homeModal === "reference" && <ReferenceVideoModal items={referenceHistory} selected={selectedReference} onDelete={(id) => { setReferenceHistory((items) => items.filter((item) => item.id !== id)); if (selectedReference?.id === id) setSelectedReference(null); }} onClose={() => setHomeModal(null)} onConfirm={(item) => { setSelectedReference(item); setHomeModal(null); }} />}
-        {homeModal === "script" && <ScriptSelectorModal selected={selectedScript} onClose={() => setHomeModal(null)} onConfirm={(item) => { setSelectedScript(item); setHomeModal(null); }} />}
-        {homeModal === "sources" && <SourceSelectorModal selected={selectedSources} onClose={() => setHomeModal(null)} onConfirm={(items) => { setSelectedSources(items); setHomeModal(null); }} showToast={showToast} />}
+        {homeModal === "product_link" && <ProductLinkModal onClose={() => setHomeModal(null)} onConfirm={(product) => { setSelectedProduct(product); appendPromptPart("product"); setHomeModal(null); }} />}
+        {homeModal === "product_image" && <ProductImageModal onClose={() => setHomeModal(null)} onConfirm={(product) => { setSelectedProduct(product); appendPromptPart("product"); setHomeModal(null); }} />}
+        {homeModal === "reference" && <ReferenceVideoModal items={referenceHistory} selected={selectedReference} onDelete={(id) => { setReferenceHistory((items) => items.filter((item) => item.id !== id)); if (selectedReference?.id === id) removePromptPart("reference"); }} onClose={() => setHomeModal(null)} onConfirm={(item) => { setSelectedReference(item); appendPromptPart("reference"); setHomeModal(null); }} />}
+        {homeModal === "script" && <ScriptSelectorModal selected={selectedScript} onClose={() => setHomeModal(null)} onConfirm={(item) => { setSelectedScript(item); appendPromptPart("script"); setHomeModal(null); }} />}
+        {homeModal === "sources" && <SourceSelectorModal selected={selectedSources} onClose={() => setHomeModal(null)} onConfirm={(items) => { setSelectedSources(items); if (items.length) appendPromptPart("sources"); else removePromptPart("sources"); setHomeModal(null); }} showToast={showToast} />}
         {homeModal === "settings" && <SettingsModal duration={videoDuration} ratio={videoRatio} removeWatermark={removeWatermark} onClose={() => setHomeModal(null)} onConfirm={(settings) => { setVideoDuration(settings.duration); setVideoRatio(settings.ratio); setRemoveWatermark(settings.removeWatermark); setHomeModal(null); }} />}
-        {homeModal === "style" && <StyleModal value={selectedStyle} onClose={() => setHomeModal(null)} onConfirm={(value) => { setSelectedStyle(value); setHomeModal(null); }} />}
+        {homeModal === "style" && <StyleModal value={selectedStyle} onClose={() => setHomeModal(null)} onConfirm={(value) => { setSelectedStyle(value); if (value) appendPromptPart("style"); else removePromptPart("style"); setHomeModal(null); }} />}
       </div>
     );
   }
@@ -1166,20 +1240,46 @@ function Toast({ message }: { message: string }) {
   return <div className="fixed left-1/2 top-5 z-[150] flex -translate-x-1/2 items-center gap-2 rounded-md bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xl"><CheckCircle2 className="h-4 w-4 text-emerald-400" />{message}</div>;
 }
 
-function SelectionChip({ icon: Icon, label, image, onRemove }: { icon: React.ComponentType<{ className?: string }>; label: string; image?: string; onRemove: () => void }) {
+function EditablePromptText({ value, onChange, placeholder, inline }: { value: string; onChange: (value: string) => void; placeholder: string; inline: boolean }) {
+  const ref = useRef<HTMLSpanElement | null>(null);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || document.activeElement === element || element.textContent === value) return;
+    element.textContent = value;
+  }, [value]);
+
   return (
-    <span className="group inline-flex h-9 max-w-[260px] items-center gap-2 rounded-md border border-violet-200 bg-violet-50 px-2 text-xs font-semibold text-violet-700">
-      {image ? <img src={image} alt="" className="h-6 w-6 rounded object-cover" referrerPolicy="no-referrer" /> : <Icon className="h-3.5 w-3.5 shrink-0" />}
+    <span
+      ref={ref}
+      contentEditable
+      suppressContentEditableWarning
+      role="textbox"
+      aria-label="发送给 Agent"
+      data-placeholder={placeholder}
+      onInput={(event) => onChange(event.currentTarget.textContent || "")}
+      className={`${inline ? "inline-block min-w-[80px]" : "block w-full min-h-[112px]"} whitespace-pre-wrap break-words outline-none empty:before:pointer-events-none empty:before:text-slate-400 empty:before:content-[attr(data-placeholder)]`}
+    />
+  );
+}
+
+function SelectionChip({ icon: Icon, prefix, label, image, onRemove, compact = false }: { icon: React.ComponentType<{ className?: string }>; prefix?: string; label: string; image?: string; onRemove: () => void; compact?: boolean }) {
+  return (
+    <span className={`group inline-flex ${compact ? "h-8" : "h-9"} max-w-[280px] items-center gap-2 rounded-md border border-violet-200 bg-violet-50 px-2 text-xs font-semibold text-violet-700`}>
+      {!image && <Icon className="h-3.5 w-3.5 shrink-0" />}
+      {prefix && <span className="shrink-0">{prefix}</span>}
+      {image && <img src={image} alt="" className={`${compact ? "h-5 w-5" : "h-6 w-6"} shrink-0 rounded object-cover`} referrerPolicy="no-referrer" />}
       <span className="truncate">{label}</span>
       <button onClick={onRemove} title="移除" className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-violet-400 hover:bg-violet-100 hover:text-violet-700"><X className="h-3 w-3" /></button>
     </span>
   );
 }
 
-function HomeMenuButton({ icon: Icon, label, active, onClick, children }: { icon: React.ComponentType<{ className?: string }>; label: string; active?: boolean; onClick: () => void; children?: React.ReactNode }) {
+function HomeMenuButton({ icon: Icon, label, active, disabled = false, disabledHint, onClick, children }: { icon: React.ComponentType<{ className?: string }>; label: string; active?: boolean; disabled?: boolean; disabledHint?: string; onClick: () => void; children?: React.ReactNode }) {
   return (
-    <div className="relative">
-      <button onClick={onClick} className={`flex h-8 items-center gap-1.5 rounded-md px-2.5 font-semibold transition-colors ${active ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-slate-100"}`}><Icon className="h-3.5 w-3.5" /><span className="max-w-[120px] truncate">{label}</span></button>
+    <div className="group/menu relative">
+      <button disabled={disabled} onClick={onClick} className={`flex h-8 items-center gap-1.5 rounded-md px-2.5 font-semibold transition-colors ${disabled ? "cursor-not-allowed text-slate-300" : active ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-slate-100"}`}><Icon className="h-3.5 w-3.5" /><span className="max-w-[120px] truncate">{label}</span></button>
+      {disabled && disabledHint && <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-800 px-2.5 py-1.5 text-[11px] font-medium text-white shadow-lg group-hover/menu:block">{disabledHint}<span className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-slate-800" /></span>}
       {children}
     </div>
   );
