@@ -11,11 +11,12 @@ import UploadFinishedVideoModal from "./UploadFinishedVideoModal";
 
 type StepType = "analysis" | "script" | "preview" | "final";
 type SessionStatus = "queue" | "generating" | "completed" | "failed" | "cancelled";
-type HomePromptPart = "product" | "reference" | "script" | "sources" | "style";
+type HomePromptPart = "product_info" | `product_batch:${string}` | "reference" | "script" | "sources" | "style";
 
 interface HomePromptPartValue {
   lead: string;
   label: string;
+  promptLabel?: string;
   prefix?: string;
   image?: string;
   icon: React.ComponentType<{ className?: string }>;
@@ -26,6 +27,18 @@ interface ProductSelection {
   name: string;
   image: string;
   source: "douyin" | "images" | "local" | "conversation";
+  primaryCategory?: string;
+  secondaryCategory?: string;
+  tags?: string[];
+  author?: string;
+  status?: string;
+  size?: string;
+  resolution?: string;
+}
+
+interface ProductImageBatch {
+  id: string;
+  images: ProductSelection[];
 }
 
 interface ReferenceVideoSelection {
@@ -43,6 +56,7 @@ interface ScriptSelection {
   status: string;
   author: string;
   updatedAt: string;
+  source?: "library" | "manual";
 }
 
 interface SourceVideoSelection {
@@ -166,10 +180,14 @@ const SAMPLE_COVERS = [
 ];
 
 const IMAGE_LIBRARY: ProductSelection[] = [
-  { id: "img-1", name: "防晒植物提取精华液展图.jpg", image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=600&auto=format&fit=crop&q=80", source: "images" },
-  { id: "img-2", name: "无痕防晒冰丝丝袜场景模特图.png", image: "https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?w=600&auto=format&fit=crop&q=80", source: "images" },
-  { id: "img-4", name: "草本护肤成分拆解对比展图.png", image: "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=600&auto=format&fit=crop&q=80", source: "images" },
-  { id: "img-8", name: "高奢护肤瓶身渲染特写.jpg", image: "https://images.unsplash.com/photo-1608248597261-833257058444?w=600&auto=format&fit=crop&q=80", source: "images" }
+  { id: "img-1", name: "防晒植物提取精华液展图.jpg", image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=600&auto=format&fit=crop&q=80", source: "images", primaryCategory: "美妆护肤", secondaryCategory: "商品主图", tags: ["产品实拍", "成分党"], author: "致上互娱", status: "审核通过", size: "2.4 MB", resolution: "1080x1440" },
+  { id: "img-2", name: "无痕防晒冰丝丝袜场景模特图.png", image: "https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?w=600&auto=format&fit=crop&q=80", source: "images", primaryCategory: "服饰内衣", secondaryCategory: "模特展示", tags: ["模特出镜", "清凉冰丝"], author: "汤小真", status: "待审核", size: "1.8 MB", resolution: "800x1200" },
+  { id: "img-3", name: "夏日爆款产品宣发主图.jpg", image: "https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=600&auto=format&fit=crop&q=80", source: "images", primaryCategory: "日用百货", secondaryCategory: "宣发主图", tags: ["爆款", "活动促销"], author: "致上互娱", status: "审核通过", size: "4.5 MB", resolution: "1920x1080" },
+  { id: "img-4", name: "草本护肤成分拆解对比展图.png", image: "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=600&auto=format&fit=crop&q=80", source: "images", primaryCategory: "美妆护肤", secondaryCategory: "成分展示", tags: ["对比实测"], author: "汤小真", status: "审核通过", size: "3.1 MB", resolution: "1080x1080" },
+  { id: "img-5", name: "防晒霜SPF50权威检测图.jpg", image: "https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=600&auto=format&fit=crop&q=80", source: "images", primaryCategory: "美妆护肤", secondaryCategory: "资质证明", tags: ["成分党", "检测报告"], author: "致上互娱", status: "未审核", size: "1.2 MB", resolution: "1080x1920" },
+  { id: "img-6", name: "补水面膜水分提升对比实验图.jpg", image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=600&auto=format&fit=crop&q=80", source: "images", primaryCategory: "美妆护肤", secondaryCategory: "效果对比", tags: ["对比实测"], author: "徐振", status: "审核通过", size: "2.9 MB", resolution: "1080x1440" },
+  { id: "img-7", name: "夏日清凉草本展示图.jpg", image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&auto=format&fit=crop&q=80", source: "images", primaryCategory: "食品饮料", secondaryCategory: "商品主图", tags: ["清凉夏日", "产品实拍"], author: "美妆设计组", status: "待审核", size: "5.4 MB", resolution: "2000x2000" },
+  { id: "img-8", name: "高奢护肤瓶身渲染特写.jpg", image: "https://images.unsplash.com/photo-1608248597261-833257058444?w=600&auto=format&fit=crop&q=80", source: "images", primaryCategory: "美妆护肤", secondaryCategory: "商品主图", tags: ["高端质感", "3D渲染"], author: "汤小真", status: "审核通过", size: "3.8 MB", resolution: "1440x1920" }
 ];
 
 const REFERENCE_VIDEOS: ReferenceVideoSelection[] = [
@@ -179,9 +197,9 @@ const REFERENCE_VIDEOS: ReferenceVideoSelection[] = [
 ];
 
 const SCRIPT_OPTIONS: ScriptSelection[] = [
-  { id: "S-10291", name: "脚本 1 - 口播温和洁面破圈案", category: "个护家清 / 洗发护发", status: "待审核", author: "致上编导", updatedAt: "2026-08-04 14:20" },
-  { id: "S-10292", name: "玻璃油膜擦雨天实测分镜", category: "汽车用品 / 清洁养护", status: "审核通过", author: "徐振", updatedAt: "2026-08-18 10:32" },
-  { id: "S-10293", name: "高腰塑身裤痛点反转脚本", category: "服饰内衣 / 女士内衣", status: "审核通过", author: "汤小真", updatedAt: "2026-08-20 16:08" }
+  { id: "S-10291", name: "脚本 1 - 口播温和洁面破圈案", category: "个护家清 / 洗发护发", status: "待审核", author: "致上编导", updatedAt: "2026-08-04 14:20", source: "library" },
+  { id: "S-10292", name: "玻璃油膜擦雨天实测分镜", category: "汽车用品 / 清洁养护", status: "审核通过", author: "徐振", updatedAt: "2026-08-18 10:32", source: "library" },
+  { id: "S-10293", name: "高腰塑身裤痛点反转脚本", category: "服饰内衣 / 女士内衣", status: "审核通过", author: "汤小真", updatedAt: "2026-08-20 16:08", source: "library" }
 ];
 
 const SOURCE_VIDEOS: SourceVideoSelection[] = [
@@ -475,6 +493,7 @@ export default function AgentCreationView({
   const [homeMenu, setHomeMenu] = useState<"product" | "reference" | "source" | null>(null);
   const [homeModal, setHomeModal] = useState<"product_link" | "product_image" | "reference" | "script" | "sources" | "settings" | "style" | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<ProductSelection | null>(null);
+  const [productImageBatches, setProductImageBatches] = useState<ProductImageBatch[]>([]);
   const [selectedReference, setSelectedReference] = useState<ReferenceVideoSelection | null>(null);
   const [selectedScript, setSelectedScript] = useState<ScriptSelection | null>(null);
   const [selectedSources, setSelectedSources] = useState<SourceVideoSelection[]>([]);
@@ -500,6 +519,8 @@ export default function AgentCreationView({
   const [toast, setToast] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionRef = useRef<AgentSession | null>(session);
+  const productImageCount = productImageBatches.reduce((sum, batch) => sum + batch.images.length, 0);
+  const productForCreation = selectedProduct || productImageBatches[0]?.images[0] || null;
 
   useEffect(() => {
     try {
@@ -520,11 +541,23 @@ export default function AgentCreationView({
 
   const removePromptPart = (part: HomePromptPart) => {
     setHomePromptOrder((current) => current.filter((item) => item !== part));
-    if (part === "product") setSelectedProduct(null);
+    if (part === "product_info") setSelectedProduct(null);
+    if (part.startsWith("product_batch:")) {
+      const batchId = part.slice("product_batch:".length);
+      setProductImageBatches((current) => current.filter((batch) => batch.id !== batchId));
+    }
     if (part === "reference") setSelectedReference(null);
     if (part === "script") setSelectedScript(null);
     if (part === "sources") setSelectedSources([]);
     if (part === "style") setSelectedStyle("");
+  };
+
+  const addProductImageBatch = (images: ProductSelection[], includeInPrompt = true) => {
+    if (!images.length) return;
+    const batch: ProductImageBatch = { id: `batch-${Date.now()}`, images };
+    setProductImageBatches((current) => [...current, batch]);
+    if (includeInPrompt) appendPromptPart(`product_batch:${batch.id}`);
+    setHomeModal(null);
   };
 
   useEffect(() => {
@@ -598,14 +631,28 @@ export default function AgentCreationView({
   };
 
   const getHomePromptPart = (part: HomePromptPart): HomePromptPartValue | null => {
-    if (part === "product" && selectedProduct) {
+    if (part === "product_info" && selectedProduct) {
       return { lead: "商品是", label: selectedProduct.name, image: selectedProduct.image, icon: Package };
+    }
+    if (part.startsWith("product_batch:")) {
+      const batch = productImageBatches.find((item) => `product_batch:${item.id}` === part);
+      if (!batch?.images.length) return null;
+      return {
+        lead: "商品图片是",
+        label: batch.images.length === 1 ? batch.images[0].name : `等 ${batch.images.length} 张商品图`,
+        prefix: "商品图：",
+        image: batch.images[0].image,
+        icon: ImageIcon
+      };
     }
     if (part === "reference" && selectedReference) {
       return { lead: "用上参考视频", label: selectedReference.name, image: selectedReference.cover, icon: Video };
     }
     if (part === "script" && selectedScript) {
-      return { lead: "脚本是", label: selectedScript.name, icon: FileText };
+      const shortLabel = selectedScript.source === "manual" && Array.from(selectedScript.name).length > 8
+        ? `${Array.from(selectedScript.name).slice(0, 8).join("")}...`
+        : selectedScript.name;
+      return { lead: "脚本是", label: shortLabel, promptLabel: selectedScript.name, icon: FileText };
     }
     if (part === "sources" && selectedSources.length > 0) {
       return {
@@ -633,7 +680,7 @@ export default function AgentCreationView({
     let value = `${HOME_PROMPT_PREFIX}${idea.trim()}`;
     activeHomePromptParts.forEach(({ value: part }) => {
       value += /[，,。；;!?！？]\s*$/.test(value) ? " " : "，";
-      value += `${part.lead}${part.prefix || ""}${part.label}`;
+      value += `${part.lead}${part.prefix || ""}${part.promptLabel || part.label}`;
     });
     return value.trim();
   };
@@ -641,10 +688,10 @@ export default function AgentCreationView({
   const startCreation = () => {
     const prompt = buildHomePrompt() || "开始 Agent 创作";
     const initial = makeBaseSession(prompt, "step");
-    const base = selectedProduct ? withProductAnalysis(initial, selectedProduct) : initial;
+    const base = productForCreation ? withProductAnalysis(initial, productForCreation) : initial;
     onSessionChange(base.id);
 
-    if (!selectedProduct) {
+    if (!productForCreation) {
       const waiting: AgentSession = {
         ...base,
         status: "queue",
@@ -670,8 +717,8 @@ export default function AgentCreationView({
   };
 
   const confirmProductInConversation = () => {
-    if (!session?.awaitingProduct || (!chatInput.trim() && !selectedProduct)) return;
-    const product = selectedProduct || {
+    if (!session?.awaitingProduct || (!chatInput.trim() && !productForCreation)) return;
+    const product = productForCreation || {
       id: `conversation_${Date.now()}`,
       name: chatInput.trim(),
       image: SAMPLE_COVERS[0],
@@ -857,6 +904,7 @@ export default function AgentCreationView({
     setUploadOpen(false);
     setIdea("");
     setSelectedProduct(null);
+    setProductImageBatches([]);
     setSelectedReference(null);
     setSelectedScript(null);
     setSelectedSources([]);
@@ -867,7 +915,7 @@ export default function AgentCreationView({
   };
 
   const selectedFinals = useMemo(() => session?.finals.filter((item) => item.selected) || [], [session?.finals]);
-  const canStart = Boolean(idea.trim() || selectedProduct || selectedReference || selectedScript || selectedSources.length || selectedStyle);
+  const canStart = Boolean(idea.trim() || productForCreation || selectedReference || selectedScript || selectedSources.length || selectedStyle);
 
   if (uploadOpen) {
     return (
@@ -925,10 +973,10 @@ export default function AgentCreationView({
               </div>
               <div className="mt-3 flex items-end justify-between gap-3 border-t border-slate-100 pt-3">
                 <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
-                  <HomeMenuButton icon={Package} label="商品" active={homeMenu === "product" || !!selectedProduct} onClick={() => setHomeMenu(homeMenu === "product" ? null : "product")}>
+                  <HomeMenuButton icon={Package} label="商品" active={homeMenu === "product" || !!selectedProduct || productImageCount > 0} onClick={() => setHomeMenu(homeMenu === "product" ? null : "product")}>
                     {homeMenu === "product" && <MenuPopup>
                       <MenuAction icon={Link2} label="输入商品信息" disabled={!!selectedProduct} onClick={() => { setHomeMenu(null); setHomeModal("product_link"); }} />
-                      <MenuAction icon={ImageIcon} label="添加商品图" disabled={!!selectedProduct} onClick={() => { setHomeMenu(null); setHomeModal("product_image"); }} />
+                      <MenuAction icon={ImageIcon} label="添加商品图" disabled={productImageCount >= 6} onClick={() => { setHomeMenu(null); setHomeModal("product_image"); }} />
                     </MenuPopup>}
                   </HomeMenuButton>
                   <HomeMenuButton icon={Video} label="参考" active={homeMenu === "reference"} disabled={!!selectedReference} disabledHint="已添加参考视频" onClick={() => setHomeMenu(homeMenu === "reference" ? null : "reference")}>
@@ -939,9 +987,8 @@ export default function AgentCreationView({
                   </HomeMenuButton>
                   <HomeMenuButton icon={FileText} label="脚本/原料" active={homeMenu === "source" || !!selectedScript || selectedSources.length > 0} onClick={() => setHomeMenu(homeMenu === "source" ? null : "source")}>
                     {homeMenu === "source" && <MenuPopup>
-                      <MenuAction icon={FileText} label="从脚本管理选择" disabled={!!selectedScript} onClick={() => { setHomeMenu(null); setHomeModal("script"); }} />
-                      <MenuAction icon={Film} label="从资源库选择原料" onClick={() => { setHomeMenu(null); setHomeModal("sources"); }} />
-                      <LocalSourceAction onUploaded={(items) => { setSelectedSources((current) => [...current, ...items].slice(0, 100)); appendPromptPart("sources"); setHomeMenu(null); }} showToast={showToast} />
+                      <MenuAction icon={FileText} label="添加脚本" disabled={!!selectedScript} onClick={() => { setHomeMenu(null); setHomeModal("script"); }} />
+                      <MenuAction icon={Film} label="添加原料" onClick={() => { setHomeMenu(null); setHomeModal("sources"); }} />
                     </MenuPopup>}
                   </HomeMenuButton>
                   <HomeMenuButton icon={Settings} label={`${videoDuration}秒 · ${videoRatio}`} active={homeModal === "settings"} onClick={() => { setHomeMenu(null); setHomeModal("settings"); }} />
@@ -958,8 +1005,8 @@ export default function AgentCreationView({
           </div>
         </main>
 
-        {homeModal === "product_link" && <ProductLinkModal onClose={() => setHomeModal(null)} onConfirm={(product) => { setSelectedProduct(product); appendPromptPart("product"); setHomeModal(null); }} />}
-        {homeModal === "product_image" && <ProductImageModal onClose={() => setHomeModal(null)} onConfirm={(product) => { setSelectedProduct(product); appendPromptPart("product"); setHomeModal(null); }} />}
+        {homeModal === "product_link" && <ProductLinkModal onClose={() => setHomeModal(null)} onConfirm={(product) => { setSelectedProduct(product); appendPromptPart("product_info"); setHomeModal(null); }} />}
+        {homeModal === "product_image" && <ProductImageModal existingCount={productImageCount} onClose={() => setHomeModal(null)} onConfirm={(images) => addProductImageBatch(images)} showToast={showToast} />}
         {homeModal === "reference" && <ReferenceVideoModal items={referenceHistory} selected={selectedReference} onDelete={(id) => { setReferenceHistory((items) => items.filter((item) => item.id !== id)); if (selectedReference?.id === id) removePromptPart("reference"); }} onClose={() => setHomeModal(null)} onConfirm={(item) => { setSelectedReference(item); appendPromptPart("reference"); setHomeModal(null); }} />}
         {homeModal === "script" && <ScriptSelectorModal selected={selectedScript} onClose={() => setHomeModal(null)} onConfirm={(item) => { setSelectedScript(item); appendPromptPart("script"); setHomeModal(null); }} />}
         {homeModal === "sources" && <SourceSelectorModal selected={selectedSources} onClose={() => setHomeModal(null)} onConfirm={(items) => { setSelectedSources(items); if (items.length) appendPromptPart("sources"); else removePromptPart("sources"); setHomeModal(null); }} showToast={showToast} />}
@@ -984,23 +1031,26 @@ export default function AgentCreationView({
               : <p key={index} className="max-w-2xl text-sm leading-7 text-slate-600">{message.content}</p>)}
           </div>
           <div className="rounded-lg border border-violet-300 bg-white p-3 shadow-sm">
-            {selectedProduct && <div className="mb-2"><SelectionChip icon={Package} label={selectedProduct.name} image={selectedProduct.image} onRemove={() => setSelectedProduct(null)} /></div>}
+            {(selectedProduct || productImageBatches.length > 0) && <div className="mb-2 flex flex-wrap gap-2">
+              {selectedProduct && <SelectionChip icon={Package} label={selectedProduct.name} image={selectedProduct.image} onRemove={() => setSelectedProduct(null)} />}
+              {productImageBatches.map((batch) => <SelectionChip key={batch.id} icon={ImageIcon} prefix="商品图：" label={batch.images.length === 1 ? batch.images[0].name : `等 ${batch.images.length} 张商品图`} image={batch.images[0].image} onRemove={() => setProductImageBatches((current) => current.filter((item) => item.id !== batch.id))} />)}
+            </div>}
             <textarea value={chatInput} onChange={(event) => setChatInput(event.target.value)} rows={3} placeholder="补充商品信息" className="w-full resize-none border-0 bg-transparent text-sm leading-6 outline-none placeholder:text-slate-400" />
             <div className="mt-2 flex items-center justify-between">
               <div className="relative">
-                <HomeMenuButton icon={Package} label="商品" active={homeMenu === "product" || !!selectedProduct} onClick={() => setHomeMenu(homeMenu === "product" ? null : "product")}>
+                <HomeMenuButton icon={Package} label="商品" active={homeMenu === "product" || !!selectedProduct || productImageCount > 0} onClick={() => setHomeMenu(homeMenu === "product" ? null : "product")}>
                   {homeMenu === "product" && <MenuPopup>
                     <MenuAction icon={Link2} label="输入商品信息" disabled={!!selectedProduct} onClick={() => { setHomeMenu(null); setHomeModal("product_link"); }} />
-                    <MenuAction icon={ImageIcon} label="添加商品图" disabled={!!selectedProduct} onClick={() => { setHomeMenu(null); setHomeModal("product_image"); }} />
+                    <MenuAction icon={ImageIcon} label="添加商品图" disabled={productImageCount >= 6} onClick={() => { setHomeMenu(null); setHomeModal("product_image"); }} />
                   </MenuPopup>}
                 </HomeMenuButton>
               </div>
-              <button onClick={confirmProductInConversation} disabled={!chatInput.trim() && !selectedProduct} title="发送" className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-600 text-white disabled:bg-slate-200 disabled:text-slate-400"><ArrowUp className="h-4 w-4" /></button>
+              <button onClick={confirmProductInConversation} disabled={!chatInput.trim() && !productForCreation} title="发送" className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-600 text-white disabled:bg-slate-200 disabled:text-slate-400"><ArrowUp className="h-4 w-4" /></button>
             </div>
           </div>
         </main>
         {homeModal === "product_link" && <ProductLinkModal onClose={() => setHomeModal(null)} onConfirm={(product) => { setSelectedProduct(product); setHomeModal(null); }} />}
-        {homeModal === "product_image" && <ProductImageModal onClose={() => setHomeModal(null)} onConfirm={(product) => { setSelectedProduct(product); setHomeModal(null); }} />}
+        {homeModal === "product_image" && <ProductImageModal existingCount={productImageCount} onClose={() => setHomeModal(null)} onConfirm={(images) => addProductImageBatch(images, false)} showToast={showToast} />}
       </div>
     );
   }
@@ -1304,18 +1354,6 @@ function LocalReferenceAction({ disabled, onUploaded, showToast }: { disabled?: 
   return <><button disabled={disabled} onClick={() => inputRef.current?.click()} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"><Upload className="h-3.5 w-3.5" />本地上传</button><input ref={inputRef} type="file" accept=".mp4,.mov,video/mp4,video/quicktime" className="hidden" onChange={(event) => upload(event.target.files?.[0])} /></>;
 }
 
-function LocalSourceAction({ onUploaded, showToast }: { onUploaded: (items: SourceVideoSelection[]) => void; showToast: (message: string) => void }) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const upload = (files?: FileList | null) => {
-    if (!files?.length) return;
-    const valid = Array.from(files).filter((file) => /\.(mp4|mov)$/i.test(file.name));
-    if (valid.length !== files.length) showToast("原料仅支持视频格式");
-    if (valid.length > 20) return showToast("所选视频合计时长不能超过 10 分钟");
-    onUploaded(valid.map((file, index) => ({ id: `local-${Date.now()}-${index}`, name: file.name, cover: SAMPLE_COVERS[index % SAMPLE_COVERS.length], status: "本地文件", section: "本地上传", category: "本地上传", author: "当前用户", durationSeconds: 30, duration: "00:30", size: `${(file.size / 1024 / 1024).toFixed(1)} MB`, tags: [] })));
-  };
-  return <><button onClick={() => inputRef.current?.click()} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"><Upload className="h-3.5 w-3.5" />本地上传原料</button><input ref={inputRef} type="file" multiple accept="video/*,.mp4,.mov" className="hidden" onChange={(event) => upload(event.target.files)} /></>;
-}
-
 function ModalFrame({ title, width = "max-w-3xl", children, footer, onClose }: { title: string; width?: string; children: React.ReactNode; footer?: React.ReactNode; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/45 p-4" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -1341,18 +1379,90 @@ function ProductLinkModal({ onClose, onConfirm }: { onClose: () => void; onConfi
   </ModalFrame>;
 }
 
-function ProductImageModal({ onClose, onConfirm }: { onClose: () => void; onConfirm: (product: ProductSelection) => void }) {
-  const [selected, setSelected] = useState<ProductSelection | null>(null);
+function ProductImageModal({ existingCount, onClose, onConfirm, showToast }: { existingCount: number; onClose: () => void; onConfirm: (images: ProductSelection[]) => void; showToast: (message: string) => void }) {
+  const [tab, setTab] = useState<"library" | "local">("library");
+  const [selected, setSelected] = useState<ProductSelection[]>([]);
+  const [primaryCategory, setPrimaryCategory] = useState("全部一级分类");
+  const [secondaryCategory, setSecondaryCategory] = useState("全部二级分类");
+  const [tag, setTag] = useState("全部标签");
+  const [status, setStatus] = useState("全部状态");
+  const [author, setAuthor] = useState("全部上传人");
+  const [onlyMine, setOnlyMine] = useState(false);
+  const [search, setSearch] = useState("");
   const uploadRef = useRef<HTMLInputElement | null>(null);
-  const localUpload = (file?: File) => {
-    if (!file) return;
-    setSelected({ id: `product-local-${Date.now()}`, name: file.name, image: URL.createObjectURL(file), source: "local" });
+  const capacity = Math.max(0, 6 - existingCount);
+  const filtered = IMAGE_LIBRARY.filter((item) =>
+    (primaryCategory === "全部一级分类" || item.primaryCategory === primaryCategory) &&
+    (secondaryCategory === "全部二级分类" || item.secondaryCategory === secondaryCategory) &&
+    (tag === "全部标签" || item.tags?.includes(tag)) &&
+    (status === "全部状态" || item.status === status) &&
+    (author === "全部上传人" || item.author === author) &&
+    (!onlyMine || item.author === "徐振") &&
+    `${item.name}${item.id}${item.primaryCategory}${item.secondaryCategory}${item.tags?.join("")}`.toLowerCase().includes(search.toLowerCase())
+  );
+  const toggle = (item: ProductSelection) => {
+    if (selected.some((image) => image.id === item.id)) {
+      setSelected((current) => current.filter((image) => image.id !== item.id));
+      return;
+    }
+    if (selected.length >= capacity) return showToast("商品图片最多上传 6 张");
+    setSelected((current) => [...current, item]);
   };
-  return <ModalFrame title="添加商品图" onClose={onClose} footer={<><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!selected} onClick={() => selected && onConfirm(selected)} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">确认选择</button></>}>
+  const localUpload = async (files?: FileList | null) => {
+    if (!files?.length) return;
+    const remaining = capacity - selected.length;
+    if (remaining <= 0) return showToast("商品图片最多上传 6 张");
+    const accepted: ProductSelection[] = [];
+    for (const file of Array.from(files).slice(0, remaining)) {
+      if (!/\.(jpe?g|png|webp|bmp|tiff?|gif)$/i.test(file.name)) {
+        showToast("仅支持 jpeg、png、webp、bmp、tiff、gif 格式");
+        continue;
+      }
+      if (file.size >= 30 * 1024 * 1024) {
+        showToast("单张图片需小于 30MB");
+        continue;
+      }
+      const imageUrl = URL.createObjectURL(file);
+      const dimensions = await new Promise<{ width: number; height: number } | null>((resolve) => {
+        const image = new window.Image();
+        image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+        image.onerror = () => resolve(null);
+        image.src = imageUrl;
+      });
+      if (!dimensions || dimensions.width < 300 || dimensions.width > 6000 || dimensions.height < 300 || dimensions.height > 6000 || dimensions.width / dimensions.height < 0.4 || dimensions.width / dimensions.height > 2.5) {
+        URL.revokeObjectURL(imageUrl);
+        showToast("图片尺寸或宽高比不符合要求");
+        continue;
+      }
+      accepted.push({ id: `product-local-${Date.now()}-${accepted.length}`, name: file.name, image: imageUrl, source: "local", status: "本地文件", author: "当前用户", size: `${(file.size / 1024 / 1024).toFixed(1)} MB`, resolution: `${dimensions.width}x${dimensions.height}` });
+    }
+    if (files.length > remaining) showToast(`本次最多还可添加 ${remaining} 张商品图`);
+    setSelected((current) => [...current, ...accepted]);
+    if (uploadRef.current) uploadRef.current.value = "";
+  };
+  return <ModalFrame title="添加商品图" onClose={onClose} width="max-w-6xl" footer={<><div className="mr-auto text-xs text-slate-500">已选 <b className="text-violet-700">{selected.length}</b> 张 · 还可添加 {capacity - selected.length} 张</div><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!selected.length} onClick={() => onConfirm(selected)} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">确认选择</button></>}>
     <div className="p-5">
-      <div className="mb-4 flex items-center justify-between"><p className="text-xs text-slate-500">从图片管理选择一张商品图</p><button onClick={() => uploadRef.current?.click()} className="flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Upload className="h-3.5 w-3.5" />本地上传</button><input ref={uploadRef} type="file" accept="image/*" className="hidden" onChange={(event) => localUpload(event.target.files?.[0])} /></div>
-      <div className="grid grid-cols-4 gap-3">{IMAGE_LIBRARY.map((item) => <button key={item.id} onClick={() => setSelected(item)} className={`overflow-hidden rounded-md border bg-white text-left ${selected?.id === item.id ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200 hover:border-slate-300"}`}><div className="relative aspect-square"><img src={item.image} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />{selected?.id === item.id && <span className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-white"><Check className="h-3 w-3" /></span>}</div><p className="truncate px-2 py-2 text-[11px] text-slate-600">{item.name}</p></button>)}</div>
-      {selected?.source === "local" && <div className="mt-4 flex items-center gap-3 rounded-md border border-violet-200 bg-violet-50 p-3"><img src={selected.image} alt="" className="h-12 w-12 rounded object-cover" /><p className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700">{selected.name}</p><button onClick={() => setSelected(null)} title="删除"><Trash2 className="h-4 w-4 text-slate-400" /></button></div>}
+      <div className="mb-5 flex items-center gap-1 border-b border-slate-200">
+        <button onClick={() => setTab("library")} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${tab === "library" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>图片管理</button>
+        <button onClick={() => setTab("local")} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${tab === "local" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>本地上传</button>
+      </div>
+      {tab === "library" ? <>
+        <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-[130px_130px_130px_130px_minmax(180px,1fr)_auto]">
+          <select value={primaryCategory} onChange={(event) => setPrimaryCategory(event.target.value)} className="h-9 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部一级分类</option><option>美妆护肤</option><option>服饰内衣</option><option>日用百货</option><option>食品饮料</option></select>
+          <select value={secondaryCategory} onChange={(event) => setSecondaryCategory(event.target.value)} className="h-9 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部二级分类</option><option>商品主图</option><option>模特展示</option><option>成分展示</option><option>效果对比</option></select>
+          <select value={tag} onChange={(event) => setTag(event.target.value)} className="h-9 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部标签</option><option>产品实拍</option><option>对比实测</option><option>高端质感</option></select>
+          <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-9 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部状态</option><option>审核通过</option><option>待审核</option><option>未审核</option></select>
+          <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索图片名称或 ID" className="h-9 w-full rounded-md border border-slate-200 pl-9 pr-3 text-xs outline-none focus:border-violet-400" /></div>
+          <label className="flex h-9 items-center gap-2 whitespace-nowrap px-2 text-xs text-slate-600"><input type="checkbox" checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)} className="accent-violet-600" />仅看我的</label>
+        </div>
+        <div className="mb-3 flex justify-end"><select value={author} onChange={(event) => setAuthor(event.target.value)} className="h-8 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部上传人</option><option>徐振</option><option>致上互娱</option><option>汤小真</option><option>美妆设计组</option></select></div>
+        <div className="overflow-x-auto rounded-md border border-slate-200"><table className="min-w-[860px] w-full text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="w-12 px-4 py-3"></th><th className="px-3 py-3">图片缩略图</th><th className="px-3 py-3">文件名称 / ID</th><th className="px-3 py-3">状态</th><th className="px-3 py-3">分类 / 标签</th><th className="px-3 py-3">上传人</th><th className="px-3 py-3">分辨率</th><th className="px-3 py-3">大小</th></tr></thead><tbody>{filtered.map((item) => { const checked = selected.some((image) => image.id === item.id); return <tr key={item.id} onClick={() => toggle(item)} className={`cursor-pointer border-t border-slate-100 ${checked ? "bg-violet-50" : "hover:bg-slate-50"}`}><td className="px-4 py-3"><span className={`flex h-4 w-4 items-center justify-center rounded border ${checked ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300"}`}>{checked && <Check className="h-2.5 w-2.5" />}</span></td><td className="px-3 py-2"><img src={item.image} alt="" className="h-12 w-12 rounded object-cover" referrerPolicy="no-referrer" /></td><td className="max-w-[220px] px-3 py-3"><p className="truncate font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.id}</p></td><td className="px-3 py-3"><span className="rounded bg-slate-100 px-2 py-1 text-[10px] text-slate-600">{item.status}</span></td><td className="px-3 py-3"><p className="font-semibold text-slate-700">{item.primaryCategory} / {item.secondaryCategory}</p><p className="mt-1 text-[10px] text-slate-400">{item.tags?.join("、")}</p></td><td className="px-3 py-3 text-slate-500">{item.author}</td><td className="px-3 py-3 text-slate-500">{item.resolution}</td><td className="px-3 py-3 text-slate-500">{item.size}</td></tr>; })}</tbody></table></div>
+      </> : <div>
+        <button onClick={() => uploadRef.current?.click()} className="flex h-48 w-full flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:text-violet-700"><Upload className="h-6 w-6" /><span className="mt-3 text-xs font-semibold">点击选择本地图片</span></button>
+        <input ref={uploadRef} type="file" multiple accept=".jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff,.gif,image/*" className="hidden" onChange={(event) => localUpload(event.target.files)} />
+        <p className="mt-3 text-center text-xs leading-6 text-slate-400">支持 jpeg、png、webp、bmp、tiff、gif，单张小于 30MB<br />宽高比 0.4-2.5，宽高 300-6000px</p>
+        {selected.some((item) => item.source === "local") && <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">{selected.filter((item) => item.source === "local").map((item) => <div key={item.id} className="flex min-w-0 items-center gap-2 rounded-md border border-slate-200 p-2"><img src={item.image} alt="" className="h-11 w-11 rounded object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.resolution} · {item.size}</p></div><button onClick={() => toggle(item)} title="删除" className="p-1 text-slate-400 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div>}
+      </div>}
     </div>
   </ModalFrame>;
 }
@@ -1369,37 +1479,88 @@ function ReferenceVideoModal({ items, selected, onDelete, onClose, onConfirm }: 
 }
 
 function ScriptSelectorModal({ selected, onClose, onConfirm }: { selected: ScriptSelection | null; onClose: () => void; onConfirm: (item: ScriptSelection) => void }) {
+  const [tab, setTab] = useState<"manual" | "library">("manual");
+  const [manualText, setManualText] = useState(selected?.source === "manual" ? selected.name : "");
   const [search, setSearch] = useState("");
-  const [draft, setDraft] = useState<ScriptSelection | null>(selected);
+  const [draft, setDraft] = useState<ScriptSelection | null>(selected?.source === "library" ? selected : null);
   const filtered = SCRIPT_OPTIONS.filter((item) => `${item.name}${item.id}${item.category}`.toLowerCase().includes(search.toLowerCase()));
-  return <ModalFrame title="从脚本管理选择" onClose={onClose} width="max-w-4xl" footer={<><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!draft} onClick={() => draft && onConfirm(draft)} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">确认选择</button></>}>
-    <div className="p-5"><div className="mb-4 grid grid-cols-[1fr_160px_160px] gap-2"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索脚本名称或 ID" className="h-9 w-full rounded-md border border-slate-200 pl-9 pr-3 text-xs outline-none" /></div><select className="rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部分类</option><option>个护家清</option><option>服饰内衣</option></select><select className="rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部状态</option><option>审核通过</option><option>待审核</option></select></div>
-      <div className="overflow-hidden rounded-md border border-slate-200"><table className="w-full text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="w-12 px-4 py-3"></th><th className="px-3 py-3">脚本名称 / ID</th><th className="px-3 py-3">分类</th><th className="px-3 py-3">状态</th><th className="px-3 py-3">上传人</th><th className="px-3 py-3">更新时间</th></tr></thead><tbody>{filtered.map((item) => <tr key={item.id} onClick={() => setDraft(item)} className={`cursor-pointer border-t border-slate-100 ${draft?.id === item.id ? "bg-violet-50" : "hover:bg-slate-50"}`}><td className="px-4 py-3"><span className={`flex h-4 w-4 items-center justify-center rounded-full border ${draft?.id === item.id ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300"}`}>{draft?.id === item.id && <Check className="h-2.5 w-2.5" />}</span></td><td className="px-3 py-3"><p className="font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.id}</p></td><td className="px-3 py-3 text-slate-500">{item.category}</td><td className="px-3 py-3"><span className="rounded bg-emerald-50 px-2 py-1 text-[10px] text-emerald-700">{item.status}</span></td><td className="px-3 py-3 text-slate-500">{item.author}</td><td className="px-3 py-3 text-slate-400">{item.updatedAt}</td></tr>)}</tbody></table></div>
+  const confirm = () => {
+    if (tab === "manual" && manualText.trim()) {
+      onConfirm({ id: `manual-${Date.now()}`, name: manualText.trim(), category: "手动输入", status: "当前输入", author: "当前用户", updatedAt: nowText(), source: "manual" });
+      return;
+    }
+    if (tab === "library" && draft) onConfirm(draft);
+  };
+  const canConfirm = tab === "manual" ? Boolean(manualText.trim()) : Boolean(draft);
+  return <ModalFrame title="添加脚本" onClose={onClose} width="max-w-4xl" footer={<><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!canConfirm} onClick={confirm} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">确认</button></>}>
+    <div className="p-5">
+      <div className="mb-5 flex items-center gap-1 border-b border-slate-200"><button onClick={() => setTab("manual")} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${tab === "manual" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>输入脚本</button><button onClick={() => setTab("library")} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${tab === "library" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>脚本管理</button></div>
+      {tab === "manual" ? <div className="relative"><textarea value={manualText} maxLength={1000} onChange={(event) => setManualText(event.target.value)} rows={14} placeholder="请输入脚本内容" className="w-full resize-none rounded-md border border-slate-200 p-4 pb-9 text-sm leading-7 outline-none focus:border-violet-400" /><span className="absolute bottom-3 right-3 text-[11px] text-slate-400">{manualText.length}/1000</span></div> : <>
+        <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_160px_160px]"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索脚本名称或 ID" className="h-9 w-full rounded-md border border-slate-200 pl-9 pr-3 text-xs outline-none" /></div><select className="rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部分类</option><option>个护家清</option><option>服饰内衣</option></select><select className="rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部状态</option><option>审核通过</option><option>待审核</option></select></div>
+        <div className="overflow-x-auto rounded-md border border-slate-200"><table className="min-w-[720px] w-full text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="w-12 px-4 py-3"></th><th className="px-3 py-3">脚本名称 / ID</th><th className="px-3 py-3">分类</th><th className="px-3 py-3">状态</th><th className="px-3 py-3">上传人</th><th className="px-3 py-3">更新时间</th></tr></thead><tbody>{filtered.map((item) => <tr key={item.id} onClick={() => setDraft(item)} className={`cursor-pointer border-t border-slate-100 ${draft?.id === item.id ? "bg-violet-50" : "hover:bg-slate-50"}`}><td className="px-4 py-3"><span className={`flex h-4 w-4 items-center justify-center rounded-full border ${draft?.id === item.id ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300"}`}>{draft?.id === item.id && <Check className="h-2.5 w-2.5" />}</span></td><td className="px-3 py-3"><p className="font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.id}</p></td><td className="px-3 py-3 text-slate-500">{item.category}</td><td className="px-3 py-3"><span className="rounded bg-emerald-50 px-2 py-1 text-[10px] text-emerald-700">{item.status}</span></td><td className="px-3 py-3 text-slate-500">{item.author}</td><td className="px-3 py-3 text-slate-400">{item.updatedAt}</td></tr>)}</tbody></table></div>
+      </>}
     </div>
   </ModalFrame>;
 }
 
 function SourceSelectorModal({ selected, onClose, onConfirm, showToast }: { selected: SourceVideoSelection[]; onClose: () => void; onConfirm: (items: SourceVideoSelection[]) => void; showToast: (message: string) => void }) {
   const [draft, setDraft] = useState(selected);
-  const [tab, setTab] = useState<"全部" | "成片" | "素材">("全部");
+  const [sourceTab, setSourceTab] = useState<"library" | "local">("library");
+  const [sectionTab, setSectionTab] = useState<"全部" | "成片" | "素材">("全部");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("全部状态");
   const [author, setAuthor] = useState("全部上传人");
   const [onlyMine, setOnlyMine] = useState(false);
+  const uploadRef = useRef<HTMLInputElement | null>(null);
   const totalSeconds = draft.reduce((sum, item) => sum + item.durationSeconds, 0);
-  const filtered = SOURCE_VIDEOS.filter((item) => (tab === "全部" || item.section === tab) && (status === "全部状态" || item.status === status) && (author === "全部上传人" || item.author === author) && (!onlyMine || item.author === "徐振") && `${item.name}${item.id}${item.category}${item.tags.join("")}`.toLowerCase().includes(search.toLowerCase()));
+  const filtered = SOURCE_VIDEOS.filter((item) => (sectionTab === "全部" || item.section === sectionTab) && (status === "全部状态" || item.status === status) && (author === "全部上传人" || item.author === author) && (!onlyMine || item.author === "徐振") && `${item.name}${item.id}${item.category}${item.tags.join("")}`.toLowerCase().includes(search.toLowerCase()));
   const toggle = (item: SourceVideoSelection) => {
     if (draft.some((video) => video.id === item.id)) return setDraft(draft.filter((video) => video.id !== item.id));
     if (draft.length >= 100) return showToast("视频原料不能超过 100 个文件");
     if (totalSeconds + item.durationSeconds > 600) return showToast("视频原料合计时长不能超过 10 分钟");
     setDraft([...draft, item]);
   };
-  return <ModalFrame title="选择视频原料" onClose={onClose} width="max-w-6xl" footer={<><div className="mr-auto text-xs text-slate-500">已选 <b className="text-violet-700">{draft.length}</b> / 100 个 · 总时长 <b className="text-violet-700">{Math.floor(totalSeconds / 60)}:{String(totalSeconds % 60).padStart(2, "0")}</b> / 10:00</div><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!draft.length} onClick={() => onConfirm(draft)} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">确认选择</button></>}>
+  const uploadLocal = (files?: FileList | null) => {
+    if (!files?.length) return;
+    const accepted: SourceVideoSelection[] = [];
+    let nextSeconds = totalSeconds;
+    let nextCount = draft.length;
+    for (const file of Array.from(files)) {
+      if (!/\.(mp4|mpeg|mov)$/i.test(file.name)) {
+        showToast("原料仅支持 mp4、mpeg、mov 格式");
+        continue;
+      }
+      if (file.size >= 1000 * 1024 * 1024) {
+        showToast("单个视频需小于 1000MB");
+        continue;
+      }
+      const assumedDuration = 30;
+      if (nextCount >= 100 || nextSeconds + assumedDuration > 600) {
+        showToast("视频原料最多 100 个，合计时长不超过 10 分钟");
+        break;
+      }
+      accepted.push({ id: `local-${Date.now()}-${accepted.length}`, name: file.name, cover: SAMPLE_COVERS[(draft.length + accepted.length) % SAMPLE_COVERS.length], status: "本地文件", section: "本地上传", category: "本地上传", author: "当前用户", durationSeconds: assumedDuration, duration: "00:30", size: `${(file.size / 1024 / 1024).toFixed(1)} MB`, tags: [] });
+      nextCount += 1;
+      nextSeconds += assumedDuration;
+    }
+    setDraft((current) => [...current, ...accepted]);
+    if (uploadRef.current) uploadRef.current.value = "";
+  };
+  const localItems = draft.filter((item) => item.section === "本地上传");
+  return <ModalFrame title="添加原料" onClose={onClose} width="max-w-6xl" footer={<><div className="mr-auto text-xs text-slate-500">已选 <b className="text-violet-700">{draft.length}</b> / 100 个 · 总时长 <b className="text-violet-700">{Math.floor(totalSeconds / 60)}:{String(totalSeconds % 60).padStart(2, "0")}</b> / 10:00</div><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!draft.length} onClick={() => onConfirm(draft)} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">确认选择</button></>}>
     <div className="p-5">
-      <div className="mb-4 flex items-center gap-1 border-b border-slate-200">{(["全部", "成片", "素材"] as const).map((item) => <button key={item} onClick={() => setTab(item)} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${tab === item ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>{item}</button>)}</div>
-      <div className="mb-4 grid grid-cols-[130px_130px_130px_130px_1fr_auto] gap-2"><select className="h-9 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部一级分类</option><option>服饰内衣</option><option>美妆护肤</option><option>日用百货</option></select><select className="h-9 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部二级分类</option><option>商品实拍</option><option>面料展示</option><option>厨房用品</option></select><select className="h-9 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部标签</option><option>产品实拍</option><option>对比实测</option></select><select value={status} onChange={(event) => setStatus(event.target.value)} className="h-9 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部状态</option><option>审核通过</option><option>待审核</option><option>未审核</option><option>审核驳回</option></select><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索文件名称或 ID" className="h-9 w-full rounded-md border border-slate-200 pl-9 pr-3 text-xs outline-none" /></div><label className="flex h-9 items-center gap-2 whitespace-nowrap px-2 text-xs text-slate-600"><input type="checkbox" checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)} className="accent-violet-600" />仅看我的</label></div>
-      <div className="mb-3 flex justify-end"><select value={author} onChange={(event) => setAuthor(event.target.value)} className="h-8 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部上传人</option><option>徐振</option><option>刘弯</option><option>张小花</option><option>梁浩然</option><option>赵铁柱</option></select></div>
-      <div className="overflow-hidden rounded-md border border-slate-200"><table className="w-full text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="w-12 px-4 py-3"></th><th className="px-3 py-3">文件缩略图</th><th className="px-3 py-3">文件名称 / ID</th><th className="px-3 py-3">状态</th><th className="px-3 py-3">所在分类</th><th className="px-3 py-3">上传人</th><th className="px-3 py-3">时长</th><th className="px-3 py-3">大小</th></tr></thead><tbody>{filtered.map((item) => { const checked = draft.some((video) => video.id === item.id); return <tr key={item.id} onClick={() => toggle(item)} className={`cursor-pointer border-t border-slate-100 ${checked ? "bg-violet-50" : "hover:bg-slate-50"}`}><td className="px-4 py-3"><span className={`flex h-4 w-4 items-center justify-center rounded border ${checked ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300"}`}>{checked && <Check className="h-2.5 w-2.5" />}</span></td><td className="px-3 py-2"><img src={item.cover} alt="" className="h-10 w-16 rounded object-cover" referrerPolicy="no-referrer" /></td><td className="max-w-[220px] px-3 py-3"><p className="truncate font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.id}</p></td><td className="px-3 py-3"><span className="rounded bg-slate-100 px-2 py-1 text-[10px] text-slate-600">{item.status}</span></td><td className="px-3 py-3"><p className="font-semibold text-slate-700">{item.section}</p><p className="mt-1 text-[10px] text-slate-400">{item.category}</p></td><td className="px-3 py-3 text-slate-500">{item.author}</td><td className="px-3 py-3 text-slate-500">{item.duration}</td><td className="px-3 py-3 text-slate-500">{item.size}</td></tr>; })}</tbody></table></div>
+      <div className="mb-5 flex items-center gap-1 border-b border-slate-200"><button onClick={() => setSourceTab("library")} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${sourceTab === "library" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>资源库</button><button onClick={() => setSourceTab("local")} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${sourceTab === "local" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>本地上传</button></div>
+      {sourceTab === "library" ? <>
+        <div className="mb-4 flex items-center gap-1 border-b border-slate-200">{(["全部", "成片", "素材"] as const).map((item) => <button key={item} onClick={() => setSectionTab(item)} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${sectionTab === item ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>{item}</button>)}</div>
+        <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-[130px_130px_130px_130px_minmax(180px,1fr)_auto]"><select className="h-9 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部一级分类</option><option>服饰内衣</option><option>美妆护肤</option><option>日用百货</option></select><select className="h-9 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部二级分类</option><option>商品实拍</option><option>面料展示</option><option>厨房用品</option></select><select className="h-9 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部标签</option><option>产品实拍</option><option>对比实测</option></select><select value={status} onChange={(event) => setStatus(event.target.value)} className="h-9 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部状态</option><option>审核通过</option><option>待审核</option><option>未审核</option><option>审核驳回</option></select><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索文件名称或 ID" className="h-9 w-full rounded-md border border-slate-200 pl-9 pr-3 text-xs outline-none" /></div><label className="flex h-9 items-center gap-2 whitespace-nowrap px-2 text-xs text-slate-600"><input type="checkbox" checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)} className="accent-violet-600" />仅看我的</label></div>
+        <div className="mb-3 flex justify-end"><select value={author} onChange={(event) => setAuthor(event.target.value)} className="h-8 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部上传人</option><option>徐振</option><option>刘弯</option><option>张小花</option><option>梁浩然</option><option>赵铁柱</option></select></div>
+        <div className="overflow-x-auto rounded-md border border-slate-200"><table className="min-w-[900px] w-full text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="w-12 px-4 py-3"></th><th className="px-3 py-3">文件缩略图</th><th className="px-3 py-3">文件名称 / ID</th><th className="px-3 py-3">状态</th><th className="px-3 py-3">所在分类</th><th className="px-3 py-3">上传人</th><th className="px-3 py-3">时长</th><th className="px-3 py-3">大小</th></tr></thead><tbody>{filtered.map((item) => { const checked = draft.some((video) => video.id === item.id); return <tr key={item.id} onClick={() => toggle(item)} className={`cursor-pointer border-t border-slate-100 ${checked ? "bg-violet-50" : "hover:bg-slate-50"}`}><td className="px-4 py-3"><span className={`flex h-4 w-4 items-center justify-center rounded border ${checked ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300"}`}>{checked && <Check className="h-2.5 w-2.5" />}</span></td><td className="px-3 py-2"><img src={item.cover} alt="" className="h-10 w-16 rounded object-cover" referrerPolicy="no-referrer" /></td><td className="max-w-[220px] px-3 py-3"><p className="truncate font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.id}</p></td><td className="px-3 py-3"><span className="rounded bg-slate-100 px-2 py-1 text-[10px] text-slate-600">{item.status}</span></td><td className="px-3 py-3"><p className="font-semibold text-slate-700">{item.section}</p><p className="mt-1 text-[10px] text-slate-400">{item.category}</p></td><td className="px-3 py-3 text-slate-500">{item.author}</td><td className="px-3 py-3 text-slate-500">{item.duration}</td><td className="px-3 py-3 text-slate-500">{item.size}</td></tr>; })}</tbody></table></div>
+      </> : <div>
+        <button onClick={() => uploadRef.current?.click()} className="flex h-48 w-full flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:text-violet-700"><Upload className="h-6 w-6" /><span className="mt-3 text-xs font-semibold">点击选择本地视频</span></button>
+        <input ref={uploadRef} type="file" multiple accept=".mp4,.mpeg,.mov,video/mp4,video/mpeg,video/quicktime" className="hidden" onChange={(event) => uploadLocal(event.target.files)} />
+        <p className="mt-3 text-center text-xs leading-6 text-slate-400">支持 mp4、mpeg、mov，单个文件小于 1000MB<br />单个视频时长 2-600 秒，本地原料不会保存到资源库</p>
+        {localItems.length > 0 && <div className="mt-4 space-y-2">{localItems.map((item) => <div key={item.id} className="flex items-center gap-3 rounded-md border border-slate-200 p-2.5"><img src={item.cover} alt="" className="h-11 w-16 rounded object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.duration} · {item.size}</p></div><button onClick={() => toggle(item)} title="删除" className="p-1.5 text-slate-400 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div>}
+      </div>}
     </div>
   </ModalFrame>;
 }
