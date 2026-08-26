@@ -4,7 +4,7 @@ import {
   FileText, Film, History, Image as ImageIcon, Link2, Loader2,
   MessageSquare, MoreHorizontal, Package, Palette, Play, Plus, Search,
   RefreshCw, Settings, Sparkles, Square, Trash2, Upload,
-  Video, WandSparkles, X
+  Video, Volume2, WandSparkles, X
 } from "lucide-react";
 import { Task } from "../types";
 import UploadFinishedVideoModal from "./UploadFinishedVideoModal";
@@ -78,6 +78,18 @@ interface CreativeItem {
   title: string;
   angle: string;
   script: string;
+  overview: string;
+  recommendation: string;
+  sellingPointSummary: string;
+  presentation: string;
+  character: string;
+  voice: string;
+  shots: Array<{
+    id: number;
+    summary: string;
+    dialogue: string;
+    visual: string;
+  }>;
 }
 
 interface PreviewItem {
@@ -301,13 +313,78 @@ const STYLE_OPTIONS = [
 const nowText = () => new Date().toISOString().replace("T", " ").slice(0, 16);
 const shortTime = () => new Date().toTimeString().slice(0, 5);
 const cloneItems = <T,>(items: T[]) => items.map((item) => ({ ...item }));
+const cloneCreatives = (items: CreativeItem[]) => items.map((item) => ({ ...item, shots: item.shots.map((shot) => ({ ...shot })) }));
 const productDisplayName = (product?: ProductSelection) => product?.name.replace(/\.(jpg|jpeg|png|webp)$/i, "") || "待补充商品名称";
 
-const createCreatives = (start: number): CreativeItem[] => [
-  { id: start + 1, title: "雨天视线危机", angle: "痛点实测", script: "雨刮越刮越模糊？用真实雨天场景对比清洁前后的玻璃透光效果。" },
-  { id: start + 2, title: "夜间炫光对比", angle: "场景转化", script: "用对向车灯炫光切入，展示擦拭后的清晰视野，强化安全驾驶价值。" },
-  { id: start + 3, title: "30秒快速去膜", angle: "效率展示", script: "计时完成涂抹、擦拭和冲洗，用完整操作过程证明简单易用。" }
+const CREATIVE_DETAILS = [
+  {
+    title: "雨天视线危机",
+    angle: "痛点实测",
+    overview: "从雨天挡风玻璃油膜造成视线模糊的真实痛点切入，通过清洁前后的直观对比，突出产品快速去膜、恢复通透视野的效果。",
+    recommendation: "以“雨天视线模糊”这一高频驾驶安全隐患为切入点，先建立车主焦虑，再用清洁前后对比直接证明产品效果，购买理由清晰。",
+    sellingPointSummary: "强力去油膜、擦拭无残留、视野通透、自带海绵擦头",
+    presentation: "雨天实景痛点 + 半边玻璃清洁对比 + 清洁后驾驶视角展示",
+    character: "一位注重行车安全的年轻男车主，穿深色休闲上衣，表达自然可信。",
+    voice: "沉稳男声，语速适中，重点信息清晰有力。",
+    shots: [
+      { id: 1, summary: "痛点前置，引发用户共鸣", dialogue: "一下雨，挡风玻璃就像蒙了一层雾，雨刮越刮反而越模糊。", visual: "雨天车内第一视角，雨刮扫过后玻璃仍有大片油膜与光晕，驾驶员皱眉观察前方。" },
+      { id: 2, summary: "产品实测，展示去膜效果", dialogue: "用它在玻璃上轻轻擦几遍，冲水后油膜很快就被带走了。", visual: "近景展示玻璃油膜清洁擦，完成涂抹、擦拭和冲水；画面保留一半未清洁区域形成直观对比。" },
+      { id: 3, summary: "效果收束，强化安全价值", dialogue: "玻璃重新透亮，雨天和夜间开车都安心多了。", visual: "切回驾驶视角，挡风玻璃清晰通透，路面与车灯轮廓清楚，产品定格收尾。" }
+    ]
+  },
+  {
+    title: "夜间炫光对比",
+    angle: "场景转化",
+    overview: "聚焦夜间会车时油膜放大灯光炫光的问题，通过左右分屏对比清洁效果，将玻璃清洁与夜间驾驶安全直接关联。",
+    recommendation: "夜间灯光炫光的视觉冲击强，能够快速抓住车主注意力；分屏对比降低理解成本，并自然承接产品的安全价值。",
+    sellingPointSummary: "快速去膜、减少炫光、不伤玻璃、便携易用",
+    presentation: "夜间会车场景 + 左右分屏效果对比 + 车内口播推荐",
+    character: "一位有多年驾驶经验的通勤车主，形象干净利落，语气理性。",
+    voice: "成熟男声，口吻克制，突出真实使用体验。",
+    shots: [
+      { id: 1, summary: "夜间炫光制造视觉钩子", dialogue: "晚上会车最怕这种一圈圈的炫光，路况根本看不清。", visual: "夜间道路第一视角，对向车灯在油膜玻璃上形成明显光晕，快速拉近危险感。" },
+      { id: 2, summary: "分屏对比强化产品效果", dialogue: "清洁以后再看，灯光边缘清楚多了，玻璃也没有残留。", visual: "左右分屏展示清洁前后的同一路况，右侧炫光显著减少，并穿插产品擦拭特写。" },
+      { id: 3, summary: "使用场景转化", dialogue: "经常夜间开车的朋友，车里备一支真的很实用。", visual: "车主在停车位旁展示产品，随后放入车门储物格，叠加便携易用卖点。" }
+    ]
+  },
+  {
+    title: "30秒快速去膜",
+    angle: "效率展示",
+    overview: "用30秒计时挑战串联完整使用过程，以快节奏实操证明产品操作简单、清洁高效，适合日常洗车和出行前快速处理。",
+    recommendation: "明确的时间承诺能够形成强钩子，完整操作过程提升可信度，也能直接回应用户担心步骤复杂、费时费力的问题。",
+    sellingPointSummary: "30秒快速清洁、步骤简单、自带擦头、冲水即净",
+    presentation: "倒计时挑战 + 连续操作实拍 + 完成效果验收",
+    character: "一位行动利落的年轻女车主，日常穿搭，表达轻松自然。",
+    voice: "清爽女声，节奏明快，带轻微挑战感。",
+    shots: [
+      { id: 1, summary: "时间挑战建立期待", dialogue: "挡风玻璃有油膜？给我30秒，马上处理干净。", visual: "车主指向油膜明显的挡风玻璃，画面右上角出现30秒倒计时。" },
+      { id: 2, summary: "连续实操证明简单高效", dialogue: "打开、涂匀、来回擦拭，再用清水一冲就可以。", visual: "连续近景拍摄产品开盖、海绵擦头涂抹、擦拭与冲水动作，倒计时持续运行。" },
+      { id: 3, summary: "验收结果推动转化", dialogue: "时间到，玻璃透亮不留痕，自己在家就能轻松搞定。", visual: "倒计时停在30秒内，镜头贴近展示玻璃通透效果，车主举起产品完成推荐。" }
+    ]
+  }
 ];
+
+const createCreatives = (start: number): CreativeItem[] => CREATIVE_DETAILS.map((item, index) => ({
+  id: start + index + 1,
+  ...item,
+  script: item.overview,
+  shots: item.shots.map((shot) => ({ ...shot }))
+}));
+
+const normalizeCreatives = (items: CreativeItem[] = []) => items.map((item, index) => {
+  const fallback = CREATIVE_DETAILS[index % CREATIVE_DETAILS.length];
+  return {
+    ...fallback,
+    ...item,
+    overview: item.overview || item.script || fallback.overview,
+    recommendation: item.recommendation || fallback.recommendation,
+    sellingPointSummary: item.sellingPointSummary || fallback.sellingPointSummary,
+    presentation: item.presentation || fallback.presentation,
+    character: item.character || fallback.character,
+    voice: item.voice || fallback.voice,
+    shots: item.shots?.length ? item.shots.map((shot) => ({ ...shot })) : fallback.shots.map((shot) => ({ ...shot }))
+  };
+});
 
 const createPreviews = (): PreviewItem[] => [
   { id: `preview_${Date.now()}_1`, name: "推荐", cover: SAMPLE_COVERS[0], selected: true },
@@ -343,7 +420,7 @@ const recordFor = (session: AgentSession, step: StepType, title: string, version
     scenarios: [...session.scenarios],
     specs: [...session.specs],
     discountInfo: session.discountInfo,
-    creatives: cloneItems(session.creatives),
+    creatives: cloneCreatives(session.creatives),
     previews: cloneItems(session.previews),
     finals: cloneItems(session.finals)
   }
@@ -478,7 +555,8 @@ const loadStoredSession = (id: string) => {
       targetGroups: stored.targetGroups || [],
       scenarios: stored.scenarios || [],
       specs: stored.specs || [],
-      discountInfo: stored.discountInfo || "暂无优惠信息"
+      discountInfo: stored.discountInfo || "暂无优惠信息",
+      creatives: normalizeCreatives(stored.creatives)
     };
   } catch {
     return null;
@@ -862,7 +940,7 @@ export default function AgentCreationView({
       scenarios: [...(record.snapshot.scenarios || session.scenarios)],
       specs: [...(record.snapshot.specs || session.specs)],
       discountInfo: record.snapshot.discountInfo || session.discountInfo,
-      creatives: cloneItems(record.snapshot.creatives),
+      creatives: normalizeCreatives(record.snapshot.creatives),
       previews: cloneItems(record.snapshot.previews),
       finals: cloneItems(record.snapshot.finals),
       activeVersions: record.step === "analysis" && record.version
@@ -1320,14 +1398,85 @@ function AnalysisListField({ label, items, onChange }: { label: string; items: s
 }
 
 function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId, setSelectedCreativeId }: { session: AgentSession; setSession: React.Dispatch<React.SetStateAction<AgentSession | null>>; currentCreative?: CreativeItem; selectedCreativeId: number; setSelectedCreativeId: (id: number) => void }) {
+  const [expandedCreativeId, setExpandedCreativeId] = useState<number | null>(null);
+  const updateShot = (shotId: number, field: "dialogue" | "visual", value: string) => {
+    if (!currentCreative) return;
+    setSession((current) => current ? {
+      ...current,
+      creatives: current.creatives.map((creative) => creative.id === currentCreative.id ? {
+        ...creative,
+        shots: creative.shots.map((shot) => shot.id === shotId ? { ...shot, [field]: value } : shot)
+      } : creative)
+    } : current);
+  };
+
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto max-w-6xl">
       <PanelHeader title="创意与分镜" count={session.versionCounts.script} active={session.activeVersions.script} onChange={(value) => setSession({ ...session, activeVersions: { ...session.activeVersions, script: value } })} />
-      <div className="grid grid-cols-[220px_minmax(0,1fr)] gap-4">
-        <div className="space-y-2">{session.creatives.map((item) => <button key={item.id} onClick={() => setSelectedCreativeId(item.id)} className={`w-full rounded-lg border p-3 text-left ${selectedCreativeId === item.id ? "border-violet-400 bg-violet-50" : "border-slate-200 bg-white hover:border-slate-300"}`}><div className="flex items-center justify-between"><span className="text-xs font-bold text-slate-800">创意 {item.id}</span><span className="rounded bg-white px-1.5 py-1 text-[10px] text-slate-500">{item.angle}</span></div><p className="mt-2 truncate text-xs text-slate-600">{item.title}</p></button>)}</div>
-        {currentCreative && <section className="rounded-lg border border-slate-200 bg-white p-5"><div className="flex items-center justify-between"><div><p className="text-xs font-semibold text-violet-600">创意 {currentCreative.id}</p><h3 className="mt-1 text-base font-bold text-slate-900">{currentCreative.title}</h3></div><button title="更多" className="rounded p-2 text-slate-400 hover:bg-slate-100"><MoreHorizontal className="h-4 w-4" /></button></div><label className="mt-5 block text-xs font-semibold text-slate-500">分镜脚本</label><textarea value={currentCreative.script} onChange={(event) => setSession({ ...session, creatives: session.creatives.map((item) => item.id === currentCreative.id ? { ...item, script: event.target.value } : item) })} rows={7} className="mt-2 w-full resize-none rounded-md border border-slate-200 p-3 text-sm leading-7 outline-none focus:border-violet-400" /><div className="mt-4 grid grid-cols-3 gap-3">{["痛点开场", "产品实测", "行动引导"].map((shot, index) => <div key={shot} className="rounded-md bg-slate-50 p-3"><span className="text-[10px] text-slate-400">镜头 {index + 1}</span><p className="mt-1 text-xs font-semibold text-slate-700">{shot}</p></div>)}</div></section>}
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[236px_minmax(0,1fr)]">
+        <div className="flex gap-2 overflow-x-auto pb-1 xl:sticky xl:top-0 xl:block xl:space-y-2 xl:overflow-visible xl:pb-0">
+          {session.creatives.map((item) => (
+            <button key={item.id} onClick={() => { setSelectedCreativeId(item.id); setExpandedCreativeId(null); }} className={`w-full min-w-[180px] rounded-lg border p-3.5 text-left transition-colors xl:min-w-0 ${selectedCreativeId === item.id ? "border-violet-400 bg-violet-50" : "border-slate-200 bg-white hover:border-violet-200"}`}>
+              <div className="flex items-center justify-between gap-2"><span className="text-xs font-bold text-slate-800">创意 {item.id}</span><span className={`shrink-0 rounded px-1.5 py-1 text-[10px] ${selectedCreativeId === item.id ? "bg-white text-violet-700" : "bg-slate-100 text-slate-500"}`}>{item.angle}</span></div>
+              <p className="mt-2 text-xs font-semibold text-slate-700">{item.title}</p>
+              <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-slate-500">{item.overview}</p>
+            </button>
+          ))}
+        </div>
+        {currentCreative && (
+          <section className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <div className="px-4 py-5 xl:px-6">
+              <div className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-2"><p className="text-xs font-semibold text-violet-600">创意 {currentCreative.id}</p><span className="rounded bg-violet-50 px-2 py-1 text-[10px] text-violet-700">{currentCreative.angle}</span></div><h3 className="mt-2 text-lg font-bold text-slate-900">{currentCreative.title}</h3></div><button title="更多" className="rounded p-2 text-slate-400 hover:bg-slate-100"><MoreHorizontal className="h-4 w-4" /></button></div>
+              <div className="mt-5 rounded-lg bg-slate-50 px-4 py-3.5"><p className="text-xs font-bold text-slate-700">创意概述</p><p className="mt-2 text-sm leading-7 text-slate-600">{currentCreative.overview}</p></div>
+              <button onClick={() => setExpandedCreativeId(expandedCreativeId === currentCreative.id ? null : currentCreative.id)} className="mt-4 flex items-center gap-1.5 py-1 text-xs font-semibold text-slate-700 hover:text-violet-700">
+                {expandedCreativeId === currentCreative.id ? "收起完整创意" : "查看完整创意"}<ChevronDown className={`h-4 w-4 transition-transform ${expandedCreativeId === currentCreative.id ? "rotate-180" : "-rotate-90"}`} />
+              </button>
+              {expandedCreativeId === currentCreative.id && (
+                <div className="mt-5 space-y-5 border-t border-slate-100 pt-5">
+                  <CreativeReadOnlySection index="一" title="推荐理由" content={currentCreative.recommendation} />
+                  <CreativeReadOnlySection index="二" title="核心卖点" content={currentCreative.sellingPointSummary} />
+                  <CreativeReadOnlySection index="三" title="卖点表现形式" content={currentCreative.presentation} />
+                </div>
+              )}
+            </div>
+            <div className="border-t border-slate-200 px-4 py-6 xl:px-6">
+              <h3 className="text-lg font-bold text-violet-700">分镜脚本</h3>
+              <h4 className="mt-6 text-sm font-bold text-slate-900">1. 主体设定</h4>
+              <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-3">
+                <SubjectSettingCard label="商品" title={session.productName} image={session.productImages[0]?.image || session.product?.image || SAMPLE_COVERS[0]} />
+                <SubjectSettingCard label="人物形象 1" title={currentCreative.character} image="https://images.unsplash.com/photo-1560250097-0b93528c311a?w=500&auto=format&fit=crop&q=80" />
+                <SubjectSettingCard label="旁白" title={currentCreative.voice} audio />
+              </div>
+              <h4 className="mt-7 text-sm font-bold text-slate-900">2. 分镜描述</h4>
+              <div className="mt-4 space-y-5">
+                {currentCreative.shots.map((shot) => (
+                  <article key={shot.id}>
+                    <div className="mb-2 flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-violet-500" /><p className="text-xs font-bold text-slate-700">镜头 {shot.id}：{shot.summary}</p></div>
+                    <div className="grid grid-cols-1 overflow-hidden rounded-lg border border-slate-200 xl:grid-cols-2">
+                      <label className="border-b border-slate-200 xl:border-b-0 xl:border-r"><span className="block bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700">人物台词</span><textarea value={shot.dialogue} onChange={(event) => updateShot(shot.id, "dialogue", event.target.value)} rows={4} className="w-full resize-none border-0 px-4 py-3 text-xs leading-6 text-slate-600 outline-none focus:bg-violet-50/30" /></label>
+                      <label><span className="block bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700">画面描述</span><textarea value={shot.visual} onChange={(event) => updateShot(shot.id, "visual", event.target.value)} rows={4} className="w-full resize-none border-0 px-4 py-3 text-xs leading-6 text-slate-600 outline-none focus:bg-violet-50/30" /></label>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
       </div>
     </div>
+  );
+}
+
+function CreativeReadOnlySection({ index, title, content }: { index: string; title: string; content: string }) {
+  return <section><h4 className="text-sm font-bold text-slate-900">{index}、{title}</h4><p className="mt-2 text-sm leading-7 text-slate-600">{content}</p></section>;
+}
+
+function SubjectSettingCard({ label, title, image, audio = false }: { label: string; title: string; image?: string; audio?: boolean }) {
+  return (
+    <article className="min-w-0 rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-xs font-bold text-slate-800">{label}</p><p className="mt-1 line-clamp-2 text-[11px] leading-5 text-slate-500">{title}</p></div>{audio && <button title="试听音色" className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-white text-slate-500 hover:text-violet-700"><Volume2 className="h-3.5 w-3.5" /></button>}</div>
+      {audio ? <div className="mt-3 flex aspect-[4/3] items-center justify-center rounded-md border border-dashed border-slate-300 bg-white"><Volume2 className="h-10 w-10 text-slate-300" /></div> : <img src={image} alt={title} className="mt-3 aspect-[4/3] w-full rounded-md object-cover" referrerPolicy="no-referrer" />}
+    </article>
   );
 }
 
