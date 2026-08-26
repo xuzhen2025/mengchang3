@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft, ArrowUp, Check, CheckCircle2, ChevronDown, Copy, Download, Eye,
+  ArrowLeft, ArrowUp, AtSign, Check, CheckCircle2, ChevronDown, Copy, Download, Eye,
   FileText, Film, History, Image as ImageIcon, Link2, Loader2,
   MessageSquare, MoreHorizontal, Package, Palette, Play, Plus, Search,
   RefreshCw, Settings, Sparkles, Square, Trash2, Upload,
@@ -84,12 +84,34 @@ interface CreativeItem {
   presentation: string;
   character: string;
   voice: string;
+  productImages: ProductSelection[];
+  subjects: CreativeSubject[];
   shots: Array<{
     id: number;
     summary: string;
-    dialogue: string;
-    visual: string;
+    dialogue?: string;
+    visual?: string;
+    dialogueLines: Array<{ id: string; subjectId: string; text: string }>;
+    visualLines: Array<{ id: string; subjectIds: string[]; text: string }>;
   }>;
+}
+
+type CreativeSubjectKind = "product" | "person" | "narrator";
+
+interface VoiceOption {
+  id: string;
+  name: string;
+  description: string;
+}
+
+interface CreativeSubject {
+  id: string;
+  kind: CreativeSubjectKind;
+  name: string;
+  description: string;
+  image?: string;
+  voices: VoiceOption[];
+  activeVoiceId?: string;
 }
 
 interface PreviewItem {
@@ -313,8 +335,78 @@ const STYLE_OPTIONS = [
 const nowText = () => new Date().toISOString().replace("T", " ").slice(0, 16);
 const shortTime = () => new Date().toTimeString().slice(0, 5);
 const cloneItems = <T,>(items: T[]) => items.map((item) => ({ ...item }));
-const cloneCreatives = (items: CreativeItem[]) => items.map((item) => ({ ...item, shots: item.shots.map((shot) => ({ ...shot })) }));
+const cloneCreatives = (items: CreativeItem[]) => items.map((item) => ({
+  ...item,
+  productImages: cloneItems(item.productImages || []),
+  subjects: (item.subjects || []).map((subject) => ({ ...subject, voices: cloneItems(subject.voices || []) })),
+  shots: item.shots.map((shot) => ({
+    ...shot,
+    dialogueLines: cloneItems(shot.dialogueLines || []),
+    visualLines: (shot.visualLines || []).map((line) => ({ ...line, subjectIds: [...line.subjectIds] }))
+  }))
+}));
 const productDisplayName = (product?: ProductSelection) => product?.name.replace(/\.(jpg|jpeg|png|webp)$/i, "") || "待补充商品名称";
+
+const PERSON_IMAGES = [
+  "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=500&auto=format&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=500&auto=format&fit=crop&q=80"
+];
+
+const createVoice = (id: string, name: string, description: string): VoiceOption => ({ id, name, description });
+const createFallbackProductImage = (productName: string): ProductSelection => ({ id: "creative-product-default", name: `${productName}.jpg`, image: SAMPLE_COVERS[0], source: "conversation", status: "AI生成" });
+
+const createSubjects = (creativeIndex: number, productName: string): CreativeSubject[] => {
+  const product: CreativeSubject = { id: "product", kind: "product", name: "商品", description: productName, voices: [] };
+  const personOne: CreativeSubject = {
+    id: "person-1",
+    kind: "person",
+    name: creativeIndex === 1 ? "大刘" : "人物形象 1",
+    description: creativeIndex === 1 ? "私家车车主，沉稳理性，日常通勤中非常关注夜间驾驶安全。" : "一位注重生活品质和驾驶安全的年轻车主，表达自然可信。",
+    image: PERSON_IMAGES[0],
+    voices: [createVoice("voice-1", "音色 1", "青年男性，广告口播风格，音色清晰稳重，语速适中")],
+    activeVoiceId: "voice-1"
+  };
+  const personTwo: CreativeSubject = {
+    id: "person-2",
+    kind: "person",
+    name: "小敏",
+    description: "大刘的妻子，年轻干练，表达轻松直接，适合生活化对话。",
+    image: PERSON_IMAGES[1],
+    voices: [createVoice("voice-1", "音色 1", "青年女性，生活化表达，音色明亮自然，语速适中")],
+    activeVoiceId: "voice-1"
+  };
+  const narrator: CreativeSubject = {
+    id: "narrator",
+    kind: "narrator",
+    name: "旁白",
+    description: "广告旁白音色，专业清晰，节奏稳健，重点信息有强调。",
+    voices: [createVoice("voice-1", "音色 1", "青年男性，广告旁白风格，专业讲解口吻，音色清晰稳重")],
+    activeVoiceId: "voice-1"
+  };
+  if (creativeIndex % 3 === 0) return [product, personOne, narrator];
+  if (creativeIndex % 3 === 1) return [product, personOne, personTwo];
+  return [product, personOne];
+};
+
+const createShotRows = (shots: Array<{ id: number; summary: string; dialogue: string; visual: string }>, subjects: CreativeSubject[]) => {
+  const people = subjects.filter((subject) => subject.kind === "person");
+  const narrator = subjects.find((subject) => subject.kind === "narrator");
+  return shots.map((shot, index) => {
+    const primarySpeaker = narrator || people[index % Math.max(people.length, 1)] || subjects[0];
+    const secondarySpeaker = people[index % Math.max(people.length, 1)] || primarySpeaker;
+    return {
+      ...shot,
+      dialogueLines: [
+        { id: `${shot.id}-dialogue-1`, subjectId: primarySpeaker.id, text: shot.dialogue },
+        { id: `${shot.id}-dialogue-2`, subjectId: secondarySpeaker.id, text: index === 0 ? "别急，用这款玻璃油膜清洁擦，自己就能快速处理。" : "操作简单，擦完以后玻璃清楚多了。" }
+      ],
+      visualLines: [
+        { id: `${shot.id}-visual-1`, subjectIds: people[0] ? [people[0].id] : [], text: shot.visual },
+        { id: `${shot.id}-visual-2`, subjectIds: ["product"], text: "特写展示产品外观和实际使用过程，品牌与核心卖点清晰可见。" }
+      ]
+    };
+  });
+};
 
 const CREATIVE_DETAILS = [
   {
@@ -364,15 +456,25 @@ const CREATIVE_DETAILS = [
   }
 ];
 
-const createCreatives = (start: number): CreativeItem[] => CREATIVE_DETAILS.map((item, index) => ({
-  id: start + index + 1,
-  ...item,
-  script: item.overview,
-  shots: item.shots.map((shot) => ({ ...shot }))
-}));
+const createCreatives = (start: number, productName = "玻璃油膜清洁擦", productImages: ProductSelection[] = []): CreativeItem[] => CREATIVE_DETAILS.map((item, index) => {
+  const subjects = createSubjects(index, productName);
+  const creativeProductImages = productImages.length ? cloneItems(productImages) : [createFallbackProductImage(productName)];
+  return {
+    id: start + index + 1,
+    ...item,
+    script: item.overview,
+    productImages: creativeProductImages,
+    subjects,
+    shots: createShotRows(item.shots, subjects)
+  };
+});
 
-const normalizeCreatives = (items: CreativeItem[] = []) => items.map((item, index) => {
+const normalizeCreatives = (items: CreativeItem[] = [], productName = "玻璃油膜清洁擦", productImages: ProductSelection[] = []) => items.map((item, index) => {
   const fallback = CREATIVE_DETAILS[index % CREATIVE_DETAILS.length];
+  const subjects = item.subjects?.length
+    ? item.subjects.map((subject) => ({ ...subject, voices: subject.voices?.length ? cloneItems(subject.voices) : [createVoice("voice-1", "音色 1", subject.description)] }))
+    : createSubjects(index, productName);
+  const generatedShots = createShotRows(fallback.shots, subjects);
   return {
     ...fallback,
     ...item,
@@ -382,7 +484,13 @@ const normalizeCreatives = (items: CreativeItem[] = []) => items.map((item, inde
     presentation: item.presentation || fallback.presentation,
     character: item.character || fallback.character,
     voice: item.voice || fallback.voice,
-    shots: item.shots?.length ? item.shots.map((shot) => ({ ...shot })) : fallback.shots.map((shot) => ({ ...shot }))
+    productImages: item.productImages?.length ? cloneItems(item.productImages) : productImages.length ? cloneItems(productImages) : [createFallbackProductImage(productName)],
+    subjects,
+    shots: (item.shots?.length ? item.shots : generatedShots).map((shot, shotIndex) => ({
+      ...shot,
+      dialogueLines: shot.dialogueLines?.length ? cloneItems(shot.dialogueLines) : generatedShots[shotIndex]?.dialogueLines || [],
+      visualLines: shot.visualLines?.length ? shot.visualLines.map((line) => ({ ...line, subjectIds: [...line.subjectIds] })) : generatedShots[shotIndex]?.visualLines || []
+    }))
   };
 });
 
@@ -510,7 +618,7 @@ const withProductAnalysis = (session: AgentSession, product: ProductSelection, p
 
 const makeDemoSession = (task: Task): AgentSession => {
   const base = makeBaseSession(task.name, "step");
-  const creatives = createCreatives(0);
+  const creatives = createCreatives(0, base.productName, base.productImages);
   const previews = createPreviews();
   const finals = createFinals(previews);
   const completed = task.status === "completed";
@@ -556,7 +664,7 @@ const loadStoredSession = (id: string) => {
       scenarios: stored.scenarios || [],
       specs: stored.specs || [],
       discountInfo: stored.discountInfo || "暂无优惠信息",
-      creatives: normalizeCreatives(stored.creatives)
+      creatives: normalizeCreatives(stored.creatives, stored.productName || productDisplayName(stored.product), stored.productImages?.length ? stored.productImages : stored.product ? [stored.product] : [])
     };
   } catch {
     return null;
@@ -880,7 +988,7 @@ export default function AgentCreationView({
     const next: AgentSession = {
       ...current,
       availableSteps: Array.from(new Set([...current.availableSteps, "script"])) as StepType[],
-      creatives: [...current.creatives, ...createCreatives(current.creatives.length)],
+      creatives: [...current.creatives, ...createCreatives(current.creatives.length, current.productName, current.productImages)],
       versionCounts: { ...current.versionCounts, script: version },
       activeVersions: { ...current.activeVersions, script: version }
     };
@@ -940,7 +1048,7 @@ export default function AgentCreationView({
       scenarios: [...(record.snapshot.scenarios || session.scenarios)],
       specs: [...(record.snapshot.specs || session.specs)],
       discountInfo: record.snapshot.discountInfo || session.discountInfo,
-      creatives: normalizeCreatives(record.snapshot.creatives),
+      creatives: normalizeCreatives(record.snapshot.creatives, record.snapshot.productName || session.productName, record.snapshot.productImages || session.productImages),
       previews: cloneItems(record.snapshot.previews),
       finals: cloneItems(record.snapshot.finals),
       activeVersions: record.step === "analysis" && record.version
@@ -1191,7 +1299,7 @@ export default function AgentCreationView({
           ) : (
             <>
               {session.currentStep === "analysis" && <AnalysisPanel session={session} setSession={setSession} showToast={showToast} />}
-              {session.currentStep === "script" && <ScriptPanel session={session} setSession={setSession} currentCreative={currentCreative} selectedCreativeId={selectedCreativeId} setSelectedCreativeId={setSelectedCreativeId} />}
+              {session.currentStep === "script" && <ScriptPanel session={session} setSession={setSession} currentCreative={currentCreative} selectedCreativeId={selectedCreativeId} setSelectedCreativeId={setSelectedCreativeId} showToast={showToast} />}
               {session.currentStep === "preview" && <PreviewPanel session={session} setSession={setSession} />}
               {session.currentStep === "final" && <FinalPanel session={session} setSession={setSession} selectedFinals={selectedFinals} openUpload={openUpload} setDetailVideo={setDetailVideo} showToast={showToast} />}
             </>
@@ -1397,64 +1505,155 @@ function AnalysisListField({ label, items, onChange }: { label: string; items: s
   );
 }
 
-function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId, setSelectedCreativeId }: { session: AgentSession; setSession: React.Dispatch<React.SetStateAction<AgentSession | null>>; currentCreative?: CreativeItem; selectedCreativeId: number; setSelectedCreativeId: (id: number) => void }) {
+function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId, setSelectedCreativeId, showToast }: { session: AgentSession; setSession: React.Dispatch<React.SetStateAction<AgentSession | null>>; currentCreative?: CreativeItem; selectedCreativeId: number; setSelectedCreativeId: (id: number) => void; showToast: (message: string) => void }) {
   const [expandedCreativeId, setExpandedCreativeId] = useState<number | null>(null);
-  const updateShot = (shotId: number, field: "dialogue" | "visual", value: string) => {
+  const [subjectDraft, setSubjectDraft] = useState<{ subjectId: string; productImages: ProductSelection[]; voices: VoiceOption[]; activeVoiceId?: string } | null>(null);
+  const [imagePicker, setImagePicker] = useState<{ mode: "add" | "replace"; index?: number } | null>(null);
+  const [voiceEditorOpen, setVoiceEditorOpen] = useState(false);
+  const [voiceDraft, setVoiceDraft] = useState("");
+  const displayCreative = useMemo(() => currentCreative
+    ? normalizeCreatives(session.creatives, session.productName, session.productImages).find((creative) => creative.id === currentCreative.id)
+    : undefined, [currentCreative, session.creatives, session.productImages, session.productName]);
+
+  const updateCreative = (updater: (creative: CreativeItem) => CreativeItem) => {
     if (!currentCreative) return;
-    setSession((current) => current ? {
-      ...current,
-      creatives: current.creatives.map((creative) => creative.id === currentCreative.id ? {
-        ...creative,
-        shots: creative.shots.map((shot) => shot.id === shotId ? { ...shot, [field]: value } : shot)
-      } : creative)
-    } : current);
+    setSession((current) => {
+      if (!current) return current;
+      const normalized = normalizeCreatives(current.creatives, current.productName, current.productImages);
+      return { ...current, creatives: current.creatives.map((creative, index) => creative.id === currentCreative.id ? updater(normalized[index]) : creative) };
+    });
   };
+
+  const updateDialogueLine = (shotId: number, lineId: string, text: string) => updateCreative((creative) => ({
+    ...creative,
+    shots: creative.shots.map((shot) => shot.id === shotId ? { ...shot, dialogueLines: shot.dialogueLines.map((line) => line.id === lineId ? { ...line, text } : line) } : shot)
+  }));
+
+  const updateVisualLine = (shotId: number, lineId: string, patch: Partial<{ text: string; subjectIds: string[] }>) => updateCreative((creative) => ({
+    ...creative,
+    shots: creative.shots.map((shot) => shot.id === shotId ? { ...shot, visualLines: shot.visualLines.map((line) => line.id === lineId ? { ...line, ...patch } : line) } : shot)
+  }));
+
+  const openSubject = (subject: CreativeSubject) => {
+    setSubjectDraft({
+      subjectId: subject.id,
+      productImages: cloneItems(displayCreative?.productImages?.length ? displayCreative.productImages : session.productImages),
+      voices: cloneItems(subject.voices),
+      activeVoiceId: subject.activeVoiceId
+    });
+    setVoiceEditorOpen(false);
+    setVoiceDraft("");
+  };
+
+  const applySubjectDraft = () => {
+    if (!subjectDraft || !currentCreative) return;
+    updateCreative((creative) => ({
+      ...creative,
+      productImages: subjectDraft.subjectId === "product" ? cloneItems(subjectDraft.productImages) : creative.productImages,
+      subjects: creative.subjects.map((subject) => subject.id === subjectDraft.subjectId ? { ...subject, voices: cloneItems(subjectDraft.voices), activeVoiceId: subjectDraft.activeVoiceId } : subject)
+    }));
+    setSubjectDraft(null);
+    showToast("已应用到当前创意");
+  };
+
+  const selectedSubject = displayCreative?.subjects.find((subject) => subject.id === subjectDraft?.subjectId);
+
+  if (displayCreative && selectedSubject && subjectDraft) {
+    return (
+      <div className="mx-auto max-w-6xl">
+        <PanelHeader title="创意与分镜" count={session.versionCounts.script} active={session.activeVersions.script} onChange={(value) => setSession({ ...session, activeVersions: { ...session.activeVersions, script: value } })} />
+        <SubjectDetailPanel
+          subject={selectedSubject}
+          draft={subjectDraft}
+          productName={session.productName}
+          voiceEditorOpen={voiceEditorOpen}
+          voiceDraft={voiceDraft}
+          onBack={() => setSubjectDraft(null)}
+          onApply={applySubjectDraft}
+          onVoiceDraftChange={setVoiceDraft}
+          onToggleVoiceEditor={() => setVoiceEditorOpen((value) => !value)}
+          onAddVoice={() => {
+            const description = voiceDraft.trim();
+            if (!description) return;
+            const nextNumber = subjectDraft.voices.length + 1;
+            const id = `voice-${Date.now()}`;
+            setSubjectDraft({ ...subjectDraft, voices: [...subjectDraft.voices, createVoice(id, `音色 ${nextNumber}`, description)], activeVoiceId: id });
+            setVoiceDraft("");
+            setVoiceEditorOpen(false);
+          }}
+          onSelectVoice={(activeVoiceId) => setSubjectDraft({ ...subjectDraft, activeVoiceId })}
+          onAddImage={() => setImagePicker({ mode: "add" })}
+          onReplaceImage={(index) => setImagePicker({ mode: "replace", index })}
+          onDeleteImage={(index) => {
+            if (subjectDraft.productImages.length <= 1) return showToast("至少保留一张商品参考图");
+            setSubjectDraft({ ...subjectDraft, productImages: subjectDraft.productImages.filter((_, imageIndex) => imageIndex !== index) });
+          }}
+        />
+        {imagePicker && (
+          <ProductImageModal
+            existingCount={subjectDraft.productImages.length}
+            mode={imagePicker.mode}
+            excludedIds={subjectDraft.productImages.map((item) => item.id)}
+            onClose={() => setImagePicker(null)}
+            onConfirm={(images) => {
+              const productImages = imagePicker.mode === "replace" && imagePicker.index !== undefined
+                ? subjectDraft.productImages.map((image, index) => index === imagePicker.index ? images[0] : image)
+                : [...subjectDraft.productImages, ...images].slice(0, 6);
+              setSubjectDraft({ ...subjectDraft, productImages });
+              setImagePicker(null);
+            }}
+            showToast={showToast}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-6xl">
       <PanelHeader title="创意与分镜" count={session.versionCounts.script} active={session.activeVersions.script} onChange={(value) => setSession({ ...session, activeVersions: { ...session.activeVersions, script: value } })} />
-      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[236px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[157px_minmax(0,1fr)]">
         <div className="flex gap-2 overflow-x-auto pb-1 xl:sticky xl:top-0 xl:block xl:space-y-2 xl:overflow-visible xl:pb-0">
           {session.creatives.map((item) => (
-            <button key={item.id} onClick={() => { setSelectedCreativeId(item.id); setExpandedCreativeId(null); }} className={`w-full min-w-[180px] rounded-lg border p-3.5 text-left transition-colors xl:min-w-0 ${selectedCreativeId === item.id ? "border-violet-400 bg-violet-50" : "border-slate-200 bg-white hover:border-violet-200"}`}>
+            <button key={item.id} onClick={() => { setSelectedCreativeId(item.id); setExpandedCreativeId(null); }} className={`w-full min-w-[150px] rounded-lg border p-3 text-left transition-colors xl:min-w-0 ${selectedCreativeId === item.id ? "border-violet-400 bg-violet-50" : "border-slate-200 bg-white hover:border-violet-200"}`}>
               <div className="flex items-center justify-between gap-2"><span className="text-xs font-bold text-slate-800">创意 {item.id}</span><span className={`shrink-0 rounded px-1.5 py-1 text-[10px] ${selectedCreativeId === item.id ? "bg-white text-violet-700" : "bg-slate-100 text-slate-500"}`}>{item.angle}</span></div>
               <p className="mt-2 text-xs font-semibold text-slate-700">{item.title}</p>
               <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-slate-500">{item.overview}</p>
             </button>
           ))}
         </div>
-        {currentCreative && (
+        {displayCreative && (
           <section className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
             <div className="px-4 py-5 xl:px-6">
-              <div className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-2"><p className="text-xs font-semibold text-violet-600">创意 {currentCreative.id}</p><span className="rounded bg-violet-50 px-2 py-1 text-[10px] text-violet-700">{currentCreative.angle}</span></div><h3 className="mt-2 text-lg font-bold text-slate-900">{currentCreative.title}</h3></div><button title="更多" className="rounded p-2 text-slate-400 hover:bg-slate-100"><MoreHorizontal className="h-4 w-4" /></button></div>
-              <div className="mt-5 rounded-lg bg-slate-50 px-4 py-3.5"><p className="text-xs font-bold text-slate-700">创意概述</p><p className="mt-2 text-sm leading-7 text-slate-600">{currentCreative.overview}</p></div>
-              <button onClick={() => setExpandedCreativeId(expandedCreativeId === currentCreative.id ? null : currentCreative.id)} className="mt-4 flex items-center gap-1.5 py-1 text-xs font-semibold text-slate-700 hover:text-violet-700">
-                {expandedCreativeId === currentCreative.id ? "收起完整创意" : "查看完整创意"}<ChevronDown className={`h-4 w-4 transition-transform ${expandedCreativeId === currentCreative.id ? "rotate-180" : "-rotate-90"}`} />
+              <div className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-2"><p className="text-xs font-semibold text-violet-600">创意 {displayCreative.id}</p><span className="rounded bg-violet-50 px-2 py-1 text-[10px] text-violet-700">{displayCreative.angle}</span></div><h3 className="mt-2 text-lg font-bold text-slate-900">{displayCreative.title}</h3></div><button title="更多" className="rounded p-2 text-slate-400 hover:bg-slate-100"><MoreHorizontal className="h-4 w-4" /></button></div>
+              <div className="mt-5 rounded-lg bg-slate-50 px-4 py-3.5"><p className="text-xs font-bold text-slate-700">创意概述</p><p className="mt-2 text-sm leading-7 text-slate-600">{displayCreative.overview}</p></div>
+              <button onClick={() => setExpandedCreativeId(expandedCreativeId === displayCreative.id ? null : displayCreative.id)} className="mt-4 flex items-center gap-1.5 py-1 text-xs font-semibold text-slate-700 hover:text-violet-700">
+                {expandedCreativeId === displayCreative.id ? "收起完整创意" : "查看完整创意"}<ChevronDown className={`h-4 w-4 transition-transform ${expandedCreativeId === displayCreative.id ? "rotate-180" : "-rotate-90"}`} />
               </button>
-              {expandedCreativeId === currentCreative.id && (
+              {expandedCreativeId === displayCreative.id && (
                 <div className="mt-5 space-y-5 border-t border-slate-100 pt-5">
-                  <CreativeReadOnlySection index="一" title="推荐理由" content={currentCreative.recommendation} />
-                  <CreativeReadOnlySection index="二" title="核心卖点" content={currentCreative.sellingPointSummary} />
-                  <CreativeReadOnlySection index="三" title="卖点表现形式" content={currentCreative.presentation} />
+                  <CreativeReadOnlySection index="一" title="推荐理由" content={displayCreative.recommendation} />
+                  <CreativeReadOnlySection index="二" title="核心卖点" content={displayCreative.sellingPointSummary} />
+                  <CreativeReadOnlySection index="三" title="卖点表现形式" content={displayCreative.presentation} />
                 </div>
               )}
             </div>
             <div className="border-t border-slate-200 px-4 py-6 xl:px-6">
               <h3 className="text-lg font-bold text-violet-700">分镜脚本</h3>
               <h4 className="mt-6 text-sm font-bold text-slate-900">1. 主体设定</h4>
-              <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-3">
-                <SubjectSettingCard label="商品" title={session.productName} image={session.productImages[0]?.image || session.product?.image || SAMPLE_COVERS[0]} />
-                <SubjectSettingCard label="人物形象 1" title={currentCreative.character} image="https://images.unsplash.com/photo-1560250097-0b93528c311a?w=500&auto=format&fit=crop&q=80" />
-                <SubjectSettingCard label="旁白" title={currentCreative.voice} audio />
+              <div className="mt-3 flex flex-wrap gap-3">
+                {displayCreative.subjects.map((subject) => (
+                  <SubjectSettingCard key={subject.id} subject={subject.kind === "product" ? { ...subject, description: session.productName } : subject} productImages={displayCreative.productImages.length ? displayCreative.productImages : session.productImages} onOpen={() => openSubject(subject)} />
+                ))}
               </div>
               <h4 className="mt-7 text-sm font-bold text-slate-900">2. 分镜描述</h4>
               <div className="mt-4 space-y-5">
-                {currentCreative.shots.map((shot) => (
+                {displayCreative.shots.map((shot) => (
                   <article key={shot.id}>
                     <div className="mb-2 flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-violet-500" /><p className="text-xs font-bold text-slate-700">镜头 {shot.id}：{shot.summary}</p></div>
-                    <div className="grid grid-cols-1 overflow-hidden rounded-lg border border-slate-200 xl:grid-cols-2">
-                      <label className="border-b border-slate-200 xl:border-b-0 xl:border-r"><span className="block bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700">人物台词</span><textarea value={shot.dialogue} onChange={(event) => updateShot(shot.id, "dialogue", event.target.value)} rows={4} className="w-full resize-none border-0 px-4 py-3 text-xs leading-6 text-slate-600 outline-none focus:bg-violet-50/30" /></label>
-                      <label><span className="block bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700">画面描述</span><textarea value={shot.visual} onChange={(event) => updateShot(shot.id, "visual", event.target.value)} rows={4} className="w-full resize-none border-0 px-4 py-3 text-xs leading-6 text-slate-600 outline-none focus:bg-violet-50/30" /></label>
+                    <div className="grid grid-cols-1 rounded-lg border border-slate-200 xl:grid-cols-2">
+                      <div className="border-b border-slate-200 xl:border-b-0 xl:border-r"><span className="block rounded-tl-lg bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700">人物台词</span>{shot.dialogueLines.map((line) => <StoryboardLineEditor key={line.id} type="dialogue" text={line.text} subjects={displayCreative.subjects} subjectIds={[line.subjectId]} productImages={displayCreative.productImages} onTextChange={(text) => updateDialogueLine(shot.id, line.id, text)} />)}</div>
+                      <div><span className="block rounded-tr-lg bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700">画面描述</span>{shot.visualLines.map((line) => <StoryboardLineEditor key={line.id} type="visual" text={line.text} subjects={displayCreative.subjects} subjectIds={line.subjectIds} productImages={displayCreative.productImages} onTextChange={(text) => updateVisualLine(shot.id, line.id, { text })} onSubjectsChange={(subjectIds) => updateVisualLine(shot.id, line.id, { subjectIds })} />)}</div>
                     </div>
                   </article>
                 ))}
@@ -1471,12 +1670,99 @@ function CreativeReadOnlySection({ index, title, content }: { index: string; tit
   return <section><h4 className="text-sm font-bold text-slate-900">{index}、{title}</h4><p className="mt-2 text-sm leading-7 text-slate-600">{content}</p></section>;
 }
 
-function SubjectSettingCard({ label, title, image, audio = false }: { label: string; title: string; image?: string; audio?: boolean }) {
+function SubjectSettingCard({ subject, productImages, onOpen }: { subject: CreativeSubject; productImages: ProductSelection[]; onOpen: () => void }) {
+  const isProduct = subject.kind === "product";
+  const isNarrator = subject.kind === "narrator";
   return (
-    <article className="min-w-0 rounded-lg border border-slate-200 bg-slate-50 p-3">
-      <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-xs font-bold text-slate-800">{label}</p><p className="mt-1 line-clamp-2 text-[11px] leading-5 text-slate-500">{title}</p></div>{audio && <button title="试听音色" className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-white text-slate-500 hover:text-violet-700"><Volume2 className="h-3.5 w-3.5" /></button>}</div>
-      {audio ? <div className="mt-3 flex aspect-[4/3] items-center justify-center rounded-md border border-dashed border-slate-300 bg-white"><Volume2 className="h-10 w-10 text-slate-300" /></div> : <img src={image} alt={title} className="mt-3 aspect-[4/3] w-full rounded-md object-cover" referrerPolicy="no-referrer" />}
-    </article>
+    <button onClick={onOpen} className="group relative min-w-[150px] max-w-[220px] basis-[150px] grow rounded-lg border border-slate-200 bg-slate-50 p-3 text-left hover:border-violet-300 hover:bg-violet-50/30">
+      <div className="flex h-12 items-start justify-between gap-2"><div className="min-w-0"><p className="text-xs font-bold text-slate-800">{subject.name}</p><TruncatedSubjectDescription subject={subject} productImages={productImages} /></div>{!isProduct && <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-white text-slate-500"><Volume2 className="h-3.5 w-3.5" /></span>}</div>
+      {isProduct ? <ProductImageGrid images={productImages} /> : isNarrator ? <div className="mt-2 flex h-[180px] items-center justify-center rounded-md border border-dashed border-slate-300 bg-white"><Volume2 className="h-10 w-10 text-slate-300" /></div> : <img src={subject.image} alt={subject.name} className="mt-2 h-[180px] w-full rounded-md object-cover" referrerPolicy="no-referrer" />}
+    </button>
+  );
+}
+
+function ProductImageGrid({ images }: { images: ProductSelection[] }) {
+  const shown = images.slice(0, 4);
+  return <div className={`mt-2 grid h-[180px] overflow-hidden rounded-md bg-white ${shown.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>{shown.map((image, index) => <div key={image.id} className="relative min-h-0"><img src={image.image} alt={image.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" />{index === 3 && images.length > 4 && <span className="absolute inset-0 flex items-center justify-center bg-slate-900/65 text-base font-bold text-white">+{images.length - 3}</span>}</div>)}</div>;
+}
+
+function TruncatedSubjectDescription({ subject, productImages }: { subject: CreativeSubject; productImages: ProductSelection[] }) {
+  const textRef = useRef<HTMLParagraphElement>(null);
+  const [showDetail, setShowDetail] = useState(false);
+  const checkOverflow = () => {
+    const element = textRef.current;
+    setShowDetail(Boolean(element && element.scrollWidth > element.clientWidth));
+  };
+  return <div className="relative"><p ref={textRef} onMouseEnter={checkOverflow} onMouseLeave={() => setShowDetail(false)} className="mt-1 max-w-[154px] truncate text-[11px] leading-5 text-slate-500">{subject.description}</p>{showDetail && <SubjectTooltip subject={subject} productImages={productImages} compact />}</div>;
+}
+
+function SubjectTooltip({ subject, productImages, compact = false }: { subject: CreativeSubject; productImages: ProductSelection[]; compact?: boolean }) {
+  const image = subject.kind === "product" ? productImages[0]?.image : subject.image;
+  return (
+    <div className={`absolute left-0 top-full z-50 mt-2 hidden w-64 rounded-lg border border-violet-200 bg-white p-3 text-left shadow-xl group-hover:block ${compact ? "block" : ""}`}>
+      <div className="flex gap-3">{image ? <img src={image} alt="" className="h-16 w-12 shrink-0 rounded object-cover" referrerPolicy="no-referrer" /> : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-violet-50 text-violet-600"><Volume2 className="h-5 w-5" /></div>}<div className="min-w-0"><p className="text-xs font-bold text-slate-800">{subject.name}</p><p className="mt-1 text-[11px] leading-5 text-slate-600">{subject.description}</p></div></div>
+    </div>
+  );
+}
+
+function SubjectTag({ subject, productImages, removable = false, onRemove }: { subject: CreativeSubject; productImages: ProductSelection[]; removable?: boolean; onRemove?: () => void }) {
+  return (
+    <span className="group relative inline-flex shrink-0 items-center gap-1 rounded bg-violet-50 px-1.5 py-1 text-[11px] font-semibold text-violet-700">
+      {subject.kind === "narrator" ? <Volume2 className="h-3 w-3" /> : subject.kind === "product" ? <Package className="h-3 w-3" /> : subject.image ? <img src={subject.image} alt="" className="h-4 w-4 rounded object-cover" referrerPolicy="no-referrer" /> : null}
+      {subject.name}
+      {removable && <button onClick={onRemove} title={`移除${subject.name}`} className="ml-0.5 flex h-4 w-4 items-center justify-center rounded text-violet-400 hover:bg-violet-100 hover:text-rose-600"><X className="h-3 w-3" /></button>}
+      <SubjectTooltip subject={subject} productImages={productImages} />
+    </span>
+  );
+}
+
+function StoryboardLineEditor({ type, text, subjects, subjectIds, productImages, onTextChange, onSubjectsChange }: { type: "dialogue" | "visual"; text: string; subjects: CreativeSubject[]; subjectIds: string[]; productImages: ProductSelection[]; onTextChange: (text: string) => void; onSubjectsChange?: (subjectIds: string[]) => void }) {
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const selectedSubjects = subjectIds.map((id) => subjects.find((subject) => subject.id === id)).filter((subject): subject is CreativeSubject => Boolean(subject));
+  const availableSubjects = subjects.filter((subject) => !subjectIds.includes(subject.id));
+  return (
+    <div className="relative flex min-h-[86px] items-start gap-2 border-t border-slate-100 p-3 first:border-t-0">
+      <div className="flex max-w-[42%] flex-wrap gap-1">{selectedSubjects.map((subject) => <SubjectTag key={subject.id} subject={subject} productImages={productImages} removable={type === "visual"} onRemove={() => onSubjectsChange?.(subjectIds.filter((id) => id !== subject.id))} />)}</div>
+      <textarea
+        aria-label={type === "dialogue" ? "人物台词" : "画面描述"}
+        value={text}
+        onChange={(event) => {
+          const value = event.target.value;
+          onTextChange(value);
+          setMentionOpen(type === "visual" && /@[^@\s]*$/.test(value));
+        }}
+        onKeyDown={(event) => { if (event.key === "Escape") setMentionOpen(false); }}
+        rows={3}
+        className="min-h-[72px] min-w-0 flex-1 resize-none overflow-hidden border-0 bg-transparent p-0 text-xs leading-6 text-slate-600 outline-none [field-sizing:content]"
+      />
+      {type === "visual" && mentionOpen && (
+        <div className="absolute left-3 top-[72px] z-40 w-48 rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
+          <p className="px-2 py-1 text-[10px] text-slate-400">选择当前创意主体</p>
+          {availableSubjects.length ? availableSubjects.map((subject) => <button key={subject.id} onClick={() => { onTextChange(text.replace(/@[^@\s]*$/, "")); onSubjectsChange?.([...subjectIds, subject.id]); setMentionOpen(false); }} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-slate-700 hover:bg-violet-50"><AtSign className="h-3.5 w-3.5 text-violet-500" />{subject.name}</button>) : <p className="px-2 py-2 text-xs text-slate-400">当前主体均已关联</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubjectDetailPanel({ subject, draft, productName, voiceEditorOpen, voiceDraft, onBack, onApply, onVoiceDraftChange, onToggleVoiceEditor, onAddVoice, onSelectVoice, onAddImage, onReplaceImage, onDeleteImage }: { subject: CreativeSubject; draft: { subjectId: string; productImages: ProductSelection[]; voices: VoiceOption[]; activeVoiceId?: string }; productName: string; voiceEditorOpen: boolean; voiceDraft: string; onBack: () => void; onApply: () => void; onVoiceDraftChange: (value: string) => void; onToggleVoiceEditor: () => void; onAddVoice: () => void; onSelectVoice: (id: string) => void; onAddImage: () => void; onReplaceImage: (index: number) => void; onDeleteImage: (index: number) => void }) {
+  const isProduct = subject.kind === "product";
+  return (
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4"><button onClick={onBack} title="返回分镜脚本" className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /></button><div><h3 className="text-base font-bold text-slate-900">{isProduct ? productName : `${subject.name}设定`}</h3><p className="mt-1 text-xs text-slate-400">仅修改当前创意</p></div></div>
+      {isProduct ? (
+        <div className="p-5">
+          <div className="flex items-center justify-between"><div><h4 className="text-sm font-bold text-slate-900">商品参考图 <span className="font-normal text-slate-400">{draft.productImages.length}/6</span></h4><p className="mt-1 text-xs text-slate-400">至少保留一张商品参考图</p></div>{draft.productImages.length < 6 && <button onClick={onAddImage} className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700"><Plus className="h-3.5 w-3.5" />添加参考图</button>}</div>
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">{draft.productImages.map((image, index) => <article key={`${image.id}-${index}`} className="group relative aspect-square overflow-hidden rounded-lg border border-slate-200 bg-slate-50"><img src={image.image} alt={image.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" /><div className="absolute inset-0 flex items-start justify-end gap-1.5 bg-slate-900/0 p-2 opacity-0 transition group-hover:bg-slate-900/20 group-hover:opacity-100"><button onClick={() => onDeleteImage(index)} title={draft.productImages.length <= 1 ? "至少保留一张图片" : "删除图片"} className="flex h-7 w-7 items-center justify-center rounded bg-slate-900/75 text-white hover:bg-rose-600"><Trash2 className="h-3.5 w-3.5" /></button><button onClick={() => onReplaceImage(index)} title="替换图片" className="flex h-7 w-7 items-center justify-center rounded bg-slate-900/75 text-white hover:bg-violet-600"><RefreshCw className="h-3.5 w-3.5" /></button></div></article>)}</div>
+        </div>
+      ) : (
+        <div className={`grid gap-5 p-5 ${subject.kind === "person" ? "xl:grid-cols-[240px_minmax(0,1fr)]" : "grid-cols-1"}`}>
+          {subject.kind === "person" && <img src={subject.image} alt={subject.name} className="aspect-[3/4] w-full rounded-lg border border-slate-200 object-cover" referrerPolicy="no-referrer" />}
+          <div className="min-w-0"><section className="rounded-lg border border-slate-200 bg-slate-50 p-4"><h4 className="text-xs font-bold text-slate-800">{subject.kind === "person" ? "形象描述" : "旁白描述"}</h4><p className="mt-2 text-xs leading-6 text-slate-600">{subject.description}</p></section><div className="mt-5 flex items-center justify-between"><h4 className="text-sm font-bold text-slate-900">音色</h4><button onClick={onToggleVoiceEditor} className="text-xs font-semibold text-violet-700 hover:text-violet-800">编辑音色</button></div><div className="mt-3 flex flex-wrap gap-2">{draft.voices.map((voice) => <button key={voice.id} onClick={() => onSelectVoice(voice.id)} className={`min-w-[108px] rounded-lg border px-4 py-3 text-left ${draft.activeVoiceId === voice.id ? "border-violet-500 bg-violet-50" : "border-slate-200 bg-white hover:border-violet-200"}`}><span className="text-xs font-bold text-slate-700">{voice.name}</span><span className="mt-1 block max-w-[180px] truncate text-[10px] text-slate-400">{voice.description}</span></button>)}</div>{draft.activeVoiceId && <section className="mt-3 rounded-lg border border-slate-200 p-4"><div className="flex items-center justify-between"><h4 className="text-xs font-bold text-slate-800">音色描述</h4><button title="试听音色" className="flex h-7 w-7 items-center justify-center rounded bg-violet-50 text-violet-700"><Volume2 className="h-3.5 w-3.5" /></button></div><p className="mt-2 text-xs leading-6 text-slate-600">{draft.voices.find((voice) => voice.id === draft.activeVoiceId)?.description}</p></section>}{voiceEditorOpen && <section className="mt-3 rounded-lg border border-violet-200 bg-violet-50/30 p-3"><textarea value={voiceDraft} onChange={(event) => onVoiceDraftChange(event.target.value)} placeholder="描述希望生成的音色，例如：年轻女性，表达自然，语速稍快" rows={3} className="w-full resize-none rounded-md border border-slate-200 bg-white p-3 text-xs leading-6 outline-none focus:border-violet-400" /><div className="mt-2 flex justify-end"><button disabled={!voiceDraft.trim()} onClick={onAddVoice} className="rounded-md bg-violet-600 px-3 py-2 text-xs font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400">生成音色</button></div></section>}</div>
+        </div>
+      )}
+      <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4"><button onClick={onBack} className="rounded-md border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">取消</button><button onClick={onApply} disabled={isProduct && !draft.productImages.length} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:bg-slate-200">应用</button></div>
+    </section>
   );
 }
 
