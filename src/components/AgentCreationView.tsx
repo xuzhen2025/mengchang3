@@ -502,6 +502,7 @@ export default function AgentCreationView({
   const [removeWatermark, setRemoveWatermark] = useState(true);
   const [selectedStyle, setSelectedStyle] = useState("");
   const [homePromptOrder, setHomePromptOrder] = useState<HomePromptPart[]>([]);
+  const homePromptEditorRef = useRef<HTMLSpanElement | null>(null);
   const [referenceHistory, setReferenceHistory] = useState<ReferenceVideoSelection[]>(() => {
     try {
       const stored = JSON.parse(localStorage.getItem(REFERENCE_STORAGE_KEY) || "[]") as ReferenceVideoSelection[];
@@ -953,9 +954,15 @@ export default function AgentCreationView({
             </div>
 
             <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-colors focus-within:border-violet-400">
-              <div className="flex min-h-[120px] flex-wrap content-start items-center gap-x-1 gap-y-2 text-sm leading-7 text-slate-800">
+              <div
+                className="flex min-h-[120px] flex-wrap content-start items-center gap-x-1 gap-y-2 text-sm leading-7 text-slate-800"
+                onClick={(event) => {
+                  if (event.target === event.currentTarget) homePromptEditorRef.current?.focus();
+                }}
+              >
                 {activeHomePromptParts.length > 0 && <span>{HOME_PROMPT_PREFIX}</span>}
                 <EditablePromptText
+                  editorRef={homePromptEditorRef}
                   value={idea}
                   onChange={setIdea}
                   inline={activeHomePromptParts.length > 0}
@@ -1290,8 +1297,9 @@ function Toast({ message }: { message: string }) {
   return <div className="fixed left-1/2 top-5 z-[150] flex -translate-x-1/2 items-center gap-2 rounded-md bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xl"><CheckCircle2 className="h-4 w-4 text-emerald-400" />{message}</div>;
 }
 
-function EditablePromptText({ value, onChange, placeholder, inline }: { value: string; onChange: (value: string) => void; placeholder: string; inline: boolean }) {
-  const ref = useRef<HTMLSpanElement | null>(null);
+function EditablePromptText({ editorRef, value, onChange, placeholder, inline }: { editorRef?: React.RefObject<HTMLSpanElement | null>; value: string; onChange: (value: string) => void; placeholder: string; inline: boolean }) {
+  const internalRef = useRef<HTMLSpanElement | null>(null);
+  const ref = editorRef || internalRef;
 
   useEffect(() => {
     const element = ref.current;
@@ -1308,7 +1316,7 @@ function EditablePromptText({ value, onChange, placeholder, inline }: { value: s
       aria-label="发送给 Agent"
       data-placeholder={placeholder}
       onInput={(event) => onChange(event.currentTarget.textContent || "")}
-      className={`${inline ? "inline-block min-w-[80px]" : "block w-full min-h-[112px]"} whitespace-pre-wrap break-words outline-none empty:before:pointer-events-none empty:before:text-slate-400 empty:before:content-[attr(data-placeholder)]`}
+      className={`${inline ? "inline-block min-w-0" : "block w-full min-h-[112px]"} whitespace-pre-wrap break-words outline-none empty:before:pointer-events-none empty:before:text-slate-400 empty:before:content-[attr(data-placeholder)]`}
     />
   );
 }
