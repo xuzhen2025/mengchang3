@@ -128,7 +128,7 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
   }
 
   return (
-    <aside className="relative z-50 flex h-screen w-[390px] shrink-0 flex-col border-l border-slate-200 bg-white text-slate-800 shadow-2xl">
+    <aside className="fixed right-0 top-0 z-[70] flex h-screen w-[390px] flex-col border-l border-slate-200 bg-white text-slate-800 shadow-2xl">
       <header className="border-b border-slate-200">
         <div className="flex items-center justify-between px-4 py-3.5">
           <div className="flex items-center gap-2">

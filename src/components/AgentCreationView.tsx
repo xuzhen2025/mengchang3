@@ -100,10 +100,12 @@ interface ResultRecord {
   step: StepType;
   title: string;
   version?: number;
+  instruction?: string;
   time: string;
   snapshot: {
     demand: string;
     product?: ProductSelection;
+    productImages: ProductSelection[];
     productName: string;
     industry: string;
     category: string;
@@ -148,6 +150,7 @@ interface AgentSession {
   activeVersions: Record<"analysis" | "script", number>;
   awaitingProduct?: boolean;
   product?: ProductSelection;
+  productImages: ProductSelection[];
   conversation?: Array<{ role: "user" | "agent"; content: string }>;
 }
 
@@ -320,15 +323,17 @@ const createFinals = (previews: PreviewItem[]): FinalVideoItem[] =>
     selected: true
   }));
 
-const recordFor = (session: AgentSession, step: StepType, title: string, version?: number): ResultRecord => ({
+const recordFor = (session: AgentSession, step: StepType, title: string, version?: number, instruction?: string): ResultRecord => ({
   id: `result_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
   step,
   title,
   version,
+  instruction,
   time: shortTime(),
   snapshot: {
     demand: session.demand,
     product: session.product ? { ...session.product } : undefined,
+    productImages: cloneItems(session.productImages),
     productName: session.productName,
     industry: session.industry,
     category: session.category,
@@ -365,6 +370,7 @@ const makeBaseSession = (prompt: string, mode: AgentSession["mode"]): AgentSessi
   scenarios: ["雨天出行前清洁挡风玻璃", "夜间驾驶前快速去膜", "日常洗车后的玻璃养护"],
   specs: ["自带海绵擦头", "适用于汽车前挡风玻璃", "便携瓶身设计"],
   discountInfo: "暂无优惠信息",
+  productImages: [],
   creatives: [],
   previews: [],
   finals: [],
@@ -373,12 +379,16 @@ const makeBaseSession = (prompt: string, mode: AgentSession["mode"]): AgentSessi
   activeVersions: { analysis: 1, script: 0 }
 });
 
-const withProductAnalysis = (session: AgentSession, product: ProductSelection): AgentSession => {
+const withProductAnalysis = (session: AgentSession, product: ProductSelection, productImages?: ProductSelection[]): AgentSession => {
   const name = product.name.replace(/\.(jpg|jpeg|png|webp)$/i, "");
+  const base = {
+    ...session,
+    product,
+    productImages: productImages?.length ? cloneItems(productImages) : session.productImages.length ? session.productImages : [product]
+  };
   if (/吹风机/.test(name)) {
     return {
-      ...session,
-      product,
+      ...base,
       productName: name,
       industry: "3C及电器 / 个护健康电器",
       category: "美发电器 / 高速吹风机",
@@ -393,8 +403,7 @@ const withProductAnalysis = (session: AgentSession, product: ProductSelection): 
   }
   if (/防晒|精华|护肤|面膜/.test(name)) {
     return {
-      ...session,
-      product,
+      ...base,
       productName: name,
       industry: "美妆护肤",
       category: "面部护理 / 功效护肤",
@@ -408,8 +417,7 @@ const withProductAnalysis = (session: AgentSession, product: ProductSelection): 
     };
   }
   return {
-    ...session,
-    product,
+    ...base,
     productName: name,
     industry: "电商零售",
     category: "待补充具体品类",
@@ -461,6 +469,7 @@ const loadStoredSession = (id: string) => {
     if (!stored) return null;
     return {
       ...stored,
+      productImages: stored.productImages?.length ? stored.productImages : stored.product ? [stored.product] : [],
       productName: stored.productName || productDisplayName(stored.product),
       industry: stored.industry || "待补充商品行业",
       category: stored.category || "待补充商品品类",
@@ -520,8 +529,12 @@ export default function AgentCreationView({
   const [toast, setToast] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionRef = useRef<AgentSession | null>(session);
-  const productImageCount = productImageBatches.reduce((sum, batch) => sum + batch.images.length, 0);
-  const productForCreation = selectedProduct || productImageBatches[0]?.images[0] || null;
+  const productImagesForCreation = [
+    ...(selectedProduct ? [selectedProduct] : []),
+    ...productImageBatches.flatMap((batch) => batch.images)
+  ].filter((image, index, images) => images.findIndex((item) => item.id === image.id) === index).slice(0, 6);
+  const productImageCount = productImagesForCreation.length;
+  const productForCreation = productImagesForCreation[0] || null;
 
   useEffect(() => {
     try {
@@ -599,7 +612,7 @@ export default function AgentCreationView({
     type: "video_gen",
     status: value.status,
     progress: value.progress,
-    inputFiles: [value.product?.image || SAMPLE_COVERS[0]],
+    inputFiles: value.productImages.length ? value.productImages.map((item) => item.image) : [value.product?.image || SAMPLE_COVERS[0]],
     outputFiles: value.finals.map((item) => item.cover),
     createdAt: value.updatedAt,
     creditsCost: value.creditsCost,
@@ -689,7 +702,11 @@ export default function AgentCreationView({
   const startCreation = () => {
     const prompt = buildHomePrompt() || "开始 Agent 创作";
     const initial = makeBaseSession(prompt, "step");
-    const base = productForCreation ? withProductAnalysis(initial, productForCreation) : initial;
+    const base = productForCreation ? withProductAnalysis(initial, productForCreation, productImagesForCreation) : initial;
+    base.conversation = [
+      { role: "user", content: prompt },
+      { role: "agent", content: "我已经收到请求，将先分析商品信息，再根据分析结果继续生成后续内容。" }
+    ];
     onSessionChange(base.id);
 
     if (!productForCreation) {
@@ -727,7 +744,7 @@ export default function AgentCreationView({
     };
     const userMessage = chatInput.trim() || `我的商品是${product.name}`;
     const working: AgentSession = {
-      ...withProductAnalysis(session, product),
+      ...withProductAnalysis(session, product, productImagesForCreation.length ? productImagesForCreation : [product]),
       title: product.name.replace(/\.(jpg|jpeg|png|webp)$/i, "").slice(0, 24),
       prompt: `${session.prompt} ${userMessage}`.trim(),
       product,
@@ -789,7 +806,7 @@ export default function AgentCreationView({
       versionCounts: { ...current.versionCounts, script: version },
       activeVersions: { ...current.activeVersions, script: version }
     };
-    return { ...next, timeline: [...next.timeline, recordFor(next, "script", "创意与分镜", version)] };
+    return { ...next, timeline: [...next.timeline, recordFor(next, "script", "创意与分镜", version, "生成创意与分镜")] };
   });
 
   const generatePreviews = () => runGeneration("正在生成视频预览", "preview", 0, (current) => {
@@ -799,7 +816,7 @@ export default function AgentCreationView({
       previews: createPreviews(),
       finals: []
     };
-    return { ...next, timeline: [...next.timeline, recordFor(next, "preview", "视频预览")] };
+    return { ...next, timeline: [...next.timeline, recordFor(next, "preview", "视频预览", undefined, "生成视频预览")] };
   });
 
   const generateFinals = () => runGeneration("正在生成视频成片", "final", 5, (current) => {
@@ -808,7 +825,7 @@ export default function AgentCreationView({
       availableSteps: Array.from(new Set([...current.availableSteps, "final"])) as StepType[],
       finals: createFinals(current.previews)
     };
-    return { ...next, timeline: [...next.timeline, recordFor(next, "final", "视频成片")] };
+    return { ...next, timeline: [...next.timeline, recordFor(next, "final", "视频成片", undefined, "生成视频成片")] };
   });
 
   const stopGeneration = () => {
@@ -835,6 +852,7 @@ export default function AgentCreationView({
       currentStep: record.step,
       demand: record.snapshot.demand,
       product: record.snapshot.product ? { ...record.snapshot.product } : session.product,
+      productImages: record.snapshot.productImages?.length ? cloneItems(record.snapshot.productImages) : session.productImages,
       productName: record.snapshot.productName || session.productName,
       industry: record.snapshot.industry || session.industry,
       category: record.snapshot.category || session.category,
@@ -883,7 +901,7 @@ export default function AgentCreationView({
       } else {
         next = { ...next, finals: current.finals.map((item) => ({ ...item, name: item.name.replace(".mp4", "_调整版.mp4") })) };
       }
-      return { ...next, timeline: [...next.timeline, recordFor(next, current.currentStep, `按要求调整：${request.slice(0, 12)}`, version)] };
+      return { ...next, timeline: [...next.timeline, recordFor(next, current.currentStep, `按要求调整：${request.slice(0, 12)}`, version, request)] };
     });
   };
 
@@ -1086,7 +1104,7 @@ export default function AgentCreationView({
             return <React.Fragment key={item.id}><button onClick={() => session.status !== "generating" && setSession({ ...session, currentStep: item.id })} className={`flex h-8 items-center gap-2 rounded-md px-3 text-xs font-semibold transition-colors ${active ? "bg-violet-600 text-white" : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"}`}><Icon className="h-3.5 w-3.5" />{item.label}</button>{index < items.length - 1 && <span className="mx-1 h-px w-5 bg-slate-200" />}</React.Fragment>;
           })}
         </nav>
-        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_300px] overflow-hidden">
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_390px] overflow-hidden">
         <main className="relative min-w-0 overflow-y-auto bg-slate-50 px-5 pb-0 pt-5">
           {session.status === "generating" ? (
             <div className="flex h-full min-h-[420px] flex-col items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-violet-600" /><p className="mt-4 text-sm font-semibold text-slate-700">{generatingLabel}</p><button onClick={stopGeneration} className="mt-5 flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Square className="h-3.5 w-3.5" />停止生成</button></div>
@@ -1094,7 +1112,7 @@ export default function AgentCreationView({
             <div className="flex h-full min-h-[420px] flex-col items-center justify-center"><div className="flex h-11 w-11 items-center justify-center rounded-full bg-rose-50 text-rose-600"><X className="h-5 w-5" /></div><p className="mt-4 text-sm font-semibold">当前阶段生成失败</p><button onClick={retryGeneration} className="mt-5 flex items-center gap-2 rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white"><RefreshCw className="h-3.5 w-3.5" />重新生成</button></div>
           ) : (
             <>
-              {session.currentStep === "analysis" && <AnalysisPanel session={session} setSession={setSession} />}
+              {session.currentStep === "analysis" && <AnalysisPanel session={session} setSession={setSession} showToast={showToast} />}
               {session.currentStep === "script" && <ScriptPanel session={session} setSession={setSession} currentCreative={currentCreative} selectedCreativeId={selectedCreativeId} setSelectedCreativeId={setSelectedCreativeId} />}
               {session.currentStep === "preview" && <PreviewPanel session={session} setSession={setSession} />}
               {session.currentStep === "final" && <FinalPanel session={session} setSession={setSession} selectedFinals={selectedFinals} openUpload={openUpload} setDetailVideo={setDetailVideo} showToast={showToast} />}
@@ -1104,7 +1122,7 @@ export default function AgentCreationView({
           {session.status !== "generating" && session.status !== "failed" && (
             <div className="sticky bottom-0 z-20 -mx-5 mt-6 flex items-center justify-end gap-2 border-t border-slate-200 bg-white/95 px-5 py-3 backdrop-blur-sm">
               {session.currentStep === "analysis" && <>
-                <button onClick={() => runGeneration("正在生成视频成片", "final", 5, (current) => { const previews = createPreviews(); const next = { ...current, availableSteps: Array.from(new Set([...current.availableSteps, "final"])) as StepType[], previews, finals: createFinals(previews) }; return { ...next, timeline: [...next.timeline, recordFor(next, "final", "视频成片")] }; })} className="rounded-md border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">一键成片</button>
+                <button onClick={() => runGeneration("正在生成视频成片", "final", 5, (current) => { const previews = createPreviews(); const next = { ...current, availableSteps: Array.from(new Set([...current.availableSteps, "final"])) as StepType[], previews, finals: createFinals(previews) }; return { ...next, timeline: [...next.timeline, recordFor(next, "final", "视频成片", undefined, "一键成片")] }; })} className="rounded-md border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">一键成片</button>
                 <button onClick={generateScripts} className="rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-700">生成创意与分镜</button>
               </>}
               {session.currentStep === "script" && <button onClick={generatePreviews} className="rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-700">生成视频预览</button>}
@@ -1114,25 +1132,7 @@ export default function AgentCreationView({
           )}
         </main>
 
-        <aside className="flex min-h-0 flex-col border-l border-slate-200 bg-white">
-          <div className="flex h-12 shrink-0 items-center gap-2 border-b border-slate-200 px-4"><MessageSquare className="h-4 w-4 text-violet-600" /><h2 className="text-xs font-bold text-slate-800">创作记录</h2></div>
-          <div className="flex-1 overflow-y-auto p-3">
-            <div className="space-y-2">
-              {session.timeline.map((record) => {
-                const meta = STEP_META.find((item) => item.id === record.step)!;
-                const Icon = meta.icon;
-                const active = session.currentStep === record.step && session.timeline[session.timeline.length - 1]?.id === record.id;
-                return <button key={record.id} onClick={() => restoreResult(record)} className={`w-full rounded-md border p-3 text-left transition-colors ${active ? "border-violet-300 bg-violet-50" : "border-slate-200 bg-white hover:border-slate-300"}`}><div className="flex items-start gap-2"><span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded ${active ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-500"}`}><Icon className="h-3.5 w-3.5" /></span><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-slate-800">{record.title}</p><p className="mt-1 text-[10px] text-slate-400">{meta.label}{record.version ? ` · 第${record.version}版` : ""} · {record.time}</p></div></div></button>;
-              })}
-            </div>
-          </div>
-          <div className="shrink-0 border-t border-slate-200 p-3">
-            <div className="flex items-end gap-2 rounded-md border border-slate-200 bg-slate-50 p-2 focus-within:border-violet-400">
-              <textarea value={chatInput} onChange={(event) => setChatInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitChat(); } }} rows={2} placeholder="告诉 Agent 如何调整" className="min-w-0 flex-1 resize-none bg-transparent text-xs leading-5 outline-none placeholder:text-slate-400" />
-              <button onClick={submitChat} disabled={!chatInput.trim() || session.status === "generating"} title="发送" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40"><ArrowUp className="h-4 w-4" /></button>
-            </div>
-          </div>
-        </aside>
+        <ConversationPanel session={session} chatInput={chatInput} setChatInput={setChatInput} submitChat={submitChat} restoreResult={restoreResult} />
         </div>
       </div>
 
@@ -1150,31 +1150,114 @@ function PanelHeader({ title, count, active, onChange }: { title: string; count?
   );
 }
 
-function AnalysisPanel({ session, setSession }: { session: AgentSession; setSession: React.Dispatch<React.SetStateAction<AgentSession | null>> }) {
-  const [imagePickerOpen, setImagePickerOpen] = useState(false);
-  const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
-  const image = session.product?.image || SAMPLE_COVERS[0];
+function ConversationPanel({ session, chatInput, setChatInput, submitChat, restoreResult }: { session: AgentSession; chatInput: string; setChatInput: (value: string) => void; submitChat: () => void; restoreResult: (record: ResultRecord) => void }) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const messages = session.conversation?.length ? session.conversation : [
+    { role: "user" as const, content: session.prompt },
+    { role: "agent" as const, content: "我已经收到请求，将先分析商品信息，再根据分析结果继续生成后续内容。" }
+  ];
+
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (element) element.scrollTop = element.scrollHeight;
+  }, [session.timeline.length, session.status, messages.length]);
+
+  const resultTitle = (record: ResultRecord) => {
+    if (record.step === "analysis") return `${session.productName}的需求分析`;
+    if (record.step === "script") return `${session.productName}的分镜`;
+    if (record.step === "preview") return `${session.productName}的预览`;
+    return `${session.productName}的${record.snapshot.finals.length || session.finals.length}个成片`;
+  };
+
+  const resultDescription = (record: ResultRecord) => {
+    if (record.step === "analysis") return `已完成${session.productName}的需求和商品分析，可在左侧查看并修改详细内容。`;
+    if (record.step === "script") return `已生成${record.snapshot.creatives.length}套创意与分镜脚本，可在左侧选择并查看详细内容。`;
+    if (record.step === "preview") return `已生成${record.snapshot.previews.length}个视频预览，可在左侧查看并选择需要继续生成的版本。`;
+    return `已生成${record.snapshot.finals.length}个最终成片，可在左侧查看完整视频结果。`;
+  };
+
+  return (
+    <aside className="flex min-h-0 w-[390px] flex-col border-l border-slate-200 bg-white">
+      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-slate-200 px-4"><MessageSquare className="h-4 w-4 text-violet-600" /><h2 className="text-xs font-bold text-slate-800">创作记录</h2></div>
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="space-y-4">
+          {messages.map((message, index) => (
+            <React.Fragment key={`message-${index}`}>
+              {message.role === "user" ? (
+                <div className="flex justify-end"><div className="max-w-[88%] rounded-lg bg-violet-600 px-3.5 py-2.5 text-xs leading-5 text-white">{message.content}</div></div>
+              ) : (
+                <p className="text-xs leading-6 text-slate-600">{message.content}</p>
+              )}
+              {index === 0 && session.productImages[0] && (
+                <div className="flex justify-end"><div className="flex w-64 items-center gap-3 rounded-lg border border-violet-200 bg-violet-50 p-2.5"><img src={session.productImages[0].image} alt="" className="h-12 w-12 shrink-0 rounded object-cover" referrerPolicy="no-referrer" /><div className="min-w-0"><p className="truncate text-xs font-bold text-slate-800">{session.productName}</p><p className="mt-1 text-[10px] text-slate-400">商品 · 共 {session.productImages.length} 张参考图</p></div></div></div>
+              )}
+            </React.Fragment>
+          ))}
+
+          {session.timeline.map((record) => {
+            const meta = STEP_META.find((item) => item.id === record.step)!;
+            const Icon = meta.icon;
+            const active = session.currentStep === record.step && session.timeline[session.timeline.length - 1]?.id === record.id;
+            return (
+              <div key={record.id} className="space-y-3">
+                {record.instruction && <div className="flex justify-end"><div className="max-w-[88%] rounded-lg bg-violet-600 px-3.5 py-2.5 text-xs leading-5 text-white">{record.instruction}</div></div>}
+                <button onClick={() => restoreResult(record)} className={`w-[82%] rounded-lg border p-3 text-left transition-colors ${active ? "border-violet-300 bg-violet-50" : "border-slate-200 bg-slate-50 hover:border-slate-300"}`}>
+                  <div className="flex items-start gap-2.5"><span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${active ? "bg-violet-600 text-white" : "bg-white text-violet-600"}`}><Icon className="h-4 w-4" /></span><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-800">{resultTitle(record)}</p><p className="mt-1.5 text-[10px] text-slate-400">查看详情 <span className="mx-1">|</span> {record.time}{record.version ? ` · 第${record.version}版` : ""}</p></div></div>
+                </button>
+                <p className="text-xs leading-6 text-slate-600">{resultDescription(record)}</p>
+              </div>
+            );
+          })}
+
+          {session.status === "generating" && <div className="flex items-center gap-2 text-xs text-slate-500"><Loader2 className="h-3.5 w-3.5 animate-spin text-violet-600" />Agent 正在处理当前指令</div>}
+        </div>
+      </div>
+      <div className="shrink-0 border-t border-slate-200 bg-white p-3">
+        <div className="flex items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5 focus-within:border-violet-400 focus-within:bg-white">
+          <textarea value={chatInput} onChange={(event) => setChatInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitChat(); } }} rows={3} placeholder="可以随时告诉我你的想法" className="min-w-0 flex-1 resize-none bg-transparent text-xs leading-5 outline-none placeholder:text-slate-400" />
+          <button onClick={submitChat} disabled={!chatInput.trim() || session.status === "generating"} title="发送" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-violet-600 text-white hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400"><ArrowUp className="h-4 w-4" /></button>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function AnalysisPanel({ session, setSession, showToast }: { session: AgentSession; setSession: React.Dispatch<React.SetStateAction<AgentSession | null>>; showToast: (message: string) => void }) {
+  const [imagePicker, setImagePicker] = useState<{ mode: "add" | "replace"; index?: number } | null>(null);
+  const [previewImage, setPreviewImage] = useState<ProductSelection | null>(null);
+  const images = session.productImages || [];
+  const updateImages = (productImages: ProductSelection[]) => setSession({ ...session, productImages, product: productImages[0] });
   const updateList = (field: "sellingPoints" | "painPoints" | "targetGroups" | "scenarios" | "specs", items: string[]) => setSession({ ...session, [field]: items });
   return (
     <div className="mx-auto max-w-5xl">
-      <PanelHeader title="需求分析" count={session.versionCounts.analysis} active={session.activeVersions.analysis} onChange={(value) => setSession({ ...session, activeVersions: { ...session.activeVersions, analysis: value } })} />
-      <div className="space-y-7">
+      <PanelHeader title={session.productName} count={session.versionCounts.analysis} active={session.activeVersions.analysis} onChange={(value) => setSession({ ...session, activeVersions: { ...session.activeVersions, analysis: value } })} />
+      <p className="mb-6 text-base font-bold text-violet-700">商品分析信息</p>
+      <div className="space-y-8">
         <section>
-          <div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-bold text-slate-900">商品参考图</h3><p className="mt-1 text-xs text-slate-400">{session.productName}</p></div></div>
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <div className="group relative h-36 w-36 overflow-hidden rounded-md border border-slate-200 bg-slate-100">
-              <img src={image} alt={session.productName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-              <div className="absolute inset-0 hidden items-center justify-center gap-2 bg-slate-900/55 group-hover:flex">
-                <button onClick={() => setImagePreviewOpen(true)} className="flex h-8 items-center gap-1 rounded-md bg-white px-2.5 text-[11px] font-semibold text-slate-700"><Eye className="h-3.5 w-3.5" />查看大图</button>
-                <button onClick={() => setImagePickerOpen(true)} className="flex h-8 items-center gap-1 rounded-md bg-violet-600 px-2.5 text-[11px] font-semibold text-white"><ImageIcon className="h-3.5 w-3.5" />替换</button>
-              </div>
+          <h3 className="mb-4 text-lg font-bold text-slate-900">1. 商品参考图</h3>
+          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <div className="flex min-h-14 items-center justify-between gap-4 border-b border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs text-slate-600">上传丰富的参考图有助于提升模型的生成质量</p>
+              {images.length < 6 && <button onClick={() => setImagePicker({ mode: "add" })} className="flex shrink-0 items-center gap-1.5 rounded-md bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700"><Plus className="h-3.5 w-3.5" />添加参考图</button>}
+            </div>
+            <div className="flex min-h-36 flex-wrap content-start gap-3 p-4">
+              {images.map((image, index) => (
+                <div key={`${image.id}-${index}`} className="group relative h-28 w-28 overflow-hidden rounded-md border border-slate-200 bg-slate-100">
+                  <button onClick={() => setPreviewImage(image)} title="查看大图" className="h-full w-full"><img src={image.image} alt={image.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" /></button>
+                  <div className="absolute right-1.5 top-1.5 hidden flex-col gap-1 group-hover:flex">
+                    <button onClick={() => updateImages(images.filter((_, itemIndex) => itemIndex !== index))} title="删除图片" className="flex h-7 w-7 items-center justify-center rounded bg-slate-900/75 text-white hover:bg-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => setImagePicker({ mode: "replace", index })} title="替换图片" className="flex h-7 w-7 items-center justify-center rounded bg-slate-900/75 text-white hover:bg-violet-600"><RefreshCw className="h-3.5 w-3.5" /></button>
+                  </div>
+                </div>
+              ))}
+              {images.length === 0 && <div className="flex min-h-28 w-full items-center justify-center text-xs text-slate-400">暂无参考图</div>}
             </div>
           </div>
         </section>
 
         <section>
-          <h3 className="mb-3 text-sm font-bold text-slate-900">商品详细信息</h3>
-          <div className="grid grid-cols-2 gap-3">
+          <h3 className="mb-4 text-lg font-bold text-slate-900">2. 商品详细信息</h3>
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
             <AnalysisTextField label="商品名称" value={session.productName} onChange={(productName) => setSession({ ...session, productName })} />
             <AnalysisTextField label="商品行业" value={session.industry} onChange={(industry) => setSession({ ...session, industry })} />
             <AnalysisTextField label="商品品类" value={session.category} onChange={(category) => setSession({ ...session, category })} />
@@ -1182,7 +1265,7 @@ function AnalysisPanel({ session, setSession }: { session: AgentSession; setSess
           </div>
         </section>
 
-        <section className="grid grid-cols-2 items-start gap-3">
+        <section className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
           <AnalysisListField label="商品卖点" items={session.sellingPoints} onChange={(items) => updateList("sellingPoints", items)} />
           <AnalysisListField label="商品痛点" items={session.painPoints} onChange={(items) => updateList("painPoints", items)} />
           <AnalysisListField label="目标人群" items={session.targetGroups} onChange={(items) => updateList("targetGroups", items)} />
@@ -1191,10 +1274,21 @@ function AnalysisPanel({ session, setSession }: { session: AgentSession; setSess
         </section>
       </div>
 
-      {imagePickerOpen && <AnalysisImagePicker current={session.product || null} onClose={() => setImagePickerOpen(false)} onConfirm={(product) => { setSession({ ...session, product }); setImagePickerOpen(false); }} />}
-      {imagePreviewOpen && (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-900/65 p-5" onMouseDown={(event) => event.target === event.currentTarget && setImagePreviewOpen(false)}>
-          <div className="relative max-h-[88vh] max-w-4xl overflow-hidden rounded-lg bg-white p-2 shadow-2xl"><img src={image} alt={session.productName} className="max-h-[82vh] max-w-full object-contain" referrerPolicy="no-referrer" /><button onClick={() => setImagePreviewOpen(false)} title="关闭" className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-md bg-slate-900/70 text-white"><X className="h-4 w-4" /></button></div>
+      {imagePicker && <ProductImageModal
+        existingCount={images.length}
+        mode={imagePicker.mode}
+        excludedIds={images.filter((_, index) => imagePicker.mode === "add" || index !== imagePicker.index).map((image) => image.id)}
+        onClose={() => setImagePicker(null)}
+        onConfirm={(selected) => {
+          if (imagePicker.mode === "replace" && imagePicker.index !== undefined) updateImages(images.map((image, index) => index === imagePicker.index ? selected[0] : image));
+          else updateImages([...images, ...selected].slice(0, 6));
+          setImagePicker(null);
+        }}
+        showToast={showToast}
+      />}
+      {previewImage && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-900/65 p-5" onMouseDown={(event) => event.target === event.currentTarget && setPreviewImage(null)}>
+          <div className="relative max-h-[88vh] max-w-4xl overflow-hidden rounded-lg bg-white p-2 shadow-2xl"><img src={previewImage.image} alt={previewImage.name} className="max-h-[82vh] max-w-full object-contain" referrerPolicy="no-referrer" /><button onClick={() => setPreviewImage(null)} title="关闭" className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-md bg-slate-900/70 text-white"><X className="h-4 w-4" /></button></div>
         </div>
       )}
     </div>
@@ -1207,6 +1301,7 @@ function AnalysisTextField({ label, value, onChange }: { label: string; value: s
 
 function AnalysisListField({ label, items, onChange }: { label: string; items: string[]; onChange: (items: string[]) => void }) {
   const [draft, setDraft] = useState("");
+  const [editing, setEditing] = useState(false);
   const addItem = () => {
     const value = draft.trim();
     if (!value) return;
@@ -1214,32 +1309,14 @@ function AnalysisListField({ label, items, onChange }: { label: string; items: s
     setDraft("");
   };
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
-      <h4 className="text-xs font-bold text-slate-800">{label}</h4>
+    <section className="group rounded-lg border border-slate-200 bg-white p-4">
+      <div className="flex items-center justify-between"><h4 className="text-sm font-bold text-slate-900">{label}</h4><button onClick={() => setEditing((value) => !value)} title={editing ? "完成编辑" : "编辑"} className="flex h-7 w-7 items-center justify-center rounded text-slate-400 opacity-0 hover:bg-violet-50 hover:text-violet-700 group-hover:opacity-100">{editing ? <Check className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}</button></div>
       <div className="mt-3 space-y-1.5">
-        {items.map((item, index) => <div key={`${label}-${index}`} className="group flex min-h-8 items-center gap-2 rounded-md px-2 hover:bg-slate-50"><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" /><input value={item} onChange={(event) => onChange(items.map((value, itemIndex) => itemIndex === index ? event.target.value : value))} className="min-w-0 flex-1 border-0 bg-transparent py-1 text-xs leading-5 text-slate-700 outline-none" /><button onClick={() => onChange(items.filter((_, itemIndex) => itemIndex !== index))} title="删除" className="hidden h-7 w-7 shrink-0 items-center justify-center rounded text-slate-400 hover:bg-rose-50 hover:text-rose-600 group-hover:flex"><Trash2 className="h-3.5 w-3.5" /></button></div>)}
+        {items.map((item, index) => editing ? <div key={`${label}-${index}`} className="flex min-h-8 items-center gap-2 rounded-md bg-slate-50 px-2"><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" /><input value={item} onChange={(event) => onChange(items.map((value, itemIndex) => itemIndex === index ? event.target.value : value))} className="min-w-0 flex-1 border-0 bg-transparent py-1 text-xs leading-5 text-slate-700 outline-none" /><button onClick={() => onChange(items.filter((_, itemIndex) => itemIndex !== index))} title="删除" className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button></div> : <div key={`${label}-${index}`} className="flex gap-2 text-xs leading-6 text-slate-600"><span className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" /><span>{item}</span></div>)}
       </div>
-      <div className="mt-2 flex items-center gap-2 border-t border-slate-100 pt-3"><input value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addItem(); } }} placeholder={`添加${label}`} className="h-8 min-w-0 flex-1 rounded-md border border-slate-200 px-2.5 text-xs outline-none focus:border-violet-400" /><button onClick={addItem} disabled={!draft.trim()} title="添加" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-violet-600 text-white disabled:bg-slate-200 disabled:text-slate-400"><Plus className="h-3.5 w-3.5" /></button></div>
+      {editing && <div className="mt-2 flex items-center gap-2 border-t border-slate-100 pt-3"><input value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addItem(); } }} placeholder={`添加${label}`} className="h-8 min-w-0 flex-1 rounded-md border border-slate-200 px-2.5 text-xs outline-none focus:border-violet-400" /><button onClick={addItem} disabled={!draft.trim()} title="添加" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-violet-600 text-white disabled:bg-slate-200 disabled:text-slate-400"><Plus className="h-3.5 w-3.5" /></button></div>}
     </section>
   );
-}
-
-function AnalysisImagePicker({ current, onClose, onConfirm }: { current: ProductSelection | null; onClose: () => void; onConfirm: (product: ProductSelection) => void }) {
-  const [tab, setTab] = useState<"library" | "local">("library");
-  const [selected, setSelected] = useState<ProductSelection | null>(current);
-  const uploadRef = useRef<HTMLInputElement | null>(null);
-  const localUpload = (file?: File) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setSelected({ id: `analysis-local-${Date.now()}`, name: file.name, image: String(reader.result), source: "local" });
-    reader.readAsDataURL(file);
-  };
-  return <ModalFrame title="替换参考图" onClose={onClose} width="max-w-3xl" footer={<><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!selected} onClick={() => selected && onConfirm(selected)} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">确认替换</button></>}>
-    <div className="p-5">
-      <div className="mb-5 flex items-center gap-1 border-b border-slate-200"><button onClick={() => setTab("library")} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${tab === "library" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>图片管理</button><button onClick={() => setTab("local")} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${tab === "local" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>本地上传</button></div>
-      {tab === "library" ? <div className="grid grid-cols-4 gap-3">{IMAGE_LIBRARY.map((item) => <button key={item.id} onClick={() => setSelected(item)} className={`overflow-hidden rounded-md border bg-white text-left ${selected?.id === item.id ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200 hover:border-slate-300"}`}><div className="relative aspect-square"><img src={item.image} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />{selected?.id === item.id && <span className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-white"><Check className="h-3 w-3" /></span>}</div><p className="truncate px-2 py-2 text-[11px] text-slate-600">{item.name}</p></button>)}</div> : <div><button onClick={() => uploadRef.current?.click()} className="flex h-48 w-full flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:text-violet-700"><Upload className="h-6 w-6" /><span className="mt-3 text-xs font-semibold">点击选择本地图片</span></button><input ref={uploadRef} type="file" accept="image/*" className="hidden" onChange={(event) => localUpload(event.target.files?.[0])} />{selected?.source === "local" && <div className="mt-4 flex items-center gap-3 rounded-md border border-violet-200 bg-violet-50 p-3"><img src={selected.image} alt="" className="h-14 w-14 rounded object-cover" /><p className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700">{selected.name}</p><button onClick={() => setSelected(null)} title="删除"><Trash2 className="h-4 w-4 text-slate-400" /></button></div>}</div>}
-    </div>
-  </ModalFrame>;
 }
 
 function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId, setSelectedCreativeId }: { session: AgentSession; setSession: React.Dispatch<React.SetStateAction<AgentSession | null>>; currentCreative?: CreativeItem; selectedCreativeId: number; setSelectedCreativeId: (id: number) => void }) {
@@ -1387,7 +1464,7 @@ function ProductLinkModal({ onClose, onConfirm }: { onClose: () => void; onConfi
   </ModalFrame>;
 }
 
-function ProductImageModal({ existingCount, onClose, onConfirm, showToast }: { existingCount: number; onClose: () => void; onConfirm: (images: ProductSelection[]) => void; showToast: (message: string) => void }) {
+function ProductImageModal({ existingCount, mode = "add", excludedIds = [], onClose, onConfirm, showToast }: { existingCount: number; mode?: "add" | "replace"; excludedIds?: string[]; onClose: () => void; onConfirm: (images: ProductSelection[]) => void; showToast: (message: string) => void }) {
   const [tab, setTab] = useState<"library" | "local">("library");
   const [selected, setSelected] = useState<ProductSelection[]>([]);
   const [primaryCategory, setPrimaryCategory] = useState("全部一级分类");
@@ -1398,8 +1475,9 @@ function ProductImageModal({ existingCount, onClose, onConfirm, showToast }: { e
   const [onlyMine, setOnlyMine] = useState(false);
   const [search, setSearch] = useState("");
   const uploadRef = useRef<HTMLInputElement | null>(null);
-  const capacity = Math.max(0, 6 - existingCount);
+  const capacity = mode === "replace" ? 1 : Math.max(0, 6 - existingCount);
   const filtered = IMAGE_LIBRARY.filter((item) =>
+    !excludedIds.includes(item.id) &&
     (primaryCategory === "全部一级分类" || item.primaryCategory === primaryCategory) &&
     (secondaryCategory === "全部二级分类" || item.secondaryCategory === secondaryCategory) &&
     (tag === "全部标签" || item.tags?.includes(tag)) &&
@@ -1413,12 +1491,15 @@ function ProductImageModal({ existingCount, onClose, onConfirm, showToast }: { e
       setSelected((current) => current.filter((image) => image.id !== item.id));
       return;
     }
-    if (selected.length >= capacity) return showToast("商品图片最多上传 6 张");
+    if (selected.length >= capacity) {
+      if (mode === "replace") return setSelected([item]);
+      return showToast("商品图片最多上传 6 张");
+    }
     setSelected((current) => [...current, item]);
   };
   const localUpload = async (files?: FileList | null) => {
     if (!files?.length) return;
-    const remaining = capacity - selected.length;
+    const remaining = mode === "replace" ? 1 : capacity - selected.length;
     if (remaining <= 0) return showToast("商品图片最多上传 6 张");
     const accepted: ProductSelection[] = [];
     for (const file of Array.from(files).slice(0, remaining)) {
@@ -1445,10 +1526,10 @@ function ProductImageModal({ existingCount, onClose, onConfirm, showToast }: { e
       accepted.push({ id: `product-local-${Date.now()}-${accepted.length}`, name: file.name, image: imageUrl, source: "local", status: "本地文件", author: "当前用户", size: `${(file.size / 1024 / 1024).toFixed(1)} MB`, resolution: `${dimensions.width}x${dimensions.height}` });
     }
     if (files.length > remaining) showToast(`本次最多还可添加 ${remaining} 张商品图`);
-    setSelected((current) => [...current, ...accepted]);
+    setSelected((current) => mode === "replace" ? accepted.slice(0, 1) : [...current, ...accepted]);
     if (uploadRef.current) uploadRef.current.value = "";
   };
-  return <ModalFrame title="添加商品图" onClose={onClose} width="max-w-6xl" footer={<><div className="mr-auto text-xs text-slate-500">已选 <b className="text-violet-700">{selected.length}</b> 张 · 还可添加 {capacity - selected.length} 张</div><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!selected.length} onClick={() => onConfirm(selected)} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">确认选择</button></>}>
+  return <ModalFrame title={mode === "replace" ? "替换参考图" : "添加商品图"} onClose={onClose} width="max-w-6xl" footer={<><div className="mr-auto text-xs text-slate-500">已选 <b className="text-violet-700">{selected.length}</b> 张{mode === "add" ? ` · 还可添加 ${capacity - selected.length} 张` : ""}</div><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!selected.length} onClick={() => onConfirm(selected)} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">{mode === "replace" ? "确认替换" : "确认选择"}</button></>}>
     <div className="p-5">
       <div className="mb-5 flex items-center gap-1 border-b border-slate-200">
         <button onClick={() => setTab("library")} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${tab === "library" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>图片管理</button>
@@ -1467,7 +1548,7 @@ function ProductImageModal({ existingCount, onClose, onConfirm, showToast }: { e
         <div className="overflow-x-auto rounded-md border border-slate-200"><table className="min-w-[860px] w-full text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="w-12 px-4 py-3"></th><th className="px-3 py-3">图片缩略图</th><th className="px-3 py-3">文件名称 / ID</th><th className="px-3 py-3">状态</th><th className="px-3 py-3">分类 / 标签</th><th className="px-3 py-3">上传人</th><th className="px-3 py-3">分辨率</th><th className="px-3 py-3">大小</th></tr></thead><tbody>{filtered.map((item) => { const checked = selected.some((image) => image.id === item.id); return <tr key={item.id} onClick={() => toggle(item)} className={`cursor-pointer border-t border-slate-100 ${checked ? "bg-violet-50" : "hover:bg-slate-50"}`}><td className="px-4 py-3"><span className={`flex h-4 w-4 items-center justify-center rounded border ${checked ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300"}`}>{checked && <Check className="h-2.5 w-2.5" />}</span></td><td className="px-3 py-2"><img src={item.image} alt="" className="h-12 w-12 rounded object-cover" referrerPolicy="no-referrer" /></td><td className="max-w-[220px] px-3 py-3"><p className="truncate font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.id}</p></td><td className="px-3 py-3"><span className="rounded bg-slate-100 px-2 py-1 text-[10px] text-slate-600">{item.status}</span></td><td className="px-3 py-3"><p className="font-semibold text-slate-700">{item.primaryCategory} / {item.secondaryCategory}</p><p className="mt-1 text-[10px] text-slate-400">{item.tags?.join("、")}</p></td><td className="px-3 py-3 text-slate-500">{item.author}</td><td className="px-3 py-3 text-slate-500">{item.resolution}</td><td className="px-3 py-3 text-slate-500">{item.size}</td></tr>; })}</tbody></table></div>
       </> : <div>
         <button onClick={() => uploadRef.current?.click()} className="flex h-48 w-full flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:text-violet-700"><Upload className="h-6 w-6" /><span className="mt-3 text-xs font-semibold">点击选择本地图片</span></button>
-        <input ref={uploadRef} type="file" multiple accept=".jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff,.gif,image/*" className="hidden" onChange={(event) => localUpload(event.target.files)} />
+        <input ref={uploadRef} type="file" multiple={mode === "add"} accept=".jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff,.gif,image/*" className="hidden" onChange={(event) => localUpload(event.target.files)} />
         <p className="mt-3 text-center text-xs leading-6 text-slate-400">支持上传本地图片文件，图片格式：jpeg、 png、 webp、 bmp、 tiff、 gif，单张图片大小≤30MB。<br />图片宽高比需在 (0.4, 2.5) 之间，宽高像素需在 (300px, 6000px) 之间。<br />仅支持上传非人脸图，请仔细查看要求并确保上传素材为您原创或已取得合法授权。</p>
         {selected.some((item) => item.source === "local") && <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">{selected.filter((item) => item.source === "local").map((item) => <div key={item.id} className="flex min-w-0 items-center gap-2 rounded-md border border-slate-200 p-2"><img src={item.image} alt="" className="h-11 w-11 rounded object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.resolution} · {item.size}</p></div><button onClick={() => toggle(item)} title="删除" className="p-1 text-slate-400 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div>}
       </div>}
