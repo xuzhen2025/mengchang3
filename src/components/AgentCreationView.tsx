@@ -707,6 +707,7 @@ export default function AgentCreationView({
     }
   });
   const [selectedCreativeId, setSelectedCreativeId] = useState(1);
+  const [scriptSubjectDetailOpen, setScriptSubjectDetailOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [generatingLabel, setGeneratingLabel] = useState("");
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -729,6 +730,10 @@ export default function AgentCreationView({
       // Browser storage is optional for the prototype.
     }
   }, [referenceHistory]);
+
+  useEffect(() => {
+    if (session?.currentStep !== "script") setScriptSubjectDetailOpen(false);
+  }, [session?.currentStep]);
 
   const showToast = (message: string) => {
     setToast(message);
@@ -1299,7 +1304,7 @@ export default function AgentCreationView({
           ) : (
             <>
               {session.currentStep === "analysis" && <AnalysisPanel session={session} setSession={setSession} showToast={showToast} />}
-              {session.currentStep === "script" && <ScriptPanel session={session} setSession={setSession} currentCreative={currentCreative} selectedCreativeId={selectedCreativeId} setSelectedCreativeId={setSelectedCreativeId} showToast={showToast} />}
+              {session.currentStep === "script" && <ScriptPanel session={session} setSession={setSession} currentCreative={currentCreative} selectedCreativeId={selectedCreativeId} setSelectedCreativeId={setSelectedCreativeId} onSubjectDetailChange={setScriptSubjectDetailOpen} showToast={showToast} />}
               {session.currentStep === "preview" && <PreviewPanel session={session} setSession={setSession} />}
               {session.currentStep === "final" && <FinalPanel session={session} setSession={setSession} selectedFinals={selectedFinals} openUpload={openUpload} setDetailVideo={setDetailVideo} showToast={showToast} />}
             </>
@@ -1311,7 +1316,7 @@ export default function AgentCreationView({
                 <button onClick={() => runGeneration("正在生成视频成片", "final", 5, (current) => { const previews = createPreviews(); const next = { ...current, availableSteps: Array.from(new Set([...current.availableSteps, "final"])) as StepType[], previews, finals: createFinals(previews) }; return { ...next, timeline: [...next.timeline, recordFor(next, "final", "视频成片", undefined, "一键成片")] }; })} className="rounded-md border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">一键成片</button>
                 <button onClick={generateScripts} className="rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-700">生成创意与分镜</button>
               </>}
-              {session.currentStep === "script" && <button onClick={generatePreviews} className="rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-700">生成视频预览</button>}
+              {session.currentStep === "script" && !scriptSubjectDetailOpen && <button onClick={generatePreviews} className="rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-700">生成视频预览</button>}
               {session.currentStep === "preview" && <button onClick={generateFinals} disabled={session.previews.every((item) => !item.selected)} className="rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-40">生成视频成片</button>}
               {session.currentStep === "final" && <button onClick={() => openUpload(selectedFinals)} className="flex items-center gap-2 rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-700"><Upload className="h-4 w-4" />上传资源库</button>}
             </div>
@@ -1505,7 +1510,7 @@ function AnalysisListField({ label, items, onChange }: { label: string; items: s
   );
 }
 
-function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId, setSelectedCreativeId, showToast }: { session: AgentSession; setSession: React.Dispatch<React.SetStateAction<AgentSession | null>>; currentCreative?: CreativeItem; selectedCreativeId: number; setSelectedCreativeId: (id: number) => void; showToast: (message: string) => void }) {
+function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId, setSelectedCreativeId, onSubjectDetailChange, showToast }: { session: AgentSession; setSession: React.Dispatch<React.SetStateAction<AgentSession | null>>; currentCreative?: CreativeItem; selectedCreativeId: number; setSelectedCreativeId: (id: number) => void; onSubjectDetailChange: (open: boolean) => void; showToast: (message: string) => void }) {
   const [expandedCreativeId, setExpandedCreativeId] = useState<number | null>(null);
   const [subjectDraft, setSubjectDraft] = useState<{ subjectId: string; productImages: ProductSelection[]; voices: VoiceOption[]; activeVoiceId?: string } | null>(null);
   const [imagePicker, setImagePicker] = useState<{ mode: "add" | "replace"; index?: number } | null>(null);
@@ -1543,6 +1548,14 @@ function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId,
     });
     setVoiceEditorOpen(false);
     setVoiceDraft("");
+    onSubjectDetailChange(true);
+  };
+
+  const closeSubject = () => {
+    setSubjectDraft(null);
+    setVoiceEditorOpen(false);
+    setVoiceDraft("");
+    onSubjectDetailChange(false);
   };
 
   const applySubjectDraft = () => {
@@ -1552,7 +1565,7 @@ function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId,
       productImages: subjectDraft.subjectId === "product" ? cloneItems(subjectDraft.productImages) : creative.productImages,
       subjects: creative.subjects.map((subject) => subject.id === subjectDraft.subjectId ? { ...subject, voices: cloneItems(subjectDraft.voices), activeVoiceId: subjectDraft.activeVoiceId } : subject)
     }));
-    setSubjectDraft(null);
+    closeSubject();
     showToast("已应用到当前创意");
   };
 
@@ -1561,17 +1574,19 @@ function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId,
   if (displayCreative && selectedSubject && subjectDraft) {
     return (
       <div className="mx-auto max-w-6xl">
-        <PanelHeader title="创意与分镜" count={session.versionCounts.script} active={session.activeVersions.script} onChange={(value) => setSession({ ...session, activeVersions: { ...session.activeVersions, script: value } })} />
         <SubjectDetailPanel
           subject={selectedSubject}
           draft={subjectDraft}
           productName={session.productName}
           voiceEditorOpen={voiceEditorOpen}
           voiceDraft={voiceDraft}
-          onBack={() => setSubjectDraft(null)}
+          onBack={closeSubject}
           onApply={applySubjectDraft}
           onVoiceDraftChange={setVoiceDraft}
-          onToggleVoiceEditor={() => setVoiceEditorOpen((value) => !value)}
+          onToggleVoiceEditor={() => {
+            if (voiceEditorOpen) setVoiceDraft("");
+            setVoiceEditorOpen(!voiceEditorOpen);
+          }}
           onAddVoice={() => {
             const description = voiceDraft.trim();
             if (!description) return;
@@ -1758,7 +1773,7 @@ function SubjectDetailPanel({ subject, draft, productName, voiceEditorOpen, voic
       ) : (
         <div className={`grid gap-5 p-5 ${subject.kind === "person" ? "xl:grid-cols-[240px_minmax(0,1fr)]" : "grid-cols-1"}`}>
           {subject.kind === "person" && <img src={subject.image} alt={subject.name} className="aspect-[3/4] w-full rounded-lg border border-slate-200 object-cover" referrerPolicy="no-referrer" />}
-          <div className="min-w-0"><section className="rounded-lg border border-slate-200 bg-slate-50 p-4"><h4 className="text-xs font-bold text-slate-800">{subject.kind === "person" ? "形象描述" : "旁白描述"}</h4><p className="mt-2 text-xs leading-6 text-slate-600">{subject.description}</p></section><div className="mt-5 flex items-center justify-between"><h4 className="text-sm font-bold text-slate-900">音色</h4><button onClick={onToggleVoiceEditor} className="text-xs font-semibold text-violet-700 hover:text-violet-800">编辑音色</button></div><div className="mt-3 flex flex-wrap gap-2">{draft.voices.map((voice) => <button key={voice.id} onClick={() => onSelectVoice(voice.id)} className={`min-w-[108px] rounded-lg border px-4 py-3 text-left ${draft.activeVoiceId === voice.id ? "border-violet-500 bg-violet-50" : "border-slate-200 bg-white hover:border-violet-200"}`}><span className="text-xs font-bold text-slate-700">{voice.name}</span><span className="mt-1 block max-w-[180px] truncate text-[10px] text-slate-400">{voice.description}</span></button>)}</div>{draft.activeVoiceId && <section className="mt-3 rounded-lg border border-slate-200 p-4"><div className="flex items-center justify-between"><h4 className="text-xs font-bold text-slate-800">音色描述</h4><button title="试听音色" className="flex h-7 w-7 items-center justify-center rounded bg-violet-50 text-violet-700"><Volume2 className="h-3.5 w-3.5" /></button></div><p className="mt-2 text-xs leading-6 text-slate-600">{draft.voices.find((voice) => voice.id === draft.activeVoiceId)?.description}</p></section>}{voiceEditorOpen && <section className="mt-3 rounded-lg border border-violet-200 bg-violet-50/30 p-3"><textarea value={voiceDraft} onChange={(event) => onVoiceDraftChange(event.target.value)} placeholder="描述希望生成的音色，例如：年轻女性，表达自然，语速稍快" rows={3} className="w-full resize-none rounded-md border border-slate-200 bg-white p-3 text-xs leading-6 outline-none focus:border-violet-400" /><div className="mt-2 flex justify-end"><button disabled={!voiceDraft.trim()} onClick={onAddVoice} className="rounded-md bg-violet-600 px-3 py-2 text-xs font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400">生成音色</button></div></section>}</div>
+          <div className="min-w-0"><section className="rounded-lg border border-slate-200 bg-slate-50 p-4"><h4 className="text-xs font-bold text-slate-800">{subject.kind === "person" ? "形象描述" : "旁白描述"}</h4><p className="mt-2 text-xs leading-6 text-slate-600">{subject.description}</p></section><div className="mt-5 flex items-center justify-between"><h4 className="text-sm font-bold text-slate-900">音色</h4><button onClick={onToggleVoiceEditor} className="text-xs font-semibold text-violet-700 hover:text-violet-800">{voiceEditorOpen ? "取消" : "新增音色"}</button></div><div className="mt-3 flex flex-wrap gap-2">{draft.voices.map((voice) => <button key={voice.id} onClick={() => onSelectVoice(voice.id)} className={`min-w-[108px] rounded-lg border px-4 py-3 text-left ${draft.activeVoiceId === voice.id ? "border-violet-500 bg-violet-50" : "border-slate-200 bg-white hover:border-violet-200"}`}><span className="text-xs font-bold text-slate-700">{voice.name}</span></button>)}</div>{draft.activeVoiceId && <section className="mt-3 rounded-lg border border-slate-200 p-4"><div className="flex items-center justify-between"><h4 className="text-xs font-bold text-slate-800">音色描述</h4><button title="试听音色" className="flex h-7 w-7 items-center justify-center rounded bg-violet-50 text-violet-700"><Volume2 className="h-3.5 w-3.5" /></button></div><p className="mt-2 text-xs leading-6 text-slate-600">{draft.voices.find((voice) => voice.id === draft.activeVoiceId)?.description}</p></section>}{voiceEditorOpen && <section className="mt-3 rounded-lg border border-violet-200 bg-violet-50/30 p-3"><textarea value={voiceDraft} onChange={(event) => onVoiceDraftChange(event.target.value)} placeholder="描述希望生成的音色，例如：年轻女性，表达自然，语速稍快" rows={3} className="w-full resize-none rounded-md border border-slate-200 bg-white p-3 text-xs leading-6 outline-none focus:border-violet-400" /><div className="mt-2 flex justify-end"><button disabled={!voiceDraft.trim()} onClick={onAddVoice} className="rounded-md bg-violet-600 px-3 py-2 text-xs font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400">生成音色</button></div></section>}</div>
         </div>
       )}
       <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4"><button onClick={onBack} className="rounded-md border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">取消</button><button onClick={onApply} disabled={isProduct && !draft.productImages.length} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:bg-slate-200">应用</button></div>
