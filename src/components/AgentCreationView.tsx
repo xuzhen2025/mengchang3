@@ -1261,16 +1261,16 @@ function AnalysisPanel({ session, setSession, showToast }: { session: AgentSessi
             <AnalysisTextField label="商品名称" value={session.productName} onChange={(productName) => setSession({ ...session, productName })} />
             <AnalysisTextField label="商品行业" value={session.industry} onChange={(industry) => setSession({ ...session, industry })} />
             <AnalysisTextField label="商品品类" value={session.category} onChange={(category) => setSession({ ...session, category })} />
-            <AnalysisTextField label="优惠信息" value={session.discountInfo} onChange={(discountInfo) => setSession({ ...session, discountInfo })} />
           </div>
         </section>
 
-        <section className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
+        <section className="grid grid-cols-1 gap-3 xl:grid-cols-2">
           <AnalysisListField label="商品卖点" items={session.sellingPoints} onChange={(items) => updateList("sellingPoints", items)} />
           <AnalysisListField label="商品痛点" items={session.painPoints} onChange={(items) => updateList("painPoints", items)} />
           <AnalysisListField label="目标人群" items={session.targetGroups} onChange={(items) => updateList("targetGroups", items)} />
           <AnalysisListField label="适用人群和场景" items={session.scenarios} onChange={(items) => updateList("scenarios", items)} />
           <AnalysisListField label="商品规格" items={session.specs} onChange={(items) => updateList("specs", items)} />
+          <AnalysisTextField label="优惠信息" value={session.discountInfo} onChange={(discountInfo) => setSession({ ...session, discountInfo })} large />
         </section>
       </div>
 
@@ -1295,8 +1295,8 @@ function AnalysisPanel({ session, setSession, showToast }: { session: AgentSessi
   );
 }
 
-function AnalysisTextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label className="rounded-lg border border-slate-200 bg-white p-4"><span className="block text-xs font-semibold text-slate-500">{label}</span><input value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 h-8 w-full border-0 bg-transparent p-0 text-sm text-slate-800 outline-none" /></label>;
+function AnalysisTextField({ label, value, onChange, large = false }: { label: string; value: string; onChange: (value: string) => void; large?: boolean }) {
+  return <label className={`rounded-lg border border-slate-200 bg-white p-4 ${large ? "min-h-[168px]" : ""}`}><span className={`block font-semibold ${large ? "text-sm text-slate-900" : "text-xs text-slate-500"}`}>{label}</span><input value={value} onChange={(event) => onChange(event.target.value)} className={`${large ? "mt-4" : "mt-2"} h-8 w-full border-0 bg-transparent p-0 text-sm text-slate-800 outline-none`} /></label>;
 }
 
 function AnalysisListField({ label, items, onChange }: { label: string; items: string[]; onChange: (items: string[]) => void }) {
