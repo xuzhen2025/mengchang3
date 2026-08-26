@@ -1460,7 +1460,7 @@ function ProductImageModal({ existingCount, onClose, onConfirm, showToast }: { e
       </> : <div>
         <button onClick={() => uploadRef.current?.click()} className="flex h-48 w-full flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:text-violet-700"><Upload className="h-6 w-6" /><span className="mt-3 text-xs font-semibold">点击选择本地图片</span></button>
         <input ref={uploadRef} type="file" multiple accept=".jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff,.gif,image/*" className="hidden" onChange={(event) => localUpload(event.target.files)} />
-        <p className="mt-3 text-center text-xs leading-6 text-slate-400">支持 jpeg、png、webp、bmp、tiff、gif，单张小于 30MB<br />宽高比 0.4-2.5，宽高 300-6000px</p>
+        <p className="mt-3 text-center text-xs leading-6 text-slate-400">支持上传本地图片文件，图片格式：jpeg、 png、 webp、 bmp、 tiff、 gif，单张图片大小≤30MB。<br />图片宽高比需在 (0.4, 2.5) 之间，宽高像素需在 (300px, 6000px) 之间。<br />仅支持上传非人脸图，请仔细查看要求并确保上传素材为您原创或已取得合法授权。</p>
         {selected.some((item) => item.source === "local") && <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">{selected.filter((item) => item.source === "local").map((item) => <div key={item.id} className="flex min-w-0 items-center gap-2 rounded-md border border-slate-200 p-2"><img src={item.image} alt="" className="h-11 w-11 rounded object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.resolution} · {item.size}</p></div><button onClick={() => toggle(item)} title="删除" className="p-1 text-slate-400 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div>}
       </div>}
     </div>
@@ -1558,7 +1558,7 @@ function SourceSelectorModal({ selected, onClose, onConfirm, showToast }: { sele
       </> : <div>
         <button onClick={() => uploadRef.current?.click()} className="flex h-48 w-full flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:text-violet-700"><Upload className="h-6 w-6" /><span className="mt-3 text-xs font-semibold">点击选择本地视频</span></button>
         <input ref={uploadRef} type="file" multiple accept=".mp4,.mpeg,.mov,video/mp4,video/mpeg,video/quicktime" className="hidden" onChange={(event) => uploadLocal(event.target.files)} />
-        <p className="mt-3 text-center text-xs leading-6 text-slate-400">支持 mp4、mpeg、mov，单个文件小于 1000MB<br />单个视频时长 2-600 秒，本地原料不会保存到资源库</p>
+        <p className="mt-3 text-center text-xs leading-6 text-slate-400">视频格式: mp4、mpeg、mov,宽高无限制, 大小&lt;1000M<br />建议1280*720&lt;尺寸&lt;3840*2160, 2s&lt;时长&lt;600s<br />*尺寸超出建议范围可能导致生成时间超长或效果不佳<br />请确保您上传素材为您原创或已取得合法授权</p>
         {localItems.length > 0 && <div className="mt-4 space-y-2">{localItems.map((item) => <div key={item.id} className="flex items-center gap-3 rounded-md border border-slate-200 p-2.5"><img src={item.cover} alt="" className="h-11 w-16 rounded object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.duration} · {item.size}</p></div><button onClick={() => toggle(item)} title="删除" className="p-1.5 text-slate-400 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div>}
       </div>}
     </div>
