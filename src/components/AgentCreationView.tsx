@@ -1633,8 +1633,11 @@ function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId,
   const [expandedCreativeId, setExpandedCreativeId] = useState<number | null>(null);
   const [subjectDraft, setSubjectDraft] = useState<{ subjectId: string; productImages: ProductSelection[]; voices: VoiceOption[]; activeVoiceId?: string } | null>(null);
   const [imagePicker, setImagePicker] = useState<{ mode: "add" | "replace"; index?: number } | null>(null);
+  const [cardImagePickerOpen, setCardImagePickerOpen] = useState(false);
+  const [playingSubjectId, setPlayingSubjectId] = useState<string | null>(null);
   const [voiceEditorOpen, setVoiceEditorOpen] = useState(false);
   const [voiceDraft, setVoiceDraft] = useState("");
+  const voicePreviewRef = useRef<SpeechSynthesisUtterance | null>(null);
   const displayCreative = useMemo(() => currentCreative
     ? normalizeCreatives(session.creatives, session.productName, session.productImages).find((creative) => creative.id === currentCreative.id)
     : undefined, [currentCreative, session.creatives, session.productImages, session.productName]);
@@ -1644,6 +1647,39 @@ function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId,
   const activeCreativeVersion = currentCreative
     ? session.activeCreativeVersions[String(currentCreative.id)] || 1
     : 1;
+
+  const stopVoicePreview = () => {
+    window.speechSynthesis?.cancel();
+    voicePreviewRef.current = null;
+    setPlayingSubjectId(null);
+  };
+
+  useEffect(() => {
+    window.speechSynthesis?.cancel();
+    voicePreviewRef.current = null;
+    setPlayingSubjectId(null);
+    return () => window.speechSynthesis?.cancel();
+  }, [selectedCreativeId, activeCreativeVersion]);
+
+  const toggleVoicePreview = (subject: CreativeSubject) => {
+    if (playingSubjectId === subject.id) return stopVoicePreview();
+    if (!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) return showToast("当前浏览器暂不支持音色试听");
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(subject.kind === "narrator"
+      ? "玻璃重新透亮，雨天和夜间开车都安心多了。"
+      : "别急，用这款玻璃油膜清洁擦，自己就能快速处理。");
+    utterance.lang = "zh-CN";
+    utterance.rate = subject.kind === "narrator" ? 0.92 : 1;
+    utterance.pitch = subject.kind === "narrator" ? 0.9 : 1.05;
+    utterance.onend = utterance.onerror = () => {
+      if (voicePreviewRef.current !== utterance) return;
+      voicePreviewRef.current = null;
+      setPlayingSubjectId(null);
+    };
+    voicePreviewRef.current = utterance;
+    setPlayingSubjectId(subject.id);
+    window.speechSynthesis.speak(utterance);
+  };
 
   const updateCreative = (updater: (creative: CreativeItem) => CreativeItem) => {
     if (!currentCreative) return;
@@ -1687,6 +1723,7 @@ function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId,
   }));
 
   const openSubject = (subject: CreativeSubject) => {
+    stopVoicePreview();
     setSubjectDraft({
       subjectId: subject.id,
       productImages: cloneItems(displayCreative?.productImages?.length ? displayCreative.productImages : session.productImages),
@@ -1805,7 +1842,15 @@ function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId,
               <h4 className="mt-6 text-sm font-bold text-slate-900">1. 主体设定</h4>
               <div className="mt-3 flex flex-wrap gap-3">
                 {displayCreative.subjects.map((subject) => (
-                  <SubjectSettingCard key={subject.id} subject={subject.kind === "product" ? { ...subject, description: session.productName } : subject} productImages={displayCreative.productImages.length ? displayCreative.productImages : session.productImages} onOpen={() => openSubject(subject)} />
+                  <SubjectSettingCard
+                    key={subject.id}
+                    subject={subject.kind === "product" ? { ...subject, description: session.productName } : subject}
+                    productImages={displayCreative.productImages.length ? displayCreative.productImages : session.productImages}
+                    playing={playingSubjectId === subject.id}
+                    onOpen={() => openSubject(subject)}
+                    onAddProductImage={() => setCardImagePickerOpen(true)}
+                    onToggleVoice={() => toggleVoicePreview(subject)}
+                  />
                 ))}
               </div>
               <h4 className="mt-7 text-sm font-bold text-slate-900">2. 分镜描述</h4>
@@ -1824,6 +1869,20 @@ function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId,
           </section>
         )}
       </div>
+      {cardImagePickerOpen && displayCreative && (
+        <ProductImageModal
+          existingCount={displayCreative.productImages.length}
+          mode="add"
+          excludedIds={displayCreative.productImages.map((item) => item.id)}
+          onClose={() => setCardImagePickerOpen(false)}
+          onConfirm={(images) => {
+            updateCreative((creative) => ({ ...creative, productImages: [...creative.productImages, ...images].slice(0, 6) }));
+            setCardImagePickerOpen(false);
+            showToast("已添加参考图");
+          }}
+          showToast={showToast}
+        />
+      )}
     </div>
   );
 }
@@ -1832,20 +1891,30 @@ function CreativeReadOnlySection({ index, title, content }: { index: string; tit
   return <section><h4 className="text-sm font-bold text-slate-900">{index}、{title}</h4><p className="mt-2 text-sm leading-7 text-slate-600">{content}</p></section>;
 }
 
-function SubjectSettingCard({ subject, productImages, onOpen }: { subject: CreativeSubject; productImages: ProductSelection[]; onOpen: () => void }) {
+function SubjectSettingCard({ subject, productImages, playing, onOpen, onAddProductImage, onToggleVoice }: { subject: CreativeSubject; productImages: ProductSelection[]; playing: boolean; onOpen: () => void; onAddProductImage: () => void; onToggleVoice: () => void }) {
   const isProduct = subject.kind === "product";
   const isNarrator = subject.kind === "narrator";
+  const productLimitReached = productImages.length >= 6;
   return (
-    <button onClick={onOpen} className="group relative min-w-[150px] max-w-[220px] basis-[150px] grow rounded-lg border border-slate-200 bg-slate-50 p-3 text-left hover:border-violet-300 hover:bg-violet-50/30">
-      <div className="flex h-12 items-start justify-between gap-2"><div className="min-w-0"><p className="text-xs font-bold text-slate-800">{subject.name}</p><TruncatedSubjectDescription subject={subject} productImages={productImages} /></div>{!isProduct && <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-white text-slate-500"><Volume2 className="h-3.5 w-3.5" /></span>}</div>
-      {isProduct ? <ProductImageGrid images={productImages} /> : isNarrator ? <div className="mt-2 flex h-[180px] items-center justify-center rounded-md border border-dashed border-slate-300 bg-white"><Volume2 className="h-10 w-10 text-slate-300" /></div> : <img src={subject.image} alt={subject.name} className="mt-2 h-[180px] w-full rounded-md object-cover" referrerPolicy="no-referrer" />}
-    </button>
+    <article className="group relative min-w-[150px] max-w-[220px] basis-[150px] grow rounded-lg border border-slate-200 bg-slate-50 p-3 text-left">
+      <div className="flex h-12 items-start justify-between gap-2">
+        <div className="min-w-0"><p className="text-xs font-bold text-slate-800">{subject.name}</p><TruncatedSubjectDescription subject={subject} productImages={productImages} /></div>
+        {isProduct ? (
+          <button disabled={productLimitReached} onClick={onAddProductImage} title={productLimitReached ? "商品参考图已达 6 张上限" : "添加参考图"} className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-white text-slate-500 hover:bg-violet-100 hover:text-violet-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"><Plus className="h-4 w-4" /></button>
+        ) : (
+          <button onClick={onToggleVoice} title={playing ? "停止试听音色" : "试听音色"} className={`flex h-7 w-7 shrink-0 items-center justify-center rounded transition-colors ${playing ? "bg-violet-100 text-violet-700" : "bg-white text-slate-500 hover:bg-violet-50 hover:text-violet-700"}`}><Volume2 className="h-3.5 w-3.5" /></button>
+        )}
+      </div>
+      <button onClick={onOpen} aria-label={`查看${subject.name}详情`} className="mt-2 block w-full rounded-md text-left outline-none ring-violet-300 hover:ring-2 focus-visible:ring-2">
+        {isProduct ? <ProductImageGrid images={productImages} /> : isNarrator ? <span className="flex h-[180px] items-center justify-center rounded-md border border-dashed border-slate-300 bg-white"><Volume2 className="h-10 w-10 text-slate-300" /></span> : <img src={subject.image} alt={subject.name} className="h-[180px] w-full rounded-md object-cover" referrerPolicy="no-referrer" />}
+      </button>
+    </article>
   );
 }
 
 function ProductImageGrid({ images }: { images: ProductSelection[] }) {
   const shown = images.slice(0, 4);
-  return <div className={`mt-2 grid h-[180px] overflow-hidden rounded-md bg-white ${shown.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>{shown.map((image, index) => <div key={image.id} className="relative min-h-0"><img src={image.image} alt={image.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" />{index === 3 && images.length > 4 && <span className="absolute inset-0 flex items-center justify-center bg-slate-900/65 text-base font-bold text-white">+{images.length - 3}</span>}</div>)}</div>;
+  return <span className={`grid h-[180px] overflow-hidden rounded-md bg-white ${shown.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>{shown.map((image, index) => <span key={image.id} className="relative min-h-0"><img src={image.image} alt={image.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" />{index === 3 && images.length > 4 && <span className="absolute inset-0 flex items-center justify-center bg-slate-900/65 text-base font-bold text-white">+{images.length - 3}</span>}</span>)}</span>;
 }
 
 function TruncatedSubjectDescription({ subject, productImages }: { subject: CreativeSubject; productImages: ProductSelection[] }) {
