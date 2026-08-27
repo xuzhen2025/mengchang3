@@ -528,11 +528,16 @@ const normalizeCreatives = (items: CreativeItem[] = [], productName = "玻璃油
 
 const createPreviews = (): PreviewItem[] => [
   { id: `preview_${Date.now()}_1`, name: "推荐", cover: SAMPLE_COVERS[0], selected: true },
-  { id: `preview_${Date.now()}_2`, name: "备用", cover: SAMPLE_COVERS[1], selected: true }
+  { id: `preview_${Date.now()}_2`, name: "备选1", cover: SAMPLE_COVERS[1], selected: true }
 ];
 
+const normalizePreviews = (previews: PreviewItem[] = []): PreviewItem[] => previews.map((item, index) => ({
+  ...item,
+  name: index === 0 ? "推荐" : `备选${index}`
+}));
+
 const createFinals = (previews: PreviewItem[]): FinalVideoItem[] =>
-  previews.filter((item) => item.selected).map((item, index) => ({
+  previews.map((item, index) => ({
     id: `final_${Date.now()}_${index}`,
     name: `${item.name}版_玻璃油膜擦营销成片.mp4`,
     cover: item.cover,
@@ -725,6 +730,7 @@ const loadStoredSession = (id: string) => {
       discountInfo: stored.discountInfo || "暂无优惠信息",
       creatives,
       creativeVersions,
+      previews: normalizePreviews(stored.previews),
       timeline: (stored.timeline || []).map((record) => (
         record.step === "analysis" || (record.step === "script" && !record.creativeId)
           ? { ...record, version: undefined }
@@ -1105,8 +1111,8 @@ export default function AgentCreationView({
       finals: createFinals(current.previews)
     };
     return { ...next, timeline: [...next.timeline, recordFor(next, "final", "视频成片", {
-      instruction: repeated ? "重新选择视频预览，生成成片" : "生成成片",
-      response: `已为您生成${current.productName}的最终广告成片，您可以在左侧查看完整的视频结果。`
+      instruction: repeated ? "重新生成视频成片" : "生成成片",
+      response: `已根据当前${current.previews.length}个视频预览生成${current.previews.length}个${current.productName}广告成片，您可以在左侧查看完整的视频结果。`
     })] };
   });
 
@@ -1418,7 +1424,7 @@ export default function AgentCreationView({
             <>
               {session.currentStep === "analysis" && <AnalysisPanel session={session} setSession={setSession} showToast={showToast} />}
               {session.currentStep === "script" && <ScriptPanel session={session} setSession={setSession} currentCreative={currentCreative} selectedCreativeId={selectedCreativeId} setSelectedCreativeId={setSelectedCreativeId} onSubjectDetailChange={setScriptSubjectDetailOpen} showToast={showToast} />}
-              {session.currentStep === "preview" && <PreviewPanel session={session} setSession={setSession} />}
+              {session.currentStep === "preview" && <PreviewPanel session={session} />}
               {session.currentStep === "final" && <FinalPanel session={session} setSession={setSession} selectedFinals={selectedFinals} openUpload={openUpload} setDetailVideo={setDetailVideo} showToast={showToast} />}
             </>
           )}
@@ -1430,7 +1436,7 @@ export default function AgentCreationView({
                 <button onClick={generateScripts} className="rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-700">生成创意与分镜</button>
               </>}
               {session.currentStep === "script" && !scriptSubjectDetailOpen && <button onClick={generatePreviews} className="rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-700">生成视频预览</button>}
-              {session.currentStep === "preview" && <button onClick={generateFinals} disabled={session.previews.every((item) => !item.selected)} className="rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-40">生成视频成片</button>}
+              {session.currentStep === "preview" && <button onClick={generateFinals} disabled={!session.previews.length} className="rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-40">生成视频成片</button>}
               {session.currentStep === "final" && <button onClick={() => openUpload(selectedFinals)} className="flex items-center gap-2 rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-700"><Upload className="h-4 w-4" />上传资源库</button>}
             </div>
           )}
@@ -1478,7 +1484,7 @@ function ConversationPanel({ session, chatInput, setChatInput, submitChat, resto
     if (record.response) return record.response;
     if (record.step === "analysis") return `已为您完成${session.productName}的需求和商品分析，您可以在左侧查看详细分析结果。`;
     if (record.step === "script") return `已生成${record.generatedCreativeIds?.length || 3}套创意与分镜脚本，可在左侧选择并查看详细内容。`;
-    if (record.step === "preview") return `已生成${record.snapshot.previews.length}个视频预览，可在左侧查看并选择需要继续生成的版本。`;
+    if (record.step === "preview") return `已生成${record.snapshot.previews.length}个视频预览，可在左侧切换查看。`;
     return `已生成${record.snapshot.finals.length}个最终成片，可在左侧查看完整视频结果。`;
   };
 
@@ -2169,17 +2175,94 @@ function SubjectDetailPanel({ subject, draft, productName, voiceEditorOpen, voic
   );
 }
 
-function PreviewPanel({ session, setSession }: { session: AgentSession; setSession: React.Dispatch<React.SetStateAction<AgentSession | null>> }) {
-  const copyPreview = (item: PreviewItem) => {
-    const alternatives = session.previews.filter((preview) => preview.name.startsWith("备选")).length;
-    setSession({ ...session, previews: [...session.previews, { ...item, id: `preview_copy_${Date.now()}`, name: `备选${alternatives + 1}`, selected: true }] });
-  };
+function PreviewPanel({ session }: { session: AgentSession }) {
+  const [activePreviewId, setActivePreviewId] = useState(session.previews[0]?.id || "");
+  const activeIndex = Math.max(session.previews.findIndex((item) => item.id === activePreviewId), 0);
+  const activePreview = session.previews[activeIndex] || session.previews[0];
+  const previewRecord = [...session.timeline].reverse().find((record) => record.step === "preview" && !record.cancelled);
+  const creative = session.creatives.find((item) => item.id === previewRecord?.creativeId) || session.creatives[activeIndex % Math.max(session.creatives.length, 1)] || session.creatives[0];
+  const shots = creative?.shots?.length ? creative.shots.slice(0, 4) : [];
+  const productImages = creative?.productImages?.length ? creative.productImages : session.productImages;
+  const totalSeconds = shots.length ? shots.length * 7 : 28;
+
+  useEffect(() => {
+    if (!session.previews.some((item) => item.id === activePreviewId)) setActivePreviewId(session.previews[0]?.id || "");
+  }, [activePreviewId, session.previews]);
+
+  if (!activePreview) return <div className="flex min-h-[420px] items-center justify-center text-sm text-slate-400">暂无视频预览</div>;
+
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto max-w-6xl">
       <PanelHeader title="视频预览" />
-      <div className="grid grid-cols-2 gap-4">
-        {session.previews.map((item) => <article key={item.id} className={`overflow-hidden rounded-lg border bg-white ${item.selected ? "border-violet-400" : "border-slate-200"}`}><div className="relative aspect-video bg-slate-900"><img src={item.cover} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" /><div className="absolute inset-0 flex items-center justify-center bg-black/10"><button title="播放预览" className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-violet-700 shadow"><Play className="ml-0.5 h-4 w-4 fill-current" /></button></div><button onClick={() => setSession({ ...session, previews: session.previews.map((preview) => preview.id === item.id ? { ...preview, selected: !preview.selected } : preview) })} title={item.selected ? "取消选择" : "选择"} className={`absolute left-3 top-3 flex h-6 w-6 items-center justify-center rounded border ${item.selected ? "border-violet-600 bg-violet-600 text-white" : "border-white bg-white/80 text-transparent"}`}><Check className="h-3.5 w-3.5" /></button></div><div className="flex items-center justify-between p-3"><div><p className="text-xs font-bold text-slate-800">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">30秒 · 9:16</p></div><button onClick={() => copyPreview(item)} title="复制为备选" className="rounded-md border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"><Copy className="h-3.5 w-3.5" /></button></div></article>)}
-      </div>
+      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <div className="grid min-h-[510px] grid-cols-[68px_220px_minmax(0,1fr)]">
+          <aside className="border-r border-slate-200 bg-slate-50 px-2 py-4" aria-label="视频预览版本">
+            <div className="space-y-2">
+              {session.previews.map((item, index) => {
+                const active = item.id === activePreview.id;
+                return (
+                  <button key={item.id} onClick={() => setActivePreviewId(item.id)} className={`flex w-full flex-col items-center gap-2 rounded-md px-1 py-3 text-[11px] font-semibold transition-colors ${active ? "bg-violet-50 text-violet-700" : "text-slate-500 hover:bg-white hover:text-slate-800"}`}>
+                    <span className={`relative flex h-8 w-8 items-center justify-center rounded-md border bg-white ${active ? "border-violet-300" : "border-slate-200"}`}><Video className="h-4 w-4" />{index > 0 && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-cyan-400" />}</span>
+                    {item.name}
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
+
+          <div className="flex flex-col border-r border-slate-200 p-4">
+            <div className="relative mx-auto aspect-[9/16] w-full max-w-[188px] overflow-hidden rounded-lg bg-slate-900 shadow-sm">
+              <img src={activePreview.cover} alt={`${activePreview.name}视频预览`} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+              <div className="absolute inset-0 bg-slate-900/10" />
+              <button title="播放视频预览" className="absolute inset-0 m-auto flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-violet-700 shadow"><Play className="ml-0.5 h-5 w-5 fill-current" /></button>
+              <span className="absolute left-2 top-2 rounded bg-slate-900/65 px-2 py-1 text-[10px] font-semibold text-white">{activePreview.name}</span>
+            </div>
+            <div className="mt-4 flex items-center gap-2">
+              <button title="播放" className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"><Play className="h-3.5 w-3.5 fill-current" /></button>
+              <button title="声音" className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"><Volume2 className="h-4 w-4" /></button>
+              <span className="text-xs font-semibold text-slate-700">00:00</span>
+              <span className="text-xs text-slate-400">/ 00:{totalSeconds}</span>
+            </div>
+          </div>
+
+          <div className="min-w-0 p-4">
+            <h3 className="text-sm font-bold text-slate-900">适合“画面1”的原料</h3>
+            <div className="mt-3 flex gap-2">
+              <button className="flex h-16 w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-md border border-dashed border-slate-300 text-[10px] text-slate-500 hover:border-violet-300 hover:text-violet-700"><Plus className="h-4 w-4" />新增视频</button>
+              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md border-2 border-violet-500 bg-slate-100"><img src={activePreview.cover} alt="当前画面原料" className="h-full w-full object-cover" referrerPolicy="no-referrer" /><span className="absolute left-1 top-1 rounded bg-slate-900/70 px-1 text-[9px] text-white">AI</span></div>
+            </div>
+
+            <section className="mt-4 rounded-lg bg-slate-50 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div><h4 className="text-xs font-bold text-slate-800">画面描述</h4><p className="mt-1 text-[10px] text-slate-400">原料时长：{shots.length ? "7秒" : "--"} · 所用片段：0.0-7.0秒</p></div>
+                <div className="flex shrink-0 gap-1.5"><button className="flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1.5 text-[10px] text-slate-500 hover:bg-white"><RefreshCw className="h-3 w-3" />裁剪</button><button className="flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1.5 text-[10px] text-slate-500 hover:bg-white"><WandSparkles className="h-3 w-3" />优化</button></div>
+              </div>
+              <div className="mt-3 max-h-48 space-y-3 overflow-y-auto border-t border-slate-200 pt-3 text-xs leading-6 text-slate-600">
+                {(shots.length ? shots : [{ id: 0, summary: "展示商品使用前后的直观变化，突出核心卖点与真实使用效果。", dialogueLines: [], visualLines: [] }]).map((shot, index) => (
+                  <div key={shot.id}><span className="font-semibold text-slate-700">[00:{String(index * 7).padStart(2, "0")}-00:{String((index + 1) * 7).padStart(2, "0")}]</span> {shot.visualLines?.[0]?.text || shot.visual || shot.summary}{shot.dialogueLines?.[0]?.text && <p className="mt-1 text-slate-700">口播内容：{shot.dialogueLines[0].text}</p>}</div>
+                ))}
+              </div>
+              <div className="mt-3 flex items-center gap-2 border-t border-slate-200 pt-3"><span className="text-[11px] font-semibold text-slate-600">参考主体：</span>{(creative?.subjects || []).slice(0, 3).map((subject) => <span key={subject.id} title={subject.name} className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-white">{subject.image ? <img src={subject.image} alt={subject.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : subject.kind === "narrator" ? <Volume2 className="h-3.5 w-3.5 text-slate-500" /> : <Package className="h-3.5 w-3.5 text-slate-500" />}</span>)}{!creative?.subjects?.length && productImages.slice(0, 2).map((image) => <img key={image.id} src={image.image} alt={image.name} className="h-8 w-8 rounded-md border border-slate-200 object-cover" referrerPolicy="no-referrer" />)}</div>
+            </section>
+          </div>
+        </div>
+
+        <div className="border-t border-slate-200 px-4 py-3">
+          <div className="ml-[272px] flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 text-slate-400"><button title="替换素材" className="rounded-md p-2 hover:bg-slate-100 hover:text-slate-600"><RefreshCw className="h-4 w-4" /></button><button title="优化画面" className="rounded-md p-2 hover:bg-slate-100 hover:text-slate-600"><WandSparkles className="h-4 w-4" /></button><button title="添加画面" className="rounded-md p-2 hover:bg-slate-100 hover:text-slate-600"><Plus className="h-4 w-4" /></button></div>
+            <p className="text-[10px] text-slate-400">点击画面可查看对应分镜</p>
+          </div>
+          <div className="mt-2 ml-[272px] flex min-w-0 gap-2 overflow-x-auto pb-1">
+            {(shots.length ? shots : [{ id: 0, summary: "商品展示" }]).map((shot, index) => (
+              <button key={shot.id} className={`relative h-16 min-w-[112px] overflow-hidden rounded-md border-2 text-left ${index === 0 ? "border-violet-500" : "border-transparent"}`}>
+                <img src={index % 2 === 0 ? activePreview.cover : productImages[index % Math.max(productImages.length, 1)]?.image || activePreview.cover} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                <span className="absolute inset-x-0 top-0 bg-slate-900/55 px-1.5 py-1 text-[9px] font-semibold text-white">画面{index + 1}</span>
+                <span className="absolute bottom-1 right-1 rounded bg-slate-900/70 px-1 text-[9px] text-white">7.0s</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
