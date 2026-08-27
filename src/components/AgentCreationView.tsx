@@ -1409,7 +1409,7 @@ export default function AgentCreationView({
           })}
         </nav>
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_390px] overflow-hidden">
-        <main className="relative min-w-0 overflow-y-auto bg-slate-50 px-5 pb-0 pt-5">
+        <main className={`relative min-w-0 overflow-y-auto px-5 pb-0 pt-5 ${scriptSubjectDetailOpen ? "bg-white" : "bg-slate-50"}`}>
           {session.status === "generating" ? (
             <div className="flex h-full min-h-[420px] flex-col items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-violet-600" /><p className="mt-4 text-sm font-semibold text-slate-700">{generatingLabel}</p><button onClick={stopGeneration} className="mt-5 flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Square className="h-3.5 w-3.5" />停止生成</button></div>
           ) : session.status === "failed" ? (
@@ -1423,7 +1423,7 @@ export default function AgentCreationView({
             </>
           )}
 
-          {session.status !== "generating" && session.status !== "failed" && (
+          {session.status !== "generating" && session.status !== "failed" && !(session.currentStep === "script" && scriptSubjectDetailOpen) && (
             <div className="sticky bottom-0 z-20 -mx-5 mt-6 flex items-center justify-end gap-2 border-t border-slate-200 bg-white/95 px-5 py-3 backdrop-blur-sm">
               {session.currentStep === "analysis" && <>
                 <button onClick={() => runGeneration("正在生成视频成片", "final", 5, (current) => { const previews = createPreviews(); const next = { ...current, availableSteps: Array.from(new Set([...current.availableSteps, "final"])) as StepType[], previews, finals: createFinals(previews) }; return { ...next, timeline: [...next.timeline, recordFor(next, "final", "视频成片", { instruction: "一键成片", response: `已为您生成${current.productName}的最终广告成片，您可以在左侧查看完整的视频结果。` })] }; })} className="rounded-md border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">一键成片</button>
@@ -1878,29 +1878,167 @@ function SubjectTag({ subject, productImages, removable = false, onRemove }: { s
   );
 }
 
+const hasSubjectToken = (value: string) => /\[\[subject:[^\]]+\]\]/.test(value);
+const getSubjectTokenMatches = (value: string) => Array.from(value.matchAll(/\[\[subject:([^\]]+)\]\]/g));
+
 function StoryboardLineEditor({ type, text, subjects, subjectIds, productImages, onTextChange, onSubjectsChange }: { type: "dialogue" | "visual"; text: string; subjects: CreativeSubject[]; subjectIds: string[]; productImages: ProductSelection[]; onTextChange: (text: string) => void; onSubjectsChange?: (subjectIds: string[]) => void }) {
   const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionPosition, setMentionPosition] = useState({ left: 12, top: 64 });
+  const editorRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const mentionRangeRef = useRef<Range | null>(null);
+  const serializedRef = useRef("");
   const selectedSubjects = subjectIds.map((id) => subjects.find((subject) => subject.id === id)).filter((subject): subject is CreativeSubject => Boolean(subject));
   const availableSubjects = subjects.filter((subject) => !subjectIds.includes(subject.id));
+
+  const createSubjectChip = (subject: CreativeSubject) => {
+    const chip = document.createElement("span");
+    chip.contentEditable = "false";
+    chip.dataset.subjectId = subject.id;
+    chip.title = subject.description;
+    chip.className = "mx-0.5 inline-flex h-6 select-none items-center gap-1 rounded bg-violet-50 px-1.5 align-middle text-[11px] font-semibold text-violet-700";
+    const imageUrl = subject.kind === "product" ? productImages[0]?.image : subject.image;
+    if (imageUrl) {
+      const image = document.createElement("img");
+      image.src = imageUrl;
+      image.alt = "";
+      image.className = "h-4 w-4 rounded object-cover";
+      chip.appendChild(image);
+    } else if (subject.kind === "narrator") {
+      const icon = document.createElement("span");
+      icon.textContent = "◌";
+      icon.className = "text-xs text-violet-500";
+      chip.appendChild(icon);
+    }
+    chip.appendChild(document.createTextNode(subject.name));
+    return chip;
+  };
+
+  const serializeEditor = () => {
+    const editor = editorRef.current;
+    if (!editor) return "";
+    const serializeNode = (node: Node): string => {
+      if (node.nodeType === Node.TEXT_NODE) return node.textContent || "";
+      if (!(node instanceof HTMLElement)) return "";
+      if (node.dataset.subjectId) return `[[subject:${node.dataset.subjectId}]]`;
+      if (node.tagName === "BR") return "\n";
+      const content = Array.from(node.childNodes).map(serializeNode).join("");
+      return node.tagName === "DIV" || node.tagName === "P" ? `${content}\n` : content;
+    };
+    return Array.from(editor.childNodes).map(serializeNode).join("").replace(/\n$/, "");
+  };
+
+  const commitEditor = () => {
+    const encoded = serializeEditor();
+    serializedRef.current = encoded;
+    const ids = getSubjectTokenMatches(encoded).map((match) => match[1]);
+    onTextChange(encoded);
+    onSubjectsChange?.(Array.from(new Set(ids)));
+  };
+
+  useEffect(() => {
+    if (type !== "visual" || !editorRef.current) return;
+    const encoded = hasSubjectToken(text)
+      ? text
+      : `${subjectIds.map((id) => `[[subject:${id}]]`).join(" ")}${subjectIds.length ? " " : ""}${text}`;
+    if (serializedRef.current === encoded && editorRef.current.childNodes.length) return;
+    const editor = editorRef.current;
+    editor.replaceChildren();
+    let cursor = 0;
+    for (const match of getSubjectTokenMatches(encoded)) {
+      if (match.index > cursor) editor.appendChild(document.createTextNode(encoded.slice(cursor, match.index)));
+      const subject = subjects.find((item) => item.id === match[1]);
+      editor.appendChild(subject ? createSubjectChip(subject) : document.createTextNode(match[0]));
+      cursor = match.index + match[0].length;
+    }
+    if (cursor < encoded.length) editor.appendChild(document.createTextNode(encoded.slice(cursor)));
+    serializedRef.current = encoded;
+  }, [type, text, subjectIds, subjects, productImages]);
+
+  if (type === "dialogue") {
+    return (
+      <div className="relative flex min-h-[86px] items-start gap-2 border-t border-slate-100 p-3 first:border-t-0">
+        <div className="flex max-w-[42%] flex-wrap gap-1">{selectedSubjects.map((subject) => <SubjectTag key={subject.id} subject={subject} productImages={productImages} />)}</div>
+        <textarea aria-label="人物台词" value={text} onChange={(event) => onTextChange(event.target.value)} rows={3} className="min-h-[72px] min-w-0 flex-1 resize-none overflow-hidden border-0 bg-transparent p-0 text-xs leading-6 text-slate-600 outline-none [field-sizing:content]" />
+      </div>
+    );
+  }
+
+  const updateMentionRange = () => {
+    const selection = window.getSelection();
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    if (!range || !range.collapsed || !editorRef.current?.contains(range.startContainer) || range.startContainer.nodeType !== Node.TEXT_NODE) {
+      setMentionOpen(false);
+      return;
+    }
+    const content = range.startContainer.textContent?.slice(0, range.startOffset) || "";
+    const match = content.match(/@[^@\s]*$/);
+    if (!match) {
+      setMentionOpen(false);
+      return;
+    }
+    const mentionRange = range.cloneRange();
+    mentionRange.setStart(range.startContainer, range.startOffset - match[0].length);
+    mentionRangeRef.current = mentionRange;
+    const caretRect = range.getBoundingClientRect();
+    const wrapperRect = wrapperRef.current?.getBoundingClientRect();
+    if (wrapperRect) setMentionPosition({ left: Math.max(8, caretRect.left - wrapperRect.left), top: caretRect.bottom - wrapperRect.top + 6 });
+    setMentionOpen(true);
+  };
+
+  const insertSubject = (subject: CreativeSubject) => {
+    const range = mentionRangeRef.current;
+    const editor = editorRef.current;
+    if (!range || !editor) return;
+    range.deleteContents();
+    const chip = createSubjectChip(subject);
+    const space = document.createTextNode(" ");
+    range.insertNode(space);
+    range.insertNode(chip);
+    range.setStartAfter(space);
+    range.collapse(true);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    setMentionOpen(false);
+    commitEditor();
+  };
+
   return (
-    <div className="relative flex min-h-[86px] items-start gap-2 border-t border-slate-100 p-3 first:border-t-0">
-      <div className="flex max-w-[42%] flex-wrap gap-1">{selectedSubjects.map((subject) => <SubjectTag key={subject.id} subject={subject} productImages={productImages} removable={type === "visual"} onRemove={() => onSubjectsChange?.(subjectIds.filter((id) => id !== subject.id))} />)}</div>
-      <textarea
-        aria-label={type === "dialogue" ? "人物台词" : "画面描述"}
-        value={text}
-        onChange={(event) => {
-          const value = event.target.value;
-          onTextChange(value);
-          setMentionOpen(type === "visual" && /@[^@\s]*$/.test(value));
+    <div ref={wrapperRef} className="relative min-h-[86px] border-t border-slate-100 p-3 first:border-t-0">
+      <div
+        ref={editorRef}
+        role="textbox"
+        aria-label="画面描述"
+        aria-multiline="true"
+        contentEditable
+        suppressContentEditableWarning
+        onInput={() => { commitEditor(); updateMentionRange(); }}
+        onKeyUp={updateMentionRange}
+        onMouseUp={updateMentionRange}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") setMentionOpen(false);
+          if (event.key !== "Backspace") return;
+          const selection = window.getSelection();
+          const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+          if (!range?.collapsed) return;
+          const previous = range.startContainer.nodeType === Node.TEXT_NODE && range.startOffset === 0
+            ? range.startContainer.previousSibling
+            : range.startContainer === editorRef.current && range.startOffset > 0
+              ? editorRef.current.childNodes[range.startOffset - 1]
+              : null;
+          if (previous instanceof HTMLElement && previous.dataset.subjectId) {
+            event.preventDefault();
+            previous.remove();
+            commitEditor();
+          }
         }}
-        onKeyDown={(event) => { if (event.key === "Escape") setMentionOpen(false); }}
-        rows={3}
-        className="min-h-[72px] min-w-0 flex-1 resize-none overflow-hidden border-0 bg-transparent p-0 text-xs leading-6 text-slate-600 outline-none [field-sizing:content]"
+        className="min-h-[72px] whitespace-pre-wrap break-words text-xs leading-6 text-slate-600 outline-none"
       />
-      {type === "visual" && mentionOpen && (
-        <div className="absolute left-3 top-[72px] z-40 w-48 rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
+      {mentionOpen && (
+        <div style={{ left: mentionPosition.left, top: mentionPosition.top }} className="absolute z-40 w-48 rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
           <p className="px-2 py-1 text-[10px] text-slate-400">选择当前创意主体</p>
-          {availableSubjects.length ? availableSubjects.map((subject) => <button key={subject.id} onClick={() => { onTextChange(text.replace(/@[^@\s]*$/, "")); onSubjectsChange?.([...subjectIds, subject.id]); setMentionOpen(false); }} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-slate-700 hover:bg-violet-50"><AtSign className="h-3.5 w-3.5 text-violet-500" />{subject.name}</button>) : <p className="px-2 py-2 text-xs text-slate-400">当前主体均已关联</p>}
+          {availableSubjects.length ? availableSubjects.map((subject) => <button key={subject.id} onMouseDown={(event) => event.preventDefault()} onClick={() => insertSubject(subject)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-slate-700 hover:bg-violet-50"><AtSign className="h-3.5 w-3.5 text-violet-500" />{subject.name}</button>) : <p className="px-2 py-2 text-xs text-slate-400">当前主体均已关联</p>}
         </div>
       )}
     </div>
@@ -1915,7 +2053,7 @@ function SubjectDetailPanel({ subject, draft, productName, voiceEditorOpen, voic
       {isProduct ? (
         <div className="p-5">
           <div className="flex items-center justify-between"><div><h4 className="text-sm font-bold text-slate-900">商品参考图 <span className="font-normal text-slate-400">{draft.productImages.length}/6</span></h4><p className="mt-1 text-xs text-slate-400">至少保留一张商品参考图</p></div>{draft.productImages.length < 6 && <button onClick={onAddImage} className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700"><Plus className="h-3.5 w-3.5" />添加参考图</button>}</div>
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">{draft.productImages.map((image, index) => <article key={`${image.id}-${index}`} className="group relative aspect-square overflow-hidden rounded-lg border border-slate-200 bg-slate-50"><img src={image.image} alt={image.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" /><div className="absolute inset-0 flex items-start justify-end gap-1.5 bg-slate-900/0 p-2 opacity-0 transition group-hover:bg-slate-900/20 group-hover:opacity-100"><button onClick={() => onDeleteImage(index)} title={draft.productImages.length <= 1 ? "至少保留一张图片" : "删除图片"} className="flex h-7 w-7 items-center justify-center rounded bg-slate-900/75 text-white hover:bg-rose-600"><Trash2 className="h-3.5 w-3.5" /></button><button onClick={() => onReplaceImage(index)} title="替换图片" className="flex h-7 w-7 items-center justify-center rounded bg-slate-900/75 text-white hover:bg-violet-600"><RefreshCw className="h-3.5 w-3.5" /></button></div></article>)}</div>
+          <div className="mt-4 grid grid-cols-6 gap-2">{draft.productImages.map((image, index) => <article key={`${image.id}-${index}`} className="group relative aspect-square min-w-0 overflow-hidden rounded-md border border-slate-200 bg-slate-50"><img src={image.image} alt={image.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" /><div className="absolute inset-0 flex items-start justify-end gap-1 bg-slate-900/0 p-1.5 opacity-0 transition group-hover:bg-slate-900/20 group-hover:opacity-100"><button onClick={() => onDeleteImage(index)} title={draft.productImages.length <= 1 ? "至少保留一张图片" : "删除图片"} className="flex h-6 w-6 items-center justify-center rounded bg-slate-900/75 text-white hover:bg-rose-600"><Trash2 className="h-3 w-3" /></button><button onClick={() => onReplaceImage(index)} title="替换图片" className="flex h-6 w-6 items-center justify-center rounded bg-slate-900/75 text-white hover:bg-violet-600"><RefreshCw className="h-3 w-3" /></button></div></article>)}</div>
         </div>
       ) : (
         <div className={`grid gap-5 p-5 ${subject.kind === "person" ? "xl:grid-cols-[240px_minmax(0,1fr)]" : "grid-cols-1"}`}>
