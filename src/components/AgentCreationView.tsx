@@ -134,7 +134,12 @@ interface ResultRecord {
   step: StepType;
   title: string;
   version?: number;
+  creativeId?: number;
+  generatedCreativeIds?: number[];
   instruction?: string;
+  response?: string;
+  cancelled?: boolean;
+  hideCard?: boolean;
   time: string;
   snapshot: {
     demand: string;
@@ -177,6 +182,8 @@ interface AgentSession {
   specs: string[];
   discountInfo: string;
   creatives: CreativeItem[];
+  creativeVersions: Record<string, CreativeItem[]>;
+  activeCreativeVersions: Record<string, number>;
   previews: PreviewItem[];
   finals: FinalVideoItem[];
   timeline: ResultRecord[];
@@ -345,6 +352,10 @@ const cloneCreatives = (items: CreativeItem[]) => items.map((item) => ({
     visualLines: (shot.visualLines || []).map((line) => ({ ...line, subjectIds: [...line.subjectIds] }))
   }))
 }));
+const createCreativeVersionState = (creatives: CreativeItem[]) => ({
+  creativeVersions: Object.fromEntries(creatives.map((creative) => [String(creative.id), cloneCreatives([creative])])),
+  activeCreativeVersions: Object.fromEntries(creatives.map((creative) => [String(creative.id), 1]))
+});
 const productDisplayName = (product?: ProductSelection) => product?.name.replace(/\.(jpg|jpeg|png|webp)$/i, "") || "待补充商品名称";
 
 const PERSON_IMAGES = [
@@ -469,6 +480,27 @@ const createCreatives = (start: number, productName = "玻璃油膜清洁擦", p
   };
 });
 
+const applyCreativeChatRequest = (creative: CreativeItem, request: string): CreativeItem => {
+  const next = cloneCreatives([creative])[0];
+  const quotedTexts = Array.from(request.matchAll(/[“"]([^”"]+)[”"]/g), (match) => match[1]);
+  const replacement = quotedTexts.at(-1)?.trim();
+  const numericShot = request.match(/第\s*(\d+)\s*个?镜头/);
+  const shotIndex = /第一个镜头/.test(request) ? 0 : numericShot ? Math.max(Number(numericShot[1]) - 1, 0) : 0;
+  const targetShot = next.shots[Math.min(shotIndex, next.shots.length - 1)];
+
+  if (replacement && targetShot) {
+    if (/画面描述|画面/.test(request) && !/台词/.test(request)) {
+      targetShot.visualLines[0] = { ...targetShot.visualLines[0], text: replacement };
+    } else {
+      targetShot.dialogueLines[0] = { ...targetShot.dialogueLines[0], text: replacement };
+    }
+  } else {
+    next.overview = `${next.overview} ${request}`;
+    next.script = `${next.script} ${request}`;
+  }
+  return next;
+};
+
 const normalizeCreatives = (items: CreativeItem[] = [], productName = "玻璃油膜清洁擦", productImages: ProductSelection[] = []) => items.map((item, index) => {
   const fallback = CREATIVE_DETAILS[index % CREATIVE_DETAILS.length];
   const subjects = item.subjects?.length
@@ -508,12 +540,13 @@ const createFinals = (previews: PreviewItem[]): FinalVideoItem[] =>
     selected: true
   }));
 
-const recordFor = (session: AgentSession, step: StepType, title: string, version?: number, instruction?: string): ResultRecord => ({
+type ResultRecordOptions = Pick<ResultRecord, "version" | "creativeId" | "generatedCreativeIds" | "instruction" | "response" | "cancelled" | "hideCard">;
+
+const recordFor = (session: AgentSession, step: StepType, title: string, options: Partial<ResultRecordOptions> = {}): ResultRecord => ({
   id: `result_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
   step,
   title,
-  version,
-  instruction,
+  ...options,
   time: shortTime(),
   snapshot: {
     demand: session.demand,
@@ -557,6 +590,8 @@ const makeBaseSession = (prompt: string, mode: AgentSession["mode"]): AgentSessi
   discountInfo: "暂无优惠信息",
   productImages: [],
   creatives: [],
+  creativeVersions: {},
+  activeCreativeVersions: {},
   previews: [],
   finals: [],
   timeline: [],
@@ -634,16 +669,33 @@ const makeDemoSession = (task: Task): AgentSession => {
     creditsCost: task.creditsCost,
     updatedAt: task.createdAt,
     creatives,
+    ...createCreativeVersionState(creatives),
     previews: completed ? previews : [],
     finals: completed ? finals : [],
     versionCounts: { analysis: 1, script: 1 },
     activeVersions: { analysis: 1, script: 1 }
   };
   const timeline = [
-    recordFor(session, "analysis", "需求分析", 1),
-    recordFor(session, "script", "创意与分镜", 1)
+    recordFor(session, "analysis", "需求分析", {
+      response: `已为您完成${session.productName}的需求和商品分析，您可以在左侧查看详细分析结果，确认无误后我将继续为您生成创意和分镜脚本。`
+    }),
+    recordFor(session, "script", "创意与分镜", {
+      instruction: "进行下一步",
+      generatedCreativeIds: creatives.map((creative) => creative.id),
+      response: `已为您生成3套${session.productName}的创意和分镜脚本，分别是商品口播、情景混剪、情景剧三种类型，您可以在左侧查看详细内容，选择您满意的版本后我将继续为您生成视频预览。`
+    })
   ];
-  if (completed) timeline.push(recordFor(session, "preview", "视频预览"), recordFor(session, "final", "视频成片"));
+  if (completed) timeline.push(
+    recordFor(session, "preview", "视频预览", {
+      creativeId: creatives[0]?.id,
+      instruction: "生成视频预览",
+      response: `已为您生成${creatives[0]?.angle || "当前创意"}版本的${session.productName}广告视频预览，您可以在左侧查看各分镜的预览效果，确认无误后我将为您生成最终的完整广告视频。`
+    }),
+    recordFor(session, "final", "视频成片", {
+      instruction: "生成成片",
+      response: `已为您生成${session.productName}的最终广告成片，您可以在左侧查看完整的视频结果。`
+    })
+  );
   return { ...session, timeline };
 };
 
@@ -652,10 +704,17 @@ const loadStoredSession = (id: string) => {
     const sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") as Record<string, AgentSession>;
     const stored = sessions[id];
     if (!stored) return null;
+    const productImages = stored.productImages?.length ? stored.productImages : stored.product ? [stored.product] : [];
+    const productName = stored.productName || productDisplayName(stored.product);
+    const creatives = normalizeCreatives(stored.creatives, productName, productImages);
+    const creativeVersions = Object.fromEntries(creatives.map((creative) => {
+      const versions = stored.creativeVersions?.[String(creative.id)];
+      return [String(creative.id), versions?.length ? normalizeCreatives(versions, productName, productImages) : cloneCreatives([creative])];
+    }));
     return {
       ...stored,
-      productImages: stored.productImages?.length ? stored.productImages : stored.product ? [stored.product] : [],
-      productName: stored.productName || productDisplayName(stored.product),
+      productImages,
+      productName,
       industry: stored.industry || "待补充商品行业",
       category: stored.category || "待补充商品品类",
       sellingPoints: stored.sellingPoints || [],
@@ -664,7 +723,18 @@ const loadStoredSession = (id: string) => {
       scenarios: stored.scenarios || [],
       specs: stored.specs || [],
       discountInfo: stored.discountInfo || "暂无优惠信息",
-      creatives: normalizeCreatives(stored.creatives, stored.productName || productDisplayName(stored.product), stored.productImages?.length ? stored.productImages : stored.product ? [stored.product] : [])
+      creatives,
+      creativeVersions,
+      timeline: (stored.timeline || []).map((record) => (
+        record.step === "analysis" || (record.step === "script" && !record.creativeId)
+          ? { ...record, version: undefined }
+          : record
+      )),
+      activeCreativeVersions: Object.fromEntries(creatives.map((creative) => {
+        const versions = creativeVersions[String(creative.id)];
+        const active = stored.activeCreativeVersions?.[String(creative.id)] || versions.length;
+        return [String(creative.id), Math.min(Math.max(active, 1), versions.length)];
+      }))
     };
   } catch {
     return null;
@@ -715,6 +785,7 @@ export default function AgentCreationView({
   const [detailVideo, setDetailVideo] = useState<FinalVideoItem | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const generationTargetRef = useRef<StepType | null>(null);
   const sessionRef = useRef<AgentSession | null>(session);
   const productImagesForCreation = [
     ...(selectedProduct ? [selectedProduct] : []),
@@ -820,7 +891,9 @@ export default function AgentCreationView({
       const current = sessionRef.current;
       if (!current || current.id !== base.id || current.status === "cancelled") return;
       let next: AgentSession = { ...current, status: "completed", progress: 100, updatedAt: nowText() };
-      const analysis = recordFor(next, "analysis", "需求分析", 1);
+      const analysis = recordFor(next, "analysis", "需求分析", {
+        response: `已为您完成${next.productName}的需求和商品分析，您可以在左侧查看详细分析结果，确认无误后我将继续为您生成创意和分镜脚本。`
+      });
       if (oneClick) {
         const previews = createPreviews();
         next = { ...next, currentStep: "final", availableSteps: ["analysis", "final"], previews, finals: createFinals(previews) };
@@ -975,6 +1048,7 @@ export default function AgentCreationView({
     setSession(working);
     sessionRef.current = working;
     setGeneratingLabel(label);
+    generationTargetRef.current = targetStep;
     sync(working, charge);
     timerRef.current = setTimeout(() => {
       const current = sessionRef.current;
@@ -984,48 +1058,69 @@ export default function AgentCreationView({
       sessionRef.current = completed;
       setSession(completed);
       setGeneratingLabel("");
+      generationTargetRef.current = null;
       sync(completed);
     }, 1200);
   };
 
   const generateScripts = () => runGeneration("正在生成创意与分镜", "script", 0, (current) => {
-    const version = current.versionCounts.script + 1;
+    const generated = createCreatives(current.creatives.length, current.productName, current.productImages);
+    const repeated = current.creatives.length > 0;
+    const versionState = createCreativeVersionState(generated);
     const next: AgentSession = {
       ...current,
       availableSteps: Array.from(new Set([...current.availableSteps, "script"])) as StepType[],
-      creatives: [...current.creatives, ...createCreatives(current.creatives.length, current.productName, current.productImages)],
-      versionCounts: { ...current.versionCounts, script: version },
-      activeVersions: { ...current.activeVersions, script: version }
+      creatives: [...current.creatives, ...generated],
+      creativeVersions: { ...current.creativeVersions, ...versionState.creativeVersions },
+      activeCreativeVersions: { ...current.activeCreativeVersions, ...versionState.activeCreativeVersions }
     };
-    return { ...next, timeline: [...next.timeline, recordFor(next, "script", "创意与分镜", version, "生成创意与分镜")] };
+    const instruction = repeated ? "重新确认需求分析，重新生成后续结果" : "进行下一步";
+    const response = repeated
+      ? `已为您基于原需求分析重新生成了3套创意和分镜脚本，分别是商品口播、情景混剪、情景剧三种类型，您可以在左侧查看详细内容，选择您满意的版本后我将继续为您生成视频预览。`
+      : `已为您生成3套${current.productName}的创意和分镜脚本，分别是商品口播、情景混剪、情景剧三种类型，您可以在左侧查看详细内容，选择您满意的版本后我将继续为您生成视频预览。`;
+    return { ...next, timeline: [...next.timeline, recordFor(next, "script", "创意与分镜", { instruction, response, generatedCreativeIds: generated.map((creative) => creative.id) })] };
   });
 
   const generatePreviews = () => runGeneration("正在生成视频预览", "preview", 0, (current) => {
+    const creative = current.creatives.find((item) => item.id === selectedCreativeId) || current.creatives[0];
+    const repeated = current.timeline.some((record) => record.step === "preview" && !record.cancelled);
     const next = {
       ...current,
       availableSteps: Array.from(new Set([...current.availableSteps, "preview"])) as StepType[],
       previews: createPreviews(),
       finals: []
     };
-    return { ...next, timeline: [...next.timeline, recordFor(next, "preview", "视频预览", undefined, "生成视频预览")] };
+    return { ...next, timeline: [...next.timeline, recordFor(next, "preview", "视频预览", {
+      creativeId: creative?.id,
+      instruction: repeated ? "重新选择分镜脚本，生成视频预览" : "生成视频预览",
+      response: `已为您生成${creative?.angle || "当前创意"}版本的${current.productName}广告视频预览，您可以在左侧查看各分镜的预览效果，确认无误后我将为您生成最终的完整广告视频。`
+    })] };
   });
 
   const generateFinals = () => runGeneration("正在生成视频成片", "final", 5, (current) => {
+    const repeated = current.timeline.some((record) => record.step === "final" && !record.cancelled);
     const next = {
       ...current,
       availableSteps: Array.from(new Set([...current.availableSteps, "final"])) as StepType[],
       finals: createFinals(current.previews)
     };
-    return { ...next, timeline: [...next.timeline, recordFor(next, "final", "视频成片", undefined, "生成视频成片")] };
+    return { ...next, timeline: [...next.timeline, recordFor(next, "final", "视频成片", {
+      instruction: repeated ? "重新选择视频预览，生成成片" : "生成成片",
+      response: `已为您生成${current.productName}的最终广告成片，您可以在左侧查看完整的视频结果。`
+    })] };
   });
 
   const stopGeneration = () => {
     if (!session || session.status !== "generating") return;
     if (timerRef.current) clearTimeout(timerRef.current);
-    const cancelled = { ...session, status: "cancelled" as const, progress: Math.max(session.progress, 38), updatedAt: nowText() };
+    const target = generationTargetRef.current || session.currentStep;
+    const title = target === "final" ? "视频成片已停止" : target === "preview" ? "视频预览已停止" : "创意与分镜已停止";
+    const cancelledBase = { ...session, status: "cancelled" as const, progress: Math.max(session.progress, 38), updatedAt: nowText() };
+    const cancelled = { ...cancelledBase, timeline: [...cancelledBase.timeline, recordFor(cancelledBase, target, title, { cancelled: true })] };
     sessionRef.current = cancelled;
     setSession(cancelled);
     setGeneratingLabel("");
+    generationTargetRef.current = null;
     onCancelTask(session.id);
   };
 
@@ -1037,31 +1132,29 @@ export default function AgentCreationView({
   };
 
   const restoreResult = (record: ResultRecord) => {
-    if (!session || session.status === "generating") return;
-    setSession({
-      ...session,
-      currentStep: record.step,
-      demand: record.snapshot.demand,
-      product: record.snapshot.product ? { ...record.snapshot.product } : session.product,
-      productImages: record.snapshot.productImages?.length ? cloneItems(record.snapshot.productImages) : session.productImages,
-      productName: record.snapshot.productName || session.productName,
-      industry: record.snapshot.industry || session.industry,
-      category: record.snapshot.category || session.category,
-      sellingPoints: [...(record.snapshot.sellingPoints || session.sellingPoints)],
-      painPoints: [...(record.snapshot.painPoints || session.painPoints)],
-      targetGroups: [...(record.snapshot.targetGroups || session.targetGroups)],
-      scenarios: [...(record.snapshot.scenarios || session.scenarios)],
-      specs: [...(record.snapshot.specs || session.specs)],
-      discountInfo: record.snapshot.discountInfo || session.discountInfo,
-      creatives: normalizeCreatives(record.snapshot.creatives, record.snapshot.productName || session.productName, record.snapshot.productImages || session.productImages),
-      previews: cloneItems(record.snapshot.previews),
-      finals: cloneItems(record.snapshot.finals),
-      activeVersions: record.step === "analysis" && record.version
-        ? { ...session.activeVersions, analysis: record.version }
-        : record.step === "script" && record.version
-          ? { ...session.activeVersions, script: record.version }
-          : session.activeVersions
-    });
+    if (!session || session.status === "generating" || record.cancelled || record.hideCard) return;
+    let next = { ...session, currentStep: record.step };
+    if (record.step === "script" && record.creativeId) {
+      const key = String(record.creativeId);
+      const versions = session.creativeVersions[key] || [];
+      const version = record.version || session.activeCreativeVersions[key] || versions.length || 1;
+      const selected = versions[version - 1] || record.snapshot.creatives.find((creative) => creative.id === record.creativeId);
+      if (selected) {
+        next = {
+          ...next,
+          creatives: session.creatives.map((creative) => creative.id === record.creativeId ? cloneCreatives([selected])[0] : creative),
+          activeCreativeVersions: { ...session.activeCreativeVersions, [key]: version }
+        };
+      }
+      setSelectedCreativeId(record.creativeId);
+    } else if (record.step === "script" && record.generatedCreativeIds?.length) {
+      setSelectedCreativeId(record.generatedCreativeIds[0]);
+    } else if (record.step === "preview") {
+      next = { ...next, previews: cloneItems(record.snapshot.previews) };
+    } else if (record.step === "final") {
+      next = { ...next, finals: cloneItems(record.snapshot.finals) };
+    }
+    setSession(next);
   };
 
   const submitChat = () => {
@@ -1070,29 +1163,49 @@ export default function AgentCreationView({
     setChatInput("");
     runGeneration("正在按要求调整", session.currentStep, 0, (current) => {
       let next = { ...current };
-      let version: number | undefined;
       if (current.currentStep === "analysis") {
-        version = current.versionCounts.analysis + 1;
         next = {
           ...next,
-          demand: `${current.demand} 调整要求：${request}`,
-          versionCounts: { ...current.versionCounts, analysis: version },
-          activeVersions: { ...current.activeVersions, analysis: version }
+          demand: `${current.demand} 调整要求：${request}`
         };
+        return { ...next, timeline: [...next.timeline, recordFor(next, "analysis", "需求调整", {
+          instruction: request,
+          response: "已根据您的要求更新需求分析内容。",
+          hideCard: true
+        })] };
       } else if (current.currentStep === "script") {
-        version = current.versionCounts.script + 1;
+        const matchedId = request.match(/创意\s*(\d+)/)?.[1];
+        const creativeId = matchedId ? Number(matchedId) : selectedCreativeId;
+        const normalized = normalizeCreatives(current.creatives, current.productName, current.productImages);
+        const currentCreative = normalized.find((creative) => creative.id === creativeId) || normalized[0];
+        if (!currentCreative) return current;
+        const modified = applyCreativeChatRequest(currentCreative, request);
+        const key = String(currentCreative.id);
+        const previousVersions = current.creativeVersions[key]?.length ? current.creativeVersions[key] : cloneCreatives([currentCreative]);
+        const versions = [...previousVersions, cloneCreatives([modified])[0]];
+        const version = versions.length;
         next = {
           ...next,
-          creatives: current.creatives.map((item, index) => index === 0 ? { ...item, script: `${item.script} ${request}` } : item),
-          versionCounts: { ...current.versionCounts, script: version },
-          activeVersions: { ...current.activeVersions, script: version }
+          creatives: current.creatives.map((creative) => creative.id === currentCreative.id ? modified : creative),
+          creativeVersions: { ...current.creativeVersions, [key]: versions },
+          activeCreativeVersions: { ...current.activeCreativeVersions, [key]: version }
         };
+        setSelectedCreativeId(currentCreative.id);
+        return { ...next, timeline: [...next.timeline, recordFor(next, "script", "创意与分镜", {
+          creativeId: currentCreative.id,
+          version,
+          instruction: request,
+          response: `已为您修改了创意${currentCreative.id}，您可以在左侧查看修改后的创意和分镜脚本。`
+        })] };
       } else if (current.currentStep === "preview") {
         next = { ...next, previews: current.previews.map((item) => ({ ...item, name: item.name.includes("调整") ? item.name : `${item.name}·调整` })) };
       } else {
         next = { ...next, finals: current.finals.map((item) => ({ ...item, name: item.name.replace(".mp4", "_调整版.mp4") })) };
       }
-      return { ...next, timeline: [...next.timeline, recordFor(next, current.currentStep, `按要求调整：${request.slice(0, 12)}`, version, request)] };
+      return { ...next, timeline: [...next.timeline, recordFor(next, current.currentStep, `按要求调整：${request.slice(0, 12)}`, {
+        instruction: request,
+        response: current.currentStep === "preview" ? "已根据您的要求更新当前视频预览。" : "已根据您的要求更新当前视频成片。"
+      })] };
     });
   };
 
@@ -1313,7 +1426,7 @@ export default function AgentCreationView({
           {session.status !== "generating" && session.status !== "failed" && (
             <div className="sticky bottom-0 z-20 -mx-5 mt-6 flex items-center justify-end gap-2 border-t border-slate-200 bg-white/95 px-5 py-3 backdrop-blur-sm">
               {session.currentStep === "analysis" && <>
-                <button onClick={() => runGeneration("正在生成视频成片", "final", 5, (current) => { const previews = createPreviews(); const next = { ...current, availableSteps: Array.from(new Set([...current.availableSteps, "final"])) as StepType[], previews, finals: createFinals(previews) }; return { ...next, timeline: [...next.timeline, recordFor(next, "final", "视频成片", undefined, "一键成片")] }; })} className="rounded-md border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">一键成片</button>
+                <button onClick={() => runGeneration("正在生成视频成片", "final", 5, (current) => { const previews = createPreviews(); const next = { ...current, availableSteps: Array.from(new Set([...current.availableSteps, "final"])) as StepType[], previews, finals: createFinals(previews) }; return { ...next, timeline: [...next.timeline, recordFor(next, "final", "视频成片", { instruction: "一键成片", response: `已为您生成${current.productName}的最终广告成片，您可以在左侧查看完整的视频结果。` })] }; })} className="rounded-md border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">一键成片</button>
                 <button onClick={generateScripts} className="rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-700">生成创意与分镜</button>
               </>}
               {session.currentStep === "script" && !scriptSubjectDetailOpen && <button onClick={generatePreviews} className="rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-700">生成视频预览</button>}
@@ -1354,15 +1467,17 @@ function ConversationPanel({ session, chatInput, setChatInput, submitChat, resto
   }, [session.timeline.length, session.status, messages.length]);
 
   const resultTitle = (record: ResultRecord) => {
-    if (record.step === "analysis") return `${session.productName}的需求分析`;
+    if (record.cancelled) return record.title;
+    if (record.step === "analysis") return session.productName;
     if (record.step === "script") return `${session.productName}的分镜`;
     if (record.step === "preview") return `${session.productName}的预览`;
     return `${session.productName}的${record.snapshot.finals.length || session.finals.length}个成片`;
   };
 
   const resultDescription = (record: ResultRecord) => {
-    if (record.step === "analysis") return `已完成${session.productName}的需求和商品分析，可在左侧查看并修改详细内容。`;
-    if (record.step === "script") return `已生成${record.snapshot.creatives.length}套创意与分镜脚本，可在左侧选择并查看详细内容。`;
+    if (record.response) return record.response;
+    if (record.step === "analysis") return `已为您完成${session.productName}的需求和商品分析，您可以在左侧查看详细分析结果。`;
+    if (record.step === "script") return `已生成${record.generatedCreativeIds?.length || 3}套创意与分镜脚本，可在左侧选择并查看详细内容。`;
     if (record.step === "preview") return `已生成${record.snapshot.previews.length}个视频预览，可在左侧查看并选择需要继续生成的版本。`;
     return `已生成${record.snapshot.finals.length}个最终成片，可在左侧查看完整视频结果。`;
   };
@@ -1392,10 +1507,14 @@ function ConversationPanel({ session, chatInput, setChatInput, submitChat, resto
             return (
               <div key={record.id} className="space-y-3">
                 {record.instruction && <div className="flex justify-end"><div className="max-w-[88%] rounded-lg bg-violet-600 px-3.5 py-2.5 text-xs leading-5 text-white">{record.instruction}</div></div>}
-                <button onClick={() => restoreResult(record)} className={`w-[82%] rounded-lg border p-3 text-left transition-colors ${active ? "border-violet-300 bg-violet-50" : "border-slate-200 bg-slate-50 hover:border-slate-300"}`}>
-                  <div className="flex items-start gap-2.5"><span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${active ? "bg-violet-600 text-white" : "bg-white text-violet-600"}`}><Icon className="h-4 w-4" /></span><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-800">{resultTitle(record)}</p><p className="mt-1.5 text-[10px] text-slate-400">查看详情 <span className="mx-1">|</span> {record.time}{record.version ? ` · 第${record.version}版` : ""}</p></div></div>
-                </button>
-                <p className="text-xs leading-6 text-slate-600">{resultDescription(record)}</p>
+                {!record.hideCard && (record.cancelled ? (
+                  <div className="w-[82%] rounded-lg border border-violet-200 bg-violet-50 p-3"><div className="flex items-start gap-2.5"><span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white text-violet-600"><Icon className="h-4 w-4" /></span><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-800">{resultTitle(record)}</p><p className="mt-1.5 text-[10px] text-slate-400">已取消生成</p></div></div></div>
+                ) : (
+                  <button onClick={() => restoreResult(record)} className={`w-[82%] rounded-lg border p-3 text-left transition-colors ${active ? "border-violet-300 bg-violet-50" : "border-slate-200 bg-slate-50 hover:border-slate-300"}`}>
+                    <div className="flex items-start gap-2.5"><span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${active ? "bg-violet-600 text-white" : "bg-white text-violet-600"}`}><Icon className="h-4 w-4" /></span><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-800">{resultTitle(record)}</p><p className="mt-1.5 text-[10px] text-slate-400">查看详情 <span className="mx-1">|</span> {record.time}{record.version ? ` · 第${record.version}版` : ""}</p></div></div>
+                  </button>
+                ))}
+                {!record.cancelled && <p className="text-xs leading-6 text-slate-600">{resultDescription(record)}</p>}
               </div>
             );
           })}
@@ -1421,7 +1540,7 @@ function AnalysisPanel({ session, setSession, showToast }: { session: AgentSessi
   const updateList = (field: "sellingPoints" | "painPoints" | "targetGroups" | "scenarios" | "specs", items: string[]) => setSession({ ...session, [field]: items });
   return (
     <div className="mx-auto max-w-5xl">
-      <PanelHeader title={session.productName} count={session.versionCounts.analysis} active={session.activeVersions.analysis} onChange={(value) => setSession({ ...session, activeVersions: { ...session.activeVersions, analysis: value } })} />
+      <PanelHeader title={session.productName} />
       <p className="mb-6 text-base font-bold text-violet-700">商品分析信息</p>
       <div className="space-y-8">
         <section>
@@ -1519,14 +1638,42 @@ function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId,
   const displayCreative = useMemo(() => currentCreative
     ? normalizeCreatives(session.creatives, session.productName, session.productImages).find((creative) => creative.id === currentCreative.id)
     : undefined, [currentCreative, session.creatives, session.productImages, session.productName]);
+  const selectedCreativeVersions = currentCreative
+    ? session.creativeVersions[String(currentCreative.id)] || cloneCreatives([currentCreative])
+    : [];
+  const activeCreativeVersion = currentCreative
+    ? session.activeCreativeVersions[String(currentCreative.id)] || 1
+    : 1;
 
   const updateCreative = (updater: (creative: CreativeItem) => CreativeItem) => {
     if (!currentCreative) return;
     setSession((current) => {
       if (!current) return current;
       const normalized = normalizeCreatives(current.creatives, current.productName, current.productImages);
-      return { ...current, creatives: current.creatives.map((creative, index) => creative.id === currentCreative.id ? updater(normalized[index]) : creative) };
+      const updated = updater(normalized.find((creative) => creative.id === currentCreative.id) || currentCreative);
+      const key = String(currentCreative.id);
+      const versions = current.creativeVersions[key]?.length ? cloneCreatives(current.creativeVersions[key]) : cloneCreatives([updated]);
+      const activeIndex = Math.min(Math.max((current.activeCreativeVersions[key] || 1) - 1, 0), versions.length - 1);
+      versions[activeIndex] = cloneCreatives([updated])[0];
+      return {
+        ...current,
+        creatives: current.creatives.map((creative) => creative.id === currentCreative.id ? updated : creative),
+        creativeVersions: { ...current.creativeVersions, [key]: versions }
+      };
     });
+  };
+
+  const selectCreativeVersion = (version: number) => {
+    if (!currentCreative) return;
+    const key = String(currentCreative.id);
+    const selected = selectedCreativeVersions[version - 1];
+    if (!selected) return;
+    setSession((current) => current ? {
+      ...current,
+      creatives: current.creatives.map((creative) => creative.id === currentCreative.id ? cloneCreatives([selected])[0] : creative),
+      activeCreativeVersions: { ...current.activeCreativeVersions, [key]: version }
+    } : current);
+    setExpandedCreativeId(null);
   };
 
   const updateDialogueLine = (shotId: number, lineId: string, text: string) => updateCreative((creative) => ({
@@ -1626,7 +1773,7 @@ function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId,
 
   return (
     <div className="mx-auto max-w-6xl">
-      <PanelHeader title="创意与分镜" count={session.versionCounts.script} active={session.activeVersions.script} onChange={(value) => setSession({ ...session, activeVersions: { ...session.activeVersions, script: value } })} />
+      <PanelHeader title="创意与分镜" count={selectedCreativeVersions.length > 1 ? selectedCreativeVersions.length : undefined} active={activeCreativeVersion} onChange={selectCreativeVersion} />
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[157px_minmax(0,1fr)]">
         <div className="flex gap-2 overflow-x-auto pb-1 xl:sticky xl:top-0 xl:block xl:space-y-2 xl:overflow-visible xl:pb-0">
           {session.creatives.map((item) => (
