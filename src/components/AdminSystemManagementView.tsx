@@ -1345,6 +1345,15 @@ export default function AdminSystemManagementView() {
     setSelectedMemberIds([]);
   };
 
+  const handleOpenInviteModal = () => {
+    const defaultDeptId = depts.find(d => d.id !== "dept_root")?.id || depts[0]?.id || "dept_root";
+    const defaultRoleId = roles.find(r => r.id !== "super_admin")?.id || roles[0]?.id || "";
+    setInviteDeptId(defaultDeptId);
+    setInviteRoleId(defaultRoleId);
+    setInviteLink(`https://sucaicloud.com/invite/join?org=dreamchang&dept=${defaultDeptId}&code=${Math.random().toString(36).substring(2, 8)}`);
+    setInviteModalOpen(true);
+  };
+
   const handleCopyInviteLink = () => {
     navigator.clipboard.writeText(inviteLink);
     showToast("📋 专属邀请加入链接已成功复制到剪贴板！");
@@ -2928,6 +2937,14 @@ export default function AdminSystemManagementView() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={handleOpenInviteModal}
+                    className="px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 border border-purple-200"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>快捷邀请</span>
+                  </button>
+
                   <button
                     onClick={handleExportMembersCsv}
                     className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
@@ -6180,6 +6197,92 @@ export default function AdminSystemManagementView() {
           </div>
         )}
       </div>
+
+      {/* MODAL: 部门 / 分组 */}
+      {deptModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between bg-slate-900 px-5 py-4 text-white">
+              <h3 className="flex items-center gap-2 text-sm font-black"><FolderPlus className="h-4 w-4 text-purple-400" />{deptModal.mode === "add" ? `新增${deptForm.levelType === "group" ? "分组" : "部门"}` : `编辑${deptForm.levelType === "group" ? "分组" : "部门"}配置`}</h3>
+              <button type="button" onClick={() => setDeptModal(null)} title="关闭" className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"><X className="h-5 w-5" /></button>
+            </div>
+            <form onSubmit={handleSaveDept} className="space-y-4 p-6 text-xs">
+              {deptModal.data?.id !== "dept_root" && (
+                <div>
+                  <label className="mb-1 block font-bold text-slate-500">架构节点类型</label>
+                  <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1 font-bold">
+                    <button type="button" onClick={() => setDeptForm({ ...deptForm, levelType: "department", parentId: "dept_root" })} className={`rounded-lg py-2 ${deptForm.levelType === "department" ? "bg-purple-600 text-white" : "text-slate-600 hover:bg-white"}`}>部门</button>
+                    <button type="button" onClick={() => setDeptForm({ ...deptForm, levelType: "group", parentId: depts.find(d => d.parentId === "dept_root" && d.id !== "dept_root")?.id || "dept_root" })} className={`rounded-lg py-2 ${deptForm.levelType === "group" ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-white"}`}>分组</button>
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <label className="space-y-1"><span className="block font-bold text-slate-500">{deptForm.levelType === "group" ? "分组名称" : "部门名称"} *</span><input required value={deptForm.name} onChange={(e) => setDeptForm({ ...deptForm, name: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold outline-none focus:border-purple-500" /></label>
+                <label className="space-y-1"><span className="block font-bold text-slate-500">编号</span><input value={deptForm.code} onChange={(e) => setDeptForm({ ...deptForm, code: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono outline-none focus:border-purple-500" /></label>
+              </div>
+              <label className="block space-y-1"><span className="block font-bold text-slate-500">上级归属节点</span>{deptForm.levelType === "department" ? <span className="block rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 font-bold">梦畅AIGC（最高公司）</span> : <select value={deptForm.parentId} onChange={(e) => setDeptForm({ ...deptForm, parentId: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold outline-none focus:border-purple-500">{depts.filter(d => d.parentId === "dept_root" && d.id !== "dept_root" && d.id !== deptModal.data?.id).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select>}</label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="space-y-1"><span className="block font-bold text-slate-500">负责人</span><input value={deptForm.manager} onChange={(e) => setDeptForm({ ...deptForm, manager: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 outline-none focus:border-purple-500" /></label>
+                <label className="space-y-1"><span className="block font-bold text-slate-500">联系电话</span><input value={deptForm.phone} onChange={(e) => setDeptForm({ ...deptForm, phone: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono outline-none focus:border-purple-500" /></label>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="space-y-1"><span className="block font-bold text-slate-500">职责类型</span><select value={deptForm.type} onChange={(e) => setDeptForm({ ...deptForm, type: e.target.value as DeptNode["type"] })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold outline-none focus:border-purple-500"><option value="综合部门">综合部门</option><option value="内容部门">内容部门</option><option value="投放部门">投放部门</option><option value="投放组">投放组</option><option value="剪辑组">剪辑组</option><option value="编导组">编导组</option><option value="直播组">直播组</option></select></label>
+                <label className="space-y-1"><span className="block font-bold text-slate-500">编制数上限</span><input type="number" min={1} value={deptForm.quota} onChange={(e) => setDeptForm({ ...deptForm, quota: Number(e.target.value) || 1 })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono outline-none focus:border-purple-500" /></label>
+              </div>
+              <label className="block space-y-1"><span className="block font-bold text-slate-500">职责简述</span><textarea rows={3} value={deptForm.description} onChange={(e) => setDeptForm({ ...deptForm, description: e.target.value })} className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 outline-none focus:border-purple-500" /></label>
+              <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={() => setDeptModal(null)} className="px-4 py-2 font-bold text-slate-500 hover:text-slate-800">取消</button><button type="submit" className="rounded-xl bg-purple-600 px-5 py-2 font-bold text-white hover:bg-purple-700">保存配置</button></div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: 人员账号 */}
+      {memberModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
+          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between bg-slate-900 px-5 py-4 text-white"><h3 className="flex items-center gap-2 text-sm font-black"><UserPlus className="h-4 w-4 text-purple-400" />{memberModal.mode === "add" ? "录入人员账号" : "编辑成员资料与角色"}</h3><button type="button" onClick={() => setMemberModal(null)} title="关闭" className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"><X className="h-5 w-5" /></button></div>
+            <form onSubmit={handleSaveMember} className="space-y-4 p-6 text-xs">
+              <div className="grid grid-cols-2 gap-3"><label className="space-y-1"><span className="block font-bold text-slate-500">真实姓名 *</span><input required value={memberForm.name} onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold outline-none focus:border-purple-500" /></label><label className="space-y-1"><span className="block font-bold text-slate-500">工号</span><input value={memberForm.employeeNo} onChange={(e) => setMemberForm({ ...memberForm, employeeNo: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono outline-none focus:border-purple-500" /></label></div>
+              <div className="grid grid-cols-2 gap-3"><label className="space-y-1"><span className="block font-bold text-slate-500">手机号码 *</span><input required value={memberForm.phone} onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono outline-none focus:border-purple-500" /></label><label className="space-y-1"><span className="block font-bold text-slate-500">工作邮箱</span><input type="email" value={memberForm.email} onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono outline-none focus:border-purple-500" /></label></div>
+              <div className="grid grid-cols-2 gap-3"><label className="space-y-1"><span className="block font-bold text-slate-500">所属部门 *</span><select value={memberForm.selectedDeptId} onChange={(e) => handleMemberDeptChange(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold outline-none focus:border-purple-500">{depts.filter(d => d.id === "dept_root" || d.parentId === "dept_root" || d.levelType === "department" || d.levelType === "company").map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label><label className="space-y-1"><span className="block font-bold text-slate-500">所属分组</span><select value={memberForm.selectedGroupId} onChange={(e) => handleMemberGroupChange(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold outline-none focus:border-purple-500"><option value="">不指定分组</option>{depts.filter(d => d.parentId === memberForm.selectedDeptId).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label></div>
+              <div className="grid grid-cols-2 gap-3"><label className="space-y-1"><span className="block font-bold text-slate-500">绑定岗位角色</span><select value={memberForm.roleId} onChange={(e) => setMemberForm({ ...memberForm, roleId: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold outline-none focus:border-purple-500">{roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select></label><label className="space-y-1"><span className="block font-bold text-slate-500">账号状态</span><select value={memberForm.status} onChange={(e) => setMemberForm({ ...memberForm, status: e.target.value as AccountMember["status"] })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold outline-none focus:border-purple-500"><option value="normal">正常启用</option><option value="bound">账号绑定</option><option value="pending">待激活</option><option value="disabled">已停用</option></select></label></div>
+              {memberForm.status === "bound" && <label className="block space-y-1 rounded-xl border border-purple-200 bg-purple-50 p-3"><span className="block font-bold text-purple-800">绑定广告/媒体账号</span><select value={memberForm.boundAccount} onChange={(e) => setMemberForm({ ...memberForm, boundAccount: e.target.value })} className="w-full rounded-xl border border-purple-200 bg-white px-3 py-2 font-bold"><option value="巨量千川-千川主账号01 (1776342461268999)">巨量千川 - 千川主账号01</option><option value="巨量千川-服装旗舰店账号 (1776342461268888)">巨量千川 - 服装旗舰店账号</option><option value="抖音官方蓝V-美妆爆款运营账户">抖音官方蓝V - 美妆爆款运营账户</option></select></label>}
+              <label className="block space-y-1"><span className="block font-bold text-slate-500">备注</span><textarea rows={2} value={memberForm.remark} onChange={(e) => setMemberForm({ ...memberForm, remark: e.target.value })} className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 outline-none focus:border-purple-500" /></label>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-500">{memberModal.mode === "add" ? <>新账号默认登录密码为 <code className="font-bold text-purple-700">{DEFAULT_PLATFORM_PASSWORD}</code></> : <button type="button" onClick={() => { const member = memberModal.data; setMemberModal(null); if (member) handleOpenResetPassword(member); }} className="flex items-center gap-1 font-bold text-amber-700"><Key className="h-3.5 w-3.5" />重置该成员登录密码</button>}</div>
+              <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={() => setMemberModal(null)} className="px-4 py-2 font-bold text-slate-500 hover:text-slate-800">取消</button><button type="submit" className="rounded-xl bg-purple-600 px-5 py-2 font-bold text-white hover:bg-purple-700">保存成员信息</button></div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: 重置密码 */}
+      {resetPasswordModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-2xl">
+            <div className="flex items-center justify-between bg-slate-900 px-5 py-4 text-white"><h3 className="flex items-center gap-2 text-sm font-black"><Key className="h-4 w-4 text-amber-400" />重置人员登录密码</h3><button type="button" onClick={() => setResetPasswordModal(null)} title="关闭" className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"><X className="h-5 w-5" /></button></div>
+            <div className="space-y-4 p-6 text-xs">
+              <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3"><img src={resetPasswordModal.member.avatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop"} alt={resetPasswordModal.member.name} className="h-10 w-10 rounded-full object-cover" referrerPolicy="no-referrer" /><div><p className="font-extrabold text-slate-900">{resetPasswordModal.member.name}</p><p className="mt-1 text-[10px] text-slate-500">{resetPasswordModal.member.roleName} · {resetPasswordModal.member.phone}</p></div></div>
+              <div className="space-y-2"><p className="font-bold text-slate-600">选择密码重置模式</p>{([['default', '恢复平台默认初始密码'], ['random', '随机生成 8 位高强度密码'], ['custom', '手动指定新密码']] as const).map(([value, label]) => <label key={value} className={`block cursor-pointer rounded-xl border p-3 ${resetPasswordModal.resetType === value ? "border-purple-300 bg-purple-50 text-purple-900" : "border-slate-200"}`}><span className="flex items-center gap-2 font-bold"><input type="radio" name="resetType" checked={resetPasswordModal.resetType === value} onChange={() => setResetPasswordModal({ ...resetPasswordModal, resetType: value, customPassword: value === "default" ? DEFAULT_PLATFORM_PASSWORD : "" })} className="accent-purple-600" />{label}</span>{value === "custom" && resetPasswordModal.resetType === "custom" && <input value={resetPasswordModal.customPassword} onChange={(e) => setResetPasswordModal({ ...resetPasswordModal, customPassword: e.target.value })} placeholder="请输入 6~20 位新密码" className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono outline-none focus:border-purple-500" />}</label>)}</div>
+              <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3"><label className="flex items-center gap-2 font-bold"><input type="checkbox" checked={resetPasswordModal.notifyUser} onChange={(e) => setResetPasswordModal({ ...resetPasswordModal, notifyUser: e.target.checked })} className="accent-purple-600" />通知该成员</label><label className="flex items-center gap-2 font-bold"><input type="checkbox" checked={resetPasswordModal.forceNextChange} onChange={(e) => setResetPasswordModal({ ...resetPasswordModal, forceNextChange: e.target.checked })} className="accent-purple-600" />下次登录强制修改密码</label></div>
+              <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={() => setResetPasswordModal(null)} className="px-4 py-2 font-bold text-slate-500">取消</button><button type="button" onClick={handleConfirmResetPassword} className="rounded-xl bg-amber-500 px-5 py-2 font-bold text-white hover:bg-amber-600">确认重置密码</button></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: 快捷邀请 */}
+      {inviteModalOpen && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-2xl"><div className="flex items-center justify-between bg-slate-900 px-5 py-4 text-white"><h3 className="flex items-center gap-2 text-sm font-black"><UserPlus className="h-4 w-4 text-purple-400" />生成专属邀请链接</h3><button type="button" onClick={() => setInviteModalOpen(false)} title="关闭" className="rounded-lg p-1 text-slate-400 hover:bg-slate-800"><X className="h-5 w-5" /></button></div><div className="space-y-4 p-6 text-xs"><label className="block space-y-1"><span className="block font-bold text-slate-500">预指派部门</span><select value={inviteDeptId} onChange={(e) => setInviteDeptId(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold">{depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label><label className="block space-y-1"><span className="block font-bold text-slate-500">预赋予角色</span><select value={inviteRoleId} onChange={(e) => setInviteRoleId(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold">{roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select></label><label className="block space-y-1 rounded-xl border border-purple-200 bg-purple-50 p-3"><span className="block font-bold text-purple-900">邀请链接（有效期 7 天）</span><input readOnly value={inviteLink} className="w-full rounded-lg border border-purple-200 bg-white px-3 py-2 font-mono text-[11px] text-purple-800" /></label><div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={() => setInviteModalOpen(false)} className="px-4 py-2 font-bold text-slate-500">关闭</button><button type="button" onClick={handleCopyInviteLink} className="flex items-center gap-1.5 rounded-xl bg-purple-600 px-5 py-2 font-bold text-white hover:bg-purple-700"><Copy className="h-3.5 w-3.5" />复制邀请链接</button></div></div></div>
+        </div>
+      )}
+
+      {/* MODAL: 批量导入人员 */}
+      {importModalOpen && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-2xl"><div className="flex items-center justify-between bg-slate-900 px-5 py-4 text-white"><h3 className="flex items-center gap-2 text-sm font-black"><Upload className="h-4 w-4 text-purple-400" />批量导入组织成员账号</h3><button type="button" onClick={() => setImportModalOpen(false)} title="关闭" className="rounded-lg p-1 text-slate-400 hover:bg-slate-800"><X className="h-5 w-5" /></button></div><div className="space-y-4 p-6 text-xs"><div className="rounded-xl border border-slate-200 bg-slate-50 p-3 font-mono text-[11px] text-slate-600"><p className="font-sans font-bold text-slate-800">每行一个人，格式：</p><p className="mt-1 text-purple-700">姓名, 手机号, 角色, 邮箱</p></div><label className="block space-y-1"><span className="block font-bold text-slate-500">粘贴 CSV 数据</span><textarea rows={7} value={importCsvText} onChange={(e) => setImportCsvText(e.target.value)} placeholder={"张三, 13800001111, 投手, zhangsan@dreamchang.com\n李四, 13900002222, 剪辑, lisi@dreamchang.com"} className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono outline-none focus:border-purple-500" /></label><div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={() => setImportModalOpen(false)} className="px-4 py-2 font-bold text-slate-500">取消</button><button type="button" onClick={handleConfirmImportCsv} className="rounded-xl bg-purple-600 px-5 py-2 font-bold text-white hover:bg-purple-700">解析并导入</button></div></div></div>
+        </div>
+      )}
 
       {/* --------------------------------------------------------------------------- */}
       {/* MODAL: 新增/修改角色                                                         */}
