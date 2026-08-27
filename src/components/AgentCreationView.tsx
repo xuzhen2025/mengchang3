@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft, ArrowUp, AtSign, Check, CheckCircle2, ChevronDown, Copy, Download, Eye,
+  ArrowLeft, ArrowUp, AtSign, AudioLines, Check, CheckCircle2, ChevronDown, Copy, Download, Eye,
   FileText, Film, History, Image as ImageIcon, Link2, Loader2,
   MessageSquare, MoreHorizontal, Package, Palette, Play, Plus, Search,
   RefreshCw, Settings, Sparkles, Square, Trash2, Upload,
@@ -1635,6 +1635,7 @@ function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId,
   const [imagePicker, setImagePicker] = useState<{ mode: "add" | "replace"; index?: number } | null>(null);
   const [cardImagePickerOpen, setCardImagePickerOpen] = useState(false);
   const [playingSubjectId, setPlayingSubjectId] = useState<string | null>(null);
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
   const [voiceEditorOpen, setVoiceEditorOpen] = useState(false);
   const [voiceDraft, setVoiceDraft] = useState("");
   const voicePreviewRef = useRef<SpeechSynthesisUtterance | null>(null);
@@ -1652,12 +1653,14 @@ function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId,
     window.speechSynthesis?.cancel();
     voicePreviewRef.current = null;
     setPlayingSubjectId(null);
+    setPlayingVoiceId(null);
   };
 
   useEffect(() => {
     window.speechSynthesis?.cancel();
     voicePreviewRef.current = null;
     setPlayingSubjectId(null);
+    setPlayingVoiceId(null);
     return () => window.speechSynthesis?.cancel();
   }, [selectedCreativeId, activeCreativeVersion]);
 
@@ -1678,6 +1681,29 @@ function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId,
     };
     voicePreviewRef.current = utterance;
     setPlayingSubjectId(subject.id);
+    setPlayingVoiceId(null);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const toggleDetailVoicePreview = (subject: CreativeSubject, voice: VoiceOption) => {
+    if (playingVoiceId === voice.id) return stopVoicePreview();
+    if (!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) return showToast("当前浏览器暂不支持音色试听");
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(subject.kind === "narrator"
+      ? "玻璃重新透亮，雨天和夜间开车都安心多了。"
+      : "别急，用这款玻璃油膜清洁擦，自己就能快速处理。");
+    utterance.lang = "zh-CN";
+    utterance.rate = subject.kind === "narrator" ? 0.92 : 1;
+    utterance.pitch = subject.kind === "narrator" ? 0.9 : 1.05;
+    utterance.onend = utterance.onerror = () => {
+      if (voicePreviewRef.current !== utterance) return;
+      voicePreviewRef.current = null;
+      setPlayingSubjectId(null);
+      setPlayingVoiceId(null);
+    };
+    voicePreviewRef.current = utterance;
+    setPlayingSubjectId(null);
+    setPlayingVoiceId(voice.id);
     window.speechSynthesis.speak(utterance);
   };
 
@@ -1736,6 +1762,7 @@ function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId,
   };
 
   const closeSubject = () => {
+    stopVoicePreview();
     setSubjectDraft(null);
     setVoiceEditorOpen(false);
     setVoiceDraft("");
@@ -1764,23 +1791,30 @@ function ScriptPanel({ session, setSession, currentCreative, selectedCreativeId,
           productName={session.productName}
           voiceEditorOpen={voiceEditorOpen}
           voiceDraft={voiceDraft}
+          playingVoiceId={playingVoiceId}
           onBack={closeSubject}
           onApply={applySubjectDraft}
           onVoiceDraftChange={setVoiceDraft}
           onToggleVoiceEditor={() => {
+            stopVoicePreview();
             if (voiceEditorOpen) setVoiceDraft("");
             setVoiceEditorOpen(!voiceEditorOpen);
           }}
           onAddVoice={() => {
             const description = voiceDraft.trim();
             if (!description) return;
+            stopVoicePreview();
             const nextNumber = subjectDraft.voices.length + 1;
             const id = `voice-${Date.now()}`;
             setSubjectDraft({ ...subjectDraft, voices: [...subjectDraft.voices, createVoice(id, `音色 ${nextNumber}`, description)], activeVoiceId: id });
             setVoiceDraft("");
             setVoiceEditorOpen(false);
           }}
-          onSelectVoice={(activeVoiceId) => setSubjectDraft({ ...subjectDraft, activeVoiceId })}
+          onSelectVoice={(activeVoiceId) => {
+            stopVoicePreview();
+            setSubjectDraft({ ...subjectDraft, activeVoiceId });
+          }}
+          onToggleVoicePreview={(voice) => toggleDetailVoicePreview(selectedSubject, voice)}
           onAddImage={() => setImagePicker({ mode: "add" })}
           onReplaceImage={(index) => setImagePicker({ mode: "replace", index })}
           onDeleteImage={(index) => {
@@ -2114,7 +2148,7 @@ function StoryboardLineEditor({ type, text, subjects, subjectIds, productImages,
   );
 }
 
-function SubjectDetailPanel({ subject, draft, productName, voiceEditorOpen, voiceDraft, onBack, onApply, onVoiceDraftChange, onToggleVoiceEditor, onAddVoice, onSelectVoice, onAddImage, onReplaceImage, onDeleteImage }: { subject: CreativeSubject; draft: { subjectId: string; productImages: ProductSelection[]; voices: VoiceOption[]; activeVoiceId?: string }; productName: string; voiceEditorOpen: boolean; voiceDraft: string; onBack: () => void; onApply: () => void; onVoiceDraftChange: (value: string) => void; onToggleVoiceEditor: () => void; onAddVoice: () => void; onSelectVoice: (id: string) => void; onAddImage: () => void; onReplaceImage: (index: number) => void; onDeleteImage: (index: number) => void }) {
+function SubjectDetailPanel({ subject, draft, productName, voiceEditorOpen, voiceDraft, playingVoiceId, onBack, onApply, onVoiceDraftChange, onToggleVoiceEditor, onAddVoice, onSelectVoice, onToggleVoicePreview, onAddImage, onReplaceImage, onDeleteImage }: { subject: CreativeSubject; draft: { subjectId: string; productImages: ProductSelection[]; voices: VoiceOption[]; activeVoiceId?: string }; productName: string; voiceEditorOpen: boolean; voiceDraft: string; playingVoiceId: string | null; onBack: () => void; onApply: () => void; onVoiceDraftChange: (value: string) => void; onToggleVoiceEditor: () => void; onAddVoice: () => void; onSelectVoice: (id: string) => void; onToggleVoicePreview: (voice: VoiceOption) => void; onAddImage: () => void; onReplaceImage: (index: number) => void; onDeleteImage: (index: number) => void }) {
   const isProduct = subject.kind === "product";
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -2127,7 +2161,7 @@ function SubjectDetailPanel({ subject, draft, productName, voiceEditorOpen, voic
       ) : (
         <div className={`grid gap-5 p-5 ${subject.kind === "person" ? "xl:grid-cols-[240px_minmax(0,1fr)]" : "grid-cols-1"}`}>
           {subject.kind === "person" && <img src={subject.image} alt={subject.name} className="aspect-[3/4] w-full rounded-lg border border-slate-200 object-cover" referrerPolicy="no-referrer" />}
-          <div className="min-w-0"><section className="rounded-lg border border-slate-200 bg-slate-50 p-4"><h4 className="text-xs font-bold text-slate-800">{subject.kind === "person" ? "形象描述" : "旁白描述"}</h4><p className="mt-2 text-xs leading-6 text-slate-600">{subject.description}</p></section><div className="mt-5 flex items-center justify-between"><h4 className="text-sm font-bold text-slate-900">音色</h4><button onClick={onToggleVoiceEditor} className="text-xs font-semibold text-violet-700 hover:text-violet-800">{voiceEditorOpen ? "取消" : "新增音色"}</button></div><div className="mt-3 flex flex-wrap gap-2">{draft.voices.map((voice) => <button key={voice.id} onClick={() => onSelectVoice(voice.id)} className={`min-w-[108px] rounded-lg border px-4 py-3 text-left ${draft.activeVoiceId === voice.id ? "border-violet-500 bg-violet-50" : "border-slate-200 bg-white hover:border-violet-200"}`}><span className="text-xs font-bold text-slate-700">{voice.name}</span></button>)}</div>{draft.activeVoiceId && <section className="mt-3 rounded-lg border border-slate-200 p-4"><div className="flex items-center justify-between"><h4 className="text-xs font-bold text-slate-800">音色描述</h4><button title="试听音色" className="flex h-7 w-7 items-center justify-center rounded bg-violet-50 text-violet-700"><Volume2 className="h-3.5 w-3.5" /></button></div><p className="mt-2 text-xs leading-6 text-slate-600">{draft.voices.find((voice) => voice.id === draft.activeVoiceId)?.description}</p></section>}{voiceEditorOpen && <section className="mt-3 rounded-lg border border-violet-200 bg-violet-50/30 p-3"><textarea value={voiceDraft} onChange={(event) => onVoiceDraftChange(event.target.value)} placeholder="描述希望生成的音色，例如：年轻女性，表达自然，语速稍快" rows={3} className="w-full resize-none rounded-md border border-slate-200 bg-white p-3 text-xs leading-6 outline-none focus:border-violet-400" /><div className="mt-2 flex justify-end"><button disabled={!voiceDraft.trim()} onClick={onAddVoice} className="rounded-md bg-violet-600 px-3 py-2 text-xs font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400">生成音色</button></div></section>}</div>
+          <div className="min-w-0"><section className="rounded-lg border border-slate-200 bg-slate-50 p-4"><h4 className="text-xs font-bold text-slate-800">{subject.kind === "person" ? "形象描述" : "旁白描述"}</h4><p className="mt-2 text-xs leading-6 text-slate-600">{subject.description}</p></section><div className="mt-5 flex items-center justify-between"><h4 className="text-sm font-bold text-slate-900">音色</h4><button onClick={onToggleVoiceEditor} className="text-xs font-semibold text-violet-700 hover:text-violet-800">{voiceEditorOpen ? "取消" : "新增音色"}</button></div><div className="mt-3 flex flex-wrap gap-2">{draft.voices.map((voice) => { const playing = playingVoiceId === voice.id; return <div key={voice.id} className="group/voice relative min-w-[108px]"><button onClick={() => onSelectVoice(voice.id)} className={`w-full rounded-lg border px-4 py-3 text-center ${draft.activeVoiceId === voice.id ? "border-violet-500 bg-violet-50" : "border-slate-200 bg-white hover:border-violet-200"}`}><span className={`text-xs font-bold ${draft.activeVoiceId === voice.id ? "text-violet-700" : "text-slate-700"}`}>{voice.name}</span></button><button onClick={() => onToggleVoicePreview(voice)} aria-label={playing ? `停止试听${voice.name}` : `试听${voice.name}`} title={playing ? "停止试听" : "试听音色"} className={`absolute left-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-violet-700 transition-opacity hover:bg-violet-100 focus-visible:opacity-100 ${playing ? "opacity-100" : "opacity-0 group-hover/voice:opacity-100"}`}>{playing ? <AudioLines className="h-4 w-4" /> : <Play className="h-3.5 w-3.5 fill-current" />}</button></div>; })}</div>{draft.activeVoiceId && <section className="mt-3 rounded-lg border border-slate-200 p-4"><h4 className="text-xs font-bold text-slate-800">音色描述</h4><p className="mt-2 text-xs leading-6 text-slate-600">{draft.voices.find((voice) => voice.id === draft.activeVoiceId)?.description}</p></section>}{voiceEditorOpen && <section className="mt-3 rounded-lg border border-violet-200 bg-violet-50/30 p-3"><textarea value={voiceDraft} onChange={(event) => onVoiceDraftChange(event.target.value)} placeholder="描述希望生成的音色，例如：年轻女性，表达自然，语速稍快" rows={3} className="w-full resize-none rounded-md border border-slate-200 bg-white p-3 text-xs leading-6 outline-none focus:border-violet-400" /><div className="mt-2 flex justify-end"><button disabled={!voiceDraft.trim()} onClick={onAddVoice} className="rounded-md bg-violet-600 px-3 py-2 text-xs font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400">生成音色</button></div></section>}</div>
         </div>
       )}
       <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4"><button onClick={onBack} className="rounded-md border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">取消</button><button onClick={onApply} disabled={isProduct && !draft.productImages.length} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:bg-slate-200">应用</button></div>
