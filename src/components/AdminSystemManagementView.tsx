@@ -1898,16 +1898,12 @@ export default function AdminSystemManagementView() {
   const [hotVideoType, setHotVideoType] = useState<"monthly" | "total">("monthly");
   const [hotVideoThreshold, setHotVideoThreshold] = useState<number>(10);
 
-  // 3. 视频预览文案规则
-  const [previewAuthorTextEnabled, setPreviewAuthorTextEnabled] = useState<boolean>(true);
-  const [previewDefaultText, setPreviewDefaultText] = useState<string>("123123123");
-
-  // 4. 功能开关管理
+  // 3. 功能开关管理
   const [featureSwitches, setFeatureSwitches] = useState({
     mainCategory: false, // 主类目开关
     categorySearch: true, // 分类搜索开关
-    imageDownloadLog: true, // 图片下载，使用记录开关
-    textDownloadLog: true, // 文案下载，使用记录开关
+    imageDownloadLog: true, // 图片下载，操作记录开关
+    textDownloadLog: true, // 文案下载，操作记录开关
     finishedListSpendData: true, // 成片列表展示消耗数据开关
     finishedManualLinkMaterial: true, // 成片手动关联素材开关
     videoPushSuccessNotify: false, // 视频推送成功发送消息开关
@@ -1915,15 +1911,7 @@ export default function AdminSystemManagementView() {
     uploadMaterialShootTimeRequired: false, // 上传素材拍摄时间必填
   });
 
-  // 广告账户可见性
-  const [adAccountVisibility, setAdAccountVisibility] = useState({
-    all: false,
-    personal: false,
-    group: false,
-    category: false,
-  });
-
-  // 5. 资源开放下载规则 (发布多少天后开放下载/复制到剪映)
+  // 4. 资源开放下载规则 (发布多少天后开放下载/复制到剪映)
   const [downloadRules, setDownloadRules] = useState({
     finished: { group: 0, team: 0, others: 7 },
     material: { group: 0, team: 0, others: 7 },
@@ -3976,53 +3964,7 @@ export default function AdminSystemManagementView() {
               </div>
             </div>
 
-            {/* 3. 视频预览文案 */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
-              <div className="flex items-center gap-2 border-l-4 border-[#7C3AED] pl-2.5">
-                <h3 className="text-sm font-extrabold text-slate-900">视频预览文案</h3>
-              </div>
-
-              <div className="pt-2 space-y-4 text-xs font-bold text-slate-700">
-                <div className="flex items-center gap-4">
-                  <span>上传视频作者，自定义文案</span>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewAuthorTextEnabled(!previewAuthorTextEnabled)}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      previewAuthorTextEnabled ? "bg-[#7C3AED]" : "bg-slate-200"
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
-                        previewAuthorTextEnabled ? "translate-x-4" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <span className="shrink-0">默认文案</span>
-                  <input
-                    type="text"
-                    value={previewDefaultText}
-                    onChange={(e) => setPreviewDefaultText(e.target.value)}
-                    className="w-full max-w-2xl px-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-800 focus:border-[#7C3AED] outline-none font-medium"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => showToast("视频预览文案规则保存成功！")}
-                  className="px-5 py-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
-                >
-                  保存设置
-                </button>
-              </div>
-            </div>
-
-            {/* 4. 功能开关 */}
+            {/* 3. 功能开关 */}
             <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 space-y-5">
               <div className="flex items-center gap-2 border-l-4 border-[#7C3AED] pl-2.5">
                 <h3 className="text-sm font-extrabold text-slate-900">功能开关</h3>
@@ -4032,8 +3974,8 @@ export default function AdminSystemManagementView() {
                 {[
                   { key: "mainCategory", label: "主类目开关" },
                   { key: "categorySearch", label: "分类搜索开关" },
-                  { key: "imageDownloadLog", label: "图片下载，使用记录开关" },
-                  { key: "textDownloadLog", label: "文案下载，使用记录开关" },
+                  { key: "imageDownloadLog", label: "图片下载，操作记录开关" },
+                  { key: "textDownloadLog", label: "文案下载，操作记录开关" },
                   { key: "finishedListSpendData", label: "成片列表展示消耗数据开关" },
                   { key: "finishedManualLinkMaterial", label: "成片手动关联素材开关" },
                   { key: "videoPushSuccessNotify", label: "视频推送成功发送消息开关", desc: "开启后视频推送完成后会收到消息通知。" },
@@ -4065,34 +4007,6 @@ export default function AdminSystemManagementView() {
                     </button>
                   </div>
                 ))}
-
-                {/* 广告账户可见性 */}
-                <div className="pt-2 flex items-center gap-6">
-                  <span className="shrink-0">广告账户可见性</span>
-                  <div className="flex items-center gap-4 flex-wrap">
-                    {[
-                      { key: "all", label: "全部账户" },
-                      { key: "personal", label: "个人账户" },
-                      { key: "group", label: "小组账户" },
-                      { key: "category", label: "分类账户" },
-                    ].map((acc) => (
-                      <label key={acc.key} className="flex items-center gap-1.5 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={(adAccountVisibility as any)[acc.key]}
-                          onChange={(e) =>
-                            setAdAccountVisibility((prev: any) => ({
-                              ...prev,
-                              [acc.key]: e.target.checked,
-                            }))
-                          }
-                          className="accent-[#7C3AED] w-4 h-4 rounded cursor-pointer"
-                        />
-                        <span className="text-slate-700 font-medium">{acc.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
               </div>
 
               <div className="flex justify-end pt-2 border-t border-slate-100">
@@ -4106,7 +4020,7 @@ export default function AdminSystemManagementView() {
               </div>
             </div>
 
-            {/* 5. 发布多少天后开放下载/复制到剪映 */}
+            {/* 4. 发布多少天后开放下载/复制到剪映 */}
             <div className="hidden bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
               <div className="flex items-center justify-between border-l-4 border-[#7C3AED] pl-2.5">
                 <h3 className="text-sm font-extrabold text-slate-900">发布多少天后开放下载/复制到剪映</h3>
