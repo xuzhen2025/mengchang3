@@ -68,7 +68,7 @@ export default function AdminView({ adminActiveScreen, onTriggerTask, onOpenTask
     { id: "video_status", label: "视频状态", icon: Video, desc: "渲染成片/审片流转/投放状态监控" },
     { id: "script_status", label: "脚本状态", icon: FileText, desc: "文案拆解/AI分镜/审核归档状态" },
     { id: "tasks", label: "任务", icon: ListTodo, desc: "后台AI生成与批量渲染任务监控" },
-    { id: "tags", label: "标签", icon: Tag, desc: "受众偏好与平台爆款标签体系" },
+    { id: "tags", label: "公共标签", icon: Tag, desc: "受众偏好与平台爆款标签体系" },
     { id: "categories", label: "分类管理", icon: FolderTree, desc: "多级类目架构与业务属性划分" },
     { id: "script_templates", label: "脚本模板", icon: Copy, desc: "结构化文案框架与AI创作模版" },
   ];
