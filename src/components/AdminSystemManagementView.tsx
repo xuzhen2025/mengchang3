@@ -1948,6 +1948,13 @@ export default function AdminSystemManagementView() {
   const [extDownloadMode, setExtDownloadMode] = useState<"forbidden" | "allow" | "scope">("allow");
   const [extEditMode, setExtEditMode] = useState<"forbidden" | "allow" | "scope">("allow");
   const [extDeleteMode, setExtDeleteMode] = useState<"forbidden" | "allow" | "scope">("allow");
+  const [extPermissionScopes, setExtPermissionScopes] = useState<
+    Record<"download" | "edit" | "delete", { team: string; group: string; user: string }>
+  >({
+    download: { team: "", group: "", user: "陈嘉" },
+    edit: { team: "", group: "", user: "陈嘉" },
+    delete: { team: "", group: "", user: "陈嘉" },
+  });
 
   // 9. 作品可见性设置
   const [publishVisibility, setPublishVisibility] = useState({
@@ -2563,6 +2570,59 @@ export default function AdminSystemManagementView() {
   const filteredUsers = users.filter((u) =>
     u.name.includes(userSearchKey) || u.phone.includes(userSearchKey) || u.role.includes(userSearchKey)
   );
+
+  const renderExternalScopeSelector = (permission: "download" | "edit" | "delete") => {
+    const scope = extPermissionScopes[permission];
+    const updateScope = (field: "team" | "group" | "user", value: string) => {
+      setExtPermissionScopes((prev) => ({
+        ...prev,
+        [permission]: { ...prev[permission], [field]: value },
+      }));
+    };
+
+    return (
+      <div className="flex items-center gap-4 pl-18 pt-1">
+        <div className="flex items-center gap-2">
+          <span className="text-slate-500 font-normal">团队:</span>
+          <select
+            value={scope.team}
+            onChange={(e) => updateScope("team", e.target.value)}
+            className="px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-medium text-slate-600 bg-white"
+          >
+            <option value="">请选择</option>
+            <option value="team_a">电商一部</option>
+            <option value="team_b">品牌二部</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-slate-500 font-normal">小组:</span>
+          <select
+            value={scope.group}
+            onChange={(e) => updateScope("group", e.target.value)}
+            className="px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-medium text-slate-600 bg-white"
+          >
+            <option value="">请选择</option>
+            <option value="group_1">爆款剪辑组</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-slate-500 font-normal">用户:</span>
+          <div className="px-3 py-1 border border-slate-200 rounded-xl flex items-center gap-1.5 bg-white">
+            <span className="bg-slate-100 text-slate-700 text-[11px] px-2 py-0.5 rounded-md flex items-center gap-1 font-bold">
+              {scope.user}
+              <X
+                className="w-3 h-3 text-slate-400 hover:text-slate-600 cursor-pointer"
+                onClick={() => updateScope("user", "")}
+              />
+            </span>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="h-full flex flex-col overflow-y-auto bg-slate-50 text-slate-800 font-sans relative">
@@ -4320,54 +4380,63 @@ export default function AdminSystemManagementView() {
                 </div>
 
                 {/* 下载 */}
-                <div className="flex items-center gap-6">
-                  <span className="w-12 text-slate-700 font-bold">下载</span>
-                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                    <input type="radio" name="ext_dl" checked={extDownloadMode === "forbidden"} onChange={() => setExtDownloadMode("forbidden")} className="accent-[#7C3AED]" />
-                    <span className="font-medium text-slate-600">禁止</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                    <input type="radio" name="ext_dl" checked={extDownloadMode === "allow"} onChange={() => setExtDownloadMode("allow")} className="accent-[#7C3AED]" />
-                    <span className={extDownloadMode === "allow" ? "text-[#7C3AED] font-bold" : "font-medium text-slate-600"}>允许</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                    <input type="radio" name="ext_dl" checked={extDownloadMode === "scope"} onChange={() => setExtDownloadMode("scope")} className="accent-[#7C3AED]" />
-                    <span className="font-medium text-slate-600">允许指定范围</span>
-                  </label>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-6">
+                    <span className="w-12 text-slate-700 font-bold">下载</span>
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input type="radio" name="ext_dl" checked={extDownloadMode === "forbidden"} onChange={() => setExtDownloadMode("forbidden")} className="accent-[#7C3AED] w-4 h-4 cursor-pointer" />
+                      <span className="font-medium text-slate-600">禁止</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input type="radio" name="ext_dl" checked={extDownloadMode === "allow"} onChange={() => setExtDownloadMode("allow")} className="accent-[#7C3AED] w-4 h-4 cursor-pointer" />
+                      <span className={extDownloadMode === "allow" ? "text-[#7C3AED] font-bold" : "font-medium text-slate-600"}>允许</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input type="radio" name="ext_dl" checked={extDownloadMode === "scope"} onChange={() => setExtDownloadMode("scope")} className="accent-[#7C3AED] w-4 h-4 cursor-pointer" />
+                      <span className={extDownloadMode === "scope" ? "text-[#7C3AED] font-bold" : "font-medium text-slate-600"}>允许指定范围</span>
+                    </label>
+                  </div>
+                  {extDownloadMode === "scope" && renderExternalScopeSelector("download")}
                 </div>
 
                 {/* 编辑 */}
-                <div className="flex items-center gap-6">
-                  <span className="w-12 text-slate-700 font-bold">编辑</span>
-                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                    <input type="radio" name="ext_ed" checked={extEditMode === "forbidden"} onChange={() => setExtEditMode("forbidden")} className="accent-[#7C3AED]" />
-                    <span className="font-medium text-slate-600">禁止</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                    <input type="radio" name="ext_ed" checked={extEditMode === "allow"} onChange={() => setExtEditMode("allow")} className="accent-[#7C3AED]" />
-                    <span className={extEditMode === "allow" ? "text-[#7C3AED] font-bold" : "font-medium text-slate-600"}>允许</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                    <input type="radio" name="ext_ed" checked={extEditMode === "scope"} onChange={() => setExtEditMode("scope")} className="accent-[#7C3AED]" />
-                    <span className="font-medium text-slate-600">允许指定范围</span>
-                  </label>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-6">
+                    <span className="w-12 text-slate-700 font-bold">编辑</span>
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input type="radio" name="ext_ed" checked={extEditMode === "forbidden"} onChange={() => setExtEditMode("forbidden")} className="accent-[#7C3AED] w-4 h-4 cursor-pointer" />
+                      <span className="font-medium text-slate-600">禁止</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input type="radio" name="ext_ed" checked={extEditMode === "allow"} onChange={() => setExtEditMode("allow")} className="accent-[#7C3AED] w-4 h-4 cursor-pointer" />
+                      <span className={extEditMode === "allow" ? "text-[#7C3AED] font-bold" : "font-medium text-slate-600"}>允许</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input type="radio" name="ext_ed" checked={extEditMode === "scope"} onChange={() => setExtEditMode("scope")} className="accent-[#7C3AED] w-4 h-4 cursor-pointer" />
+                      <span className={extEditMode === "scope" ? "text-[#7C3AED] font-bold" : "font-medium text-slate-600"}>允许指定范围</span>
+                    </label>
+                  </div>
+                  {extEditMode === "scope" && renderExternalScopeSelector("edit")}
                 </div>
 
                 {/* 删除 */}
-                <div className="flex items-center gap-6">
-                  <span className="w-12 text-slate-700 font-bold">删除</span>
-                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                    <input type="radio" name="ext_del" checked={extDeleteMode === "forbidden"} onChange={() => setExtDeleteMode("forbidden")} className="accent-[#7C3AED]" />
-                    <span className="font-medium text-slate-600">禁止</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                    <input type="radio" name="ext_del" checked={extDeleteMode === "allow"} onChange={() => setExtDeleteMode("allow")} className="accent-[#7C3AED]" />
-                    <span className={extDeleteMode === "allow" ? "text-[#7C3AED] font-bold" : "font-medium text-slate-600"}>允许</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                    <input type="radio" name="ext_del" checked={extDeleteMode === "scope"} onChange={() => setExtDeleteMode("scope")} className="accent-[#7C3AED]" />
-                    <span className="font-medium text-slate-600">允许指定范围</span>
-                  </label>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-6">
+                    <span className="w-12 text-slate-700 font-bold">删除</span>
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input type="radio" name="ext_del" checked={extDeleteMode === "forbidden"} onChange={() => setExtDeleteMode("forbidden")} className="accent-[#7C3AED] w-4 h-4 cursor-pointer" />
+                      <span className="font-medium text-slate-600">禁止</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input type="radio" name="ext_del" checked={extDeleteMode === "allow"} onChange={() => setExtDeleteMode("allow")} className="accent-[#7C3AED] w-4 h-4 cursor-pointer" />
+                      <span className={extDeleteMode === "allow" ? "text-[#7C3AED] font-bold" : "font-medium text-slate-600"}>允许</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input type="radio" name="ext_del" checked={extDeleteMode === "scope"} onChange={() => setExtDeleteMode("scope")} className="accent-[#7C3AED] w-4 h-4 cursor-pointer" />
+                      <span className={extDeleteMode === "scope" ? "text-[#7C3AED] font-bold" : "font-medium text-slate-600"}>允许指定范围</span>
+                    </label>
+                  </div>
+                  {extDeleteMode === "scope" && renderExternalScopeSelector("delete")}
                 </div>
               </div>
 
