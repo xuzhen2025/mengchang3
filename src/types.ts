@@ -105,6 +105,10 @@ export interface Task {
   refundedCredits?: number;
   failureReason?: string;
   agentStage?: "analysis" | "script" | "preview" | "final";
+  remakeStage?: "video_analysis" | "storyboard" | "final";
+  remakeSessionId?: string;
+  cancellable?: boolean;
+  restartable?: boolean;
 }
 
 export interface CreditTransaction {

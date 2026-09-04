@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { X, Search, FileUp, Image, Video, Music, Check, FolderHeart } from "lucide-react";
 import { Asset } from "../types";
+import AssetPagination from "./AssetPagination";
 
 interface MaterialSelectorProps {
   isOpen: boolean;
@@ -24,6 +25,8 @@ export default function MaterialSelector({
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "image" | "video" | "audio">("all");
   const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   if (!isOpen) return null;
 
@@ -34,6 +37,8 @@ export default function MaterialSelector({
     const isAllowed = allowedTypes.includes(asset.type);
     return matchesSearch && matchesTab && isAllowed;
   });
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(filteredAssets.length / pageSize)));
+  const pagedAssets = filteredAssets.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const toggleSelect = (url: string) => {
     if (selectedUrls.includes(url)) {
@@ -103,7 +108,7 @@ export default function MaterialSelector({
           {/* Tabs */}
           <div className="flex bg-slate-100 border border-slate-200 p-0.5 rounded-lg flex-shrink-0">
             <button
-              onClick={() => setActiveTab("all")}
+              onClick={() => { setActiveTab("all"); setPage(1); }}
               className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
                 activeTab === "all" ? "bg-white text-slate-700 shadow-xs border border-slate-100" : "text-slate-400 hover:text-slate-600"
               }`}
@@ -112,7 +117,7 @@ export default function MaterialSelector({
             </button>
             {allowedTypes.includes("image") && (
               <button
-                onClick={() => setActiveTab("image")}
+                onClick={() => { setActiveTab("image"); setPage(1); }}
                 className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
                   activeTab === "image" ? "bg-white text-slate-700 shadow-xs border border-slate-100" : "text-slate-400 hover:text-slate-600"
                 }`}
@@ -122,7 +127,7 @@ export default function MaterialSelector({
             )}
             {allowedTypes.includes("video") && (
               <button
-                onClick={() => setActiveTab("video")}
+                onClick={() => { setActiveTab("video"); setPage(1); }}
                 className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
                   activeTab === "video" ? "bg-white text-slate-700 shadow-xs border border-slate-100" : "text-slate-400 hover:text-slate-600"
                 }`}
@@ -140,7 +145,7 @@ export default function MaterialSelector({
                 type="text"
                 placeholder="搜索资产..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
                 className="bg-slate-50 border border-slate-200 rounded-lg text-[11px] pl-8 pr-2.5 py-1.5 text-slate-700 focus:outline-none focus:border-purple-500 placeholder-slate-400 w-full"
               />
             </div>
@@ -170,7 +175,7 @@ export default function MaterialSelector({
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {filteredAssets.map((asset) => {
+              {pagedAssets.map((asset) => {
                 const isSelected = selectedUrls.includes(asset.url);
                 return (
                   <div
@@ -219,6 +224,10 @@ export default function MaterialSelector({
               })}
             </div>
           )}
+        </div>
+
+        <div className="shrink-0 border-t border-slate-100 bg-white px-4">
+          <AssetPagination total={filteredAssets.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(value) => { setPageSize(value); setPage(1); }} />
         </div>
 
         {/* Footer */}

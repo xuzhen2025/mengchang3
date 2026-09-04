@@ -85,6 +85,30 @@ const getDateLabel = (date: string) => {
   return `${Number(month)}月${Number(day)}日`;
 };
 
+const AGENT_STAGE_LABELS: Record<NonNullable<Task["agentStage"]>, string> = {
+  analysis: "需求分析",
+  script: "创意分镜",
+  preview: "视频预览",
+  final: "成片"
+};
+
+const REMAKE_STAGE_LABELS: Record<NonNullable<Task["remakeStage"]>, string> = {
+  video_analysis: "视频分析",
+  storyboard: "分镜解析",
+  final: "成片"
+};
+
+const getTaskStageLabel = (task: Task, category: GenerationTaskCategory) => {
+  if (category === "agent" && task.agentStage) return AGENT_STAGE_LABELS[task.agentStage];
+  if (category === "fission") {
+    if (task.remakeStage) return REMAKE_STAGE_LABELS[task.remakeStage];
+    if (task.name.includes("成片")) return "成片";
+    if (task.name.includes("分镜")) return "分镜解析";
+    return "视频分析";
+  }
+  return "";
+};
+
 export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, restartTask, viewResult }: TaskQueuePanelProps) {
   const [tab, setTab] = useState<"recent" | "all">("recent");
   const [recentCategory, setRecentCategory] = useState<"agent" | "tool">("agent");
@@ -176,10 +200,11 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
             <div className="space-y-2.5">
               {group.tasks.map((task) => {
                 const category = getTaskCategory(task);
+                const stageLabel = getTaskStageLabel(task, category);
                 const isAgent = category === "agent";
                 const status = STATUS_META[task.status];
-                const canCancel = task.status === "queue" || task.status === "generating";
-                const canRestart = task.status === "failed" || task.status === "cancelled";
+                const canCancel = task.cancellable !== false && (task.status === "queue" || task.status === "generating");
+                const canRestart = task.restartable !== false && (task.status === "failed" || task.status === "cancelled");
                 const preview = task.outputFiles?.[0] || task.inputFiles.find((file) => /^https?:\/\//.test(file));
                 const estimatedMinutes = Math.max(1, Math.ceil((100 - task.progress) / 12));
                 const PreviewIcon = category === "agent" ? Bot : category === "ai_image" ? ImageIcon : category === "ai_video" ? Video : WandSparkles;
@@ -191,7 +216,7 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2"><p className="line-clamp-2 text-xs font-bold leading-5 text-slate-800">{task.name}</p><span className={`shrink-0 rounded px-2 py-1 text-[10px] font-semibold ${status.className}`}>{status.label}</span></div>
-                        <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-400"><span>{CATEGORY_META[category].label}</span><span className="font-mono">{task.createdAt.slice(11)}</span></div>
+                        <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-400"><span>{CATEGORY_META[category].label}{stageLabel && <> · <b className="font-medium text-slate-500">{stageLabel}</b></>}</span><span className="font-mono">{task.createdAt.slice(11)}</span></div>
                         <div className="mt-1.5 text-[10px] text-slate-500">消耗积分 <span className="font-mono font-bold text-amber-600">-{task.creditsCost.toFixed(2)}</span>{(task.refundedCredits || 0) > 0 && <span className="ml-2 text-emerald-600">已退回 {task.refundedCredits?.toFixed(2)}</span>}</div>
                       </div>
                     </div>
@@ -207,9 +232,10 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
 
                     <div className="mt-2.5 flex justify-end gap-1.5 border-t border-slate-100 pt-2.5">
                       {canCancel && <button onClick={() => cancelTask(task.id)} className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><X className="h-3 w-3" />取消任务</button>}
+                      {task.remakeSessionId && <button onClick={() => viewResult(task.id)} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><Eye className="h-3 w-3" />{task.status === "completed" ? "查看任务" : "进入任务"}</button>}
                       {isAgent && <button onClick={() => viewResult(task.id)} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><Eye className="h-3 w-3" />{canRestart ? "继续创作" : "进入会话"}</button>}
-                      {!isAgent && canRestart && <button onClick={() => restartTask(task.id)} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><RotateCcw className="h-3 w-3" />重新生成</button>}
-                      {!isAgent && task.status === "completed" && <><button onClick={() => viewResult(task.id)} className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><Eye className="h-3 w-3" />查看结果</button><button className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><Download className="h-3 w-3" />下载</button></>}
+                      {!task.remakeSessionId && !isAgent && canRestart && <button onClick={() => restartTask(task.id)} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><RotateCcw className="h-3 w-3" />重新生成</button>}
+                      {!task.remakeSessionId && !isAgent && task.status === "completed" && <><button onClick={() => viewResult(task.id)} className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><Eye className="h-3 w-3" />查看结果</button><button className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><Download className="h-3 w-3" />下载</button></>}
                     </div>
                   </article>
                 );

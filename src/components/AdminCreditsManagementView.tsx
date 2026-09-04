@@ -5,7 +5,6 @@ import {
   Gift, 
   Wallet, 
   HelpCircle, 
-  RotateCcw, 
   Plus, 
   Search, 
   Filter, 
@@ -124,7 +123,7 @@ export default function AdminCreditsManagementView() {
   };
 
   // --- Credits / Points Management State ---
-  const [creditMode, setCreditMode] = useState<"quota" | "wallet">("quota");
+  const [creditMode] = useState<"quota" | "wallet">("quota");
   const [creditsSubTab, setCreditsSubTab] = useState<"config" | "details">("config");
   const [detailsSubTab, setDetailsSubTab] = useState<"user_summary" | "detail_list">("user_summary");
 
@@ -367,19 +366,6 @@ export default function AdminCreditsManagementView() {
             </div>
 
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  const nextMode = creditMode === "quota" ? "wallet" : "quota";
-                  setCreditMode(nextMode);
-                  showToast(`已切换为【${nextMode === "quota" ? "配额模式" : "钱包模式"}】`);
-                }}
-                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200/80 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
-              >
-                <RotateCcw className="w-3.5 h-3.5 text-purple-600" />
-                <span>切换至 {creditMode === "quota" ? "钱包模式" : "配额模式"}</span>
-              </button>
-
               <button
                 type="button"
                 onClick={() => setRechargeModalOpen(true)}

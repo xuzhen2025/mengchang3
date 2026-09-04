@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import AssetPagination from "./AssetPagination";
 import {
   ArrowLeft,
   User,
@@ -411,6 +412,11 @@ export default function ScriptDetailPage({
   const [selectedWorkIds, setSelectedWorkIds] = useState<string[]>(
     currentScript.associatedWorks?.map(w => w.id) || []
   );
+  const [workPage, setWorkPage] = useState(1);
+  const [workPageSize, setWorkPageSize] = useState(20);
+  const filteredWorkOptions = MOCK_FINISHED_VIDEOS_LIBRARY.filter(v => !workSearchText.trim() || v.title.includes(workSearchText.trim()));
+  const currentWorkPage = Math.min(workPage, Math.max(1, Math.ceil(filteredWorkOptions.length / workPageSize)));
+  const pagedWorkOptions = filteredWorkOptions.slice((currentWorkPage - 1) * workPageSize, currentWorkPage * workPageSize);
 
   // Other Modals
   const [showTasksModal, setShowTasksModal] = useState(false);
@@ -2741,15 +2747,13 @@ export default function ScriptDetailPage({
                   type="text"
                   placeholder="搜索作品名称或关键词..."
                   value={workSearchText}
-                  onChange={(e) => setWorkSearchText(e.target.value)}
+                  onChange={(e) => { setWorkSearchText(e.target.value); setWorkPage(1); }}
                   className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-purple-500 font-medium"
                 />
               </div>
 
               <div className="space-y-2">
-                {MOCK_FINISHED_VIDEOS_LIBRARY.filter(v =>
-                  !workSearchText.trim() || v.title.includes(workSearchText.trim())
-                ).map((v) => {
+                {pagedWorkOptions.map((v) => {
                   const isSelected = selectedWorkIds.includes(v.id);
                   return (
                     <div
@@ -2785,6 +2789,7 @@ export default function ScriptDetailPage({
                   );
                 })}
               </div>
+              <AssetPagination total={filteredWorkOptions.length} page={currentWorkPage} pageSize={workPageSize} onPageChange={setWorkPage} onPageSizeChange={(value) => { setWorkPageSize(value); setWorkPage(1); }} />
             </div>
 
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">

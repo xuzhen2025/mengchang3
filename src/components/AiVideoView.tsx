@@ -1294,7 +1294,7 @@ export default function AiVideoView({
                       <span className="text-[10px] text-slate-500 font-bold block uppercase">关联的参考附件图片 / Associated Reference Attachments</span>
                       <div className="flex flex-wrap gap-2">
                         {(editingVideo.inputFiles && editingVideo.inputFiles.length > 0 ? editingVideo.inputFiles : [
-                          "https://images.unsplash.com/photo-1608248597481-496100c8c836?w=600&auto=format&fit=crop&q=80",
+                          "./assets/prototype/skincare-product.jpg",
                           "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&auto=format&fit=crop&q=80"
                         ]).map((url: string, index: number) => (
                           <div 
@@ -1630,7 +1630,7 @@ export default function AiVideoView({
                             e.stopPropagation();
                             const url = (item.inputFiles && item.inputFiles.length > 0) 
                               ? item.inputFiles[0] 
-                              : "https://images.unsplash.com/photo-1608248597481-496100c8c836?w=800&auto=format&fit=crop&q=80";
+                              : "./assets/prototype/skincare-product.jpg";
                             setPreviewImageUrl(url);
                           }}
                           className="flex-shrink-0 bg-purple-50 hover:bg-purple-100 text-purple-600 font-bold border border-purple-100 rounded px-1.5 py-0.5 text-[8px] transition-all cursor-pointer flex items-center gap-0.5"

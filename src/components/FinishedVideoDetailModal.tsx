@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import LinkScriptModal from "./LinkScriptModal";
 import ReferencedVideosProduced from "./ReferencedVideosProduced";
+import AssetPagination from "./AssetPagination";
 import {
   X,
   Play,
@@ -282,6 +283,18 @@ export const SAMPLE_EMPLOYEES: EmployeePermissionInfo[] = [
       video: { view: true, download: false, copyToCapCut: false, push: true },
     }
   }
+];
+
+const MANUAL_MATERIAL_OPTIONS = [
+  { id: "17894239801", name: "纯朴洁面油10.6爆款框架高转化卡点V1.mp4" },
+  { id: "17894239802", name: "法式高奢珠宝质感展示分镜02.mp4" }
+];
+
+const MONITOR_ACCOUNT_OPTIONS = [
+  { id: "1815150855223564", name: "ell化妆品旗舰店-UDs-1" },
+  { id: "1788423177165833", name: "厦门十梦俪_ELL卸妆油1_童欣园" },
+  { id: "1892014812398112", name: "纯朴品牌美妆小店" },
+  { id: "1902847192837192", name: "巨量千川爆款极速投放A组" }
 ];
 
 export const CATEGORY_TREE = [
@@ -1024,6 +1037,22 @@ export default function FinishedVideoDetailModal({
   const [employeeSearchText, setEmployeeSearchText] = useState("");
   const [selectedPickerGroup, setSelectedPickerGroup] = useState("视频号投流组");
   const [selectedPickerSub, setSelectedPickerSub] = useState("视频号");
+  const [employeePage, setEmployeePage] = useState(1);
+  const [employeePageSize, setEmployeePageSize] = useState(20);
+  const filteredEmployees = SAMPLE_EMPLOYEES.filter((employee) =>
+    !employeeSearchText.trim() ||
+    employee.name.includes(employeeSearchText.trim()) ||
+    employee.group.includes(employeeSearchText.trim()) ||
+    employee.department.includes(employeeSearchText.trim())
+  );
+  const currentEmployeePage = Math.min(
+    employeePage,
+    Math.max(1, Math.ceil(filteredEmployees.length / employeePageSize))
+  );
+  const pagedEmployees = filteredEmployees.slice(
+    (currentEmployeePage - 1) * employeePageSize,
+    currentEmployeePage * employeePageSize
+  );
 
   // Associated Scripts State
   const [showRelatedScriptsModal, setShowRelatedScriptsModal] = useState(false);
@@ -1052,6 +1081,8 @@ export default function FinishedVideoDetailModal({
   const [selectedLogDetail, setSelectedLogDetail] = useState<OperationLogItem | null>(null);
   const [operationLogSearch, setOperationLogSearch] = useState("");
   const [operationLogTypeFilter, setOperationLogTypeFilter] = useState<string>("all");
+  const [operationLogPage, setOperationLogPage] = useState(1);
+  const [operationLogPageSize, setOperationLogPageSize] = useState(20);
   const [operationLogs, setOperationLogs] = useState<OperationLogItem[]>([
     {
       id: "log_5",
@@ -1183,7 +1214,7 @@ export default function FinishedVideoDetailModal({
       company: "纯朴科技",
       title: "提到价格不贵，增加转换",
       date: "2023-12-09 10:34",
-      thumbnail: "https://images.unsplash.com/photo-1512290900676-26c281f234c7?w=120&h=120&fit=crop"
+      thumbnail: "./assets/prototype/beauty-promo-detail.jpg"
     },
     {
       id: "ar3",
@@ -1241,11 +1272,41 @@ export default function FinishedVideoDetailModal({
   const [manualAssetSearch, setManualAssetSearch] = useState("");
   const [manualSelectedAccountIds, setManualSelectedAccountIds] = useState<string[]>(["1815150855223564"]);
   const [manualSelectedMaterialIds, setManualSelectedMaterialIds] = useState<string[]>([]);
+  const [manualMaterialPage, setManualMaterialPage] = useState(1);
+  const [manualMaterialPageSize, setManualMaterialPageSize] = useState(20);
+  const filteredManualMaterials = MANUAL_MATERIAL_OPTIONS.filter((material) =>
+    !manualAssetSearch.trim() ||
+    material.id.includes(manualAssetSearch.trim()) ||
+    material.name.toLowerCase().includes(manualAssetSearch.trim().toLowerCase())
+  );
+  const currentManualMaterialPage = Math.min(
+    manualMaterialPage,
+    Math.max(1, Math.ceil(filteredManualMaterials.length / manualMaterialPageSize))
+  );
+  const pagedManualMaterials = filteredManualMaterials.slice(
+    (currentManualMaterialPage - 1) * manualMaterialPageSize,
+    currentManualMaterialPage * manualMaterialPageSize
+  );
 
   // Modal 2: 素材配对监控 Sub-state
   const [monitorPlatform, setMonitorPlatform] = useState<string>("巨量千川");
   const [monitorGroupTab, setMonitorGroupTab] = useState<string>("收藏账户");
   const [monitorSearchInput, setMonitorSearchInput] = useState("");
+  const [monitorAccountPage, setMonitorAccountPage] = useState(1);
+  const [monitorAccountPageSize, setMonitorAccountPageSize] = useState(20);
+  const filteredMonitorAccounts = MONITOR_ACCOUNT_OPTIONS.filter((account) =>
+    !monitorSearchInput.trim() ||
+    account.id.includes(monitorSearchInput.trim()) ||
+    account.name.toLowerCase().includes(monitorSearchInput.trim().toLowerCase())
+  );
+  const currentMonitorAccountPage = Math.min(
+    monitorAccountPage,
+    Math.max(1, Math.ceil(filteredMonitorAccounts.length / monitorAccountPageSize))
+  );
+  const pagedMonitorAccounts = filteredMonitorAccounts.slice(
+    (currentMonitorAccountPage - 1) * monitorAccountPageSize,
+    currentMonitorAccountPage * monitorAccountPageSize
+  );
   const [monitoredAccountIds, setMonitoredAccountIds] = useState<string[]>([
     "1815150855223564",
     "1788423177165833"
@@ -1268,6 +1329,47 @@ export default function FinishedVideoDetailModal({
   const [aigcLinkCategory, setAigcLinkCategory] = useState<"成片" | "素材" | "第三方">("成片");
   const [aigcLinkSearch, setAigcLinkSearch] = useState("");
   const [selectedAigcVideoId, setSelectedAigcVideoId] = useState<string | null>(null);
+  const [aigcVideoPage, setAigcVideoPage] = useState(1);
+  const [aigcVideoPageSize, setAigcVideoPageSize] = useState(20);
+  const aigcVideoOptions = [
+    {
+      id: "v_aigc_1",
+      title: `【${aigcLinkCategory}】高奢美妆精油近景特写剪辑片段01.mp4`,
+      code: "39810234",
+      author: "梦畅AI智能剪辑",
+      duration: "12.5s",
+      cover: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200&auto=format&fit=crop&q=80"
+    },
+    {
+      id: "v_aigc_2",
+      title: `【${aigcLinkCategory}】模特夏日素颜上脸质感切片.mp4`,
+      code: "39810235",
+      author: "创意生成组",
+      duration: "8.2s",
+      cover: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&auto=format&fit=crop&q=80"
+    },
+    {
+      id: "v_aigc_3",
+      title: `【${aigcLinkCategory}】清爽控油产品功能演示与镜头回放.mp4`,
+      code: "39810236",
+      author: "达人授权素材",
+      duration: "15.0s",
+      cover: "https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=200&auto=format&fit=crop&q=80"
+    }
+  ];
+  const filteredAigcVideos = aigcVideoOptions.filter((item) =>
+    !aigcLinkSearch.trim() ||
+    item.title.toLowerCase().includes(aigcLinkSearch.trim().toLowerCase()) ||
+    item.code.includes(aigcLinkSearch.trim())
+  );
+  const currentAigcVideoPage = Math.min(
+    aigcVideoPage,
+    Math.max(1, Math.ceil(filteredAigcVideos.length / aigcVideoPageSize))
+  );
+  const pagedAigcVideos = filteredAigcVideos.slice(
+    (currentAigcVideoPage - 1) * aigcVideoPageSize,
+    currentAigcVideoPage * aigcVideoPageSize
+  );
   const [shotTraceMaterials, setShotTraceMaterials] = useState([
     {
       id: "shot_1",
@@ -4483,7 +4585,10 @@ export default function FinishedVideoDetailModal({
                                   type="text"
                                   placeholder="输入姓名/分组/部门搜索人员..."
                                   value={employeeSearchText}
-                                  onChange={(e) => setEmployeeSearchText(e.target.value)}
+                                  onChange={(e) => {
+                                    setEmployeeSearchText(e.target.value);
+                                    setEmployeePage(1);
+                                  }}
                                   className="w-full pl-3 pr-8 py-1.5 bg-slate-50 border border-purple-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-400"
                                 />
                                 <ChevronUp className="w-4 h-4 text-purple-600 absolute right-2.5 top-2 cursor-pointer" onClick={() => setShowEmployeePicker(false)} />
@@ -4539,12 +4644,7 @@ export default function FinishedVideoDetailModal({
                                 <div className="text-[10px] font-black text-slate-400 px-2 py-1 uppercase tracking-wider bg-slate-50 rounded">
                                   4级人员
                                 </div>
-                                {SAMPLE_EMPLOYEES.filter(emp => 
-                                  !employeeSearchText || 
-                                  emp.name.includes(employeeSearchText) || 
-                                  emp.group.includes(employeeSearchText) ||
-                                  emp.department.includes(employeeSearchText)
-                                ).map((emp) => (
+                                {pagedEmployees.map((emp) => (
                                   <button
                                     key={emp.id}
                                     onClick={() => {
@@ -4565,6 +4665,18 @@ export default function FinishedVideoDetailModal({
                                   </button>
                                 ))}
                               </div>
+                            </div>
+                            <div className="border-t border-slate-100 px-2">
+                              <AssetPagination
+                                total={filteredEmployees.length}
+                                page={currentEmployeePage}
+                                pageSize={employeePageSize}
+                                onPageChange={setEmployeePage}
+                                onPageSizeChange={(value) => {
+                                  setEmployeePageSize(value);
+                                  setEmployeePage(1);
+                                }}
+                              />
                             </div>
                           </div>
                         )}
@@ -5534,7 +5646,10 @@ export default function FinishedVideoDetailModal({
                   type="text"
                   placeholder="搜索操作人或关键词..."
                   value={operationLogSearch}
-                  onChange={(e) => setOperationLogSearch(e.target.value)}
+                  onChange={(e) => {
+                    setOperationLogSearch(e.target.value);
+                    setOperationLogPage(1);
+                  }}
                   className="w-full px-3.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-100"
                 />
               </div>
@@ -5543,7 +5658,10 @@ export default function FinishedVideoDetailModal({
                 <span className="text-xs text-slate-500 font-medium">事项筛选:</span>
                 <select
                   value={operationLogTypeFilter}
-                  onChange={(e) => setOperationLogTypeFilter(e.target.value)}
+                  onChange={(e) => {
+                    setOperationLogTypeFilter(e.target.value);
+                    setOperationLogPage(1);
+                  }}
                   className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none cursor-pointer font-medium"
                 >
                   <option value="all">全部事项</option>
@@ -5568,6 +5686,14 @@ export default function FinishedVideoDetailModal({
                   const matchType = operationLogTypeFilter === "all" || log.actionType === operationLogTypeFilter;
                   return matchSearch && matchType;
                 });
+                const currentPage = Math.min(
+                  operationLogPage,
+                  Math.max(1, Math.ceil(filtered.length / operationLogPageSize))
+                );
+                const pagedLogs = filtered.slice(
+                  (currentPage - 1) * operationLogPageSize,
+                  currentPage * operationLogPageSize
+                );
 
                 if (filtered.length === 0) {
                   return (
@@ -5578,6 +5704,7 @@ export default function FinishedVideoDetailModal({
                 }
 
                 return (
+                  <>
                   <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-2xs">
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
@@ -5590,7 +5717,7 @@ export default function FinishedVideoDetailModal({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-slate-700">
-                        {filtered.map((log) => {
+                        {pagedLogs.map((log) => {
                           const actionColor =
                             log.actionType === "修改备注" ? "bg-purple-50 text-purple-700 border-purple-200" :
                             log.actionType === "修改标题" ? "bg-amber-50 text-amber-700 border-amber-200" :
@@ -5631,6 +5758,17 @@ export default function FinishedVideoDetailModal({
                       </tbody>
                     </table>
                   </div>
+                  <AssetPagination
+                    total={filtered.length}
+                    page={currentPage}
+                    pageSize={operationLogPageSize}
+                    onPageChange={setOperationLogPage}
+                    onPageSizeChange={(value) => {
+                      setOperationLogPageSize(value);
+                      setOperationLogPage(1);
+                    }}
+                  />
+                  </>
                 );
               })()}
             </div>
@@ -6104,7 +6242,10 @@ export default function FinishedVideoDetailModal({
               ].map((plat) => (
                 <button
                   key={plat}
-                  onClick={() => setManualLinkPlatform(plat)}
+                  onClick={() => {
+                    setManualLinkPlatform(plat);
+                    setManualMaterialPage(1);
+                  }}
                   className={`px-3 py-2 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
                     manualLinkPlatform === plat
                       ? "border-purple-600 text-purple-600 bg-white rounded-t-lg"
@@ -6186,7 +6327,10 @@ export default function FinishedVideoDetailModal({
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <div className="flex items-center gap-3">
                     <button
-                      onClick={() => setManualLinkMode("从视频库关联")}
+                      onClick={() => {
+                        setManualLinkMode("从视频库关联");
+                        setManualMaterialPage(1);
+                      }}
                       className={`text-xs font-bold cursor-pointer transition-colors ${
                         manualLinkMode === "从视频库关联" ? "text-purple-600 underline underline-offset-4 font-extrabold" : "text-slate-500"
                       }`}
@@ -6194,7 +6338,10 @@ export default function FinishedVideoDetailModal({
                       从视频库关联
                     </button>
                     <button
-                      onClick={() => setManualLinkMode("从抖音号关联")}
+                      onClick={() => {
+                        setManualLinkMode("从抖音号关联");
+                        setManualMaterialPage(1);
+                      }}
                       className={`text-xs font-bold cursor-pointer transition-colors ${
                         manualLinkMode === "从抖音号关联" ? "text-purple-600 underline underline-offset-4 font-extrabold" : "text-slate-500"
                       }`}
@@ -6218,7 +6365,10 @@ export default function FinishedVideoDetailModal({
                     type="text"
                     placeholder="素材ID"
                     value={manualAssetSearch}
-                    onChange={(e) => setManualAssetSearch(e.target.value)}
+                    onChange={(e) => {
+                      setManualAssetSearch(e.target.value);
+                      setManualMaterialPage(1);
+                    }}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500/20 font-medium"
                   />
                 </div>
@@ -6236,10 +6386,7 @@ export default function FinishedVideoDetailModal({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200/60 text-slate-700">
-                      {[
-                        { id: "17894239801", name: "纯朴洁面油10.6爆款框架高转化卡点V1.mp4" },
-                        { id: "17894239802", name: "法式高奢珠宝质感展示分镜02.mp4" }
-                      ].map((item) => {
+                      {pagedManualMaterials.map((item) => {
                         const selected = manualSelectedMaterialIds.includes(item.id);
                         return (
                           <tr key={item.id} className="hover:bg-purple-50/50">
@@ -6265,9 +6412,18 @@ export default function FinishedVideoDetailModal({
 
                   <div className="p-2 bg-slate-100/60 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500 font-medium">
                     <span>共 {manualSelectedMaterialIds.length} 条已勾选</span>
-                    <span className="font-mono">1/1 页</span>
                   </div>
                 </div>
+                <AssetPagination
+                  total={filteredManualMaterials.length}
+                  page={currentManualMaterialPage}
+                  pageSize={manualMaterialPageSize}
+                  onPageChange={setManualMaterialPage}
+                  onPageSizeChange={(value) => {
+                    setManualMaterialPageSize(value);
+                    setManualMaterialPage(1);
+                  }}
+                />
               </div>
             </div>
 
@@ -6345,7 +6501,10 @@ export default function FinishedVideoDetailModal({
                   {["收藏账户", "个人账户", "小组账户", "分类账户", "全部账户", "公司分组", "去授权"].map((tab) => (
                     <button
                       key={tab}
-                      onClick={() => setMonitorGroupTab(tab)}
+                      onClick={() => {
+                        setMonitorGroupTab(tab);
+                        setMonitorAccountPage(1);
+                      }}
                       className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer whitespace-nowrap ${
                         monitorGroupTab === tab
                           ? "bg-purple-100 text-purple-700"
@@ -6364,19 +6523,17 @@ export default function FinishedVideoDetailModal({
                     type="text"
                     placeholder="请输入账户名称/id"
                     value={monitorSearchInput}
-                    onChange={(e) => setMonitorSearchInput(e.target.value)}
+                    onChange={(e) => {
+                      setMonitorSearchInput(e.target.value);
+                      setMonitorAccountPage(1);
+                    }}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500/20 font-medium"
                   />
                 </div>
 
                 {/* Accounts Checklist */}
                 <div className="flex-1 overflow-y-auto max-h-64 space-y-2 pr-1">
-                  {[
-                    { id: "1815150855223564", name: "ell化妆品旗舰店-UDs-1" },
-                    { id: "1788423177165833", name: "厦门十梦俪_ELL卸妆油1_童欣园" },
-                    { id: "1892014812398112", name: "纯朴品牌美妆小店" },
-                    { id: "1902847192837192", name: "巨量千川爆款极速投放A组" }
-                  ].map((acc) => {
+                  {pagedMonitorAccounts.map((acc) => {
                     const checked = monitoredAccountIds.includes(acc.id);
                     return (
                       <div
@@ -6407,6 +6564,16 @@ export default function FinishedVideoDetailModal({
                     );
                   })}
                 </div>
+                <AssetPagination
+                  total={filteredMonitorAccounts.length}
+                  page={currentMonitorAccountPage}
+                  pageSize={monitorAccountPageSize}
+                  onPageChange={setMonitorAccountPage}
+                  onPageSizeChange={(value) => {
+                    setMonitorAccountPageSize(value);
+                    setMonitorAccountPage(1);
+                  }}
+                />
               </div>
 
               {/* Right Column: Selected Accounts */}
@@ -6934,6 +7101,7 @@ export default function FinishedVideoDetailModal({
                     onClick={() => {
                       setAigcLinkCategory(cat);
                       setSelectedAigcVideoId(null);
+                      setAigcVideoPage(1);
                     }}
                     className={`px-4 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
                       aigcLinkCategory === cat
@@ -6953,41 +7121,17 @@ export default function FinishedVideoDetailModal({
                   type="text"
                   placeholder={`搜索${aigcLinkCategory}名称或编号...`}
                   value={aigcLinkSearch}
-                  onChange={(e) => setAigcLinkSearch(e.target.value)}
+                  onChange={(e) => {
+                    setAigcLinkSearch(e.target.value);
+                    setAigcVideoPage(1);
+                  }}
                   className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
                 />
               </div>
 
               {/* Video List Items */}
               <div className="space-y-2">
-                {[
-                  {
-                    id: "v_aigc_1",
-                    title: `【${aigcLinkCategory}】高奢美妆精油近景特写剪辑片段01.mp4`,
-                    code: "39810234",
-                    author: "梦畅AI智能剪辑",
-                    duration: "12.5s",
-                    cover: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200&auto=format&fit=crop&q=80"
-                  },
-                  {
-                    id: "v_aigc_2",
-                    title: `【${aigcLinkCategory}】模特夏日素颜上脸质感切片.mp4`,
-                    code: "39810235",
-                    author: "创意生成组",
-                    duration: "8.2s",
-                    cover: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&auto=format&fit=crop&q=80"
-                  },
-                  {
-                    id: "v_aigc_3",
-                    title: `【${aigcLinkCategory}】清爽控油产品功能演示与镜头回放.mp4`,
-                    code: "39810236",
-                    author: "达人授权素材",
-                    duration: "15.0s",
-                    cover: "https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=200&auto=format&fit=crop&q=80"
-                  }
-                ]
-                .filter(v => !aigcLinkSearch || v.title.includes(aigcLinkSearch) || v.code.includes(aigcLinkSearch))
-                .map((item) => (
+                {pagedAigcVideos.map((item) => (
                   <div
                     key={item.id}
                     onClick={() => setSelectedAigcVideoId(item.id)}
@@ -7016,6 +7160,16 @@ export default function FinishedVideoDetailModal({
                   </div>
                 ))}
               </div>
+              <AssetPagination
+                total={filteredAigcVideos.length}
+                page={currentAigcVideoPage}
+                pageSize={aigcVideoPageSize}
+                onPageChange={setAigcVideoPage}
+                onPageSizeChange={(value) => {
+                  setAigcVideoPageSize(value);
+                  setAigcVideoPage(1);
+                }}
+              />
             </div>
 
             {/* Footer */}

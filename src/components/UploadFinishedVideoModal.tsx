@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import AssetPagination from "./AssetPagination";
 import LinkScriptModal from "./LinkScriptModal";
 import {
   X,
@@ -208,9 +209,14 @@ export default function UploadFinishedVideoModal({
   // Task & Script Picker Modals
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [taskSearch, setTaskSearch] = useState("");
+  const [taskPage, setTaskPage] = useState(1);
+  const [taskPageSize, setTaskPageSize] = useState(20);
   const [showScriptDropdown, setShowScriptDropdown] = useState(false);
   const [showScriptModal, setShowScriptModal] = useState(false);
   const [scriptSearch, setScriptSearch] = useState("");
+  const filteredTaskOptions = MOCK_COLLAB_TASKS.filter(t => t.id.includes(taskSearch) || t.name.includes(taskSearch));
+  const currentTaskPage = Math.min(taskPage, Math.max(1, Math.ceil(filteredTaskOptions.length / taskPageSize)));
+  const pagedTaskOptions = filteredTaskOptions.slice((currentTaskPage - 1) * taskPageSize, currentTaskPage * taskPageSize);
 
   // Public Tag 3-Column States
   const [publicSearchText, setPublicSearchText] = useState("");
@@ -1432,7 +1438,7 @@ export default function UploadFinishedVideoModal({
                 <input
                   type="text"
                   value={taskSearch}
-                  onChange={(e) => setTaskSearch(e.target.value)}
+                  onChange={(e) => { setTaskSearch(e.target.value); setTaskPage(1); }}
                   placeholder="搜索任务ID或任务名称..."
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-purple-500"
                 />
@@ -1441,9 +1447,7 @@ export default function UploadFinishedVideoModal({
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {MOCK_COLLAB_TASKS
-                .filter(t => t.id.includes(taskSearch) || t.name.includes(taskSearch))
-                .map((task) => (
+              {pagedTaskOptions.map((task) => (
                   <div
                     key={task.id}
                     onClick={() => {
@@ -1481,6 +1485,10 @@ export default function UploadFinishedVideoModal({
                     </div>
                   </div>
                 ))}
+            </div>
+
+            <div className="shrink-0 border-t border-slate-100 bg-white px-5">
+              <AssetPagination total={filteredTaskOptions.length} page={currentTaskPage} pageSize={taskPageSize} onPageChange={setTaskPage} onPageSizeChange={(value) => { setTaskPageSize(value); setTaskPage(1); }} />
             </div>
 
             <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between">

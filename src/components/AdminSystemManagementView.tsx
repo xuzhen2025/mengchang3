@@ -6,7 +6,6 @@ import {
   Tag,
   Megaphone,
   Key,
-  Globe,
   Bell,
   Users,
   Search,
@@ -53,6 +52,7 @@ import {
   Star
 } from "lucide-react";
 import { DeptNode, AccountMember, INITIAL_DEPTS, INITIAL_MEMBERS } from "./AccountManagementView";
+import AssetPagination from "./AssetPagination";
 
 type SystemTabType =
   | "depts"
@@ -64,7 +64,6 @@ type SystemTabType =
   | "auto_tags"
   | "ad_groups"
   | "login_logs"
-  | "async_sync"
   | "notifications"
   | "users";
 
@@ -249,7 +248,6 @@ export const ADMIN_BACKEND_PERMISSION_TREE: PermissionNode[] = [
       { id: "ab_system_setting_manage", label: "配置系统参数" },
       { id: "ab_auto_tag_manage", label: "配置自动化标签" },
       { id: "ab_ad_group_manage", label: "管理广告组" },
-      { id: "ab_async_sync_manage", label: "管理多站点同步" },
     ]
   },
   {
@@ -916,7 +914,6 @@ export default function AdminSystemManagementView() {
     { id: "auto_tags", label: "系统自动化标签", icon: Tag, desc: "AI智能触发打标规则与指标自动分流" },
     { id: "ad_groups", label: "广告组管理", icon: Megaphone, desc: "跨平台广告组绑定、预算控制与同步" },
     { id: "login_logs", label: "登录记录", icon: Key, desc: "账号登录历史、IP终端及安全预警" },
-    { id: "async_sync", label: "多站点异步同步", icon: Globe, desc: "分布式节点数据集群同步与队列表监控" },
     { id: "notifications", label: "消息通知", icon: Bell, desc: "系统预警、任务状态与通知渠道订阅" },
   ];
 
@@ -2233,6 +2230,24 @@ export default function AdminSystemManagementView() {
   const [groupFormUsers, setGroupFormUsers] = useState<string[]>(["一凡最帅"]);
   const [groupFormAccountIds, setGroupFormAccountIds] = useState<string[]>([]);
   const [groupFormSearch, setGroupFormSearch] = useState("");
+  const [groupAccountPage, setGroupAccountPage] = useState(1);
+  const [groupAccountPageSize, setGroupAccountPageSize] = useState(20);
+
+  const filteredGroupAccounts = adAccounts
+    .filter((account) => account.platform === adPlatform)
+    .filter((account) =>
+      !groupFormSearch.trim() ||
+      account.name.toLowerCase().includes(groupFormSearch.trim().toLowerCase()) ||
+      account.id.includes(groupFormSearch.trim())
+    );
+  const currentGroupAccountPage = Math.min(
+    groupAccountPage,
+    Math.max(1, Math.ceil(filteredGroupAccounts.length / groupAccountPageSize))
+  );
+  const pagedGroupAccounts = filteredGroupAccounts.slice(
+    (currentGroupAccountPage - 1) * groupAccountPageSize,
+    currentGroupAccountPage * groupAccountPageSize
+  );
 
   // 下拉可选项
   const availableTeamsList = ["华东运营团队", "电商事业部", "品牌营销部", "海外推广团队"];
@@ -2320,6 +2335,7 @@ export default function AdminSystemManagementView() {
     setGroupFormUsers(["一凡最帅"]);
     setGroupFormAccountIds([]);
     setGroupFormSearch("");
+    setGroupAccountPage(1);
     setGroupModalOpen(true);
   };
 
@@ -2333,6 +2349,7 @@ export default function AdminSystemManagementView() {
     setGroupFormUsers(group.viewUsers || []);
     setGroupFormAccountIds(group.accountIds || []);
     setGroupFormSearch("");
+    setGroupAccountPage(1);
     setGroupModalOpen(true);
   };
 
@@ -2393,23 +2410,7 @@ export default function AdminSystemManagementView() {
   ]);
 
   // ---------------------------------------------------------------------------
-  // 8. 多站点异步同步 STATE & HANDLERS
-  // ---------------------------------------------------------------------------
-  const [syncNodes, setSyncNodes] = useState([
-    { id: "NODE-CN-1", name: "华东主数据中心 (杭州)", type: "Master", queueLength: 0, lastSync: "实时同步中", status: "healthy" },
-    { id: "NODE-CN-2", name: "华南镜像节点 (广州)", type: "Replica", queueLength: 12, lastSync: "2分钟前", status: "healthy" },
-    { id: "NODE-US-1", name: "北美跨境节点 (硅谷)", type: "Edge", queueLength: 145, lastSync: "15分钟前", status: "syncing" },
-  ]);
-
-  const handleManualSync = (nodeId: string) => {
-    setSyncNodes((prev) =>
-      prev.map((n) => (n.id === nodeId ? { ...n, queueLength: 0, lastSync: "刚刚", status: "healthy" } : n))
-    );
-    showToast("已发起该节点的增量同步任务");
-  };
-
-  // ---------------------------------------------------------------------------
-  // 9. 消息通知 STATE & HANDLERS
+  // 8. 消息通知 STATE & HANDLERS
   // ---------------------------------------------------------------------------
   const [notifications, setNotifications] = useState<NotificationCategory[]>(() => {
     const saved = localStorage.getItem("cloud_video_notification_settings_v2");
@@ -2642,7 +2643,7 @@ export default function AdminSystemManagementView() {
               {tabs.map((t) => {
                 const Icon = t.icon;
                 const isActive = activeTab === t.id;
-                const hasTooltip = t.id === "ad_groups" || t.id === "async_sync";
+                const hasTooltip = t.id === "ad_groups";
 
                 return (
                   <div key={t.id} className="relative group/tab">
@@ -5009,6 +5010,7 @@ export default function AdminSystemManagementView() {
                       onClick={() => {
                         setAdPlatform(plat);
                         setSelectedAdAccountIds([]);
+                        setGroupAccountPage(1);
                       }}
                       className={`px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                         isActive
@@ -5747,7 +5749,10 @@ export default function AdminSystemManagementView() {
                       type="text"
                       placeholder="请输入账户名称/id"
                       value={groupFormSearch}
-                      onChange={(e) => setGroupFormSearch(e.target.value)}
+                      onChange={(e) => {
+                        setGroupFormSearch(e.target.value);
+                        setGroupAccountPage(1);
+                      }}
                       className="w-full px-3 py-1.5 border border-slate-200 rounded-xl text-xs bg-white outline-none focus:border-[#7C3AED]"
                     />
 
@@ -5784,15 +5789,7 @@ export default function AdminSystemManagementView() {
 
                     {/* 账户列表 */}
                     <div className="space-y-2 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
-                      {adAccounts
-                        .filter((a) => a.platform === adPlatform)
-                        .filter(
-                          (a) =>
-                            !groupFormSearch.trim() ||
-                            a.name.toLowerCase().includes(groupFormSearch.toLowerCase()) ||
-                            a.id.includes(groupFormSearch)
-                        )
-                        .map((acc) => {
+                      {pagedGroupAccounts.map((acc) => {
                           const isChecked = groupFormAccountIds.includes(acc.id);
                           return (
                             <div
@@ -5842,6 +5839,16 @@ export default function AdminSystemManagementView() {
                           );
                         })}
                     </div>
+                    <AssetPagination
+                      total={filteredGroupAccounts.length}
+                      page={currentGroupAccountPage}
+                      pageSize={groupAccountPageSize}
+                      onPageChange={setGroupAccountPage}
+                      onPageSizeChange={(value) => {
+                        setGroupAccountPageSize(value);
+                        setGroupAccountPage(1);
+                      }}
+                    />
                   </div>
 
                   {/* 右栏：已选账号 */}
@@ -5989,39 +5996,7 @@ export default function AdminSystemManagementView() {
         )}
 
         {/* --------------------------------------------------------------------------- */}
-        {/* TAB 8: 多站点异步同步                                                        */}
-        {/* --------------------------------------------------------------------------- */}
-        {activeTab === "async_sync" && (
-          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 pb-2 border-b border-slate-100">
-              集群分布式节点与增量队列同步
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {syncNodes.map((node) => (
-                <div key={node.id} className="p-4 border border-slate-200/80 rounded-2xl bg-white shadow-2xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-slate-800">{node.name}</span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 bg-slate-100 text-slate-600 rounded">
-                      {node.type}
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-500">积压队列: <strong className="text-purple-700">{node.queueLength}</strong> 条</div>
-                  <div className="text-xs text-slate-400">上次同步时间: {node.lastSync}</div>
-                  <button
-                    type="button"
-                    onClick={() => handleManualSync(node.id)}
-                    className="w-full py-1.5 bg-[#7C3AED] text-white text-xs font-bold rounded-xl shadow-2xs"
-                  >
-                    手动触发增量同步
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* --------------------------------------------------------------------------- */}
-        {/* TAB 9: 消息通知 (MESSAGE NOTIFICATIONS)                                     */}
+        {/* TAB 8: 消息通知 (MESSAGE NOTIFICATIONS)                                     */}
         {/* --------------------------------------------------------------------------- */}
         {activeTab === "notifications" && (
           <div className="space-y-4 animate-fade-in pb-12">

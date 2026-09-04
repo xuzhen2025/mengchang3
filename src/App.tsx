@@ -99,6 +99,7 @@ export default function App() {
   const [selectedTaskTabForCollaboration, setSelectedTaskTabForCollaboration] = useState<"to_me" | "my_published" | "all">("all");
   const [resourceSearchIntent, setResourceSearchIntent] = useState<ResourceSearchIntent | null>(null);
   const [activeAgentSessionId, setActiveAgentSessionId] = useState<string | null>(null);
+  const [activeRemakeSessionId, setActiveRemakeSessionId] = useState<string | null>(null);
 
   const handleNavigate = (screen: ActiveScreen) => {
     setScreenHistory((prev) => {
@@ -122,6 +123,9 @@ export default function App() {
     }
     if (screen === "agent_creation") {
       setActiveAgentSessionId(null);
+    }
+    if (screen === "video_remake") {
+      setActiveRemakeSessionId(null);
     }
     setScreenHistory([screen]);
   };
@@ -612,10 +616,10 @@ export default function App() {
       setTransactions((current) => [{
         id: `tx_agent_${Date.now()}`,
         type: "consume",
-        tool: "Agent创作",
+        tool: nextTask.category === "fission" ? "爆款复刻" : "Agent创作",
         amount: -creditsCharge,
         time: new Date().toISOString().replace("T", " ").slice(0, 19),
-        remark: `Agent生成：${nextTask.name}`
+        remark: `${nextTask.category === "fission" ? "爆款复刻" : "Agent生成"}：${nextTask.name}`
       }, ...current]);
     }
   };
@@ -1008,9 +1012,16 @@ export default function App() {
       case "video_remake":
         return (
           <VideoRemakeView
-            onBack={handleBack}
-            onAddTask={handleAddTask}
+            key={activeRemakeSessionId || "latest-remake"}
+            onBack={() => setActiveRemakeSessionId(null)}
             credits={credits}
+            assets={assets}
+            activeSessionId={activeRemakeSessionId}
+            onSessionChange={setActiveRemakeSessionId}
+            onCreateSession={() => setActiveRemakeSessionId(`remake-${Date.now()}`)}
+            onOpenTaskQueue={() => setIsQueueOpen(true)}
+            onSyncTask={handleSyncAgentTask}
+            onUploadVideos={handleUploadAgentVideos}
           />
         );
       
@@ -1060,6 +1071,12 @@ export default function App() {
             if (task?.source === "agent" || task?.category === "agent") {
               setActiveAgentSessionId(taskId);
               setScreenHistory(["agent_creation"]);
+              setIsQueueOpen(false);
+              return;
+            }
+            if (task?.remakeSessionId) {
+              setActiveRemakeSessionId(task.remakeSessionId);
+              setScreenHistory(["video_remake"]);
               setIsQueueOpen(false);
               return;
             }

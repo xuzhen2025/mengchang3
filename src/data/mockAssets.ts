@@ -71,7 +71,7 @@ export const INITIAL_FULL_ASSETS: Asset[] = [
         id: "rm1",
         name: "雅诗兰黛精华空瓶_主图主体.png",
         type: "image",
-        url: "https://images.unsplash.com/photo-1608248597481-496100c8c836?w=400&q=80",
+        url: "./assets/prototype/skincare-product.jpg",
         role: "产品主体3D建模渲染图"
       },
       {

@@ -16,6 +16,7 @@ import {
   X
 } from "lucide-react";
 import { Asset } from "../types";
+import AssetPagination from "./AssetPagination";
 import ResourceLibraryItem, { ResourceLibraryItemData } from "./ResourceLibraryItem";
 
 export const PERSONAL_TAGS_KEY = "cloud_video_personal_tags_v1";
@@ -240,6 +241,9 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [bindingAsset, setBindingAsset] = useState<PersonalAsset | null>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [boundTaskPage, setBoundTaskPage] = useState(1);
+  const [linkableTaskPage, setLinkableTaskPage] = useState(1);
+  const [taskPageSize, setTaskPageSize] = useState(20);
 
   const personalAssets = useMemo(() => {
     const merged = [
@@ -434,6 +438,10 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
     : [];
   const currentBoundTaskIds = new Set(currentBindingRows.map(({ task }) => task.id));
   const linkableTasks = AVAILABLE_TASKS.filter((task) => task.status !== "completed" && !currentBoundTaskIds.has(task.id));
+  const currentBoundTaskPage = Math.min(boundTaskPage, Math.max(1, Math.ceil(currentBindingRows.length / taskPageSize)));
+  const currentLinkableTaskPage = Math.min(linkableTaskPage, Math.max(1, Math.ceil(linkableTasks.length / taskPageSize)));
+  const pagedCurrentBindingRows = currentBindingRows.slice((currentBoundTaskPage - 1) * taskPageSize, currentBoundTaskPage * taskPageSize);
+  const pagedLinkableTasks = linkableTasks.slice((currentLinkableTaskPage - 1) * taskPageSize, currentLinkableTaskPage * taskPageSize);
 
   if (mode === "personal_tags") {
     return (
@@ -552,12 +560,12 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
             <div className="overflow-y-auto p-5">
               <section>
                 <div className="mb-2 flex items-center justify-between"><h4 className="text-xs font-bold text-slate-800">当前已绑定任务（{currentBindingRows.length}）</h4><span className="text-[10px] text-slate-400">已完成任务保留历史关联</span></div>
-                {currentBindingRows.length > 0 ? <div className="space-y-2">{currentBindingRows.map(({ binding, task }) => { const statusMeta = TASK_STATUS_META[task.status]; return <div key={binding.id} className="rounded-md border border-slate-200 bg-white p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-xs font-bold text-slate-800">{task.title}</p><span className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${statusMeta.className}`}>{statusMeta.label}</span></div><p className="mt-1 text-[10px] text-slate-500">任务 {task.id} · 发布人 {task.publisher} · 提交进度 {task.submitted}/{task.required}</p><p className="mt-1 text-[10px] text-slate-400">绑定时间 {binding.boundAt}</p></div>{task.status === "completed" ? <span className="flex shrink-0 items-center gap-1 rounded bg-slate-100 px-2 py-1.5 text-[10px] font-semibold text-slate-500" title="任务完成后保留历史快照，不可解除关联"><LockKeyhole className="h-3 w-3" />不可解除</span> : <button type="button" onClick={() => unbindTask(task)} className="flex shrink-0 items-center gap-1 rounded px-2 py-1.5 text-[10px] font-semibold text-rose-600 hover:bg-rose-50"><Unlink className="h-3 w-3" />解除关联</button>}</div></div>; })}</div> : <div className="rounded-md border border-dashed border-slate-300 bg-slate-50/60 py-7 text-center text-xs text-slate-400">该资源暂未绑定任务</div>}
+                {currentBindingRows.length > 0 ? <><div className="space-y-2">{pagedCurrentBindingRows.map(({ binding, task }) => { const statusMeta = TASK_STATUS_META[task.status]; return <div key={binding.id} className="rounded-md border border-slate-200 bg-white p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-xs font-bold text-slate-800">{task.title}</p><span className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${statusMeta.className}`}>{statusMeta.label}</span></div><p className="mt-1 text-[10px] text-slate-500">任务 {task.id} · 发布人 {task.publisher} · 提交进度 {task.submitted}/{task.required}</p><p className="mt-1 text-[10px] text-slate-400">绑定时间 {binding.boundAt}</p></div>{task.status === "completed" ? <span className="flex shrink-0 items-center gap-1 rounded bg-slate-100 px-2 py-1.5 text-[10px] font-semibold text-slate-500" title="任务完成后保留历史快照，不可解除关联"><LockKeyhole className="h-3 w-3" />不可解除</span> : <button type="button" onClick={() => unbindTask(task)} className="flex shrink-0 items-center gap-1 rounded px-2 py-1.5 text-[10px] font-semibold text-rose-600 hover:bg-rose-50"><Unlink className="h-3 w-3" />解除关联</button>}</div></div>; })}</div><AssetPagination total={currentBindingRows.length} page={currentBoundTaskPage} pageSize={taskPageSize} onPageChange={setBoundTaskPage} onPageSizeChange={(value) => { setTaskPageSize(value); setBoundTaskPage(1); setLinkableTaskPage(1); }} /></> : <div className="rounded-md border border-dashed border-slate-300 bg-slate-50/60 py-7 text-center text-xs text-slate-400">该资源暂未绑定任务</div>}
               </section>
 
               <section className="mt-5 border-t border-slate-100 pt-5">
                 <div className="mb-2 flex items-center justify-between"><h4 className="text-xs font-bold text-slate-800">可关联任务</h4><span className="text-[10px] text-slate-400">同一资源可关联多个未完成任务</span></div>
-                {linkableTasks.length > 0 ? <div className="space-y-2">{linkableTasks.map((task) => { const statusMeta = TASK_STATUS_META[task.status]; const selected = selectedTaskIds.includes(task.id); return <label key={task.id} className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors ${selected ? "border-purple-400 bg-purple-50/50" : "border-slate-200 hover:bg-slate-50"}`}><input type="checkbox" checked={selected} onChange={() => setSelectedTaskIds((prev) => prev.includes(task.id) ? prev.filter((id) => id !== task.id) : [...prev, task.id])} className="mt-0.5 accent-purple-600" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-xs font-semibold text-slate-800">{task.title}</p><span className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${statusMeta.className}`}>{statusMeta.label}</span></div><p className="mt-1 text-[10px] text-slate-500">任务 {task.id} · 发布人 {task.publisher} · 提交进度 {task.submitted}/{task.required} · 截止 {task.deadline}</p></div></label>; })}</div> : <div className="flex items-center justify-center gap-1.5 rounded-md bg-emerald-50 py-5 text-xs font-semibold text-emerald-700"><CheckCircle2 className="h-4 w-4" />暂无其他可关联任务</div>}
+                {linkableTasks.length > 0 ? <><div className="space-y-2">{pagedLinkableTasks.map((task) => { const statusMeta = TASK_STATUS_META[task.status]; const selected = selectedTaskIds.includes(task.id); return <label key={task.id} className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors ${selected ? "border-purple-400 bg-purple-50/50" : "border-slate-200 hover:bg-slate-50"}`}><input type="checkbox" checked={selected} onChange={() => setSelectedTaskIds((prev) => prev.includes(task.id) ? prev.filter((id) => id !== task.id) : [...prev, task.id])} className="mt-0.5 accent-purple-600" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-xs font-semibold text-slate-800">{task.title}</p><span className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${statusMeta.className}`}>{statusMeta.label}</span></div><p className="mt-1 text-[10px] text-slate-500">任务 {task.id} · 发布人 {task.publisher} · 提交进度 {task.submitted}/{task.required} · 截止 {task.deadline}</p></div></label>; })}</div><AssetPagination total={linkableTasks.length} page={currentLinkableTaskPage} pageSize={taskPageSize} onPageChange={setLinkableTaskPage} onPageSizeChange={(value) => { setTaskPageSize(value); setBoundTaskPage(1); setLinkableTaskPage(1); }} /></> : <div className="flex items-center justify-center gap-1.5 rounded-md bg-emerald-50 py-5 text-xs font-semibold text-emerald-700"><CheckCircle2 className="h-4 w-4" />暂无其他可关联任务</div>}
               </section>
             </div>
 

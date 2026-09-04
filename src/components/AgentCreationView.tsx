@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft, ArrowUp, AtSign, AudioLines, Check, CheckCircle2, ChevronDown, Copy, Download, Eye,
+  ArrowLeft, ArrowUp, AtSign, AudioLines, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, Eye,
   FileText, Film, History, Image as ImageIcon, Link2, Loader2,
   MessageSquare, MoreHorizontal, Package, Palette, Play, Plus, Search,
   RefreshCw, Settings, Sparkles, Square, Trash2, Upload,
   Video, Volume2, WandSparkles, X
 } from "lucide-react";
 import { Task } from "../types";
+import AssetPagination from "./AssetPagination";
 import UploadFinishedVideoModal from "./UploadFinishedVideoModal";
 
 type StepType = "analysis" | "script" | "preview" | "final";
@@ -121,6 +122,30 @@ interface PreviewItem {
   selected: boolean;
 }
 
+interface PreviewFrameVideo {
+  id: string;
+  name: string;
+  cover: string;
+  source: "AI" | "上传";
+  durationSeconds: number;
+  duration: string;
+}
+
+interface PreviewFrameState {
+  id: string;
+  name: string;
+  durationSeconds: number;
+  videos: PreviewFrameVideo[];
+  activeVideoId: string;
+}
+
+interface PreviewVideoGeneration {
+  sessionId: string;
+  previewId: string;
+  frameId: string;
+  candidateId: string;
+}
+
 interface FinalVideoItem {
   id: string;
   name: string;
@@ -185,6 +210,7 @@ interface AgentSession {
   creativeVersions: Record<string, CreativeItem[]>;
   activeCreativeVersions: Record<string, number>;
   previews: PreviewItem[];
+  previewFrames?: Record<string, PreviewFrameState[]>;
   finals: FinalVideoItem[];
   timeline: ResultRecord[];
   versionCounts: Record<"analysis" | "script", number>;
@@ -231,7 +257,7 @@ const IMAGE_LIBRARY: ProductSelection[] = [
   { id: "img-5", name: "防晒霜SPF50权威检测图.jpg", image: "https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=600&auto=format&fit=crop&q=80", source: "images", primaryCategory: "美妆护肤", secondaryCategory: "资质证明", tags: ["成分党", "检测报告"], author: "致上互娱", status: "未审核", size: "1.2 MB", resolution: "1080x1920" },
   { id: "img-6", name: "补水面膜水分提升对比实验图.jpg", image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=600&auto=format&fit=crop&q=80", source: "images", primaryCategory: "美妆护肤", secondaryCategory: "效果对比", tags: ["对比实测"], author: "徐振", status: "审核通过", size: "2.9 MB", resolution: "1080x1440" },
   { id: "img-7", name: "夏日清凉草本展示图.jpg", image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&auto=format&fit=crop&q=80", source: "images", primaryCategory: "食品饮料", secondaryCategory: "商品主图", tags: ["清凉夏日", "产品实拍"], author: "美妆设计组", status: "待审核", size: "5.4 MB", resolution: "2000x2000" },
-  { id: "img-8", name: "高奢护肤瓶身渲染特写.jpg", image: "https://images.unsplash.com/photo-1608248597261-833257058444?w=600&auto=format&fit=crop&q=80", source: "images", primaryCategory: "美妆护肤", secondaryCategory: "商品主图", tags: ["高端质感", "3D渲染"], author: "汤小真", status: "审核通过", size: "3.8 MB", resolution: "1440x1920" }
+  { id: "img-8", name: "高奢护肤瓶身渲染特写.jpg", image: "./assets/prototype/luxury-skincare-set.jpg", source: "images", primaryCategory: "美妆护肤", secondaryCategory: "商品主图", tags: ["高端质感", "3D渲染"], author: "汤小真", status: "审核通过", size: "3.8 MB", resolution: "1440x1920" }
 ];
 
 const REFERENCE_VIDEOS: ReferenceVideoSelection[] = [
@@ -399,12 +425,43 @@ const createSubjects = (creativeIndex: number, productName: string): CreativeSub
   return [product, personOne];
 };
 
+const distributeSubjectTokens = (text: string, subjectIds: string[], shotIndex: number, lineIndex: number) => {
+  if (/\[\[subject:[^\]]+\]\]/.test(text)) return text;
+  const ids = Array.from(new Set(subjectIds.length ? subjectIds : ["product"]));
+  const mode = (shotIndex * 2 + lineIndex) % 4;
+  const punctuationBreaks = Array.from(text.matchAll(/[，。；]/g)).map((match) => (match.index || 0) + 1);
+  const nearestBreak = (ratio: number) => {
+    if (ratio <= 0) return 0;
+    if (ratio >= 1) return text.length;
+    if (!punctuationBreaks.length) return Math.round(text.length * ratio);
+    const target = text.length * ratio;
+    return punctuationBreaks.reduce((nearest, current) => Math.abs(current - target) < Math.abs(nearest - target) ? current : nearest, punctuationBreaks[0]);
+  };
+  const singleRatios = [0, 0.42, 1, 0.68];
+  const multipleRatios = [
+    [0, 0.64, 1],
+    [0.28, 0.76, 1],
+    [0.24, 1, 0.62],
+    [0.18, 0.52, 0.84]
+  ];
+  const ratios = ids.length === 1 ? [singleRatios[mode]] : multipleRatios[mode];
+  const placements = ids.map((id, index) => ({ id, position: nearestBreak(ratios[index % ratios.length]) })).sort((a, b) => a.position - b.position);
+  let cursor = 0;
+  return placements.map((placement) => {
+    const before = text.slice(cursor, placement.position);
+    cursor = placement.position;
+    return `${before}${before && !/\s$/.test(before) ? " " : ""}[[subject:${placement.id}]] `;
+  }).join("") + text.slice(cursor);
+};
+
 const createShotRows = (shots: Array<{ id: number; summary: string; dialogue: string; visual: string }>, subjects: CreativeSubject[]) => {
   const people = subjects.filter((subject) => subject.kind === "person");
   const narrator = subjects.find((subject) => subject.kind === "narrator");
   return shots.map((shot, index) => {
     const primarySpeaker = narrator || people[index % Math.max(people.length, 1)] || subjects[0];
     const secondarySpeaker = people[index % Math.max(people.length, 1)] || primarySpeaker;
+    const primaryVisualIds = people.length > 1 && index % 2 === 1 ? [people[0].id, people[1].id] : [people[0]?.id || "product"];
+    const detailVisualIds = index % 3 === 2 && people[0] ? ["product", people[0].id] : ["product"];
     return {
       ...shot,
       dialogueLines: [
@@ -412,8 +469,8 @@ const createShotRows = (shots: Array<{ id: number; summary: string; dialogue: st
         { id: `${shot.id}-dialogue-2`, subjectId: secondarySpeaker.id, text: index === 0 ? "别急，用这款玻璃油膜清洁擦，自己就能快速处理。" : "操作简单，擦完以后玻璃清楚多了。" }
       ],
       visualLines: [
-        { id: `${shot.id}-visual-1`, subjectIds: people[0] ? [people[0].id] : [], text: shot.visual },
-        { id: `${shot.id}-visual-2`, subjectIds: ["product"], text: "特写展示产品外观和实际使用过程，品牌与核心卖点清晰可见。" }
+        { id: `${shot.id}-visual-1`, subjectIds: primaryVisualIds, text: distributeSubjectTokens(shot.visual, primaryVisualIds, index, 0) },
+        { id: `${shot.id}-visual-2`, subjectIds: detailVisualIds, text: distributeSubjectTokens("特写展示产品外观和实际使用过程，品牌与核心卖点清晰可见。", detailVisualIds, index, 1) }
       ]
     };
   });
@@ -521,7 +578,11 @@ const normalizeCreatives = (items: CreativeItem[] = [], productName = "玻璃油
     shots: (item.shots?.length ? item.shots : generatedShots).map((shot, shotIndex) => ({
       ...shot,
       dialogueLines: shot.dialogueLines?.length ? cloneItems(shot.dialogueLines) : generatedShots[shotIndex]?.dialogueLines || [],
-      visualLines: shot.visualLines?.length ? shot.visualLines.map((line) => ({ ...line, subjectIds: [...line.subjectIds] })) : generatedShots[shotIndex]?.visualLines || []
+      visualLines: shot.visualLines?.length ? shot.visualLines.map((line, lineIndex) => {
+        const fallbackIds = generatedShots[shotIndex]?.visualLines?.[lineIndex]?.subjectIds || ["product"];
+        const subjectIds = /\[\[subject:[^\]]+\]\]/.test(line.text) && line.subjectIds?.length ? [...line.subjectIds] : fallbackIds;
+        return { ...line, subjectIds, text: distributeSubjectTokens(line.text, subjectIds, shotIndex, lineIndex) };
+      }) : generatedShots[shotIndex]?.visualLines || []
     }))
   };
 });
@@ -533,13 +594,67 @@ const createPreviews = (): PreviewItem[] => [
 
 const normalizePreviews = (previews: PreviewItem[] = []): PreviewItem[] => previews.map((item, index) => ({
   ...item,
-  name: index === 0 ? "推荐" : `备选${index}`
+  name: item.name || (index === 0 ? "推荐" : `备选${index}`)
 }));
 
-const createFinals = (previews: PreviewItem[]): FinalVideoItem[] =>
+const createPreviewFrameMap = (previews: PreviewItem[]): Record<string, PreviewFrameState[]> => Object.fromEntries(
+  previews.map((preview, previewIndex) => [preview.id, Array.from({ length: 3 }, (_, frameIndex) => {
+    const videoId = `${preview.id}_frame_${frameIndex + 1}_video_1`;
+    const cover = frameIndex === 0 ? preview.cover : SAMPLE_COVERS[(previewIndex + frameIndex) % SAMPLE_COVERS.length];
+    return {
+      id: `${preview.id}_frame_${frameIndex + 1}`,
+      name: `画面${frameIndex + 1}`,
+      durationSeconds: 7,
+      videos: [{
+        id: videoId,
+        name: `${preview.name}_${frameIndex + 1}.mp4`,
+        cover,
+        source: "AI" as const,
+        durationSeconds: 7,
+        duration: "00:07"
+      }],
+      activeVideoId: videoId
+    };
+  })])
+);
+
+const normalizePreviewFrameMap = (previews: PreviewItem[], stored?: Record<string, PreviewFrameState[]>): Record<string, PreviewFrameState[]> => {
+  const defaults = createPreviewFrameMap(previews);
+  return Object.fromEntries(previews.map((preview) => {
+    const frames = stored?.[preview.id];
+    if (!frames?.length) return [preview.id, defaults[preview.id]];
+    return [preview.id, frames.map((frame, index) => ({
+      ...frame,
+      name: frame.name || `画面${index + 1}`,
+      durationSeconds: frame.durationSeconds || 7,
+      videos: frame.videos?.length ? frame.videos : defaults[preview.id][index % defaults[preview.id].length].videos,
+      activeVideoId: frame.videos?.some((video) => video.id === frame.activeVideoId)
+        ? frame.activeVideoId
+        : frame.videos?.[0]?.id || defaults[preview.id][index % defaults[preview.id].length].activeVideoId
+    }))];
+  }));
+};
+
+const finalDateText = () => {
+  const date = new Date();
+  return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
+};
+
+const finalTaskId = (sessionId: string) => {
+  const digits = sessionId.replace(/\D/g, "");
+  if (digits) return digits.slice(-6).padStart(6, "0");
+  const hash = Array.from(sessionId).reduce((value, character) => (value * 31 + character.charCodeAt(0)) % 1000000, 0);
+  return String(hash).padStart(6, "0");
+};
+
+const finalVideoName = (sessionId: string, index: number) => `Agent创作成片_${finalDateText()}_${finalTaskId(sessionId)}_${index}.mp4`;
+
+const normalizeFinals = (finals: FinalVideoItem[] = [], sessionId: string): FinalVideoItem[] => finals.map((item, index) => ({ ...item, name: finalVideoName(sessionId, index) }));
+
+const createFinals = (previews: PreviewItem[], sessionId: string): FinalVideoItem[] =>
   previews.map((item, index) => ({
     id: `final_${Date.now()}_${index}`,
-    name: `${item.name}版_玻璃油膜擦营销成片.mp4`,
+    name: finalVideoName(sessionId, index),
     cover: item.cover,
     duration: index % 2 === 0 ? "00:28" : "00:30",
     selected: true
@@ -598,6 +713,7 @@ const makeBaseSession = (prompt: string, mode: AgentSession["mode"]): AgentSessi
   creativeVersions: {},
   activeCreativeVersions: {},
   previews: [],
+  previewFrames: {},
   finals: [],
   timeline: [],
   versionCounts: { analysis: 1, script: 0 },
@@ -660,7 +776,7 @@ const makeDemoSession = (task: Task): AgentSession => {
   const base = makeBaseSession(task.name, "step");
   const creatives = createCreatives(0, base.productName, base.productImages);
   const previews = createPreviews();
-  const finals = createFinals(previews);
+  const finals = createFinals(previews, task.id);
   const completed = task.status === "completed";
   const session: AgentSession = {
     ...base,
@@ -701,7 +817,7 @@ const makeDemoSession = (task: Task): AgentSession => {
       response: `已为您生成${session.productName}的最终广告成片，您可以在左侧查看完整的视频结果。`
     })
   );
-  return { ...session, timeline };
+  return { ...session, previewFrames: createPreviewFrameMap(session.previews), timeline };
 };
 
 const loadStoredSession = (id: string) => {
@@ -716,6 +832,7 @@ const loadStoredSession = (id: string) => {
       const versions = stored.creativeVersions?.[String(creative.id)];
       return [String(creative.id), versions?.length ? normalizeCreatives(versions, productName, productImages) : cloneCreatives([creative])];
     }));
+    const previews = normalizePreviews(stored.previews);
     return {
       ...stored,
       productImages,
@@ -730,7 +847,9 @@ const loadStoredSession = (id: string) => {
       discountInfo: stored.discountInfo || "暂无优惠信息",
       creatives,
       creativeVersions,
-      previews: normalizePreviews(stored.previews),
+      previews,
+      previewFrames: normalizePreviewFrameMap(previews, stored.previewFrames),
+      finals: normalizeFinals(stored.finals, stored.id),
       timeline: (stored.timeline || []).map((record) => (
         record.step === "analysis" || (record.step === "script" && !record.creativeId)
           ? { ...record, version: undefined }
@@ -789,8 +908,13 @@ export default function AgentCreationView({
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadItems, setUploadItems] = useState<FinalVideoItem[]>([]);
   const [detailVideo, setDetailVideo] = useState<FinalVideoItem | null>(null);
+  const [previewSourceTarget, setPreviewSourceTarget] = useState<{ previewId: string; frameId: string } | null>(null);
+  const [previewVideoGeneration, setPreviewVideoGeneration] = useState<PreviewVideoGeneration | null>(null);
+  const [previewGenerationProgress, setPreviewGenerationProgress] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewGenerationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewProgressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const generationTargetRef = useRef<StepType | null>(null);
   const sessionRef = useRef<AgentSession | null>(session);
   const productImagesForCreation = [
@@ -872,6 +996,8 @@ export default function AgentCreationView({
 
   useEffect(() => () => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    if (previewGenerationTimerRef.current) clearTimeout(previewGenerationTimerRef.current);
+    if (previewProgressTimerRef.current) clearInterval(previewProgressTimerRef.current);
   }, []);
 
   const toTask = (value: AgentSession): Task => ({
@@ -902,7 +1028,7 @@ export default function AgentCreationView({
       });
       if (oneClick) {
         const previews = createPreviews();
-        next = { ...next, currentStep: "final", availableSteps: ["analysis", "final"], previews, finals: createFinals(previews) };
+        next = { ...next, currentStep: "final", availableSteps: ["analysis", "final"], previews, finals: createFinals(previews, next.id) };
         next = { ...next, timeline: [analysis, recordFor(next, "final", "视频成片")] };
       } else {
         next = { ...next, timeline: [analysis] };
@@ -1108,7 +1234,7 @@ export default function AgentCreationView({
     const next = {
       ...current,
       availableSteps: Array.from(new Set([...current.availableSteps, "final"])) as StepType[],
-      finals: createFinals(current.previews)
+      finals: createFinals(current.previews, current.id)
     };
     return { ...next, timeline: [...next.timeline, recordFor(next, "final", "视频成片", {
       instruction: repeated ? "重新生成视频成片" : "生成成片",
@@ -1158,13 +1284,13 @@ export default function AgentCreationView({
     } else if (record.step === "preview") {
       next = { ...next, previews: cloneItems(record.snapshot.previews) };
     } else if (record.step === "final") {
-      next = { ...next, finals: cloneItems(record.snapshot.finals) };
+      next = { ...next, finals: normalizeFinals(cloneItems(record.snapshot.finals), session.id) };
     }
     setSession(next);
   };
 
   const submitChat = () => {
-    if (!session || !chatInput.trim() || session.status === "generating") return;
+    if (!session || !chatInput.trim() || session.status === "generating" || previewVideoGeneration?.sessionId === session.id) return;
     const request = chatInput.trim();
     setChatInput("");
     runGeneration("正在按要求调整", session.currentStep, 0, (current) => {
@@ -1215,6 +1341,133 @@ export default function AgentCreationView({
     });
   };
 
+  const updatePreviewFrame = (previewId: string, frameId: string, update: (frame: PreviewFrameState) => PreviewFrameState) => {
+    setSession((current) => {
+      if (!current) return current;
+      const frameMap = normalizePreviewFrameMap(current.previews, current.previewFrames);
+      const nextFrames = (frameMap[previewId] || []).map((frame) => frame.id === frameId ? update(frame) : frame);
+      const next = { ...current, previewFrames: { ...frameMap, [previewId]: nextFrames }, updatedAt: nowText() };
+      sessionRef.current = next;
+      return next;
+    });
+  };
+
+  const addPreviewFrameVideo = (previewId: string, frameId: string, video: PreviewFrameVideo) => {
+    updatePreviewFrame(previewId, frameId, (frame) => ({ ...frame, videos: [video, ...frame.videos] }));
+  };
+
+  const selectPreviewFrameVideo = (previewId: string, frameId: string, videoId: string) => {
+    updatePreviewFrame(previewId, frameId, (frame) => ({ ...frame, activeVideoId: videoId }));
+  };
+
+  const copyPreviewVersion = (previewId: string) => {
+    setSession((current) => {
+      if (!current) return current;
+      const source = current.previews.find((preview) => preview.id === previewId);
+      if (!source) return current;
+      const family = source.name.startsWith("备选") ? "备选" : "推荐";
+      const familyNumbers = current.previews
+        .filter((preview) => preview.name.startsWith(family))
+        .map((preview) => Number(preview.name.match(/(\d+)$/)?.[1] || 0));
+      const nextNumber = Math.max(...familyNumbers, 0) + 1;
+      const copiedId = `preview_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const copiedPreview: PreviewItem = { ...source, id: copiedId, name: `${family}${nextNumber}` };
+      const frameMap = normalizePreviewFrameMap(current.previews, current.previewFrames);
+      const copiedFrames = (frameMap[previewId] || []).map((frame, frameIndex) => {
+        const copiedVideos = frame.videos.map((video, videoIndex) => ({ ...video, id: `${copiedId}_frame_${frameIndex + 1}_video_${videoIndex + 1}` }));
+        const activeIndex = Math.max(frame.videos.findIndex((video) => video.id === frame.activeVideoId), 0);
+        return {
+          ...frame,
+          id: `${copiedId}_frame_${frameIndex + 1}`,
+          videos: copiedVideos,
+          activeVideoId: copiedVideos[activeIndex]?.id || copiedVideos[0]?.id || ""
+        };
+      });
+      const previews = [...current.previews];
+      const lastFamilyIndex = previews.reduce((last, preview, index) => preview.name.startsWith(family) ? index : last, -1);
+      previews.splice(lastFamilyIndex + 1, 0, copiedPreview);
+      const next = { ...current, previews, previewFrames: { ...frameMap, [copiedId]: copiedFrames }, finals: [], updatedAt: nowText() };
+      sessionRef.current = next;
+      return next;
+    });
+  };
+
+  const deletePreviewVersion = (previewId: string) => {
+    setSession((current) => {
+      if (!current || current.previews.length <= 1) return current;
+      const frameMap = normalizePreviewFrameMap(current.previews, current.previewFrames);
+      const remainingFrames = { ...frameMap };
+      delete remainingFrames[previewId];
+      const next = { ...current, previews: current.previews.filter((preview) => preview.id !== previewId), previewFrames: remainingFrames, finals: [], updatedAt: nowText() };
+      sessionRef.current = next;
+      return next;
+    });
+  };
+
+  const startPreviewFrameGeneration = (previewId: string, frameId: string) => {
+    if (!session || previewVideoGeneration) return;
+    const target: PreviewVideoGeneration = {
+      sessionId: session.id,
+      previewId,
+      frameId,
+      candidateId: `preview-video-${Date.now()}`
+    };
+    const startedAt = Date.now();
+    setPreviewVideoGeneration(target);
+    setPreviewGenerationProgress(6);
+    if (previewProgressTimerRef.current) clearInterval(previewProgressTimerRef.current);
+    previewProgressTimerRef.current = setInterval(() => {
+      const elapsed = Date.now() - startedAt;
+      setPreviewGenerationProgress(Math.min(94, 6 + (elapsed / 10000) * 88));
+    }, 250);
+    previewGenerationTimerRef.current = setTimeout(() => {
+      if (previewProgressTimerRef.current) clearInterval(previewProgressTimerRef.current);
+      setSession((current) => {
+        if (!current || current.id !== target.sessionId) return current;
+        const frameMap = normalizePreviewFrameMap(current.previews, current.previewFrames);
+        const nextFrames = (frameMap[target.previewId] || []).map((frame) => frame.id === target.frameId ? {
+          ...frame,
+          videos: [{
+            id: target.candidateId,
+            name: `${frame.name}_AI生成_${frame.videos.length + 1}.mp4`,
+            cover: SAMPLE_COVERS[(frame.videos.length + 2) % SAMPLE_COVERS.length],
+            source: "AI" as const,
+            durationSeconds: frame.durationSeconds,
+            duration: `00:${String(frame.durationSeconds).padStart(2, "0")}`
+          }, ...frame.videos]
+        } : frame);
+        const next = { ...current, previewFrames: { ...frameMap, [target.previewId]: nextFrames }, updatedAt: nowText() };
+        sessionRef.current = next;
+        return next;
+      });
+      setPreviewVideoGeneration(null);
+      setPreviewGenerationProgress(0);
+      previewGenerationTimerRef.current = null;
+    }, 10000);
+  };
+
+  const addSourceVideoToPreview = (previewId: string, frameId: string, source: SourceVideoSelection) => {
+    addPreviewFrameVideo(previewId, frameId, {
+      id: `preview-upload-${Date.now()}-${source.id}`,
+      name: source.name,
+      cover: source.cover,
+      source: "上传",
+      durationSeconds: source.durationSeconds,
+      duration: source.duration
+    });
+  };
+
+  const addLocalVideoToPreview = (previewId: string, frameId: string, file: File) => {
+    addPreviewFrameVideo(previewId, frameId, {
+      id: `preview-local-${Date.now()}`,
+      name: file.name,
+      cover: URL.createObjectURL(file),
+      source: "上传",
+      durationSeconds: 30,
+      duration: "00:30"
+    });
+  };
+
   const openUpload = (items: FinalVideoItem[]) => {
     if (items.length === 0) {
       showToast("请先选择视频");
@@ -1227,9 +1480,14 @@ export default function AgentCreationView({
 
   const startNewSession = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    if (previewGenerationTimerRef.current) clearTimeout(previewGenerationTimerRef.current);
+    if (previewProgressTimerRef.current) clearInterval(previewProgressTimerRef.current);
     setSession(null);
     sessionRef.current = null;
     setGeneratingLabel("");
+    setPreviewVideoGeneration(null);
+    setPreviewGenerationProgress(0);
+    setPreviewSourceTarget(null);
     setUploadOpen(false);
     setIdea("");
     setSelectedProduct(null);
@@ -1244,6 +1502,7 @@ export default function AgentCreationView({
   };
 
   const selectedFinals = useMemo(() => session?.finals.filter((item) => item.selected) || [], [session?.finals]);
+  const previewVideoLocked = Boolean(session && previewVideoGeneration?.sessionId === session.id);
   const canStart = Boolean(idea.trim() || productForCreation || selectedReference || selectedScript || selectedSources.length || selectedStyle);
 
   if (uploadOpen) {
@@ -1255,7 +1514,6 @@ export default function AgentCreationView({
           isOpen
           isPage
           initialFiles={uploadItems.map((item) => ({ name: item.name, type: "video/mp4" }))}
-          stayOpenOnPublish
           onClose={() => setUploadOpen(false)}
           onPublishSuccess={(message) => {
             onUploadVideos(uploadItems.map((item) => ({ name: item.name, cover: item.cover })));
@@ -1270,8 +1528,7 @@ export default function AgentCreationView({
     return (
       <div className="relative flex min-h-full flex-1 flex-col bg-slate-50 text-slate-800">
         {toast && <Toast message={toast} />}
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-5">
-          <button onClick={onBack} className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900"><ArrowLeft className="h-4 w-4" />返回</button>
+        <header className="flex h-14 shrink-0 items-center justify-end border-b border-slate-200 bg-white px-5">
           <button onClick={onOpenQueue} className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><History className="h-4 w-4" />历史任务</button>
         </header>
         <main className="flex flex-1 justify-center overflow-y-auto px-5 py-12">
@@ -1415,24 +1672,24 @@ export default function AgentCreationView({
           })}
         </nav>
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_390px] overflow-hidden">
-        <main className={`relative min-w-0 overflow-y-auto px-5 pb-0 pt-5 ${scriptSubjectDetailOpen ? "bg-white" : "bg-slate-50"}`}>
+        <main className={`relative flex min-w-0 flex-col overflow-hidden px-5 pb-0 pt-5 ${scriptSubjectDetailOpen ? "bg-white" : "bg-slate-50"}`}>
           {session.status === "generating" ? (
             <div className="flex h-full min-h-[420px] flex-col items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-violet-600" /><p className="mt-4 text-sm font-semibold text-slate-700">{generatingLabel}</p><button onClick={stopGeneration} className="mt-5 flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Square className="h-3.5 w-3.5" />停止生成</button></div>
           ) : session.status === "failed" ? (
             <div className="flex h-full min-h-[420px] flex-col items-center justify-center"><div className="flex h-11 w-11 items-center justify-center rounded-full bg-rose-50 text-rose-600"><X className="h-5 w-5" /></div><p className="mt-4 text-sm font-semibold">当前阶段生成失败</p><button onClick={retryGeneration} className="mt-5 flex items-center gap-2 rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white"><RefreshCw className="h-3.5 w-3.5" />重新生成</button></div>
           ) : (
-            <>
+            <div className={`min-h-0 flex-1 ${session.currentStep === "preview" ? "overflow-hidden" : "overflow-y-auto"} ${previewVideoLocked && session.currentStep !== "preview" ? "pointer-events-none select-none opacity-60" : ""}`}>
               {session.currentStep === "analysis" && <AnalysisPanel session={session} setSession={setSession} showToast={showToast} />}
               {session.currentStep === "script" && <ScriptPanel session={session} setSession={setSession} currentCreative={currentCreative} selectedCreativeId={selectedCreativeId} setSelectedCreativeId={setSelectedCreativeId} onSubjectDetailChange={setScriptSubjectDetailOpen} showToast={showToast} />}
-              {session.currentStep === "preview" && <PreviewPanel session={session} />}
+              {session.currentStep === "preview" && <PreviewPanel session={session} generation={previewVideoLocked ? previewVideoGeneration : null} generationProgress={previewGenerationProgress} onGenerateMore={startPreviewFrameGeneration} onOpenLibrary={(previewId, frameId) => setPreviewSourceTarget({ previewId, frameId })} onUploadLocal={addLocalVideoToPreview} onSelectVideo={selectPreviewFrameVideo} onCopyPreview={copyPreviewVersion} onDeletePreview={deletePreviewVersion} />}
               {session.currentStep === "final" && <FinalPanel session={session} setSession={setSession} selectedFinals={selectedFinals} openUpload={openUpload} setDetailVideo={setDetailVideo} showToast={showToast} />}
-            </>
+            </div>
           )}
 
-          {session.status !== "generating" && session.status !== "failed" && !(session.currentStep === "script" && scriptSubjectDetailOpen) && (
-            <div className="sticky bottom-0 z-20 -mx-5 mt-6 flex items-center justify-end gap-2 border-t border-slate-200 bg-white/95 px-5 py-3 backdrop-blur-sm">
+          {session.status !== "generating" && session.status !== "failed" && !previewVideoLocked && !(session.currentStep === "script" && scriptSubjectDetailOpen) && (
+            <div className="sticky bottom-0 z-20 -mx-5 mt-3 flex h-16 shrink-0 items-center justify-end gap-2 border-t border-slate-200 bg-white/95 px-5 backdrop-blur-sm">
               {session.currentStep === "analysis" && <>
-                <button onClick={() => runGeneration("正在生成视频成片", "final", 5, (current) => { const previews = createPreviews(); const next = { ...current, availableSteps: Array.from(new Set([...current.availableSteps, "final"])) as StepType[], previews, finals: createFinals(previews) }; return { ...next, timeline: [...next.timeline, recordFor(next, "final", "视频成片", { instruction: "一键成片", response: `已为您生成${current.productName}的最终广告成片，您可以在左侧查看完整的视频结果。` })] }; })} className="rounded-md border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">一键成片</button>
+                <button onClick={() => runGeneration("正在生成视频成片", "final", 5, (current) => { const previews = createPreviews(); const next = { ...current, availableSteps: Array.from(new Set([...current.availableSteps, "final"])) as StepType[], previews, finals: createFinals(previews, current.id) }; return { ...next, timeline: [...next.timeline, recordFor(next, "final", "视频成片", { instruction: "一键成片", response: `已为您生成${current.productName}的最终广告成片，您可以在左侧查看完整的视频结果。` })] }; })} className="rounded-md border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">一键成片</button>
                 <button onClick={generateScripts} className="rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-700">生成创意与分镜</button>
               </>}
               {session.currentStep === "script" && !scriptSubjectDetailOpen && <button onClick={generatePreviews} className="rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-700">生成视频预览</button>}
@@ -1442,11 +1699,12 @@ export default function AgentCreationView({
           )}
         </main>
 
-        <ConversationPanel session={session} chatInput={chatInput} setChatInput={setChatInput} submitChat={submitChat} restoreResult={restoreResult} />
+        <ConversationPanel session={session} chatInput={chatInput} setChatInput={setChatInput} submitChat={submitChat} restoreResult={restoreResult} sendDisabled={previewVideoLocked} />
         </div>
       </div>
 
       {detailVideo && <VideoDetail video={detailVideo} onClose={() => setDetailVideo(null)} onUpload={() => openUpload([detailVideo])} showToast={showToast} />}
+      {previewSourceTarget && <SourceSelectorModal selected={[]} selectionMode="single" onClose={() => setPreviewSourceTarget(null)} onConfirm={(items) => { const source = items[0]; if (source) addSourceVideoToPreview(previewSourceTarget.previewId, previewSourceTarget.frameId, source); setPreviewSourceTarget(null); }} showToast={showToast} />}
     </div>
   );
 }
@@ -1460,7 +1718,7 @@ function PanelHeader({ title, count, active, onChange }: { title: string; count?
   );
 }
 
-function ConversationPanel({ session, chatInput, setChatInput, submitChat, restoreResult }: { session: AgentSession; chatInput: string; setChatInput: (value: string) => void; submitChat: () => void; restoreResult: (record: ResultRecord) => void }) {
+function ConversationPanel({ session, chatInput, setChatInput, submitChat, restoreResult, sendDisabled = false }: { session: AgentSession; chatInput: string; setChatInput: (value: string) => void; submitChat: () => void; restoreResult: (record: ResultRecord) => void; sendDisabled?: boolean }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const messages = session.conversation?.length ? session.conversation : [
     { role: "user" as const, content: session.prompt },
@@ -1531,7 +1789,7 @@ function ConversationPanel({ session, chatInput, setChatInput, submitChat, resto
       <div className="shrink-0 border-t border-slate-200 bg-white p-3">
         <div className="flex items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5 focus-within:border-violet-400 focus-within:bg-white">
           <textarea value={chatInput} onChange={(event) => setChatInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitChat(); } }} rows={3} placeholder="可以随时告诉我你的想法" className="min-w-0 flex-1 resize-none bg-transparent text-xs leading-5 outline-none placeholder:text-slate-400" />
-          <button onClick={submitChat} disabled={!chatInput.trim() || session.status === "generating"} title="发送" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-violet-600 text-white hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400"><ArrowUp className="h-4 w-4" /></button>
+          <button onClick={submitChat} disabled={!chatInput.trim() || session.status === "generating" || sendDisabled} title="发送" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-violet-600 text-white hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400"><ArrowUp className="h-4 w-4" /></button>
         </div>
       </div>
     </aside>
@@ -1545,7 +1803,7 @@ function AnalysisPanel({ session, setSession, showToast }: { session: AgentSessi
   const updateImages = (productImages: ProductSelection[]) => setSession({ ...session, productImages, product: productImages[0] });
   const updateList = (field: "sellingPoints" | "painPoints" | "targetGroups" | "scenarios" | "specs", items: string[]) => setSession({ ...session, [field]: items });
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto w-full max-w-6xl pb-5">
       <PanelHeader title={session.productName} />
       <p className="mb-6 text-base font-bold text-violet-700">商品分析信息</p>
       <div className="space-y-8">
@@ -2175,94 +2433,180 @@ function SubjectDetailPanel({ subject, draft, productName, voiceEditorOpen, voic
   );
 }
 
-function PreviewPanel({ session }: { session: AgentSession }) {
+function PreviewPanel({ session, generation, generationProgress, onGenerateMore, onOpenLibrary, onUploadLocal, onSelectVideo, onCopyPreview, onDeletePreview }: { session: AgentSession; generation: PreviewVideoGeneration | null; generationProgress: number; onGenerateMore: (previewId: string, frameId: string) => void; onOpenLibrary: (previewId: string, frameId: string) => void; onUploadLocal: (previewId: string, frameId: string, file: File) => void; onSelectVideo: (previewId: string, frameId: string, videoId: string) => void; onCopyPreview: (previewId: string) => void; onDeletePreview: (previewId: string) => void }) {
   const [activePreviewId, setActivePreviewId] = useState(session.previews[0]?.id || "");
+  const [activeFrameId, setActiveFrameId] = useState("");
+  const [currentSecond, setCurrentSecond] = useState(0);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [candidateOverflow, setCandidateOverflow] = useState(false);
+  const [previewImage, setPreviewImage] = useState<{ src: string; name: string } | null>(null);
+  const candidateScrollRef = useRef<HTMLDivElement | null>(null);
+  const timelineRef = useRef<HTMLDivElement | null>(null);
+  const localUploadRef = useRef<HTMLInputElement | null>(null);
   const activeIndex = Math.max(session.previews.findIndex((item) => item.id === activePreviewId), 0);
   const activePreview = session.previews[activeIndex] || session.previews[0];
   const previewRecord = [...session.timeline].reverse().find((record) => record.step === "preview" && !record.cancelled);
   const creative = session.creatives.find((item) => item.id === previewRecord?.creativeId) || session.creatives[activeIndex % Math.max(session.creatives.length, 1)] || session.creatives[0];
-  const shots = creative?.shots?.length ? creative.shots.slice(0, 4) : [];
+  const shots = creative?.shots?.length ? creative.shots.slice(0, 3) : [];
   const productImages = creative?.productImages?.length ? creative.productImages : session.productImages;
-  const totalSeconds = shots.length ? shots.length * 7 : 28;
+  const frameMap = normalizePreviewFrameMap(session.previews, session.previewFrames);
+  const frames = activePreview ? frameMap[activePreview.id] || [] : [];
+  const activeFrameIndex = Math.max(frames.findIndex((frame) => frame.id === activeFrameId), 0);
+  const activeFrame = frames[activeFrameIndex] || frames[0];
+  const activeVideo = activeFrame?.videos.find((video) => video.id === activeFrame.activeVideoId) || activeFrame?.videos[0];
+  const activeShot = shots[activeFrameIndex] || shots[0];
+  const totalSeconds = frames.reduce((sum, frame) => sum + frame.durationSeconds, 0);
+  const frameStart = frames.slice(0, activeFrameIndex).reduce((sum, frame) => sum + frame.durationSeconds, 0);
+  const localFrameSecond = Math.min(Math.max(currentSecond - frameStart, 0), activeFrame?.durationSeconds || 0);
+  const playheadPercent = frames.length && activeFrame
+    ? ((activeFrameIndex + localFrameSecond / Math.max(activeFrame.durationSeconds, 1)) / frames.length) * 100
+    : 0;
+  const locked = Boolean(generation);
+  const generatingCurrentFrame = generation?.previewId === activePreview?.id && generation.frameId === activeFrame?.id;
+  const usedSubjectIds = new Set([
+    ...(activeShot?.visualLines || []).flatMap((line) => line.subjectIds),
+    ...(activeShot?.dialogueLines || []).map((line) => line.subjectId)
+  ]);
+  const usedReferenceImages = (creative?.subjects || []).flatMap((subject) => {
+    if (!usedSubjectIds.has(subject.id) || subject.kind === "narrator") return [];
+    if (subject.kind === "product") {
+      const image = productImages[activeFrameIndex % Math.max(productImages.length, 1)];
+      return image ? [{ id: `${subject.id}-${image.id}`, src: image.image, name: image.name.replace(/\.(jpg|jpeg|png|webp)$/i, "") }] : [];
+    }
+    return subject.image ? [{ id: subject.id, src: subject.image, name: subject.name }] : [];
+  });
+  const frameEnd = frameStart + (activeFrame?.durationSeconds || 0);
+  const activeDialogue = activeShot?.dialogueLines?.[0]?.text || "真实展示使用体验，让用户快速理解产品解决的问题和带来的变化。";
+
+  const formatTime = (seconds: number) => {
+    const rounded = Math.max(0, Math.round(seconds));
+    return `${String(Math.floor(rounded / 60)).padStart(2, "0")}:${String(rounded % 60).padStart(2, "0")}`;
+  };
+
+  const seekFromPointer = (event: React.PointerEvent<HTMLDivElement>) => {
+    const element = timelineRef.current;
+    if (!element || !frames.length) return;
+    const rect = element.getBoundingClientRect();
+    const x = Math.min(Math.max(event.clientX - rect.left, 0), rect.width - 0.01);
+    const slotWidth = rect.width / frames.length;
+    const frameIndex = Math.min(frames.length - 1, Math.floor(x / slotWidth));
+    const ratio = Math.min(1, Math.max(0, (x - frameIndex * slotWidth) / slotWidth));
+    const start = frames.slice(0, frameIndex).reduce((sum, frame) => sum + frame.durationSeconds, 0);
+    setActiveFrameId(frames[frameIndex].id);
+    setCurrentSecond(start + ratio * frames[frameIndex].durationSeconds);
+  };
 
   useEffect(() => {
     if (!session.previews.some((item) => item.id === activePreviewId)) setActivePreviewId(session.previews[0]?.id || "");
   }, [activePreviewId, session.previews]);
 
-  if (!activePreview) return <div className="flex min-h-[420px] items-center justify-center text-sm text-slate-400">暂无视频预览</div>;
+  useEffect(() => {
+    const nextFrames = activePreview ? frameMap[activePreview.id] || [] : [];
+    if (!nextFrames.some((frame) => frame.id === activeFrameId)) {
+      setActiveFrameId(nextFrames[0]?.id || "");
+      setCurrentSecond(0);
+    }
+  }, [activeFrameId, activePreviewId, session.previewFrames]);
+
+  useEffect(() => {
+    if (locked) setAddMenuOpen(false);
+  }, [locked]);
+
+  useEffect(() => {
+    const element = candidateScrollRef.current;
+    if (!element) return;
+    const updateOverflow = () => setCandidateOverflow(element.scrollWidth > element.clientWidth + 1);
+    updateOverflow();
+    const frame = window.requestAnimationFrame(updateOverflow);
+    const observer = new ResizeObserver(updateOverflow);
+    observer.observe(element);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [activePreviewId, activeFrameId, activeFrame?.videos.length, generatingCurrentFrame]);
+
+  if (!activePreview || !activeFrame) return <div className="flex min-h-[420px] items-center justify-center text-sm text-slate-400">暂无视频预览</div>;
 
   return (
-    <div className="mx-auto max-w-6xl">
-      <PanelHeader title="视频预览" />
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <div className="grid min-h-[510px] grid-cols-[68px_220px_minmax(0,1fr)]">
+    <div className="mx-auto flex h-full min-h-0 w-full flex-col">
+      <div className="mb-3 flex shrink-0 items-center justify-between"><h2 className="text-lg font-bold text-slate-900">视频预览</h2></div>
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <div className="grid min-h-0 flex-1 grid-cols-[68px_230px_minmax(0,1fr)]">
           <aside className="border-r border-slate-200 bg-slate-50 px-2 py-4" aria-label="视频预览版本">
             <div className="space-y-2">
-              {session.previews.map((item, index) => {
+              {session.previews.map((item) => {
                 const active = item.id === activePreview.id;
-                return (
-                  <button key={item.id} onClick={() => setActivePreviewId(item.id)} className={`flex w-full flex-col items-center gap-2 rounded-md px-1 py-3 text-[11px] font-semibold transition-colors ${active ? "bg-violet-50 text-violet-700" : "text-slate-500 hover:bg-white hover:text-slate-800"}`}>
-                    <span className={`relative flex h-8 w-8 items-center justify-center rounded-md border bg-white ${active ? "border-violet-300" : "border-slate-200"}`}><Video className="h-4 w-4" />{index > 0 && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-cyan-400" />}</span>
-                    {item.name}
-                  </button>
-                );
+                return <div key={item.id} className="group/version relative"><button onClick={() => setActivePreviewId(item.id)} className={`flex w-full flex-col items-center gap-2 rounded-md px-1 py-3 text-[11px] font-semibold transition-colors ${active ? "bg-violet-50 text-violet-700" : "text-slate-500 hover:bg-white hover:text-slate-800"}`}><span className={`flex h-8 w-8 items-center justify-center rounded-md border bg-white ${active ? "border-violet-300" : "border-slate-200"}`}><Video className="h-4 w-4" /></span><span className="group-hover/version:hidden group-focus-within/version:hidden">{item.name}</span><span className="hidden group-hover/version:inline group-focus-within/version:inline">编辑</span></button><div className="invisible absolute left-0 top-full z-[70] w-24 pt-1 opacity-0 transition group-hover/version:visible group-hover/version:opacity-100 group-focus-within/version:visible group-focus-within/version:opacity-100"><div className="rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl"><button disabled={locked} onClick={(event) => { event.stopPropagation(); onCopyPreview(item.id); }} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"><Copy className="h-3.5 w-3.5" />复制</button><button disabled={locked || session.previews.length <= 1} onClick={(event) => { event.stopPropagation(); onDeletePreview(item.id); }} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-slate-600 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:text-slate-300"><Trash2 className="h-3.5 w-3.5" />删除</button></div></div></div>;
               })}
             </div>
           </aside>
 
-          <div className="flex flex-col border-r border-slate-200 p-4">
-            <div className="relative mx-auto aspect-[9/16] w-full max-w-[188px] overflow-hidden rounded-lg bg-slate-900 shadow-sm">
-              <img src={activePreview.cover} alt={`${activePreview.name}视频预览`} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+          <div className="flex min-h-0 flex-col border-r border-slate-200 p-4">
+            <div className="relative mr-auto aspect-[9/16] w-full max-w-[194px] shrink-0 overflow-hidden rounded-lg bg-slate-900 shadow-sm">
+              <img src={activeVideo?.cover || activePreview.cover} alt={`${activePreview.name}${activeFrame.name}视频预览`} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
               <div className="absolute inset-0 bg-slate-900/10" />
               <button title="播放视频预览" className="absolute inset-0 m-auto flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-violet-700 shadow"><Play className="ml-0.5 h-5 w-5 fill-current" /></button>
-              <span className="absolute left-2 top-2 rounded bg-slate-900/65 px-2 py-1 text-[10px] font-semibold text-white">{activePreview.name}</span>
             </div>
-            <div className="mt-4 flex items-center gap-2">
-              <button title="播放" className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"><Play className="h-3.5 w-3.5 fill-current" /></button>
-              <button title="声音" className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"><Volume2 className="h-4 w-4" /></button>
-              <span className="text-xs font-semibold text-slate-700">00:00</span>
-              <span className="text-xs text-slate-400">/ 00:{totalSeconds}</span>
-            </div>
+            <div className="mt-4 flex items-center gap-2"><button title="播放" className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"><Play className="h-3.5 w-3.5 fill-current" /></button><button title="声音" className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"><Volume2 className="h-4 w-4" /></button><span className="text-xs font-semibold text-slate-700">{formatTime(currentSecond)}</span><span className="text-xs text-slate-400">/ {formatTime(totalSeconds)}</span></div>
           </div>
 
-          <div className="min-w-0 p-4">
-            <h3 className="text-sm font-bold text-slate-900">适合“画面1”的原料</h3>
-            <div className="mt-3 flex gap-2">
-              <button className="flex h-16 w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-md border border-dashed border-slate-300 text-[10px] text-slate-500 hover:border-violet-300 hover:text-violet-700"><Plus className="h-4 w-4" />新增视频</button>
-              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md border-2 border-violet-500 bg-slate-100"><img src={activePreview.cover} alt="当前画面原料" className="h-full w-full object-cover" referrerPolicy="no-referrer" /><span className="absolute left-1 top-1 rounded bg-slate-900/70 px-1 text-[9px] text-white">AI</span></div>
+          <div className="flex min-h-0 min-w-0 flex-col overflow-hidden p-4">
+            <h3 className="text-sm font-bold text-slate-900">适合“{activeFrame.name}”的视频</h3>
+            <div className="mt-3 flex min-w-0 items-start gap-2">
+              <div className="relative shrink-0">
+                <button disabled={locked} onClick={() => setAddMenuOpen((open) => !open)} className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-md border border-dashed border-slate-300 text-[10px] text-slate-500 hover:border-violet-300 hover:text-violet-700 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-300"><Plus className="h-4 w-4" />新增视频</button>
+                {addMenuOpen && <div onMouseDown={(event) => event.stopPropagation()} className="pointer-events-auto absolute left-0 top-full z-[70] mt-1 w-36 rounded-md border border-slate-200 bg-white p-1.5 shadow-xl"><button type="button" onClick={() => { setAddMenuOpen(false); onGenerateMore(activePreview.id, activeFrame.id); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"><Sparkles className="h-3.5 w-3.5" />生成更多</button><button type="button" onClick={() => { setAddMenuOpen(false); onOpenLibrary(activePreview.id, activeFrame.id); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"><Film className="h-3.5 w-3.5" />资源库选择</button><button type="button" onClick={() => { setAddMenuOpen(false); localUploadRef.current?.click(); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"><Upload className="h-3.5 w-3.5" />本地上传</button></div>}
+                <input ref={localUploadRef} type="file" accept=".mp4,.mpeg,.mov,video/mp4,video/mpeg,video/quicktime" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) onUploadLocal(activePreview.id, activeFrame.id, file); event.currentTarget.value = ""; }} />
+              </div>
+              <div className="relative min-w-0 flex-1">
+                <div ref={candidateScrollRef} className="flex min-w-0 gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {generatingCurrentFrame && <div className="flex h-20 w-20 shrink-0 flex-col items-center justify-center rounded-md border border-violet-200 bg-violet-50 px-2"><Loader2 className="h-4 w-4 animate-spin text-violet-600" /><span className="mt-2 text-[10px] font-semibold text-violet-700">生成中</span><span className="mt-2 h-1 w-full overflow-hidden rounded-full bg-violet-100"><span className="block h-full rounded-full bg-violet-600 transition-[width] duration-300" style={{ width: `${generationProgress}%` }} /></span></div>}
+                  {activeFrame.videos.map((video) => {
+                    const selected = video.id === activeFrame.activeVideoId;
+                    return <button key={video.id} disabled={locked} onClick={() => onSelectVideo(activePreview.id, activeFrame.id, video.id)} className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-md border-2 bg-slate-100 disabled:cursor-not-allowed ${selected ? "border-violet-500" : "border-transparent hover:border-violet-200"}`}><img src={video.cover} alt={video.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" /><span className={`absolute right-1 top-1 rounded px-1.5 py-0.5 text-[9px] font-semibold text-white ${video.source === "AI" ? "bg-violet-600" : "bg-slate-700"}`}>{video.source}</span>{selected && <span className="absolute bottom-1 left-1 flex h-4 w-4 items-center justify-center rounded-full bg-violet-600 text-white"><Check className="h-2.5 w-2.5" /></span>}</button>;
+                  })}
+                </div>
+                {candidateOverflow && <><button onClick={() => candidateScrollRef.current?.scrollBy({ left: -176, behavior: "smooth" })} title="向左浏览" className="absolute left-1 top-6 z-20 flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white/95 text-slate-500 shadow-sm hover:bg-white"><ChevronLeft className="h-4 w-4" /></button><button onClick={() => candidateScrollRef.current?.scrollBy({ left: 176, behavior: "smooth" })} title="向右浏览" className="absolute right-1 top-6 z-20 flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white/95 text-slate-500 shadow-sm hover:bg-white"><ChevronRight className="h-4 w-4" /></button></>}
+              </div>
             </div>
 
-            <section className="mt-4 rounded-lg bg-slate-50 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div><h4 className="text-xs font-bold text-slate-800">画面描述</h4><p className="mt-1 text-[10px] text-slate-400">原料时长：{shots.length ? "7秒" : "--"} · 所用片段：0.0-7.0秒</p></div>
-                <div className="flex shrink-0 gap-1.5"><button className="flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1.5 text-[10px] text-slate-500 hover:bg-white"><RefreshCw className="h-3 w-3" />裁剪</button><button className="flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1.5 text-[10px] text-slate-500 hover:bg-white"><WandSparkles className="h-3 w-3" />优化</button></div>
-              </div>
-              <div className="mt-3 max-h-48 space-y-3 overflow-y-auto border-t border-slate-200 pt-3 text-xs leading-6 text-slate-600">
-                {(shots.length ? shots : [{ id: 0, summary: "展示商品使用前后的直观变化，突出核心卖点与真实使用效果。", dialogueLines: [], visualLines: [] }]).map((shot, index) => (
-                  <div key={shot.id}><span className="font-semibold text-slate-700">[00:{String(index * 7).padStart(2, "0")}-00:{String((index + 1) * 7).padStart(2, "0")}]</span> {shot.visualLines?.[0]?.text || shot.visual || shot.summary}{shot.dialogueLines?.[0]?.text && <p className="mt-1 text-slate-700">口播内容：{shot.dialogueLines[0].text}</p>}</div>
-                ))}
-              </div>
-              <div className="mt-3 flex items-center gap-2 border-t border-slate-200 pt-3"><span className="text-[11px] font-semibold text-slate-600">参考主体：</span>{(creative?.subjects || []).slice(0, 3).map((subject) => <span key={subject.id} title={subject.name} className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-white">{subject.image ? <img src={subject.image} alt={subject.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : subject.kind === "narrator" ? <Volume2 className="h-3.5 w-3.5 text-slate-500" /> : <Package className="h-3.5 w-3.5 text-slate-500" />}</span>)}{!creative?.subjects?.length && productImages.slice(0, 2).map((image) => <img key={image.id} src={image.image} alt={image.name} className="h-8 w-8 rounded-md border border-slate-200 object-cover" referrerPolicy="no-referrer" />)}</div>
-            </section>
+            {activeVideo?.source === "上传" ? (
+              <section className="mt-4 flex min-h-0 flex-1 flex-col rounded-lg bg-slate-50 p-4">
+                <h4 className="text-xs font-bold text-slate-800">基础信息</h4>
+                <div className="mt-3 space-y-2 text-xs text-slate-500"><p>原料时长：{activeVideo.duration}</p><p>所用片段：0.0-{activeFrame.durationSeconds.toFixed(1)}秒</p></div>
+              </section>
+            ) : (
+              <section className="mt-4 flex min-h-0 flex-1 flex-col rounded-lg bg-slate-50 p-4">
+                <div className="shrink-0"><h4 className="text-xs font-bold text-slate-800">画面描述</h4><p className="mt-1 text-[10px] text-slate-400">原料时长：{activeFrame.durationSeconds}秒 · 所用片段：0.0-{activeFrame.durationSeconds.toFixed(1)}秒</p></div>
+                <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto border-t border-slate-200 pr-2 pt-3 text-xs leading-6 text-slate-600">
+                  <p><span className="font-semibold text-slate-700">【全局强制规则】</span>除推广商品之外，画面中的其他物品、包装、服装、背景、店铺和屏幕元素均保持无品牌、无商标、无可读文字的通用样式；不生成字幕、漂浮图标、装饰贴纸或额外水印，画面光影自然，细节清晰。</p>
+                  <p><span className="font-semibold text-slate-700">[{formatTime(frameStart)}-{formatTime(frameEnd)}]</span> {activeShot?.visualLines?.[0]?.text || activeShot?.visual || activeShot?.summary || "固定机位从近景切入，完整展示商品使用过程和效果变化，镜头稳定，构图简洁。"}</p>
+                  <p>镜头从商品与使用场景的关系开始建立信息，随后缓慢推进至核心操作区域，重点呈现材质、动作和前后变化。主体始终位于视觉焦点，背景适度虚化，避免无关元素分散注意力。</p>
+                  {usedReferenceImages.length > 0 && <p>画面中使用{usedReferenceImages.map((item) => <span key={`inline-${item.id}`} className="mx-1 inline-flex items-center gap-1 rounded bg-white px-1.5 py-0.5 align-middle font-semibold text-slate-700 shadow-sm"><img src={item.src} alt="" className="h-4 w-4 rounded object-cover" referrerPolicy="no-referrer" />{item.name}</span>)}作为实际参考，人物动作、商品外观和镜头中的位置关系均与参考图保持一致。</p>}
+                  <p>中景镜头保持稳定，人物自然完成操作并观察效果，手部动作清楚连贯；随后切换到局部特写，突出商品表面细节和使用后的直观变化，色彩真实，画面不过度锐化。</p>
+                  <p className="font-semibold text-slate-700">台词：{activeDialogue}</p>
+                  <p>结尾镜头回到完整使用场景，主体稍作停留并自然收尾，确保商品和最终效果同时清晰可见，为后续画面衔接保留稳定的动作与构图。</p>
+                  {usedReferenceImages.length > 0 && <div className="flex items-center gap-2 border-t border-slate-200 pt-3"><span className="shrink-0 text-[11px] font-semibold text-slate-700">参考主体：</span>{usedReferenceImages.map((item) => <button key={item.id} onClick={() => setPreviewImage({ src: item.src, name: item.name })} title={`查看${item.name}大图`} className="h-11 w-11 overflow-hidden rounded-md border border-slate-200 bg-white hover:border-violet-400"><img src={item.src} alt={item.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" /></button>)}</div>}
+                </div>
+              </section>
+            )}
           </div>
         </div>
 
-        <div className="border-t border-slate-200 px-4 py-3">
-          <div className="ml-[272px] flex items-center justify-between gap-3">
-            <div className="flex items-center gap-1.5 text-slate-400"><button title="替换素材" className="rounded-md p-2 hover:bg-slate-100 hover:text-slate-600"><RefreshCw className="h-4 w-4" /></button><button title="优化画面" className="rounded-md p-2 hover:bg-slate-100 hover:text-slate-600"><WandSparkles className="h-4 w-4" /></button><button title="添加画面" className="rounded-md p-2 hover:bg-slate-100 hover:text-slate-600"><Plus className="h-4 w-4" /></button></div>
-            <p className="text-[10px] text-slate-400">点击画面可查看对应分镜</p>
-          </div>
-          <div className="mt-2 ml-[272px] flex min-w-0 gap-2 overflow-x-auto pb-1">
-            {(shots.length ? shots : [{ id: 0, summary: "商品展示" }]).map((shot, index) => (
-              <button key={shot.id} className={`relative h-16 min-w-[112px] overflow-hidden rounded-md border-2 text-left ${index === 0 ? "border-violet-500" : "border-transparent"}`}>
-                <img src={index % 2 === 0 ? activePreview.cover : productImages[index % Math.max(productImages.length, 1)]?.image || activePreview.cover} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                <span className="absolute inset-x-0 top-0 bg-slate-900/55 px-1.5 py-1 text-[9px] font-semibold text-white">画面{index + 1}</span>
-                <span className="absolute bottom-1 right-1 rounded bg-slate-900/70 px-1 text-[9px] text-white">7.0s</span>
-              </button>
-            ))}
+        <div className="h-[140px] shrink-0 border-t border-slate-200 px-4 pb-3 pt-2">
+          <div className="ml-[68px] overflow-x-auto pt-7">
+            <div ref={timelineRef} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); seekFromPointer(event); }} onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) seekFromPointer(event); }} onPointerUp={(event) => event.currentTarget.hasPointerCapture(event.pointerId) && event.currentTarget.releasePointerCapture(event.pointerId)} className="relative grid w-max grid-flow-col auto-cols-[176px] gap-2 select-none touch-none">
+              <div className="pointer-events-none absolute -top-7 bottom-0 z-20 w-px bg-violet-600" style={{ left: `${playheadPercent}%` }}><span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded bg-violet-600 px-1.5 py-1 text-[9px] font-semibold text-white">{formatTime(currentSecond)}/{formatTime(totalSeconds)}</span></div>
+              {frames.map((frame, index) => {
+                const video = frame.videos.find((item) => item.id === frame.activeVideoId) || frame.videos[0];
+                return <button key={frame.id} onClick={() => setActiveFrameId(frame.id)} className={`relative h-24 w-44 overflow-hidden rounded-md border-2 text-left ${frame.id === activeFrame.id ? "border-violet-500" : "border-transparent"}`}><img src={video?.cover || activePreview.cover} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" /><span className="absolute inset-x-0 top-0 bg-slate-900/55 px-2 py-1.5 text-[10px] font-semibold text-white">画面{index + 1}</span><span className="absolute bottom-1.5 right-1.5 rounded bg-slate-900/70 px-1.5 py-0.5 text-[9px] text-white">{frame.durationSeconds.toFixed(1)}s</span></button>;
+              })}
+            </div>
           </div>
         </div>
       </section>
+      {previewImage && <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/70 p-6" onMouseDown={(event) => event.target === event.currentTarget && setPreviewImage(null)}><div className="relative max-h-[88vh] max-w-[88vw] overflow-hidden rounded-lg bg-white p-2 shadow-2xl"><img src={previewImage.src} alt={previewImage.name} className="max-h-[82vh] max-w-[82vw] object-contain" referrerPolicy="no-referrer" /><button onClick={() => setPreviewImage(null)} title="关闭大图" className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-md bg-slate-900/75 text-white hover:bg-slate-900"><X className="h-4 w-4" /></button></div></div>}
     </div>
   );
 }
@@ -2272,8 +2616,8 @@ function FinalPanel({ session, setSession, selectedFinals, openUpload, setDetail
   return (
     <div className="mx-auto max-w-5xl">
       <div className="mb-5 flex items-center justify-between"><h2 className="text-lg font-bold text-slate-900">视频成片</h2><label className="flex cursor-pointer items-center gap-2 text-xs text-slate-500"><button onClick={() => setSession({ ...session, finals: session.finals.map((item) => ({ ...item, selected: !allSelected })) })} className={`flex h-4 w-4 items-center justify-center rounded border ${allSelected ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300 bg-white"}`}><Check className="h-3 w-3" /></button>全选</label></div>
-      <div className="grid grid-cols-2 gap-4">
-        {session.finals.map((item, index) => <article key={item.id} className={`overflow-hidden rounded-lg border bg-white ${item.selected ? "border-violet-400" : "border-slate-200"}`}><div className="relative aspect-video bg-slate-900"><img src={item.cover} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" /><button onClick={() => setSession({ ...session, finals: session.finals.map((video) => video.id === item.id ? { ...video, selected: !video.selected } : video) })} title={item.selected ? "取消选择" : "选择"} className={`absolute left-3 top-3 flex h-6 w-6 items-center justify-center rounded border ${item.selected ? "border-violet-600 bg-violet-600 text-white" : "border-white bg-white/80 text-transparent"}`}><Check className="h-3.5 w-3.5" /></button><span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-1 text-[10px] text-white">{item.duration}</span>{index === 0 && <span className="absolute right-2 top-2 rounded bg-violet-600 px-2 py-1 text-[10px] font-semibold text-white">推荐</span>}</div><div className="p-3"><p className="truncate text-xs font-bold text-slate-800">{item.name}</p><div className="mt-3 flex gap-2"><button onClick={() => setDetailVideo(item)} className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-slate-200 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Eye className="h-3.5 w-3.5" />详情</button><button onClick={() => openUpload([item])} title="上传资源库" className="rounded-md border border-slate-200 p-2 text-slate-600 hover:bg-slate-50"><Upload className="h-3.5 w-3.5" /></button><button onClick={() => showToast("已开始下载")} title="下载" className="rounded-md border border-slate-200 p-2 text-slate-600 hover:bg-slate-50"><Download className="h-3.5 w-3.5" /></button></div></div></article>)}
+      <div className="grid grid-cols-[repeat(3,minmax(0,248px))] justify-start gap-4">
+        {session.finals.map((item) => <article key={item.id} className={`min-w-0 overflow-hidden rounded-lg border bg-white ${item.selected ? "border-violet-400" : "border-slate-200"}`}><div className="relative aspect-[9/16] bg-slate-900"><img src={item.cover} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" /><button onClick={() => setSession({ ...session, finals: session.finals.map((video) => video.id === item.id ? { ...video, selected: !video.selected } : video) })} title={item.selected ? "取消选择" : "选择"} className={`absolute left-3 top-3 flex h-6 w-6 items-center justify-center rounded border ${item.selected ? "border-violet-600 bg-violet-600 text-white" : "border-white bg-white/80 text-transparent"}`}><Check className="h-3.5 w-3.5" /></button><span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-1 text-[10px] text-white">{item.duration}</span></div><div className="p-3"><p className="truncate text-xs font-bold text-slate-800">{item.name}</p><div className="mt-3 flex gap-2"><button onClick={() => setDetailVideo(item)} className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-slate-200 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Eye className="h-3.5 w-3.5" />详情</button><button onClick={() => openUpload([item])} title="上传资源库" className="rounded-md border border-slate-200 p-2 text-slate-600 hover:bg-slate-50"><Upload className="h-3.5 w-3.5" /></button><button onClick={() => showToast("已开始下载")} title="下载" className="rounded-md border border-slate-200 p-2 text-slate-600 hover:bg-slate-50"><Download className="h-3.5 w-3.5" /></button></div></div></article>)}
       </div>
       {selectedFinals.length > 0 && <p className="mt-3 text-right text-[11px] text-slate-400">已选择 {selectedFinals.length} 个视频</p>}
     </div>
@@ -2360,12 +2704,12 @@ function LocalReferenceAction({ disabled, onUploaded, showToast }: { disabled?: 
   return <><button disabled={disabled} onClick={() => inputRef.current?.click()} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"><Upload className="h-3.5 w-3.5" />本地上传</button><input ref={inputRef} type="file" accept=".mp4,.mov,video/mp4,video/quicktime" className="hidden" onChange={(event) => upload(event.target.files?.[0])} /></>;
 }
 
-function ModalFrame({ title, width = "max-w-3xl", children, footer, onClose }: { title: string; width?: string; children: React.ReactNode; footer?: React.ReactNode; onClose: () => void }) {
+function ModalFrame({ title, width = "max-w-3xl", children, footer, onClose, hideHeader = false, lockBodyScroll = false, fixedHeight = lockBodyScroll }: { title: string; width?: string; children: React.ReactNode; footer?: React.ReactNode; onClose: () => void; hideHeader?: boolean; lockBodyScroll?: boolean; fixedHeight?: boolean }) {
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/45 p-4" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div className={`flex max-h-[86vh] w-full ${width} flex-col overflow-hidden rounded-lg bg-white shadow-2xl`}>
-        <div className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 px-5"><h3 className="text-sm font-bold text-slate-900">{title}</h3><button onClick={onClose} title="关闭" className="rounded p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>
-        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+      <div className={`flex max-h-[86vh] w-full ${fixedHeight ? "h-[86vh]" : ""} ${width} flex-col overflow-hidden rounded-lg bg-white shadow-2xl`}>
+        {!hideHeader && <div className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 px-5"><h3 className="text-sm font-bold text-slate-900">{title}</h3><button onClick={onClose} title="关闭" className="rounded p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>}
+        <div className={`min-h-0 flex-1 ${lockBodyScroll ? "overflow-hidden" : "overflow-y-auto"}`}>{children}</div>
         {footer && <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">{footer}</div>}
       </div>
     </div>
@@ -2395,6 +2739,8 @@ function ProductImageModal({ existingCount, mode = "add", excludedIds = [], onCl
   const [author, setAuthor] = useState("全部上传人");
   const [onlyMine, setOnlyMine] = useState(false);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const uploadRef = useRef<HTMLInputElement | null>(null);
   const capacity = mode === "replace" ? 1 : Math.max(0, 6 - existingCount);
   const filtered = IMAGE_LIBRARY.filter((item) =>
@@ -2407,6 +2753,8 @@ function ProductImageModal({ existingCount, mode = "add", excludedIds = [], onCl
     (!onlyMine || item.author === "徐振") &&
     `${item.name}${item.id}${item.primaryCategory}${item.secondaryCategory}${item.tags?.join("")}`.toLowerCase().includes(search.toLowerCase())
   );
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / pageSize)));
+  const pagedImages = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const toggle = (item: ProductSelection) => {
     if (selected.some((image) => image.id === item.id)) {
       setSelected((current) => current.filter((image) => image.id !== item.id));
@@ -2450,24 +2798,30 @@ function ProductImageModal({ existingCount, mode = "add", excludedIds = [], onCl
     setSelected((current) => mode === "replace" ? accepted.slice(0, 1) : [...current, ...accepted]);
     if (uploadRef.current) uploadRef.current.value = "";
   };
-  return <ModalFrame title={mode === "replace" ? "替换参考图" : "添加商品图"} onClose={onClose} width="max-w-6xl" footer={<><div className="mr-auto text-xs text-slate-500">已选 <b className="text-violet-700">{selected.length}</b> 张{mode === "add" ? ` · 还可添加 ${capacity - selected.length} 张` : ""}</div><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!selected.length} onClick={() => onConfirm(selected)} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">{mode === "replace" ? "确认替换" : "确认选择"}</button></>}>
-    <div className="p-5">
-      <div className="mb-5 flex items-center gap-1 border-b border-slate-200">
-        <button onClick={() => setTab("library")} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${tab === "library" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>图片管理</button>
-        <button onClick={() => setTab("local")} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${tab === "local" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>本地上传</button>
+  return <ModalFrame title="" hideHeader lockBodyScroll onClose={onClose} width="max-w-6xl" footer={<><div className="mr-auto text-xs text-slate-500">已选 <b className="text-violet-700">{selected.length}</b> 张{mode === "add" ? ` · 还可添加 ${capacity - selected.length} 张` : ""}</div><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!selected.length} onClick={() => onConfirm(selected)} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">{mode === "replace" ? "确认替换" : "确认选择"}</button></>}>
+    <div className="flex h-[calc(86vh-57px)] min-h-0 flex-col p-5">
+      <div className="mb-5 flex shrink-0 items-center justify-between border-b border-slate-200">
+        <div className="flex items-center gap-1">
+          <button onClick={() => { setTab("library"); setPage(1); }} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${tab === "library" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>图片管理</button>
+          <button onClick={() => { setTab("local"); setPage(1); }} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${tab === "local" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>本地上传</button>
+        </div>
+        <button onClick={onClose} title="关闭" className="mb-1 rounded p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button>
       </div>
       {tab === "library" ? <>
-        <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-[130px_130px_130px_130px_minmax(180px,1fr)_auto]">
-          <select value={primaryCategory} onChange={(event) => setPrimaryCategory(event.target.value)} className="h-9 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部一级分类</option><option>美妆护肤</option><option>服饰内衣</option><option>日用百货</option><option>食品饮料</option></select>
-          <select value={secondaryCategory} onChange={(event) => setSecondaryCategory(event.target.value)} className="h-9 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部二级分类</option><option>商品主图</option><option>模特展示</option><option>成分展示</option><option>效果对比</option></select>
-          <select value={tag} onChange={(event) => setTag(event.target.value)} className="h-9 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部标签</option><option>产品实拍</option><option>对比实测</option><option>高端质感</option></select>
-          <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-9 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部状态</option><option>审核通过</option><option>待审核</option><option>未审核</option></select>
-          <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索图片名称或 ID" className="h-9 w-full rounded-md border border-slate-200 pl-9 pr-3 text-xs outline-none focus:border-violet-400" /></div>
-          <label className="flex h-9 items-center gap-2 whitespace-nowrap px-2 text-xs text-slate-600"><input type="checkbox" checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)} className="accent-violet-600" />仅看我的</label>
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="sticky top-0 z-20 mb-4 flex flex-nowrap items-center gap-2 overflow-x-auto bg-white pb-3">
+          <select value={primaryCategory} onChange={(event) => { setPrimaryCategory(event.target.value); setPage(1); }} className="h-9 w-[130px] shrink-0 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部一级分类</option><option>美妆护肤</option><option>服饰内衣</option><option>日用百货</option><option>食品饮料</option></select>
+          <select value={secondaryCategory} onChange={(event) => { setSecondaryCategory(event.target.value); setPage(1); }} className="h-9 w-[130px] shrink-0 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部二级分类</option><option>商品主图</option><option>模特展示</option><option>成分展示</option><option>效果对比</option></select>
+          <select value={tag} onChange={(event) => { setTag(event.target.value); setPage(1); }} className="h-9 w-[130px] shrink-0 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部标签</option><option>产品实拍</option><option>对比实测</option><option>高端质感</option></select>
+          <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} className="h-9 w-[130px] shrink-0 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部状态</option><option>审核通过</option><option>待审核</option><option>未审核</option></select>
+          <select value={author} onChange={(event) => { setAuthor(event.target.value); setPage(1); }} className="h-9 w-[130px] shrink-0 whitespace-nowrap rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部上传人</option><option>徐振</option><option>致上互娱</option><option>汤小真</option><option>美妆设计组</option></select>
+          <div className="relative min-w-[180px] flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="搜索图片名称或 ID" className="h-9 w-full rounded-md border border-slate-200 pl-9 pr-3 text-xs outline-none focus:border-violet-400" /></div>
+          <label className="flex h-9 shrink-0 items-center gap-2 whitespace-nowrap px-2 text-xs text-slate-600"><input type="checkbox" checked={onlyMine} onChange={(event) => { setOnlyMine(event.target.checked); setPage(1); }} className="accent-violet-600" />仅看我的</label>
         </div>
-        <div className="mb-3 flex justify-end"><select value={author} onChange={(event) => setAuthor(event.target.value)} className="h-8 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部上传人</option><option>徐振</option><option>致上互娱</option><option>汤小真</option><option>美妆设计组</option></select></div>
-        <div className="overflow-x-auto rounded-md border border-slate-200"><table className="min-w-[860px] w-full text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="w-12 px-4 py-3"></th><th className="px-3 py-3">图片缩略图</th><th className="px-3 py-3">文件名称 / ID</th><th className="px-3 py-3">状态</th><th className="px-3 py-3">分类 / 标签</th><th className="px-3 py-3">上传人</th><th className="px-3 py-3">分辨率</th><th className="px-3 py-3">大小</th></tr></thead><tbody>{filtered.map((item) => { const checked = selected.some((image) => image.id === item.id); return <tr key={item.id} onClick={() => toggle(item)} className={`cursor-pointer border-t border-slate-100 ${checked ? "bg-violet-50" : "hover:bg-slate-50"}`}><td className="px-4 py-3"><span className={`flex h-4 w-4 items-center justify-center rounded border ${checked ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300"}`}>{checked && <Check className="h-2.5 w-2.5" />}</span></td><td className="px-3 py-2"><img src={item.image} alt="" className="h-12 w-12 rounded object-cover" referrerPolicy="no-referrer" /></td><td className="max-w-[220px] px-3 py-3"><p className="truncate font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.id}</p></td><td className="px-3 py-3"><span className="rounded bg-slate-100 px-2 py-1 text-[10px] text-slate-600">{item.status}</span></td><td className="px-3 py-3"><p className="font-semibold text-slate-700">{item.primaryCategory} / {item.secondaryCategory}</p><p className="mt-1 text-[10px] text-slate-400">{item.tags?.join("、")}</p></td><td className="px-3 py-3 text-slate-500">{item.author}</td><td className="px-3 py-3 text-slate-500">{item.resolution}</td><td className="px-3 py-3 text-slate-500">{item.size}</td></tr>; })}</tbody></table></div>
-      </> : <div>
+        <div className="overflow-x-auto rounded-md border border-slate-200"><table className="min-w-[860px] w-full text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="w-12 px-4 py-3"></th><th className="px-3 py-3">图片缩略图</th><th className="px-3 py-3">文件名称 / ID</th><th className="px-3 py-3">状态</th><th className="px-3 py-3">分类 / 标签</th><th className="px-3 py-3">上传人</th><th className="px-3 py-3">分辨率</th><th className="px-3 py-3">大小</th></tr></thead><tbody>{pagedImages.map((item) => { const checked = selected.some((image) => image.id === item.id); return <tr key={item.id} onClick={() => toggle(item)} className={`cursor-pointer border-t border-slate-100 ${checked ? "bg-violet-50" : "hover:bg-slate-50"}`}><td className="px-4 py-3"><span className={`flex h-4 w-4 items-center justify-center rounded border ${checked ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300"}`}>{checked && <Check className="h-2.5 w-2.5" />}</span></td><td className="px-3 py-2"><img src={item.image} alt="" className="h-12 w-12 rounded object-cover" referrerPolicy="no-referrer" /></td><td className="max-w-[220px] px-3 py-3"><p className="truncate font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.id}</p></td><td className="px-3 py-3"><span className="rounded bg-slate-100 px-2 py-1 text-[10px] text-slate-600">{item.status}</span></td><td className="px-3 py-3"><p className="font-semibold text-slate-700">{item.primaryCategory} / {item.secondaryCategory}</p><p className="mt-1 text-[10px] text-slate-400">{item.tags?.join("、")}</p></td><td className="px-3 py-3 text-slate-500">{item.author}</td><td className="px-3 py-3 text-slate-500">{item.resolution}</td><td className="px-3 py-3 text-slate-500">{item.size}</td></tr>; })}</tbody></table></div>
+        </div>
+        <AssetPagination total={filtered.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(value) => { setPageSize(value); setPage(1); }} />
+      </> : <div className="min-h-0 flex-1 overflow-y-auto">
         <button onClick={() => uploadRef.current?.click()} className="flex h-48 w-full flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:text-violet-700"><Upload className="h-6 w-6" /><span className="mt-3 text-xs font-semibold">点击选择本地图片</span></button>
         <input ref={uploadRef} type="file" multiple={mode === "add"} accept=".jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff,.gif,image/*" className="hidden" onChange={(event) => localUpload(event.target.files)} />
         <p className="mt-3 text-center text-xs leading-6 text-slate-400">支持上传本地图片文件，图片格式：jpeg、 png、 webp、 bmp、 tiff、 gif，单张图片大小≤30MB。<br />图片宽高比需在 (0.4, 2.5) 之间，宽高像素需在 (300px, 6000px) 之间。<br />仅支持上传非人脸图，请仔细查看要求并确保上传素材为您原创或已取得合法授权。</p>
@@ -2480,10 +2834,19 @@ function ProductImageModal({ existingCount, mode = "add", excludedIds = [], onCl
 function ReferenceVideoModal({ items, selected, onDelete, onClose, onConfirm }: { items: ReferenceVideoSelection[]; selected: ReferenceVideoSelection | null; onDelete: (id: string) => void; onClose: () => void; onConfirm: (item: ReferenceVideoSelection) => void }) {
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState<ReferenceVideoSelection | null>(selected);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const filtered = items.filter((item) => item.name.toLowerCase().includes(search.toLowerCase()));
-  return <ModalFrame title="选择参考视频" onClose={onClose} footer={<><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!draft} onClick={() => draft && onConfirm(draft)} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">确认选择</button></>}>
-    <div className="p-5"><div className="relative mb-4"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索历史投放素材" className="h-10 w-full rounded-md border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-violet-400" /></div>
-      <div className="grid grid-cols-3 gap-3">{filtered.map((item) => <button key={item.id} onClick={() => setDraft(item)} className={`group overflow-hidden rounded-md border bg-white text-left ${draft?.id === item.id ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200 hover:border-slate-300"}`}><div className="relative aspect-video"><img src={item.cover} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" /><span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">{item.duration}</span><span onClick={(event) => { event.stopPropagation(); onDelete(item.id); if (draft?.id === item.id) setDraft(null); }} title="删除历史素材" className="absolute right-2 top-2 hidden h-7 w-7 items-center justify-center rounded bg-black/65 text-white group-hover:flex"><Trash2 className="h-3.5 w-3.5" /></span>{draft?.id === item.id && <span className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-white"><Check className="h-3 w-3" /></span>}</div><div className="p-2.5"><p className="truncate text-xs font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.size}</p></div></button>)}</div>
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / pageSize)));
+  const pagedItems = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  return <ModalFrame title="" hideHeader lockBodyScroll onClose={onClose} width="max-w-4xl" footer={<><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!draft} onClick={() => draft && onConfirm(draft)} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">确认选择</button></>}>
+    <div className="flex h-[calc(86vh-57px)] min-h-0 flex-col p-5">
+      <div className="mb-4 flex shrink-0 items-center gap-3 border-b border-slate-200 pb-4">
+        <div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="搜索历史投放素材" className="h-10 w-full rounded-md border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-violet-400" /></div>
+        <button onClick={onClose} title="关闭" className="rounded p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto pr-1"><div className="grid grid-cols-3 gap-3">{pagedItems.map((item) => <button key={item.id} onClick={() => setDraft(item)} className={`group overflow-hidden rounded-md border bg-white text-left ${draft?.id === item.id ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200 hover:border-slate-300"}`}><div className="relative aspect-video"><img src={item.cover} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" /><span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">{item.duration}</span><span onClick={(event) => { event.stopPropagation(); onDelete(item.id); if (draft?.id === item.id) setDraft(null); }} title="删除历史素材" className="absolute right-2 top-2 hidden h-7 w-7 items-center justify-center rounded bg-black/65 text-white group-hover:flex"><Trash2 className="h-3.5 w-3.5" /></span>{draft?.id === item.id && <span className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-white"><Check className="h-3 w-3" /></span>}</div><div className="p-2.5"><p className="truncate text-xs font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.size}</p></div></button>)}</div></div>
+      <AssetPagination total={filtered.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(value) => { setPageSize(value); setPage(1); }} />
     </div>
   </ModalFrame>;
 }
@@ -2492,8 +2855,14 @@ function ScriptSelectorModal({ selected, onClose, onConfirm }: { selected: Scrip
   const [tab, setTab] = useState<"manual" | "library">("manual");
   const [manualText, setManualText] = useState(selected?.source === "manual" ? selected.name : "");
   const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("全部分类");
+  const [status, setStatus] = useState("全部状态");
   const [draft, setDraft] = useState<ScriptSelection | null>(selected?.source === "library" ? selected : null);
-  const filtered = SCRIPT_OPTIONS.filter((item) => `${item.name}${item.id}${item.category}`.toLowerCase().includes(search.toLowerCase()));
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const filtered = SCRIPT_OPTIONS.filter((item) => (category === "全部分类" || item.category.includes(category)) && (status === "全部状态" || item.status === status) && `${item.name}${item.id}${item.category}`.toLowerCase().includes(search.toLowerCase()));
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / pageSize)));
+  const pagedScripts = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const confirm = () => {
     if (tab === "manual" && manualText.trim()) {
       onConfirm({ id: `manual-${Date.now()}`, name: manualText.trim(), category: "手动输入", status: "当前输入", author: "当前用户", updatedAt: nowText(), source: "manual" });
@@ -2502,18 +2871,19 @@ function ScriptSelectorModal({ selected, onClose, onConfirm }: { selected: Scrip
     if (tab === "library" && draft) onConfirm(draft);
   };
   const canConfirm = tab === "manual" ? Boolean(manualText.trim()) : Boolean(draft);
-  return <ModalFrame title="添加脚本" onClose={onClose} width="max-w-4xl" footer={<><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!canConfirm} onClick={confirm} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">确认</button></>}>
-    <div className="p-5">
-      <div className="mb-5 flex items-center gap-1 border-b border-slate-200"><button onClick={() => setTab("manual")} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${tab === "manual" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>输入脚本</button><button onClick={() => setTab("library")} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${tab === "library" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>脚本管理</button></div>
-      {tab === "manual" ? <div className="relative"><textarea value={manualText} maxLength={1000} onChange={(event) => setManualText(event.target.value)} rows={14} placeholder="请输入脚本内容" className="w-full resize-none rounded-md border border-slate-200 p-4 pb-9 text-sm leading-7 outline-none focus:border-violet-400" /><span className="absolute bottom-3 right-3 text-[11px] text-slate-400">{manualText.length}/1000</span></div> : <>
-        <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_160px_160px]"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索脚本名称或 ID" className="h-9 w-full rounded-md border border-slate-200 pl-9 pr-3 text-xs outline-none" /></div><select className="rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部分类</option><option>个护家清</option><option>服饰内衣</option></select><select className="rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部状态</option><option>审核通过</option><option>待审核</option></select></div>
-        <div className="overflow-x-auto rounded-md border border-slate-200"><table className="min-w-[720px] w-full text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="w-12 px-4 py-3"></th><th className="px-3 py-3">脚本名称 / ID</th><th className="px-3 py-3">分类</th><th className="px-3 py-3">状态</th><th className="px-3 py-3">上传人</th><th className="px-3 py-3">更新时间</th></tr></thead><tbody>{filtered.map((item) => <tr key={item.id} onClick={() => setDraft(item)} className={`cursor-pointer border-t border-slate-100 ${draft?.id === item.id ? "bg-violet-50" : "hover:bg-slate-50"}`}><td className="px-4 py-3"><span className={`flex h-4 w-4 items-center justify-center rounded-full border ${draft?.id === item.id ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300"}`}>{draft?.id === item.id && <Check className="h-2.5 w-2.5" />}</span></td><td className="px-3 py-3"><p className="font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.id}</p></td><td className="px-3 py-3 text-slate-500">{item.category}</td><td className="px-3 py-3"><span className="rounded bg-emerald-50 px-2 py-1 text-[10px] text-emerald-700">{item.status}</span></td><td className="px-3 py-3 text-slate-500">{item.author}</td><td className="px-3 py-3 text-slate-400">{item.updatedAt}</td></tr>)}</tbody></table></div>
+  return <ModalFrame title="" hideHeader lockBodyScroll onClose={onClose} width="max-w-4xl" footer={<><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!canConfirm} onClick={confirm} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">确认</button></>}>
+    <div className="flex h-[calc(86vh-57px)] min-h-0 flex-col p-5">
+      <div className="mb-5 flex shrink-0 items-center justify-between border-b border-slate-200"><div className="flex items-center gap-1"><button onClick={() => { setTab("manual"); setPage(1); }} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${tab === "manual" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>输入脚本</button><button onClick={() => { setTab("library"); setPage(1); }} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${tab === "library" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>脚本管理</button></div><button onClick={onClose} title="关闭" className="mb-1 rounded p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>
+      {tab === "manual" ? <div className="relative min-h-0 flex-1 overflow-y-auto"><textarea value={manualText} maxLength={1000} onChange={(event) => setManualText(event.target.value)} rows={14} placeholder="请输入脚本内容" className="min-h-full w-full resize-none rounded-md border border-slate-200 p-4 pb-9 text-sm leading-7 outline-none focus:border-violet-400" /><span className="absolute bottom-3 right-3 text-[11px] text-slate-400">{manualText.length}/1000</span></div> : <>
+        <div className="mb-4 grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-[1fr_160px_160px]"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="搜索脚本名称或 ID" className="h-9 w-full rounded-md border border-slate-200 pl-9 pr-3 text-xs outline-none" /></div><select value={category} onChange={(event) => { setCategory(event.target.value); setPage(1); }} className="rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部分类</option><option>个护家清</option><option>服饰内衣</option></select><select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} className="rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部状态</option><option>审核通过</option><option>待审核</option></select></div>
+        <div className="min-h-0 flex-1 overflow-auto rounded-md border border-slate-200"><table className="min-w-[720px] w-full text-left text-xs"><thead className="sticky top-0 z-10 bg-slate-50 text-slate-500"><tr><th className="w-12 px-4 py-3"></th><th className="px-3 py-3">脚本名称 / ID</th><th className="px-3 py-3">分类</th><th className="px-3 py-3">状态</th><th className="px-3 py-3">上传人</th><th className="px-3 py-3">更新时间</th></tr></thead><tbody>{pagedScripts.map((item) => <tr key={item.id} onClick={() => setDraft(item)} className={`cursor-pointer border-t border-slate-100 ${draft?.id === item.id ? "bg-violet-50" : "hover:bg-slate-50"}`}><td className="px-4 py-3"><span className={`flex h-4 w-4 items-center justify-center rounded-full border ${draft?.id === item.id ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300"}`}>{draft?.id === item.id && <Check className="h-2.5 w-2.5" />}</span></td><td className="px-3 py-3"><p className="font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.id}</p></td><td className="px-3 py-3 text-slate-500">{item.category}</td><td className="px-3 py-3"><span className="rounded bg-emerald-50 px-2 py-1 text-[10px] text-emerald-700">{item.status}</span></td><td className="px-3 py-3 text-slate-500">{item.author}</td><td className="px-3 py-3 text-slate-400">{item.updatedAt}</td></tr>)}</tbody></table></div>
+        <AssetPagination total={filtered.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(value) => { setPageSize(value); setPage(1); }} />
       </>}
     </div>
   </ModalFrame>;
 }
 
-function SourceSelectorModal({ selected, onClose, onConfirm, showToast }: { selected: SourceVideoSelection[]; onClose: () => void; onConfirm: (items: SourceVideoSelection[]) => void; showToast: (message: string) => void }) {
+function SourceSelectorModal({ selected, onClose, onConfirm, showToast, selectionMode = "multiple" }: { selected: SourceVideoSelection[]; onClose: () => void; onConfirm: (items: SourceVideoSelection[]) => void; showToast: (message: string) => void; selectionMode?: "multiple" | "single" }) {
   const [draft, setDraft] = useState(selected);
   const [sourceTab, setSourceTab] = useState<"library" | "local">("library");
   const [sectionTab, setSectionTab] = useState<"全部" | "成片" | "素材">("全部");
@@ -2521,11 +2891,16 @@ function SourceSelectorModal({ selected, onClose, onConfirm, showToast }: { sele
   const [status, setStatus] = useState("全部状态");
   const [author, setAuthor] = useState("全部上传人");
   const [onlyMine, setOnlyMine] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const uploadRef = useRef<HTMLInputElement | null>(null);
   const totalSeconds = draft.reduce((sum, item) => sum + item.durationSeconds, 0);
   const filtered = SOURCE_VIDEOS.filter((item) => (sectionTab === "全部" || item.section === sectionTab) && (status === "全部状态" || item.status === status) && (author === "全部上传人" || item.author === author) && (!onlyMine || item.author === "徐振") && `${item.name}${item.id}${item.category}${item.tags.join("")}`.toLowerCase().includes(search.toLowerCase()));
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / pageSize)));
+  const pagedVideos = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const toggle = (item: SourceVideoSelection) => {
     if (draft.some((video) => video.id === item.id)) return setDraft(draft.filter((video) => video.id !== item.id));
+    if (selectionMode === "single") return setDraft([item]);
     if (draft.length >= 100) return showToast("视频原料不能超过 100 个文件");
     if (totalSeconds + item.durationSeconds > 600) return showToast("视频原料合计时长不能超过 10 分钟");
     setDraft([...draft, item]);
@@ -2545,6 +2920,10 @@ function SourceSelectorModal({ selected, onClose, onConfirm, showToast }: { sele
         continue;
       }
       const assumedDuration = 30;
+      if (selectionMode === "single") {
+        accepted.push({ id: `local-${Date.now()}`, name: file.name, cover: SAMPLE_COVERS[1], status: "本地文件", section: "本地上传", category: "本地上传", author: "当前用户", durationSeconds: assumedDuration, duration: "00:30", size: `${(file.size / 1024 / 1024).toFixed(1)} MB`, tags: [] });
+        break;
+      }
       if (nextCount >= 100 || nextSeconds + assumedDuration > 600) {
         showToast("视频原料最多 100 个，合计时长不超过 10 分钟");
         break;
@@ -2553,21 +2932,25 @@ function SourceSelectorModal({ selected, onClose, onConfirm, showToast }: { sele
       nextCount += 1;
       nextSeconds += assumedDuration;
     }
-    setDraft((current) => [...current, ...accepted]);
+    setDraft((current) => selectionMode === "single" ? accepted.slice(0, 1) : [...current, ...accepted]);
     if (uploadRef.current) uploadRef.current.value = "";
   };
   const localItems = draft.filter((item) => item.section === "本地上传");
-  return <ModalFrame title="添加原料" onClose={onClose} width="max-w-6xl" footer={<><div className="mr-auto text-xs text-slate-500">已选 <b className="text-violet-700">{draft.length}</b> / 100 个 · 总时长 <b className="text-violet-700">{Math.floor(totalSeconds / 60)}:{String(totalSeconds % 60).padStart(2, "0")}</b> / 10:00</div><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!draft.length} onClick={() => onConfirm(draft)} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">确认选择</button></>}>
-    <div className="p-5">
-      <div className="mb-5 flex items-center gap-1 border-b border-slate-200"><button onClick={() => setSourceTab("library")} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${sourceTab === "library" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>资源库</button><button onClick={() => setSourceTab("local")} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${sourceTab === "local" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>本地上传</button></div>
+  return <ModalFrame title="" hideHeader lockBodyScroll fixedHeight={selectionMode !== "single"} onClose={onClose} width="max-w-6xl" footer={<><div className="mr-auto text-xs text-slate-500">{selectionMode === "single" ? <>已选择 <b className="text-violet-700">{draft.length}</b> 个视频</> : <>已选 <b className="text-violet-700">{draft.length}</b> / 100 个 · 总时长 <b className="text-violet-700">{Math.floor(totalSeconds / 60)}:{String(totalSeconds % 60).padStart(2, "0")}</b> / 10:00</>}</div><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!draft.length} onClick={() => onConfirm(selectionMode === "single" ? draft.slice(0, 1) : draft)} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">确认选择</button></>}>
+    <div className="flex h-[calc(86vh-57px)] min-h-0 flex-col p-5">
+      <div className="mb-5 flex shrink-0 items-center justify-between border-b border-slate-200"><div className="flex items-center gap-1"><button onClick={() => { setSourceTab("library"); setPage(1); }} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${sourceTab === "library" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>资源库</button><button onClick={() => { setSourceTab("local"); setPage(1); }} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${sourceTab === "local" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>本地上传</button></div><button onClick={onClose} title="关闭" className="mb-1 rounded p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>
       {sourceTab === "library" ? <>
-        <div className="mb-4 flex items-center gap-1 border-b border-slate-200">{(["全部", "成片", "素材"] as const).map((item) => <button key={item} onClick={() => setSectionTab(item)} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${sectionTab === item ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>{item}</button>)}</div>
-        <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-[130px_130px_130px_130px_minmax(180px,1fr)_auto]"><select className="h-9 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部一级分类</option><option>服饰内衣</option><option>美妆护肤</option><option>日用百货</option></select><select className="h-9 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部二级分类</option><option>商品实拍</option><option>面料展示</option><option>厨房用品</option></select><select className="h-9 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部标签</option><option>产品实拍</option><option>对比实测</option></select><select value={status} onChange={(event) => setStatus(event.target.value)} className="h-9 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部状态</option><option>审核通过</option><option>待审核</option><option>未审核</option><option>审核驳回</option></select><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索文件名称或 ID" className="h-9 w-full rounded-md border border-slate-200 pl-9 pr-3 text-xs outline-none" /></div><label className="flex h-9 items-center gap-2 whitespace-nowrap px-2 text-xs text-slate-600"><input type="checkbox" checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)} className="accent-violet-600" />仅看我的</label></div>
-        <div className="mb-3 flex justify-end"><select value={author} onChange={(event) => setAuthor(event.target.value)} className="h-8 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部上传人</option><option>徐振</option><option>刘弯</option><option>张小花</option><option>梁浩然</option><option>赵铁柱</option></select></div>
-        <div className="overflow-x-auto rounded-md border border-slate-200"><table className="min-w-[900px] w-full text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="w-12 px-4 py-3"></th><th className="px-3 py-3">文件缩略图</th><th className="px-3 py-3">文件名称 / ID</th><th className="px-3 py-3">状态</th><th className="px-3 py-3">所在分类</th><th className="px-3 py-3">上传人</th><th className="px-3 py-3">时长</th><th className="px-3 py-3">大小</th></tr></thead><tbody>{filtered.map((item) => { const checked = draft.some((video) => video.id === item.id); return <tr key={item.id} onClick={() => toggle(item)} className={`cursor-pointer border-t border-slate-100 ${checked ? "bg-violet-50" : "hover:bg-slate-50"}`}><td className="px-4 py-3"><span className={`flex h-4 w-4 items-center justify-center rounded border ${checked ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300"}`}>{checked && <Check className="h-2.5 w-2.5" />}</span></td><td className="px-3 py-2"><img src={item.cover} alt="" className="h-10 w-16 rounded object-cover" referrerPolicy="no-referrer" /></td><td className="max-w-[220px] px-3 py-3"><p className="truncate font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.id}</p></td><td className="px-3 py-3"><span className="rounded bg-slate-100 px-2 py-1 text-[10px] text-slate-600">{item.status}</span></td><td className="px-3 py-3"><p className="font-semibold text-slate-700">{item.section}</p><p className="mt-1 text-[10px] text-slate-400">{item.category}</p></td><td className="px-3 py-3 text-slate-500">{item.author}</td><td className="px-3 py-3 text-slate-500">{item.duration}</td><td className="px-3 py-3 text-slate-500">{item.size}</td></tr>; })}</tbody></table></div>
-      </> : <div>
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="sticky top-0 z-20 bg-white pb-1">
+        <div className="mb-4 flex items-center gap-1 border-b border-slate-200">{(["全部", "成片", "素材"] as const).map((item) => <button key={item} onClick={() => { setSectionTab(item); setPage(1); }} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${sectionTab === item ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>{item}</button>)}</div>
+        <div className="mb-4 flex flex-nowrap items-center gap-2 overflow-x-auto pb-1"><select onChange={() => setPage(1)} className="h-9 w-[130px] shrink-0 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部一级分类</option><option>服饰内衣</option><option>美妆护肤</option><option>日用百货</option></select><select onChange={() => setPage(1)} className="h-9 w-[130px] shrink-0 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部二级分类</option><option>商品实拍</option><option>面料展示</option><option>厨房用品</option></select><select onChange={() => setPage(1)} className="h-9 w-[130px] shrink-0 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部标签</option><option>产品实拍</option><option>对比实测</option></select><select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} className="h-9 w-[130px] shrink-0 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部状态</option><option>审核通过</option><option>待审核</option><option>未审核</option><option>审核驳回</option></select><select value={author} onChange={(event) => { setAuthor(event.target.value); setPage(1); }} className="h-9 w-[130px] shrink-0 whitespace-nowrap rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部上传人</option><option>徐振</option><option>刘弯</option><option>张小花</option><option>梁浩然</option><option>赵铁柱</option></select><div className="relative min-w-[180px] flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="搜索文件名称或 ID" className="h-9 w-full rounded-md border border-slate-200 pl-9 pr-3 text-xs outline-none" /></div><label className="flex h-9 shrink-0 items-center gap-2 whitespace-nowrap px-2 text-xs text-slate-600"><input type="checkbox" checked={onlyMine} onChange={(event) => { setOnlyMine(event.target.checked); setPage(1); }} className="accent-violet-600" />仅看我的</label></div>
+        </div>
+        <div className="overflow-x-auto rounded-md border border-slate-200"><table className="min-w-[900px] w-full text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="w-12 px-4 py-3"></th><th className="px-3 py-3">文件缩略图</th><th className="px-3 py-3">文件名称 / ID</th><th className="px-3 py-3">状态</th><th className="px-3 py-3">所在分类</th><th className="px-3 py-3">上传人</th><th className="px-3 py-3">时长</th><th className="px-3 py-3">大小</th></tr></thead><tbody>{pagedVideos.map((item) => { const checked = draft.some((video) => video.id === item.id); return <tr key={item.id} onClick={() => toggle(item)} className={`cursor-pointer border-t border-slate-100 ${checked ? "bg-violet-50" : "hover:bg-slate-50"}`}><td className="px-4 py-3"><span className={`flex h-4 w-4 items-center justify-center border ${selectionMode === "single" ? "rounded-full" : "rounded"} ${checked ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300"}`}>{checked && <Check className="h-2.5 w-2.5" />}</span></td><td className="px-3 py-2"><img src={item.cover} alt="" className="h-10 w-16 rounded object-cover" referrerPolicy="no-referrer" /></td><td className="max-w-[220px] px-3 py-3"><p className="truncate font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.id}</p></td><td className="px-3 py-3"><span className="rounded bg-slate-100 px-2 py-1 text-[10px] text-slate-600">{item.status}</span></td><td className="px-3 py-3"><p className="font-semibold text-slate-700">{item.section}</p><p className="mt-1 text-[10px] text-slate-400">{item.category}</p></td><td className="px-3 py-3 text-slate-500">{item.author}</td><td className="px-3 py-3 text-slate-500">{item.duration}</td><td className="px-3 py-3 text-slate-500">{item.size}</td></tr>; })}</tbody></table></div>
+        </div>
+        <AssetPagination total={filtered.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(value) => { setPageSize(value); setPage(1); }} />
+      </> : <div className="min-h-0 flex-1 overflow-y-auto">
         <button onClick={() => uploadRef.current?.click()} className="flex h-48 w-full flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:text-violet-700"><Upload className="h-6 w-6" /><span className="mt-3 text-xs font-semibold">点击选择本地视频</span></button>
-        <input ref={uploadRef} type="file" multiple accept=".mp4,.mpeg,.mov,video/mp4,video/mpeg,video/quicktime" className="hidden" onChange={(event) => uploadLocal(event.target.files)} />
+        <input ref={uploadRef} type="file" multiple={selectionMode === "multiple"} accept=".mp4,.mpeg,.mov,video/mp4,video/mpeg,video/quicktime" className="hidden" onChange={(event) => uploadLocal(event.target.files)} />
         <p className="mt-3 text-center text-xs leading-6 text-slate-400">视频格式: mp4、mpeg、mov,宽高无限制, 大小&lt;1000M<br />建议1280*720&lt;尺寸&lt;3840*2160, 2s&lt;时长&lt;600s<br />*尺寸超出建议范围可能导致生成时间超长或效果不佳<br />请确保您上传素材为您原创或已取得合法授权</p>
         {localItems.length > 0 && <div className="mt-4 space-y-2">{localItems.map((item) => <div key={item.id} className="flex items-center gap-3 rounded-md border border-slate-200 p-2.5"><img src={item.cover} alt="" className="h-11 w-16 rounded object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.duration} · {item.size}</p></div><button onClick={() => toggle(item)} title="删除" className="p-1.5 text-slate-400 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div>}
       </div>}

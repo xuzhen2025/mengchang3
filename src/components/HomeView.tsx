@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import AssetPagination from "./AssetPagination";
 import { 
   Search, 
   Bell, 
@@ -420,6 +421,8 @@ export default function HomeView({
   const [centerTypeFilter, setCenterTypeFilter] = useState<string>("全部类型");
   const [centerStatusFilter, setCenterStatusFilter] = useState<"全部" | "未读" | "已读">("全部");
   const [centerTimeFilter, setCenterTimeFilter] = useState<string>("全部时间");
+  const [centerMessagePage, setCenterMessagePage] = useState(1);
+  const [centerMessagePageSize, setCenterMessagePageSize] = useState(20);
 
   const totalUnreadCount = messagesList.filter(m => m.status === "unread").length;
 
@@ -453,6 +456,14 @@ export default function HomeView({
 
     return true;
   });
+  const currentCenterMessagePage = Math.min(
+    centerMessagePage,
+    Math.max(1, Math.ceil(filteredCenterMessages.length / centerMessagePageSize))
+  );
+  const pagedCenterMessages = filteredCenterMessages.slice(
+    (currentCenterMessagePage - 1) * centerMessagePageSize,
+    currentCenterMessagePage * centerMessagePageSize
+  );
 
   // ================= 5. HELP CENTER MODAL STATES =================
   const [activeHelpModal, setActiveHelpModal] = useState<"docs" | "tutorial" | "service" | "faq" | null>(null);
@@ -1107,7 +1118,10 @@ export default function HomeView({
                 <label className="text-[11px] font-bold text-slate-500 block">消息类型</label>
                 <select
                   value={centerTypeFilter}
-                  onChange={(e) => setCenterTypeFilter(e.target.value)}
+                  onChange={(e) => {
+                    setCenterTypeFilter(e.target.value);
+                    setCenterMessagePage(1);
+                  }}
                   className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-purple-500 cursor-pointer"
                 >
                   <option value="全部类型">全部类型</option>
@@ -1128,7 +1142,10 @@ export default function HomeView({
                     <button
                       key={st}
                       type="button"
-                      onClick={() => setCenterStatusFilter(st)}
+                      onClick={() => {
+                        setCenterStatusFilter(st);
+                        setCenterMessagePage(1);
+                      }}
                       className={`flex-1 py-1 rounded-lg transition-all cursor-pointer ${
                         centerStatusFilter === st
                           ? "bg-purple-600 text-white font-black"
@@ -1146,7 +1163,10 @@ export default function HomeView({
                 <label className="text-[11px] font-bold text-slate-500 block">消息时间</label>
                 <select
                   value={centerTimeFilter}
-                  onChange={(e) => setCenterTimeFilter(e.target.value)}
+                  onChange={(e) => {
+                    setCenterTimeFilter(e.target.value);
+                    setCenterMessagePage(1);
+                  }}
                   className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-purple-500 cursor-pointer"
                 >
                   <option value="全部时间">全部时间</option>
@@ -1163,7 +1183,7 @@ export default function HomeView({
                   没有找到符合筛选条件的消息
                 </div>
               ) : (
-                filteredCenterMessages.map((msg) => (
+                pagedCenterMessages.map((msg) => (
                   <div
                     key={msg.id}
                     onClick={() => {
@@ -1213,6 +1233,19 @@ export default function HomeView({
                   </div>
                 ))
               )}
+            </div>
+
+            <div className="shrink-0 border-t border-slate-200 bg-white px-6">
+              <AssetPagination
+                total={filteredCenterMessages.length}
+                page={currentCenterMessagePage}
+                pageSize={centerMessagePageSize}
+                onPageChange={setCenterMessagePage}
+                onPageSizeChange={(value) => {
+                  setCenterMessagePageSize(value);
+                  setCenterMessagePage(1);
+                }}
+              />
             </div>
 
             {/* Modal Footer */}

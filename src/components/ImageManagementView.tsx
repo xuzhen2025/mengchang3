@@ -184,7 +184,7 @@ const MOCK_IMAGES: ImageItem[] = [
     id: "img-8",
     title: "高奢护肤瓶身渲染特写.jpg",
     subtitle: "3D透视修图",
-    imageUrl: "https://images.unsplash.com/photo-1608248597261-833257058444?w=600&auto=format&fit=crop&q=80",
+    imageUrl: "./assets/prototype/luxury-skincare-set.jpg",
     badge: "图片",
     downloads: 3,
     filesCount: 1,

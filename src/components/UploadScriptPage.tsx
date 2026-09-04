@@ -10,7 +10,6 @@ import {
   ChevronDown,
   Plus,
   Minus,
-  Sparkles,
   Upload,
   Folder,
   Search
@@ -624,16 +623,13 @@ export default function UploadScriptPage({
                   <div className="col-span-1 border-r border-purple-200 flex items-center justify-center">序号</div>
                   <div className="col-span-2 border-r border-purple-200 flex items-center justify-center gap-1">
                     <span>画面时间点 (秒)</span>
-                    <Sparkles className="w-3.5 h-3.5 text-purple-600" />
                   </div>
                   <div className="col-span-3 border-r border-purple-200 flex items-center justify-center gap-1">
                     <span>台词/对白</span>
-                    <Sparkles className="w-3.5 h-3.5 text-purple-600" />
                   </div>
                   <div className="col-span-3 border-r border-purple-200 flex items-center justify-center">画面镜头</div>
                   <div className="col-span-2 border-r border-purple-200 flex items-center justify-center gap-1">
                     <span>画面注意事项</span>
-                    <Sparkles className="w-3.5 h-3.5 text-purple-600" />
                   </div>
                   <div className="col-span-1 flex items-center justify-center">操作</div>
                 </div>

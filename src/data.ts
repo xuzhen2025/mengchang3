@@ -352,7 +352,7 @@ export const INITIAL_ASSETS: Asset[] = [
     id: "a1",
     name: "雅诗兰黛精华空瓶_主图主体.png",
     type: "image",
-    url: "https://images.unsplash.com/photo-1608248597481-496100c8c836?w=400&auto=format&fit=crop&q=80",
+    url: "./assets/prototype/skincare-product.jpg",
     size: "1.2 MB",
     createdAt: "2026-08-19 14:20",
     category: "商品主图",
@@ -590,7 +590,7 @@ export const INITIAL_TASKS: Task[] = [
     progress: 100,
     inputFiles: ["雅诗兰黛精华空瓶_主图主体.png"],
     outputFiles: [
-      "https://images.unsplash.com/photo-1608248597481-496100c8c836?w=400&q=80",
+      "./assets/prototype/skincare-product.jpg",
       "https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=400&q=80",
       "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400&q=80",
       "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400&q=80"
