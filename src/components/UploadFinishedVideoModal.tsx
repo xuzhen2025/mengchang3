@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import AssetPagination from "./AssetPagination";
 import LinkScriptModal from "./LinkScriptModal";
+import OverlayPortal from "./overlays/OverlayPortal";
 import {
   X,
   UploadCloud,
@@ -277,7 +278,7 @@ export default function UploadFinishedVideoModal({
   const currentCategoryGroups = HIERARCHICAL_CATEGORIES[partition] || HIERARCHICAL_CATEGORIES["成片"];
   const activePrimaryObj = currentCategoryGroups.find(c => c.primary === selectedPrimaryCat) || currentCategoryGroups[0];
 
-  return (
+  const content = (
     <div className={isPage ? "flex-1 flex flex-col min-h-0 bg-[#F8F9FD] w-full h-full overflow-hidden animate-in fade-in duration-200" : "fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200"}>
       <div className={isPage ? "bg-[#F8F9FD] w-full flex-1 flex flex-col overflow-hidden" : "bg-[#F8F9FD] rounded-2xl shadow-2xl border border-slate-200/90 w-full max-w-5xl h-[92vh] flex flex-col overflow-hidden"}>
         
@@ -1604,4 +1605,6 @@ export default function UploadFinishedVideoModal({
 
     </div>
   );
+
+  return isPage ? content : <OverlayPortal layer="modal" className="fixed inset-0">{content}</OverlayPortal>;
 }

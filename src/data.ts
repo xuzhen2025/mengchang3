@@ -1,4 +1,4 @@
-import { GalleryItem, Asset, Task, CreditTransaction, AppMessage } from "./types";
+import { GalleryItem, Asset, Task, CreditTransaction, AppMessage, AiVideoMediaItem } from "./types";
 
 export const MESSAGE_CATEGORY_CONFIGS = [
   { id: "approval", name: "审批待办", subcategories: ["积分申请"] },
@@ -450,7 +450,141 @@ export const INITIAL_ASSETS: Asset[] = [
   }
 ];
 
+const AI_VIDEO_DEMO_RESULT_URL = "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4";
+const AI_VIDEO_DEMO_MEDIA: Record<string, AiVideoMediaItem> = {
+  skincareSet: { id: "stock-1", name: "轻奢护肤礼盒主图.jpg", type: "image", url: "/assets/prototype/luxury-skincare-set.jpg", source: "library" },
+  skincareProduct: { id: "stock-2", name: "精华液商品特写.jpg", type: "image", url: "/assets/prototype/skincare-product.jpg", source: "library" },
+  character: { id: "stock-4", name: "都市女性自然口播.jpg", type: "image", url: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=720&auto=format&fit=crop&q=85", source: "library" },
+  model: { id: "stock-5", name: "运动服模特正面.jpg", type: "image", url: "https://images.unsplash.com/photo-1538805060514-97d9cc17730c?w=720&auto=format&fit=crop&q=85", source: "library" },
+  clothing: { id: "stock-8", name: "白色针织上衣.jpg", type: "image", url: "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=720&auto=format&fit=crop&q=85", source: "library" },
+  beach: { id: "stock-11", name: "海边日落氛围.jpg", type: "image", url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=720&auto=format&fit=crop&q=85", source: "library" },
+  selectedLook: { id: "stock-13", name: "通勤女装模特.jpg", type: "image", url: "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=720&auto=format&fit=crop&q=85", source: "generated" },
+  sourceVideo: { id: "video-2", name: "都市女性口播原片.mp4", type: "video", url: AI_VIDEO_DEMO_RESULT_URL, coverUrl: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=720&auto=format&fit=crop&q=85", durationSeconds: 12, source: "library" }
+};
+
 export const INITIAL_TASKS: Task[] = [
+  {
+    id: "ai-video-demo-queue",
+    name: "AI视频原料_参考生视频_护肤礼盒动态展示",
+    type: "video_gen",
+    status: "queue",
+    progress: 0,
+    inputFiles: [AI_VIDEO_DEMO_MEDIA.skincareSet.url, AI_VIDEO_DEMO_MEDIA.character.url],
+    createdAt: "2026-09-07 11:26:40",
+    creditsCost: 40,
+    category: "ai_video",
+    source: "tool",
+    autoProgress: false,
+    restartable: false,
+    aiVideoSnapshot: {
+      mode: "reference",
+      model: "video-vd-1",
+      ratio: "9:16",
+      duration: 8,
+      prompt: "镜头缓慢推进，商品始终保持清晰，人物自然展示产品细节，光线柔和，画面具有真实电商广告质感。",
+      references: [AI_VIDEO_DEMO_MEDIA.skincareSet, AI_VIDEO_DEMO_MEDIA.character]
+    }
+  },
+  {
+    id: "ai-video-demo-generating",
+    name: "AI视频原料_首尾帧生视频_海边产品转场",
+    type: "video_gen",
+    status: "generating",
+    progress: 68,
+    inputFiles: [AI_VIDEO_DEMO_MEDIA.skincareProduct.url, AI_VIDEO_DEMO_MEDIA.beach.url],
+    createdAt: "2026-09-07 10:48:12",
+    creditsCost: 60,
+    category: "ai_video",
+    source: "tool",
+    autoProgress: false,
+    cancellable: false,
+    restartable: false,
+    aiVideoSnapshot: {
+      mode: "first_last",
+      model: "video-sd-t1.6",
+      ratio: "9:16",
+      duration: 8,
+      prompt: "从首帧自然过渡到尾帧，主体动作连贯，镜头轻微环绕，商品外观与背景结构保持一致。",
+      firstFrame: AI_VIDEO_DEMO_MEDIA.skincareProduct,
+      lastFrame: AI_VIDEO_DEMO_MEDIA.beach
+    }
+  },
+  {
+    id: "ai-video-demo-completed",
+    name: "AI视频原料_配音生视频_新品精华口播",
+    type: "video_gen",
+    status: "completed",
+    progress: 100,
+    inputFiles: [AI_VIDEO_DEMO_MEDIA.character.url],
+    outputFiles: [AI_VIDEO_DEMO_RESULT_URL],
+    createdAt: "2026-09-07 10:16:28",
+    creditsCost: 34,
+    category: "ai_video",
+    source: "tool",
+    autoProgress: false,
+    restartable: false,
+    aiVideoSnapshot: {
+      mode: "dubbing",
+      model: "video-sd-t1.6",
+      ratio: "9:16",
+      duration: 11,
+      character: AI_VIDEO_DEMO_MEDIA.character,
+      voiceId: "clear-female",
+      voiceName: "清醒语录",
+      speech: "这款精华质地清透，上脸吸收很快，日常护肤使用也不会有黏腻感。"
+    },
+    aiVideoOutput: { videoUrl: AI_VIDEO_DEMO_RESULT_URL, coverUrl: AI_VIDEO_DEMO_MEDIA.character.url, duration: 11 }
+  },
+  {
+    id: "ai-video-demo-failed",
+    name: "AI视频原料_视频编辑-换背景_直播间焕新",
+    type: "video_gen",
+    status: "failed",
+    progress: 43,
+    inputFiles: [AI_VIDEO_DEMO_MEDIA.sourceVideo.url],
+    createdAt: "2026-09-07 09:39:22",
+    creditsCost: 34,
+    refundedCredits: 34,
+    failureReason: "素材中检测到无法稳定分离的快速遮挡，请检查原视频后重新编辑。",
+    category: "ai_video",
+    source: "tool",
+    autoProgress: false,
+    restartable: false,
+    aiVideoSnapshot: {
+      mode: "background",
+      model: "video-sd-t1.6",
+      ratio: "9:16",
+      duration: 8,
+      prompt: "将背景替换为明亮整洁的现代家居空间，保留人物与商品主体，光线方向和原视频一致。",
+      sourceVideos: [AI_VIDEO_DEMO_MEDIA.sourceVideo]
+    }
+  },
+  {
+    id: "ai-video-demo-cancelled",
+    name: "AI视频原料_视频编辑-换装_通勤套装展示",
+    type: "video_gen",
+    status: "cancelled",
+    progress: 0,
+    inputFiles: [AI_VIDEO_DEMO_MEDIA.clothing.url, AI_VIDEO_DEMO_MEDIA.model.url],
+    createdAt: "2026-09-06 18:21:06",
+    creditsCost: 61,
+    refundedCredits: 61,
+    category: "ai_video",
+    source: "tool",
+    autoProgress: false,
+    restartable: false,
+    aiVideoSnapshot: {
+      mode: "outfit",
+      model: "video-sd-t1.6",
+      ratio: "9:16",
+      duration: 8,
+      outfitMode: "single",
+      clothingImages: [AI_VIDEO_DEMO_MEDIA.clothing],
+      modelMedia: AI_VIDEO_DEMO_MEDIA.model,
+      selectedLook: AI_VIDEO_DEMO_MEDIA.selectedLook,
+      actionDescription: "模特先正面展示服装，再缓慢向右转身，动作自然舒展，完整呈现服装正面、侧面与背面细节。"
+    }
+  },
   {
     id: "t_demo_queue_model",
     name: "秋季风衣模特换装任务",
@@ -541,19 +675,6 @@ export const INITIAL_TASKS: Task[] = [
     creditsCost: 15,
     source: "tool",
     category: "fission"
-  },
-  {
-    id: "t_demo_ai_video",
-    name: "产品旋转展示 AI 视频素材",
-    type: "video_gen",
-    status: "completed",
-    progress: 100,
-    inputFiles: ["产品白底图.png"],
-    outputFiles: ["https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=480&auto=format&fit=crop&q=80"],
-    createdAt: "2026-08-20 10:25",
-    creditsCost: 10,
-    source: "tool",
-    category: "ai_video"
   },
   {
     id: "t_demo_ai_image",

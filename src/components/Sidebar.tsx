@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { 
   Home, 
   Video, 
@@ -26,6 +26,7 @@ import {
   LayoutDashboard
 } from "lucide-react";
 import { ActiveScreen } from "../types";
+import AnchoredPopover from "./overlays/AnchoredPopover";
 
 interface SidebarProps {
   activeScreen: ActiveScreen;
@@ -57,6 +58,7 @@ export default function Sidebar({
   setAdminActiveScreen = () => {}
 }: SidebarProps) {
   const [modeDropdownOpen, setModeDropdownOpen] = useState(false);
+  const modeButtonRef = useRef<HTMLButtonElement | null>(null);
   const canSwitchModes = allowedModes.length > 1;
 
   const userMenuItems: { id: string; label: string; icon: any; badge?: string }[] = [
@@ -64,7 +66,7 @@ export default function Sidebar({
     { id: "quick_creation", label: "快速创作", icon: Zap },
     { id: "agent_creation", label: "Agent 创作", icon: Sparkles },
     { id: "video_remake", label: "爆款复刻", icon: RefreshCw },
-    { id: "ai_video", label: "AI视频", icon: Video },
+    { id: "ai_video", label: "AI视频原料", icon: Video },
     { id: "ai_image", label: "AI图片", icon: ImageIcon },
     { id: "canvas", label: "画布", icon: Layers },
     { id: "live_management", label: "直播管理", icon: Radio },
@@ -105,6 +107,7 @@ export default function Sidebar({
           {!collapsed && canSwitchModes && (
             <div className="relative shrink-0">
               <button
+                ref={modeButtonRef}
                 id="btn-client-mode-dropdown"
                 type="button"
                 onClick={() => setModeDropdownOpen(!modeDropdownOpen)}
@@ -115,9 +118,7 @@ export default function Sidebar({
               </button>
 
               {modeDropdownOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setModeDropdownOpen(false)} />
-                  <div className="absolute right-0 top-full mt-1.5 w-28 bg-white border border-slate-200 rounded-xl shadow-xl py-1 z-50 animate-fade-in">
+                  <AnchoredPopover anchorRef={modeButtonRef} align="end" width={112} gap={6} onClose={() => setModeDropdownOpen(false)} className="rounded-xl border border-slate-200 bg-white py-1 shadow-xl animate-fade-in">
                     {allowedModes.map((mode) => (
                       <button
                         key={mode}
@@ -134,8 +135,7 @@ export default function Sidebar({
                         {appMode === mode && <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />}
                       </button>
                     ))}
-                  </div>
-                </>
+                  </AnchoredPopover>
               )}
             </div>
           )}

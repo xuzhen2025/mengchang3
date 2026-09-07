@@ -1,1707 +1,991 @@
-import React, { useState, useRef, useEffect } from "react";
-import { 
-  Video as VideoIcon, 
-  Sparkles, 
-  SlidersHorizontal, 
-  HelpCircle, 
-  FolderHeart, 
-  Clock, 
-  Sliders, 
-  Trash2,
-  FileVideo,
-  Play,
-  Heart,
-  Eye,
-  Loader2,
-  Plus,
-  ArrowLeft,
-  Volume2,
-  VolumeX,
-  Maximize2,
-  Camera,
-  FileText,
-  Tv,
-  Mic,
-  Info,
-  Scissors,
-  CheckCircle,
-  Copy,
-  RotateCcw,
-  Download,
-  Layers,
-  Settings,
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
   AlertCircle,
+  ArrowLeft,
+  Ban,
+  Box,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  Clock3,
+  CloudUpload,
+  Download,
+  Edit3,
+  Film,
+  FolderOpen,
+  Images,
+  ListTodo,
+  Loader2,
+  Mic2,
   Pause,
-  ChevronRight,
+  Play,
+  Plus,
+  RefreshCw,
+  Search,
+  SlidersHorizontal,
+  Sparkles,
+  Trash2,
+  Upload,
+  Video,
+  Volume2,
+  WandSparkles,
   X
 } from "lucide-react";
+import AssetPagination from "./AssetPagination";
+import UploadFinishedVideoModal from "./UploadFinishedVideoModal";
+import AnchoredPopover from "./overlays/AnchoredPopover";
+import OverlayPortal from "./overlays/OverlayPortal";
+import {
+  AiVideoMediaItem,
+  AiVideoMode,
+  AiVideoTaskSnapshot,
+  GalleryItem,
+  Task
+} from "../types";
 
 interface AiVideoViewProps {
-  onBack: () => void;
-  onAddTask: (type: "detail_set" | "watermark" | "subtitle" | "enhance" | "video_gen" | "image_gen" | "fission", name: string, inputFiles: string[], creditsCost: number, customPrompt?: string) => void;
-  onOpenMaterialSelector: (callback: (selectedUrls: string[]) => void) => void;
-  galleryItems: any[];
+  galleryItems: GalleryItem[];
+  tasks: Task[];
+  activeTaskId: string | null;
+  onActiveTaskChange: (taskId: string | null) => void;
+  onCreateTask: (snapshot: AiVideoTaskSnapshot, creditsCost: number) => string | null;
+  onConsumeCredits: (creditsCost: number, remark: string) => boolean;
+  onCancelTask: (taskId: string) => void;
+  onOpenTaskQueue: () => void;
+  onUploadVideos: (videos: Array<{ name: string; cover: string }>) => void;
   presetPrompt?: string;
   presetReferences?: string[];
   onClearPreset?: () => void;
 }
 
+type PickerTarget =
+  | "references"
+  | "firstFrame"
+  | "lastFrame"
+  | "character"
+  | "backgroundVideos"
+  | "singleClothing"
+  | "topClothing"
+  | "bottomClothing"
+  | "modelMedia";
+
+interface PickerState {
+  target: PickerTarget;
+  allowed: "image" | "video" | "both";
+  max: number;
+}
+
+interface VoiceOption {
+  id: string;
+  name: string;
+  scene: string;
+  tone: string;
+  avatar: string;
+  source: "system" | "clone";
+}
+
+const MODE_OPTIONS: Array<{
+  id: AiVideoMode | "video_edit";
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  { id: "reference", label: "参考生视频", description: "多图参考，生成连续动态画面", icon: Images },
+  { id: "first_last", label: "首尾帧生视频", description: "连接首尾画面，生成自然过渡", icon: Film },
+  { id: "dubbing", label: "配音生视频", description: "人物、音色与文案驱动口播", icon: Mic2 },
+  { id: "video_edit", label: "视频编辑", description: "为原视频换背景或完成换装", icon: WandSparkles }
+];
+
+const MODEL_OPTIONS = [
+  { id: "video-vd-1", name: "视频 VD 1.0", description: "支持多张参考图，主体一致性更强", badge: "推荐" },
+  { id: "video-sd-t1.6", name: "视频 SD-T1.6", description: "人物动态表现自然，适合电商展示", badge: "" }
+];
+
+const RATIOS: AiVideoTaskSnapshot["ratio"][] = ["9:16", "16:9", "4:3", "3:4", "1:1"];
+const RESULT_VIDEO_URL = "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4";
+
+const STOCK_IMAGES: AiVideoMediaItem[] = [
+  { id: "stock-1", name: "轻奢护肤礼盒主图.jpg", type: "image", url: "/assets/prototype/luxury-skincare-set.jpg", source: "library" },
+  { id: "stock-2", name: "精华液商品特写.jpg", type: "image", url: "/assets/prototype/skincare-product.jpg", source: "library" },
+  { id: "stock-3", name: "护肤品促销场景.jpg", type: "image", url: "/assets/prototype/beauty-promo-detail.jpg", source: "library" },
+  { id: "stock-4", name: "都市女性自然口播.jpg", type: "image", url: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=720&auto=format&fit=crop&q=85", source: "library" },
+  { id: "stock-5", name: "运动服模特正面.jpg", type: "image", url: "https://images.unsplash.com/photo-1538805060514-97d9cc17730c?w=720&auto=format&fit=crop&q=85", source: "library" },
+  { id: "stock-6", name: "商务男士口播形象.jpg", type: "image", url: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=720&auto=format&fit=crop&q=85", source: "library" },
+  { id: "stock-7", name: "粉色连衣裙商品图.jpg", type: "image", url: "https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=720&auto=format&fit=crop&q=85", source: "library" },
+  { id: "stock-8", name: "白色针织上衣.jpg", type: "image", url: "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=720&auto=format&fit=crop&q=85", source: "library" },
+  { id: "stock-9", name: "深色休闲长裤.jpg", type: "image", url: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=720&auto=format&fit=crop&q=85", source: "library" },
+  { id: "stock-10", name: "居家厨房场景.jpg", type: "image", url: "https://images.unsplash.com/photo-1556911220-bff31c812dba?w=720&auto=format&fit=crop&q=85", source: "library" },
+  { id: "stock-11", name: "海边日落氛围.jpg", type: "image", url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=720&auto=format&fit=crop&q=85", source: "library" },
+  { id: "stock-12", name: "现代客厅背景.jpg", type: "image", url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=720&auto=format&fit=crop&q=85", source: "library" },
+  { id: "stock-13", name: "通勤女装模特.jpg", type: "image", url: "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=720&auto=format&fit=crop&q=85", source: "library" },
+  { id: "stock-14", name: "户外产品展示.jpg", type: "image", url: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=720&auto=format&fit=crop&q=85", source: "library" },
+  { id: "stock-15", name: "美妆达人半身照.jpg", type: "image", url: "https://images.unsplash.com/photo-1616683693504-3ea7e9ad6fec?w=720&auto=format&fit=crop&q=85", source: "library" },
+  { id: "stock-16", name: "清爽产品静物.jpg", type: "image", url: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=720&auto=format&fit=crop&q=85", source: "library" }
+];
+
+const STOCK_VIDEOS: AiVideoMediaItem[] = [
+  { id: "video-1", name: "夏日护肤产品展示.mp4", type: "video", url: RESULT_VIDEO_URL, coverUrl: "/assets/prototype/skincare-product.jpg", durationSeconds: 6, source: "library" },
+  { id: "video-2", name: "都市女性口播原片.mp4", type: "video", url: RESULT_VIDEO_URL, coverUrl: STOCK_IMAGES[3].url, durationSeconds: 12, source: "library" },
+  { id: "video-3", name: "运动服模特走秀.mp4", type: "video", url: RESULT_VIDEO_URL, coverUrl: STOCK_IMAGES[4].url, durationSeconds: 8, source: "library" },
+  { id: "video-4", name: "精华液桌面陈列.mp4", type: "video", url: RESULT_VIDEO_URL, coverUrl: STOCK_IMAGES[1].url, durationSeconds: 17, source: "library" },
+  { id: "video-5", name: "轻奢礼盒开箱.mp4", type: "video", url: RESULT_VIDEO_URL, coverUrl: STOCK_IMAGES[0].url, durationSeconds: 7, source: "library" },
+  { id: "video-6", name: "商务男士产品讲解.mp4", type: "video", url: RESULT_VIDEO_URL, coverUrl: STOCK_IMAGES[5].url, durationSeconds: 15, source: "library" },
+  { id: "video-7", name: "家居场景种草.mp4", type: "video", url: RESULT_VIDEO_URL, coverUrl: STOCK_IMAGES[9].url, durationSeconds: 10, source: "library" },
+  { id: "video-8", name: "海边防晒氛围片.mp4", type: "video", url: RESULT_VIDEO_URL, coverUrl: STOCK_IMAGES[10].url, durationSeconds: 9, source: "library" }
+];
+
+const VOICES: VoiceOption[] = [
+  { id: "clear-female", name: "清醒语录", scene: "自然对话", tone: "清晰、克制", avatar: STOCK_IMAGES[3].url, source: "system" },
+  { id: "story-girl", name: "儿童绘本", scene: "故事讲述", tone: "温柔、亲切", avatar: STOCK_IMAGES[14].url, source: "system" },
+  { id: "vivid-male", name: "生动解说", scene: "商品讲解", tone: "明快、有感染力", avatar: STOCK_IMAGES[5].url, source: "system" },
+  { id: "premium-female", name: "精品有声书", scene: "质感旁白", tone: "沉稳、细腻", avatar: STOCK_IMAGES[6].url, source: "system" },
+  { id: "smooth-female", name: "流畅女声", scene: "电商口播", tone: "自然、轻快", avatar: STOCK_IMAGES[15].url, source: "system" },
+  { id: "sunny-male", name: "阳光男生", scene: "潮流种草", tone: "活力、年轻", avatar: STOCK_IMAGES[5].url, source: "system" },
+  { id: "warm-aunt", name: "温暖生活家", scene: "生活分享", tone: "松弛、可信", avatar: STOCK_IMAGES[13].url, source: "system" },
+  { id: "clone-xuzhen", name: "我的音色 01", scene: "音色克隆", tone: "自然原声", avatar: STOCK_IMAGES[4].url, source: "clone" },
+  { id: "clone-brand", name: "品牌主播音色", scene: "音色克隆", tone: "专业、明亮", avatar: STOCK_IMAGES[3].url, source: "clone" }
+];
+
+const MODE_LABELS: Record<AiVideoMode, string> = {
+  reference: "参考生视频",
+  first_last: "首尾帧生视频",
+  dubbing: "配音生视频",
+  background: "视频编辑-换背景",
+  outfit: "视频编辑-换装"
+};
+
+const DEFAULT_PROMPTS: Record<AiVideoMode, string> = {
+  reference: "镜头缓慢推进，商品始终保持清晰，人物自然展示产品细节，光线柔和，画面具有真实电商广告质感。",
+  first_last: "从首帧自然过渡到尾帧，主体动作连贯，镜头轻微环绕，商品外观与背景结构保持一致。",
+  dubbing: "这款精华质地清透，上脸吸收很快，日常护肤使用也不会有黏腻感。",
+  background: "将背景替换为明亮整洁的现代家居空间，保留人物与商品主体，光线方向和原视频一致。",
+  outfit: "模特先正面展示服装，再缓慢向右转身，动作自然舒展，完整呈现服装正面、侧面与背面细节。"
+};
+
+const demoSnapshot = (mode: AiVideoMode): AiVideoTaskSnapshot => ({
+  mode,
+  model: mode === "reference" ? "video-vd-1" : "video-sd-t1.6",
+  ratio: "9:16",
+  duration: 8,
+  prompt: DEFAULT_PROMPTS[mode],
+  references: mode === "reference" ? [STOCK_IMAGES[0], STOCK_IMAGES[3]] : [],
+  firstFrame: mode === "first_last" ? STOCK_IMAGES[1] : null,
+  lastFrame: mode === "first_last" ? STOCK_IMAGES[10] : null,
+  character: mode === "dubbing" ? STOCK_IMAGES[3] : null,
+  voiceId: mode === "dubbing" ? VOICES[0].id : undefined,
+  voiceName: mode === "dubbing" ? VOICES[0].name : undefined,
+  speech: mode === "dubbing" ? DEFAULT_PROMPTS.dubbing : undefined,
+  sourceVideos: mode === "background" ? [STOCK_VIDEOS[1]] : [],
+  outfitMode: mode === "outfit" ? "single" : undefined,
+  clothingImages: mode === "outfit" ? [STOCK_IMAGES[7]] : [],
+  modelMedia: mode === "outfit" ? STOCK_IMAGES[4] : null,
+  selectedLook: mode === "outfit" ? STOCK_IMAGES[12] : null,
+  actionDescription: mode === "outfit" ? DEFAULT_PROMPTS.outfit : undefined
+});
+
 export default function AiVideoView({
-  onBack,
-  onAddTask,
-  onOpenMaterialSelector,
   galleryItems,
+  tasks,
+  activeTaskId,
+  onActiveTaskChange,
+  onCreateTask,
+  onConsumeCredits,
+  onCancelTask,
+  onOpenTaskQueue,
+  onUploadVideos,
   presetPrompt,
   presetReferences,
   onClearPreset
 }: AiVideoViewProps) {
-  // Main page states
-  const [prompt, setPrompt] = useState("");
-  const [references, setReferences] = useState<string[]>([]);
-  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
-  const [model, setModel] = useState("seedance_2");
-  const [aspectRatio, setAspectRatio] = useState("9:16");
-  const [resolution, setResolution] = useState("720p");
-  const [duration, setDuration] = useState("15");
-  const [audio, setAudio] = useState("include");
-  const [isExpanding, setIsExpanding] = useState(false);
-  const [showSettingsPopover, setShowSettingsPopover] = useState(false);
+  const [mode, setMode] = useState<AiVideoMode>("reference");
+  const [modeMenuOpen, setModeMenuOpen] = useState(false);
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [model, setModel] = useState(MODEL_OPTIONS[0].id);
+  const [ratio, setRatio] = useState<AiVideoTaskSnapshot["ratio"]>("9:16");
+  const [durations, setDurations] = useState({ reference: 8, first_last: 8, outfit: 8 });
+  const [referencePrompt, setReferencePrompt] = useState(DEFAULT_PROMPTS.reference);
+  const [firstLastPrompt, setFirstLastPrompt] = useState(DEFAULT_PROMPTS.first_last);
+  const [references, setReferences] = useState<AiVideoMediaItem[]>([]);
+  const [firstFrame, setFirstFrame] = useState<AiVideoMediaItem | null>(null);
+  const [lastFrame, setLastFrame] = useState<AiVideoMediaItem | null>(null);
+  const [character, setCharacter] = useState<AiVideoMediaItem | null>(null);
+  const [voice, setVoice] = useState<VoiceOption | null>(null);
+  const [speech, setSpeech] = useState("");
+  const [dubbingAction, setDubbingAction] = useState("");
+  const [backgroundVideos, setBackgroundVideos] = useState<AiVideoMediaItem[]>([]);
+  const [backgroundPrompt, setBackgroundPrompt] = useState(DEFAULT_PROMPTS.background);
+  const [outfitMode, setOutfitMode] = useState<"single" | "multiple">("single");
+  const [singleClothing, setSingleClothing] = useState<AiVideoMediaItem | null>(null);
+  const [topClothing, setTopClothing] = useState<AiVideoMediaItem | null>(null);
+  const [bottomClothing, setBottomClothing] = useState<AiVideoMediaItem | null>(null);
+  const [modelMedia, setModelMedia] = useState<AiVideoMediaItem | null>(null);
+  const [outfitAction, setOutfitAction] = useState(DEFAULT_PROMPTS.outfit);
+  const [picker, setPicker] = useState<PickerState | null>(null);
+  const [modelMediaTypePickerOpen, setModelMediaTypePickerOpen] = useState(false);
+  const [voicePickerOpen, setVoicePickerOpen] = useState(false);
+  const [outfitPreview, setOutfitPreview] = useState(false);
+  const [outfitPreviewProgress, setOutfitPreviewProgress] = useState(0);
+  const [outfitCandidates, setOutfitCandidates] = useState<AiVideoMediaItem[]>([]);
+  const [selectedLook, setSelectedLook] = useState<AiVideoMediaItem | null>(null);
+  const [confirmOutfitReturn, setConfirmOutfitReturn] = useState(false);
+  const [previewTask, setPreviewTask] = useState<Task | null>(null);
+  const [uploadTask, setUploadTask] = useState<Task | null>(null);
+  const [toast, setToast] = useState("");
+  const lastFocusedTask = useRef<string | null>(null);
+  const modeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const modelButtonRef = useRef<HTMLButtonElement | null>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  // Pre-fill Preset Prompt and References from "一键同款"
-  useEffect(() => {
-    if (presetPrompt) {
-      setPrompt(presetPrompt);
-    }
-    if (presetReferences && presetReferences.length > 0) {
-      setReferences(presetReferences);
-    }
-    if (presetPrompt || (presetReferences && presetReferences.length > 0)) {
-      onClearPreset?.();
-    }
-  }, [presetPrompt, presetReferences, onClearPreset]);
-
-  // Edit Mode states
-  const [editingVideo, setEditingVideo] = useState<any | null>(null);
-  
-  // Custom Player states
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [durationTime, setDurationTime] = useState(15);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [isLooping, setIsLooping] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(0.8);
-
-  // Segment modification states (段修改)
-  const [segmentStart, setSegmentStart] = useState(8.0);
-  const [segmentEnd, setSegmentEnd] = useState(12.0);
-  const [segmentPrompt, setSegmentPrompt] = useState("");
-  const [segmentSuccessMsg, setSegmentSuccessMsg] = useState("");
-
-  // Frame Extraction states (抽帧)
-  const [capturedFrames, setCapturedFrames] = useState<any[]>([]);
-  const [isExtractingFrame, setIsExtractingFrame] = useState(false);
-  const [frameNotification, setFrameNotification] = useState("");
-
-  // Tabs for editing operations
-  const [activeEditTab, setActiveEditTab] = useState<"subtitle" | "voice" | "hd" | "info" | "paoman">("subtitle");
-
-  // 去字幕 sub-states
-  const [subtitlePosition, setSubtitlePosition] = useState("bottom");
-  const [subtitleMethod, setSubtitleMethod] = useState("generative");
-  const [isEraserRunning, setIsEraserRunning] = useState(false);
-  const [eraseSuccessMsg, setEraseSuccessMsg] = useState("");
-
-  // 高清 sub-states
-  const [hdResolution, setHdResolution] = useState("4k");
-  const [hdFaceRestore, setHdFaceRestore] = useState(true);
-  const [hdDenoise, setHdDenoise] = useState(true);
-  const [hdFps, setHdFps] = useState(true);
-  const [isHdRunning, setIsHdRunning] = useState(false);
-  const [hdSuccessMsg, setHdSuccessMsg] = useState("");
-
-  // 音色克隆 sub-states
-  const [selectedVoice, setSelectedVoice] = useState("yating");
-  const [voiceText, setVoiceText] = useState("");
-  const [voiceSpeed, setVoiceSpeed] = useState(1.0);
-  const [voicePitch, setVoicePitch] = useState(1.0);
-  const [isVoiceRunning, setIsVoiceRunning] = useState(false);
-  const [voiceSuccessMsg, setVoiceSuccessMsg] = useState("");
-
-  // 泡漫AI漫剧 sub-states
-  const [paomanCharacterName, setPaomanCharacterName] = useState("女主角 楚瑶");
-  const [paomanCharacterOutfit, setPaomanCharacterOutfit] = useState("高奢职业装、白衬衫、珍珠耳环");
-  const [paomanCharacterRole, setPaomanCharacterRole] = useState("churao_office");
-  const [paomanCameraMotion, setPaomanCameraMotion] = useState("dolly_in");
-  const [paomanMotionIntensity, setPaomanMotionIntensity] = useState("standard");
-  const [paomanStyle, setPaomanStyle] = useState("cn_anime");
-  const [paomanScript, setPaomanScript] = useState("楚瑶推开会议室大门，面带自信的微笑走入，身后的助理抱着厚厚的发布会文件...");
-  const [isPaomanRunning, setIsPaomanRunning] = useState(false);
-  const [paomanSuccessMsg, setPaomanSuccessMsg] = useState("");
-
-  // Filter video items from database
-  const videoGallery = galleryItems.filter((g) => g.type === "video");
-
-  // Sync video time updates
-  const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
-    }
-  };
-
-  const handleLoadedMetadata = () => {
-    if (videoRef.current) {
-      setDurationTime(videoRef.current.duration || 15);
-    }
-  };
-
-  const handlePlayPause = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-        setIsPlaying(false);
-      } else {
-        videoRef.current.play();
-        setIsPlaying(true);
-      }
-    }
-  };
-
-  const handleStop = () => {
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.currentTime = 0;
-      setIsPlaying(false);
-      setCurrentTime(0);
-    }
-  };
-
-  const handleScrubChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newTime = parseFloat(e.target.value);
-    setCurrentTime(newTime);
-    if (videoRef.current) {
-      videoRef.current.currentTime = newTime;
-    }
-  };
-
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newVol = parseFloat(e.target.value);
-    setVolume(newVol);
-    if (videoRef.current) {
-      videoRef.current.volume = newVol;
-      setIsMuted(newVol === 0);
-    }
-  };
-
-  const handleToggleMute = () => {
-    if (videoRef.current) {
-      const nextMuted = !isMuted;
-      setIsMuted(nextMuted);
-      videoRef.current.muted = nextMuted;
-    }
-  };
-
-  const handleSpeedChange = (speed: number) => {
-    setPlaybackSpeed(speed);
-    if (videoRef.current) {
-      videoRef.current.playbackRate = speed;
-    }
-  };
-
-  const handleToggleLoop = () => {
-    const nextLoop = !isLooping;
-    setIsLooping(nextLoop);
-    if (videoRef.current) {
-      videoRef.current.loop = nextLoop;
-    }
-  };
-
-  // Video Generator triggers
-  const handleSelectReferences = () => {
-    onOpenMaterialSelector((urls) => {
-      setReferences([...references, ...urls].slice(0, 15));
+  const libraryItems = useMemo(() => {
+    const galleryMedia: AiVideoMediaItem[] = galleryItems.map((item) => ({
+      id: `gallery-${item.id}`,
+      name: item.title,
+      type: item.type,
+      url: item.url,
+      coverUrl: item.coverUrl,
+      durationSeconds: item.type === "video" ? Number.parseInt(item.duration || "8", 10) || 8 : undefined,
+      source: "library"
+    }));
+    const seen = new Set<string>();
+    return [...galleryMedia, ...STOCK_IMAGES, ...STOCK_VIDEOS].filter((item) => {
+      const key = `${item.type}-${item.url}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
     });
-  };
+  }, [galleryItems]);
 
-  const handleRemoveRef = (index: number) => {
-    setReferences(references.filter((_, i) => i !== index));
-  };
+  const taskRecords = useMemo(() => {
+    return tasks
+      .filter((task) => task.category === "ai_video")
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  }, [tasks]);
+  const modeRecords = useMemo(
+    () => taskRecords.filter((task) => (task.aiVideoSnapshot?.mode || "reference") === mode),
+    [mode, taskRecords]
+  );
 
-  // Calling server-side Gemini prompt helper
-  const handleAiWrite = async () => {
-    if (!prompt.trim()) {
-      alert("请先输入一些关于您产品的简短描述，以便AI为您针对性扩写！");
-      return;
+  useEffect(() => {
+    if (presetPrompt) setReferencePrompt(presetPrompt);
+    if (presetReferences?.length) {
+      setReferences(presetReferences.slice(0, 7).map((url, index) => ({ id: `preset-${index}-${url}`, name: `同款参考图${index + 1}.jpg`, type: "image", url, source: "library" })));
+      setMode("reference");
     }
+    if (presetPrompt || presetReferences?.length) onClearPreset?.();
+  }, [onClearPreset, presetPrompt, presetReferences]);
 
-    setIsExpanding(true);
-    try {
-      const response = await fetch("/api/write-prompt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "视频生成",
-          shortDescription: prompt,
-          style: "极度奢华美妆带货，微距漫反射，4K商用光影"
-        })
-      });
-      const data = await response.json();
-      if (data.success && data.prompt) {
-        setPrompt(data.prompt);
-      } else {
-        alert("AI 扩写失败，请稍后重试。");
+  useEffect(() => {
+    if (!outfitPreview || outfitCandidates.length > 0) return;
+    const startedAt = Date.now();
+    const interval = window.setInterval(() => {
+      const next = Math.min(100, Math.round(((Date.now() - startedAt) / 5000) * 100));
+      setOutfitPreviewProgress(next);
+      if (next >= 100) {
+        const stamp = Date.now();
+        setOutfitCandidates([
+          { ...STOCK_IMAGES[12], id: `look-${stamp}-1`, name: "搭配预览 1", source: "generated" },
+          { ...STOCK_IMAGES[4], id: `look-${stamp}-2`, name: "搭配预览 2", source: "generated" },
+          { ...STOCK_IMAGES[6], id: `look-${stamp}-3`, name: "搭配预览 3", source: "generated" },
+          { ...STOCK_IMAGES[14], id: `look-${stamp}-4`, name: "搭配预览 4", source: "generated" }
+        ]);
+        window.clearInterval(interval);
       }
-    } catch (err) {
-      console.error(err);
-      alert("连接后台AI助手超时。");
-    } finally {
-      setIsExpanding(false);
-    }
+    }, 100);
+    return () => window.clearInterval(interval);
+  }, [outfitCandidates.length, outfitPreview]);
+
+  useEffect(() => {
+    if (!activeTaskId || lastFocusedTask.current === activeTaskId) return;
+    const task = taskRecords.find((item) => item.id === activeTaskId);
+    if (!task) return;
+    lastFocusedTask.current = activeTaskId;
+    setMode(task.aiVideoSnapshot?.mode || "reference");
+    window.setTimeout(() => document.getElementById(`ai-video-record-${activeTaskId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
+  }, [activeTaskId, taskRecords]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(""), 2400);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  const selectedModel = MODEL_OPTIONS.find((item) => item.id === model) || MODEL_OPTIONS[0];
+  const speechDuration = Math.max(3, Math.ceil(Math.max(1, speech.trim().length) / 4));
+  const currentDuration = mode === "reference"
+    ? durations.reference
+    : mode === "first_last"
+      ? durations.first_last
+      : mode === "outfit"
+        ? durations.outfit
+        : mode === "background"
+          ? 8
+          : speechDuration;
+  const currentCost = useMemo(() => {
+    if (mode === "reference") return 16 + durations.reference * 3;
+    if (mode === "first_last") return 20 + durations.first_last * 5;
+    if (mode === "dubbing") return 16 + Math.ceil(speech.trim().length / 5) * 3;
+    if (mode === "background") return 24 + Math.max(1, backgroundVideos.length) * 10;
+    return 27 + durations.outfit * 3 + (outfitMode === "multiple" ? 10 : 5);
+  }, [backgroundVideos.length, durations.first_last, durations.outfit, durations.reference, mode, outfitMode, speech]);
+
+  const canGenerate = mode === "reference"
+    ? references.length > 0 && Boolean(referencePrompt.trim())
+    : mode === "first_last"
+      ? Boolean(firstFrame && lastFrame && firstLastPrompt.trim())
+      : mode === "dubbing"
+        ? Boolean(character && voice && speech.trim())
+        : mode === "background"
+          ? backgroundVideos.length > 0 && Boolean(backgroundPrompt.trim())
+          : Boolean(selectedLook && modelMedia && outfitAction.trim());
+
+  const showMode = (nextMode: AiVideoMode) => {
+    setMode(nextMode);
+    setModeMenuOpen(false);
+    setOutfitPreview(false);
+    setSettingsOpen(false);
+    setModelMenuOpen(false);
+    onActiveTaskChange(null);
   };
 
-  const handleGenerate = () => {
-    if (!prompt.trim() && references.length === 0) {
-      alert("请在创意描述框中输入视频文案或添加参考图！");
-      return;
-    }
+  const openPicker = (target: PickerTarget, allowed: PickerState["allowed"], max: number) => setPicker({ target, allowed, max });
 
-    // Estimate credits cost
-    const baseCost = parseFloat(duration) * 1.36; // e.g. 15s * 1.36 = 20.4
-    const finalCost = resolution === "1080p" ? baseCost * 1.5 : baseCost;
-
-    onAddTask(
-      "video_gen",
-      `AI 视频生成: "${prompt.slice(0, 12)}..." (${aspectRatio})`,
-      references,
-      finalCost,
-      prompt
-    );
-
-    // Clear prompt and ref on success
-    setPrompt("");
-    setReferences([]);
+  const pickerSelection = (): AiVideoMediaItem[] => {
+    if (!picker) return [];
+    if (picker.target === "references") return references;
+    if (picker.target === "firstFrame") return firstFrame ? [firstFrame] : [];
+    if (picker.target === "lastFrame") return lastFrame ? [lastFrame] : [];
+    if (picker.target === "character") return character ? [character] : [];
+    if (picker.target === "backgroundVideos") return backgroundVideos;
+    if (picker.target === "singleClothing") return singleClothing ? [singleClothing] : [];
+    if (picker.target === "topClothing") return topClothing ? [topClothing] : [];
+    if (picker.target === "bottomClothing") return bottomClothing ? [bottomClothing] : [];
+    return modelMedia ? [modelMedia] : [];
   };
 
-  // Segment Regeneration (段修改)
-  const handleSegmentRegen = () => {
-    if (!segmentPrompt.trim()) {
-      alert("请输入该区间欲替换的分镜描述！");
-      return;
-    }
-
-    const durationSeg = segmentEnd - segmentStart;
-    if (durationSeg <= 0) {
-      alert("结束时间必须大于开始时间！");
-      return;
-    }
-
-    const cost = Math.ceil(durationSeg * 1.8);
-    
-    // Dispatch actual task
-    onAddTask(
-      "video_gen",
-      `视频分段修改 [${segmentStart.toFixed(1)}s-${segmentEnd.toFixed(1)}s]: "${segmentPrompt.slice(0, 15)}..."`,
-      [editingVideo?.url || ""],
-      cost,
-      segmentPrompt
-    );
-
-    setSegmentSuccessMsg(`成功提交 ${segmentStart.toFixed(1)}秒 - ${segmentEnd.toFixed(1)}秒 的局部段修改生成任务！已扣除 ${cost} 积分。`);
-    setTimeout(() => {
-      setSegmentSuccessMsg("");
-      setSegmentPrompt("");
-    }, 5000);
+  const applyPickerSelection = (items: AiVideoMediaItem[]) => {
+    if (!picker) return;
+    if (picker.target === "references") setReferences(items.slice(0, 7));
+    if (picker.target === "firstFrame") setFirstFrame(items[0] || null);
+    if (picker.target === "lastFrame") setLastFrame(items[0] || null);
+    if (picker.target === "character") setCharacter(items[0] || null);
+    if (picker.target === "backgroundVideos") setBackgroundVideos(items.slice(0, 5));
+    if (picker.target === "singleClothing") setSingleClothing(items[0] || null);
+    if (picker.target === "topClothing") setTopClothing(items[0] || null);
+    if (picker.target === "bottomClothing") setBottomClothing(items[0] || null);
+    if (picker.target === "modelMedia") setModelMedia(items[0] || null);
+    setPicker(null);
   };
 
-  // Preset Segment helper
-  const handleApplySegmentPreset = (preset: "start" | "middle" | "end" | "custom") => {
-    if (preset === "start") {
-      setSegmentStart(0);
-      setSegmentEnd(5);
-    } else if (preset === "middle") {
-      setSegmentStart(5);
-      setSegmentEnd(10);
-    } else if (preset === "end") {
-      setSegmentStart(10);
-      setSegmentEnd(15);
+  const hydrateSnapshot = (snapshot: AiVideoTaskSnapshot) => {
+    setMode(snapshot.mode);
+    setModel(snapshot.model || MODEL_OPTIONS[0].id);
+    setRatio(snapshot.ratio || "9:16");
+    if (snapshot.mode === "reference") {
+      setReferences(snapshot.references || []);
+      setReferencePrompt(snapshot.prompt || DEFAULT_PROMPTS.reference);
+      setDurations((current) => ({ ...current, reference: snapshot.duration || 8 }));
     }
+    if (snapshot.mode === "first_last") {
+      setFirstFrame(snapshot.firstFrame || null);
+      setLastFrame(snapshot.lastFrame || null);
+      setFirstLastPrompt(snapshot.prompt || DEFAULT_PROMPTS.first_last);
+      setDurations((current) => ({ ...current, first_last: snapshot.duration || 8 }));
+    }
+    if (snapshot.mode === "dubbing") {
+      setCharacter(snapshot.character || null);
+      setVoice(VOICES.find((item) => item.id === snapshot.voiceId) || null);
+      setSpeech(snapshot.speech || "");
+      setDubbingAction(snapshot.actionDescription || "");
+    }
+    if (snapshot.mode === "background") {
+      setBackgroundVideos(snapshot.sourceVideos || []);
+      setBackgroundPrompt(snapshot.prompt || DEFAULT_PROMPTS.background);
+    }
+    if (snapshot.mode === "outfit") {
+      const clothing = snapshot.clothingImages || [];
+      setOutfitMode(snapshot.outfitMode || "single");
+      setSingleClothing(snapshot.outfitMode === "single" ? clothing[0] || null : null);
+      setTopClothing(snapshot.outfitMode === "multiple" ? clothing[0] || null : null);
+      setBottomClothing(snapshot.outfitMode === "multiple" ? clothing[1] || null : null);
+      setModelMedia(snapshot.modelMedia || null);
+      setSelectedLook(snapshot.selectedLook || null);
+      setOutfitAction(snapshot.actionDescription || DEFAULT_PROMPTS.outfit);
+      setDurations((current) => ({ ...current, outfit: snapshot.duration || 8 }));
+      setOutfitPreview(Boolean(snapshot.selectedLook));
+      setOutfitPreviewProgress(snapshot.selectedLook ? 100 : 0);
+      setOutfitCandidates(snapshot.selectedLook ? [snapshot.selectedLook] : []);
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Frame Extraction (抽帧)
-  const handleExtractFrame = () => {
-    setIsExtractingFrame(true);
-    setFrameNotification("");
+  const buildSnapshot = (): AiVideoTaskSnapshot => {
+    const baseSnapshot = { mode, model, ratio, duration: currentDuration };
 
-    setTimeout(() => {
-      // Simulate snapshot capture
-      const randomImages = [
-        "https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=600&auto=format&fit=crop&q=80",
-        "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&auto=format&fit=crop&q=80",
-        "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&auto=format&fit=crop&q=80",
-        "https://images.unsplash.com/photo-1612817288484-6f916006741a?w=600&auto=format&fit=crop&q=80"
-      ];
-      const randomPic = randomImages[Math.floor(Math.random() * randomImages.length)];
-
-      const newFrame = {
-        id: "frame_" + Date.now(),
-        time: currentTime.toFixed(2) + "s",
-        url: randomPic,
-        size: "2.44 MB",
-        resolution: "1920 x 1080",
-        format: "PNG",
-        capturedAt: new Date().toLocaleTimeString()
+    if (mode === "reference") {
+      return { ...baseSnapshot, prompt: referencePrompt, references };
+    }
+    if (mode === "first_last") {
+      return { ...baseSnapshot, prompt: firstLastPrompt, firstFrame, lastFrame };
+    }
+    if (mode === "dubbing") {
+      return {
+        ...baseSnapshot,
+        character,
+        voiceId: voice?.id,
+        voiceName: voice?.name,
+        speech,
+        actionDescription: dubbingAction
       };
-
-      setCapturedFrames([newFrame, ...capturedFrames]);
-      setIsExtractingFrame(false);
-      setFrameNotification(`成功捕获视频第 ${currentTime.toFixed(2)}s 画面帧！`);
-      setTimeout(() => setFrameNotification(""), 3000);
-    }, 800);
-  };
-
-  // Subtitle eraser (去字幕)
-  const handleEraseSubtitles = () => {
-    setIsEraserRunning(true);
-    setEraseSuccessMsg("");
-
-    setTimeout(() => {
-      onAddTask(
-        "subtitle",
-        `擦除视频字幕: "${editingVideo?.title}" (擦除位置: ${subtitlePosition === "bottom" ? "底部" : "顶部"})`,
-        [editingVideo?.url || ""],
-        12.0
-      );
-      setIsEraserRunning(false);
-      setEraseSuccessMsg("字幕无痕消除任务已在后台排队处理！");
-      setTimeout(() => setEraseSuccessMsg(""), 5000);
-    }, 1500);
-  };
-
-  // HD Enhancer (视频高清化)
-  const handleHDEnhance = () => {
-    setIsHdRunning(true);
-    setHdSuccessMsg("");
-
-    setTimeout(() => {
-      onAddTask(
-        "enhance",
-        `视频高清重置 [${hdResolution === "4k" ? "4K 臻彩超画质" : "1080P 超清增强"}]: "${editingVideo?.title}"`,
-        [editingVideo?.url || ""],
-        25.0
-      );
-      setIsHdRunning(false);
-      setHdSuccessMsg("4K超高清重画质渲染工程已成功部署至算力中心！");
-      setTimeout(() => setHdSuccessMsg(""), 5000);
-    }, 1500);
-  };
-
-  // Voice cloning synthesis (音色克隆与配音)
-  const handleVoiceCloneAndSynth = () => {
-    if (!voiceText.trim()) {
-      alert("请先输入需要合成的配音文本！");
-      return;
+    }
+    if (mode === "background") {
+      return { ...baseSnapshot, prompt: backgroundPrompt, sourceVideos: backgroundVideos };
     }
 
-    setIsVoiceRunning(true);
-    setVoiceSuccessMsg("");
-
-    const voiceLabels: Record<string, string> = {
-      yating: "温柔女音雅婷",
-      aqiang: "激情男音阿强",
-      xiaomei: "甜美客服小美",
-      dashan: "磁性播音大山"
+    const clothingImages = outfitMode === "single"
+      ? (singleClothing ? [singleClothing] : [])
+      : [topClothing, bottomClothing].filter(Boolean) as AiVideoMediaItem[];
+    return {
+      ...baseSnapshot,
+      outfitMode,
+      clothingImages,
+      modelMedia,
+      selectedLook,
+      actionDescription: outfitAction
     };
-
-    setTimeout(() => {
-      onAddTask(
-        "subtitle", // Using subtitle as audio merge placeholder in App pipeline
-        `音色克隆配音 [${voiceLabels[selectedVoice]}]: "${voiceText.slice(0, 15)}..."`,
-        [editingVideo?.url || ""],
-        15.0
-      );
-      setIsVoiceRunning(false);
-      setVoiceSuccessMsg(`配音已合成并自动混入原视频轨道。音色模型: ${voiceLabels[selectedVoice]}`);
-      setTimeout(() => {
-        setVoiceSuccessMsg("");
-        setVoiceText("");
-      }, 5000);
-    }, 2000);
   };
 
-  // 泡漫AI漫剧生态剧本分镜/运镜动作流 (泡漫AI漫剧专区)
-  const handlePaomanAction = (actionType: "character_lock" | "camera" | "script" | "theme") => {
-    setIsPaomanRunning(true);
-    setPaomanSuccessMsg("");
-
-    setTimeout(() => {
-      let taskName = "";
-      let cost = 10;
-      if (actionType === "character_lock") {
-        taskName = `泡漫漫剧角色形象特征锁 [${paomanCharacterName}]: ${paomanCharacterOutfit.slice(0, 15)}`;
-        cost = 20;
-      } else if (actionType === "camera") {
-        const motionLabels: Record<string, string> = {
-          dolly_in: "智能微距推进 (Dolly In)",
-          quick_pan: "快速摇摄 (Quick Pan)",
-          orbit: "环绕追踪 (Orbit)",
-          low_angle: "低角度仰拍 (Low Angle)"
-        };
-        taskName = `泡漫漫剧智能镜头重算 [${motionLabels[paomanCameraMotion] || "镜头运镜"}]: 强度 ${paomanMotionIntensity === "standard" ? "标准" : "温和"}`;
-        cost = 15;
-      } else if (actionType === "script") {
-        taskName = `泡漫一键剧本漫剧分镜生成: "${paomanScript.slice(0, 15)}..." (共4幕连贯短剧)`;
-        cost = 40;
-      } else {
-        const themeLabels: Record<string, string> = {
-          cn_anime: "国漫风暴",
-          manga_hand: "日系手绘",
-          dream_3d: "3D梦幻超真",
-          retro_comic: "复古美漫"
-        };
-        taskName = `泡漫漫剧一键画风转化 [${themeLabels[paomanStyle] || "画风转化"}]: 转换短剧画幅`;
-        cost = 25;
-      }
-
-      onAddTask(
-        "fission",
-        taskName,
-        [editingVideo?.url || ""],
-        cost,
-        actionType === "script" ? paomanScript : paomanCharacterOutfit
-      );
-
-      setIsPaomanRunning(false);
-      setPaomanSuccessMsg(`泡漫生态漫剧工作流已部署！任务 [${taskName.slice(0, 25)}...] 在后台计算中，请留意右侧队列。`);
-      setTimeout(() => setPaomanSuccessMsg(""), 6000);
-    }, 1500);
+  const submitGeneration = () => {
+    if (!canGenerate) return;
+    const taskId = onCreateTask(buildSnapshot(), currentCost);
+    if (!taskId) return;
+    onActiveTaskChange(taskId);
+    setToast("任务已加入队列，将在后台继续生成");
+    window.setTimeout(() => document.getElementById(`ai-video-record-${taskId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
   };
 
-  const creditsEstimate = (parseFloat(duration) * (resolution === "1080p" ? 2.04 : 1.36));
-
-  // --- RENDERING WORKSPACE (EDIT MODE) ---
-  if (editingVideo) {
-    return (
-      <div className="flex-1 bg-slate-50 text-slate-700 p-6 overflow-y-auto font-sans">
-        <div className="max-w-7xl mx-auto space-y-6 pb-12">
-          
-          {/* Header */}
-          <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-4 gap-4">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setEditingVideo(null)}
-                className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 rounded-xl transition-all cursor-pointer border border-slate-200"
-                title="返回视频生成"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </button>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-base font-bold text-slate-800 truncate max-w-xs sm:max-w-md">
-                    {editingVideo.title}
-                  </h1>
-                  <span className="text-[10px] bg-purple-50 text-purple-600 border border-purple-100 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider font-mono">
-                    STUDIO WORKBENCH
-                  </span>
-                </div>
-                <p className="text-[10px] text-slate-500 mt-0.5 font-medium">智能视频编辑模式 ｜ 具备智能分段修改（段修改）、4K画质高清、AI智能去字幕、高保真音色克隆与漫剧生态套组</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 bg-white px-3 py-1.5 rounded-lg border border-slate-200 font-mono shadow-xs">
-                原大小: <strong className="text-slate-700">{editingVideo.duration || "15s"}</strong> ｜ 热度: <span className="text-pink-500 font-bold">♥ {editingVideo.likes}</span>
-              </span>
-              <button
-                onClick={() => setEditingVideo(null)}
-                className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-md cursor-pointer"
-              >
-                退出工作台
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            
-            {/* Left Column: Player & Timeline Segment & Extraction */}
-            <div className="lg:col-span-7 space-y-6">
-              
-              {/* Premium Video Player Panel */}
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs relative">
-                
-                {/* Media frame */}
-                <div className="aspect-video w-full bg-black relative flex items-center justify-center">
-                  <video
-                    ref={videoRef}
-                    src={editingVideo.url}
-                    poster={editingVideo.coverUrl}
-                    className="w-full h-full object-contain"
-                    onTimeUpdate={handleTimeUpdate}
-                    onLoadedMetadata={handleLoadedMetadata}
-                  />
-
-                  {/* 悬浮抽帧按钮 */}
-                  <button
-                    type="button"
-                    disabled={isExtractingFrame}
-                    onClick={handleExtractFrame}
-                    className="absolute top-4 right-4 bg-slate-900/80 backdrop-blur-md hover:bg-slate-800 text-white font-bold text-[10px] px-3 py-1.5 rounded-xl transition-all border border-slate-700/50 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 z-20 shadow-lg hover:scale-105"
-                    title="提取当前时刻为超清物料帧"
-                  >
-                    {isExtractingFrame ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
-                        <span>捕获中...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Camera className="w-3.5 h-3.5 text-purple-400" />
-                        <span>提取当前时刻帧</span>
-                      </>
-                    )}
-                  </button>
-
-                  {/* Dark overlay play button when paused */}
-                  {!isPlaying && (
-                    <button
-                      onClick={handlePlayPause}
-                      className="absolute w-14 h-14 bg-purple-600/90 hover:bg-purple-500/90 rounded-full flex items-center justify-center text-white shadow-xl transition-all hover:scale-105 cursor-pointer z-10"
-                    >
-                      <Play className="w-6 h-6 fill-white ml-1" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Scrubber Timeline Bar */}
-                <div className="p-4 bg-slate-50 border-t border-slate-200 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-[10px] text-indigo-600 font-mono font-bold w-12 text-right">
-                      {currentTime.toFixed(1)}s
-                    </span>
-                    <input
-                      type="range"
-                      min="0"
-                      max={durationTime}
-                      step="0.05"
-                      value={currentTime}
-                      onChange={handleScrubChange}
-                      className="flex-1 accent-indigo-600 h-1.5 rounded-lg bg-slate-200 cursor-pointer"
-                    />
-                    <span className="text-[10px] text-slate-500 font-mono w-12">
-                      {durationTime.toFixed(1)}s
-                    </span>
-                  </div>
-
-                  {/* Player Buttons Control Bar */}
-                  <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handlePlayPause}
-                        className="p-1.5 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 rounded-lg transition-all cursor-pointer border border-slate-200 shadow-xs"
-                        title={isPlaying ? "暂停" : "播放"}
-                      >
-                        {isPlaying ? <Pause className="w-4 h-4 fill-slate-600" /> : <Play className="w-4 h-4 fill-slate-600" />}
-                      </button>
-                      <button
-                        onClick={handleStop}
-                        className="p-1.5 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 rounded-lg transition-all cursor-pointer border border-slate-200 shadow-xs"
-                        title="停止"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                      </button>
-
-                      {/* Speed selector */}
-                      <div className="flex items-center bg-white rounded-lg p-0.5 border border-slate-200 ml-2 shadow-xs">
-                        {[0.5, 1.0, 1.5, 2.0].map((spd) => (
-                          <button
-                            key={spd}
-                            onClick={() => handleSpeedChange(spd)}
-                            className={`px-2 py-0.5 text-[9px] rounded font-mono font-bold transition-all cursor-pointer ${
-                              playbackSpeed === spd 
-                                ? "bg-indigo-600 text-white shadow-xs" 
-                                : "text-slate-500 hover:text-slate-800"
-                            }`}
-                          >
-                            {spd.toFixed(1)}x
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Volume control */}
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleToggleMute}
-                        className="text-slate-500 hover:text-slate-800 cursor-pointer"
-                      >
-                        {isMuted ? <VolumeX className="w-4 h-4 text-rose-500" /> : <Volume2 className="w-4 h-4 text-indigo-600" />}
-                      </button>
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.1"
-                        value={isMuted ? 0 : volume}
-                        onChange={handleVolumeChange}
-                        className="w-16 accent-indigo-600 h-1 bg-slate-200 rounded-lg"
-                      />
-                      
-                      <button
-                        onClick={handleToggleLoop}
-                        className={`text-[9px] font-bold px-2 py-1 rounded border ml-3 cursor-pointer transition-all ${
-                          isLooping 
-                            ? "bg-indigo-50 text-indigo-600 border-indigo-200" 
-                            : "bg-white text-slate-500 border-slate-200 hover:text-slate-700 hover:bg-slate-50 shadow-xs"
-                        }`}
-                      >
-                        {isLooping ? "循环播放开启" : "单次播放"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Segment modification (段修改) */}
-              <div className="bg-white border border-amber-200 rounded-2xl p-5 space-y-4 relative overflow-hidden shadow-xs">
-                
-                {/* Visual amber glowing accent border line */}
-                <div className="absolute top-0 inset-x-0 h-[3px] bg-gradient-to-r from-amber-500 via-orange-400 to-amber-600" />
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-amber-50 rounded-lg flex items-center justify-center border border-amber-100">
-                      <Scissors className="w-4 h-4 text-amber-500" />
-                    </div>
-                    <div>
-                      <h2 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        智能分段修改 / Partial Segment Update
-                        <span className="text-[9px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-mono font-bold border border-amber-100">
-                          段修改
-                        </span>
-                      </h2>
-                      <p className="text-[10px] text-slate-500">仅对视频特定时间区间重新生成、替换背景或添加特定镜头设定</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Segment visual play-indicator */}
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
-                  <div className="flex flex-col gap-2">
-                    <span className="text-[10px] text-slate-500 font-bold block text-center">区间预设 / Segment Range Presets</span>
-                    <div className="flex justify-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => handleApplySegmentPreset("start")}
-                        className="bg-white hover:bg-slate-100 hover:border-amber-300 hover:text-amber-600 border border-slate-200 text-[10px] font-bold text-slate-700 px-4 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs"
-                      >
-                        前段 (0s-5s)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleApplySegmentPreset("middle")}
-                        className="bg-white hover:bg-slate-100 hover:border-amber-300 hover:text-amber-600 border border-slate-200 text-[10px] font-bold text-slate-700 px-4 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs"
-                      >
-                        中段 (5s-10s)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleApplySegmentPreset("end")}
-                        className="bg-white hover:bg-slate-100 hover:border-amber-300 hover:text-amber-600 border border-slate-200 text-[10px] font-bold text-slate-700 px-4 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs"
-                      >
-                        尾段 (10s-15s)
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Interactive Dual Slider Track */}
-                  <div className="space-y-2 pt-2 border-t border-slate-200/60">
-                    <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-                      <span>0.0s</span>
-                      <span className="text-amber-700 bg-amber-50/80 px-2.5 py-0.5 rounded-full border border-amber-200 text-[10px] font-bold">
-                        当前所选区间: <strong className="text-amber-800 font-mono font-black">{segmentStart.toFixed(1)}s</strong> - <strong className="text-orange-700 font-mono font-black">{segmentEnd.toFixed(1)}s</strong> (共 {(segmentEnd - segmentStart).toFixed(1)} 秒)
-                      </span>
-                      <span>15.0s</span>
-                    </div>
-                    
-                    <div className="relative w-full h-8 flex items-center">
-                      {/* Background Track bar */}
-                      <div className="absolute inset-x-0 h-2 bg-slate-200 rounded-full border border-slate-300" />
-                      
-                      {/* Highlighted selection range */}
-                      <div 
-                        className="absolute h-2 bg-gradient-to-r from-amber-400 to-amber-500 rounded-full"
-                        style={{
-                          left: `${(segmentStart / 15) * 100}%`,
-                          width: `${((segmentEnd - segmentStart) / 15) * 100}%`
-                        }}
-                      />
-
-                      {/* Invisible HTML5 range inputs for dragging */}
-                      <input
-                        type="range"
-                        min="0"
-                        max="15"
-                        step="0.1"
-                        value={segmentStart}
-                        onChange={(e) => {
-                          const val = Math.min(parseFloat(e.target.value), segmentEnd - 0.2);
-                          setSegmentStart(parseFloat(val.toFixed(1)));
-                        }}
-                        className="absolute w-full h-8 opacity-0 cursor-pointer pointer-events-auto"
-                        style={{ zIndex: segmentStart > 7.5 ? 25 : 20 }}
-                      />
-
-                      <input
-                        type="range"
-                        min="0"
-                        max="15"
-                        step="0.1"
-                        value={segmentEnd}
-                        onChange={(e) => {
-                          const val = Math.max(parseFloat(e.target.value), segmentStart + 0.2);
-                          setSegmentEnd(parseFloat(val.toFixed(1)));
-                        }}
-                        className="absolute w-full h-8 opacity-0 cursor-pointer pointer-events-auto"
-                        style={{ zIndex: segmentStart > 7.5 ? 20 : 25 }}
-                      />
-
-                      {/* Custom styled Start handle thumb */}
-                      <div 
-                        className="absolute w-6 h-6 bg-amber-500 hover:bg-amber-400 text-white rounded-full flex items-center justify-center -ml-3 pointer-events-none transition-all shadow-md border-2 border-white"
-                        style={{ left: `${(segmentStart / 15) * 100}%` }}
-                      >
-                        <span className="text-[8px] font-bold">起</span>
-                      </div>
-
-                      {/* Custom styled End handle thumb */}
-                      <div 
-                        className="absolute w-6 h-6 bg-orange-500 hover:bg-orange-400 text-white rounded-full flex items-center justify-center -ml-3 pointer-events-none transition-all shadow-md border-2 border-white"
-                        style={{ left: `${(segmentEnd / 15) * 100}%` }}
-                      >
-                        <span className="text-[8px] font-bold">终</span>
-                      </div>
-                    </div>
-                    <p className="text-[9px] text-slate-400 text-center leading-relaxed">
-                      💡 提示：您可以直接在上述进度条上<strong>滑动拖拽 [起] [终] 两个金黄色滑块</strong>进行无级调距，或者使用区间预设进行快速划分。
-                    </p>
-                  </div>
-                </div>
-
-                {/* Prompt override input box */}
-                <div className="space-y-2">
-                  <span className="text-[10px] font-bold text-slate-600 block">段修改描述设定 / New Prompt for Segment</span>
-                  <div className="relative">
-                    <textarea
-                      value={segmentPrompt}
-                      onChange={(e) => setSegmentPrompt(e.target.value)}
-                      placeholder="例：“在该区间段，将背景中卧室的温暖光效替换为清冷微弱的淡蓝色月光，桌上高跟鞋替换为一束盛开的香槟色玫瑰”"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:bg-white h-20 resize-none font-sans"
-                    />
-                  </div>
-                </div>
-
-                {segmentSuccessMsg && (
-                  <div className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] p-2.5 rounded-xl flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                    <span>{segmentSuccessMsg}</span>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between gap-4 pt-1">
-                  <span className="text-[10px] text-slate-500 flex items-center gap-1 font-medium">
-                    <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
-                    段修改重配 预计扣除: <strong className="font-mono text-amber-600 text-xs">{(segmentEnd - segmentStart).toFixed(0)}</strong> 积分/s
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleSegmentRegen}
-                    className="bg-amber-500 hover:bg-amber-600 text-white font-black text-[11px] px-4 py-2 rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer hover:scale-[1.02]"
-                  >
-                    <Scissors className="w-3.5 h-3.5" />
-                    <span>确认重配生成片段</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Advanced Frame Extraction Tool (抽帧) */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Camera className="w-4 h-4 text-purple-600" />
-                    <div>
-                      <h3 className="text-xs font-bold text-slate-800">已提取的高清视频帧 / Captured Video Frames</h3>
-                      <p className="text-[10px] text-slate-500">拖动上方视频进度条，点击视频右上角悬浮的“提取当前时刻帧”按钮即可捕获 PNG 原画</p>
-                    </div>
-                  </div>
-                </div>
-
-                {frameNotification && (
-                  <div className="bg-purple-50 border border-purple-100 text-purple-700 text-[10px] p-2.5 rounded-xl">
-                    {frameNotification}
-                  </div>
-                )}
-
-                {/* Extracted Frame List Tray */}
-                {capturedFrames.length > 0 ? (
-                  <div className="space-y-2">
-                    <span className="text-[10px] text-slate-500 font-bold block uppercase font-mono tracking-wider">
-                      抽帧记录 ({capturedFrames.length})
-                    </span>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      {capturedFrames.map((frame) => {
-                        return (
-                          <div key={frame.id} className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden p-1.5 space-y-1.5 group relative shadow-2xs">
-                            <div className="aspect-video w-full rounded-lg overflow-hidden bg-black relative">
-                              <img src={frame.url} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                              <span className="absolute left-1.5 bottom-1.5 bg-slate-950/80 backdrop-blur-xs text-[8px] font-mono font-bold text-purple-300 px-1 rounded">
-                                {frame.time}
-                              </span>
-                            </div>
-                            
-                            <div className="text-[8px] text-slate-500 leading-tight">
-                              <p className="text-slate-800 font-bold truncate">Frame_{frame.id.slice(-4)}.png</p>
-                              <p className="font-mono text-slate-400">{frame.resolution} ｜ {frame.size}</p>
-                            </div>
-
-                            <button
-                              onClick={(e) => {
-                                e.currentTarget.innerText = "已保存至素材库 ✓";
-                                e.currentTarget.className = "w-full bg-emerald-50 border border-emerald-200 text-emerald-600 text-[9px] py-1 rounded font-bold transition-all pointer-events-none";
-                              }}
-                              className="w-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900 text-[9px] py-1 rounded font-bold transition-all cursor-pointer shadow-xs"
-                            >
-                              保存至素材库
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="border border-dashed border-slate-200 rounded-xl p-6 text-center text-slate-400 text-[10px]">
-                    暂未进行抽帧，拖动上方视频进度条，并在视频画面右上角点击“提取当前时刻帧”提取素材。
-                  </div>
-                )}
-              </div>
-
-            </div>
-
-            {/* Right Column: Tab Panels for 去字幕, 音色克隆, 高清, details */}
-            <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs flex flex-col text-slate-700">
-              
-              {/* Tabs Navigation Header */}
-              <div className="flex bg-slate-50 border-b border-slate-200 p-1.5 gap-1">
-                <button
-                  onClick={() => setActiveEditTab("subtitle")}
-                  className={`flex-1 py-2 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                    activeEditTab === "subtitle" 
-                      ? "bg-white text-slate-800 border border-slate-200 shadow-sm" 
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  <FileText className="w-3.5 h-3.5 text-purple-600" />
-                  <span>去字幕</span>
-                </button>
-                <button
-                  onClick={() => setActiveEditTab("voice")}
-                  className={`flex-1 py-2 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                    activeEditTab === "voice" 
-                      ? "bg-white text-slate-800 border border-slate-200 shadow-sm" 
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  <Mic className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>音色克隆</span>
-                </button>
-                <button
-                  onClick={() => setActiveEditTab("hd")}
-                  className={`flex-1 py-2 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                    activeEditTab === "hd" 
-                      ? "bg-white text-slate-800 border border-slate-200 shadow-sm" 
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  <Tv className="w-3.5 h-3.5 text-sky-600" />
-                  <span>画质高清</span>
-                </button>
-                <button
-                  onClick={() => setActiveEditTab("info")}
-                  className={`flex-1 py-2 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                    activeEditTab === "info" 
-                      ? "bg-white text-slate-800 border border-slate-200 shadow-sm" 
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  <Info className="w-3.5 h-3.5 text-amber-600" />
-                  <span>视频详情</span>
-                </button>
-              </div>
-
-              {/* Tab Contents */}
-              <div className="p-5 flex-1 space-y-4">
-                
-                {/* 1. Subtitle Tab (去字幕) */}
-                {activeEditTab === "subtitle" && (
-                  <div className="space-y-4">
-                    <div className="space-y-1">
-                      <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1">
-                        <span>AI 智能字幕擦除引擎</span>
-                      </h4>
-                      <p className="text-[10px] text-slate-500">利用大模型智能识别并修补字幕覆盖区域，保持视频 background 像素无痕吻合</p>
-                    </div>
-
-                    <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                      <div className="space-y-1.5">
-                        <span className="text-[10px] text-slate-500 font-bold block uppercase">字幕覆盖方位 / Detection Position</span>
-                        <div className="grid grid-cols-3 gap-2">
-                          {[
-                            { id: "bottom", label: "底部字幕 (15%)" },
-                            { id: "top", label: "顶部字幕 (10%)" },
-                            { id: "full", label: "全区域智能检测" }
-                          ].map((pos) => (
-                            <button
-                              key={pos.id}
-                              type="button"
-                              onClick={() => setSubtitlePosition(pos.id)}
-                              className={`py-1.5 rounded text-[9px] font-bold border transition-all cursor-pointer ${
-                                subtitlePosition === pos.id 
-                                  ? "bg-purple-50 border-purple-300 text-purple-700" 
-                                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                              }`}
-                            >
-                              {pos.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5 pt-1">
-                        <span className="text-[10px] text-slate-500 font-bold block uppercase">填充算法模型 / Inpainting Method</span>
-                        <div className="grid grid-cols-2 gap-2">
-                          {[
-                            { id: "generative", label: "AI 智能生成补全 (高精)", desc: "12 积分/次" },
-                            { id: "fast_blur", label: "像素融合邻近模糊 (极速)", desc: "0 积分" }
-                          ].map((meth) => (
-                            <button
-                              key={meth.id}
-                              type="button"
-                              onClick={() => setSubtitleMethod(meth.id)}
-                              className={`p-2 rounded-xl text-left border flex flex-col justify-between transition-all cursor-pointer ${
-                                subtitleMethod === meth.id 
-                                  ? "bg-indigo-50 border-indigo-300 text-indigo-700" 
-                                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                              }`}
-                            >
-                              <span className="text-[9px] font-bold">{meth.label}</span>
-                              <span className="text-[8px] text-slate-400 font-mono mt-0.5">{meth.desc}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {eraseSuccessMsg && (
-                      <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] p-3 rounded-xl flex items-start gap-2 animate-fade-in">
-                        <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-emerald-600" />
-                        <span>{eraseSuccessMsg}</span>
-                      </div>
-                    )}
-
-                    <div className="space-y-2">
-                      <button
-                        onClick={handleEraseSubtitles}
-                        disabled={isEraserRunning}
-                        className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                      >
-                        {isEraserRunning ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>消隐算法计算中...</span>
-                          </>
-                        ) : (
-                          <>
-                            <FileText className="w-4 h-4" />
-                            <span>消除原视频字幕 (预计扣除 12 积分)</span>
-                          </>
-                        )}
-                      </button>
-                      <p className="text-[8px] text-slate-500 text-center">擦除字幕成功后将自动渲染输出并保存至历史库，不覆盖您的原版视频。</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* 2. Voice Tab (音色克隆) */}
-                {activeEditTab === "voice" && (
-                  <div className="space-y-4">
-                    <div className="space-y-1">
-                      <h4 className="text-xs font-bold text-slate-800">高保真 AI 音色克隆 ｜ 智能配音</h4>
-                      <p className="text-[10px] text-slate-500">选择爆款主播或定制您的专属克隆人音轨，输入台词生成超逼真环境配音</p>
-                    </div>
-
-                    {/* Actors select */}
-                    <div className="space-y-1.5">
-                      <span className="text-[10px] text-slate-500 font-bold block uppercase">配音主播模型 / Voice Actor</span>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { id: "yating", name: "知性高奢 · 雅婷", tag: "优雅女音", style: "适合奢侈品/护肤品" },
-                          { id: "aqiang", name: "激情带货 · 阿强", tag: "喊麦男音", style: "适合数码/零食大促" },
-                          { id: "xiaomei", name: "温柔客服 · 小美", tag: "甜美轻柔", style: "适合玩具/居家百货" },
-                          { id: "dashan", name: "磁气质感 · 大山", tag: "浑厚男播", style: "适合高端定制/户外" }
-                        ].map((voice) => (
-                          <button
-                            key={voice.id}
-                            type="button"
-                            onClick={() => setSelectedVoice(voice.id)}
-                            className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
-                              selectedVoice === voice.id 
-                                ? "bg-indigo-50 border-indigo-300 text-indigo-700" 
-                                : "bg-white border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50"
-                            }`}
-                          >
-                            <div className="flex justify-between items-center w-full">
-                              <span className="text-[9px] font-bold">{voice.name}</span>
-                              <span className="text-[8px] bg-indigo-100 text-indigo-700 px-1 py-0.5 rounded font-bold">{voice.tag}</span>
-                            </div>
-                            <span className="text-[8px] text-slate-400 mt-1">{voice.style}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Text field */}
-                    <div className="space-y-1.5">
-                      <span className="text-[10px] text-slate-500 font-bold block uppercase">台词配音文本 / Narration Script</span>
-                      <textarea
-                        value={voiceText}
-                        onChange={(e) => setVoiceText(e.target.value)}
-                        placeholder="在此输入您的带货文案，如：“真丝的触感就像第二层皮肤，穿上它，把温柔还给自己...”"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500 h-20 resize-none"
-                      />
-                    </div>
-
-                    {/* Speech tuning controls */}
-                    <div className="grid grid-cols-2 gap-3 pt-1">
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[9px] text-slate-500 font-mono">
-                          <span>语速设定</span>
-                          <span>{voiceSpeed.toFixed(1)}x</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0.8"
-                          max="1.5"
-                          step="0.1"
-                          value={voiceSpeed}
-                          onChange={(e) => setVoiceSpeed(parseFloat(e.target.value))}
-                          className="w-full accent-indigo-500 h-1 bg-slate-200 rounded cursor-pointer"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[9px] text-slate-500 font-mono">
-                          <span>音调微调</span>
-                          <span>{voicePitch.toFixed(1)}x</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0.8"
-                          max="1.2"
-                          step="0.05"
-                          value={voicePitch}
-                          onChange={(e) => setVoicePitch(parseFloat(e.target.value))}
-                          className="w-full accent-indigo-500 h-1 bg-slate-200 rounded cursor-pointer"
-                        />
-                      </div>
-                    </div>
-
-                    {voiceSuccessMsg && (
-                      <div className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] p-3 rounded-xl flex items-start gap-2">
-                        <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-emerald-600" />
-                        <span>{voiceSuccessMsg}</span>
-                      </div>
-                    )}
-
-                    <div className="pt-1">
-                      <button
-                        onClick={handleVoiceCloneAndSynth}
-                        disabled={isVoiceRunning}
-                        className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-md"
-                      >
-                        {isVoiceRunning ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>克隆声线合成中...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Mic className="w-4 h-4" />
-                            <span>合成并合入原声带 (预计扣除 15 积分)</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. HD Quality Enhancement Tab (画质高清) */}
-                {activeEditTab === "hd" && (
-                  <div className="space-y-4">
-                    <div className="space-y-1">
-                      <h4 className="text-xs font-bold text-slate-800">4K 臻彩超清画质重塑 ｜ High-Definition</h4>
-                      <p className="text-[10px] text-slate-500">运用超分（Super Resolution）神经网络在每个像素上进行超细致重组，使商品细节立显奢华质感。</p>
-                    </div>
-
-                    <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                      
-                      {/* Scale selection */}
-                      <div className="space-y-1.5">
-                        <span className="text-[10px] text-slate-500 font-bold block uppercase">分辨率级别 / Resolution Output</span>
-                        <div className="grid grid-cols-2 gap-2">
-                          {[
-                            { id: "1080p", title: "1080P 超清升级", desc: "1.5x 画质密度" },
-                            { id: "4k", title: "4K 臻彩画质 (超分)", desc: "4x 像素重塑" }
-                          ].map((level) => (
-                            <button
-                              key={level.id}
-                              type="button"
-                              onClick={() => setHdResolution(level.id)}
-                              className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
-                                hdResolution === level.id 
-                                  ? "bg-sky-50 border-sky-300 text-sky-700" 
-                                  : "bg-white border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50"
-                              }`}
-                            >
-                              <span className="text-[9px] font-bold">{level.title}</span>
-                              <span className="text-[8px] text-slate-400 mt-0.5 font-bold">{level.desc}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Toggles */}
-                      <div className="space-y-2 pt-2 border-t border-slate-200">
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-0.5">
-                            <span className="text-[9px] font-bold text-slate-700 block">人脸五官超清重塑</span>
-                            <span className="text-[8px] text-slate-400 block">针对电商模特局部面部细节恢复</span>
-                          </div>
-                          <input
-                            type="checkbox"
-                            checked={hdFaceRestore}
-                            onChange={(e) => setHdFaceRestore(e.target.checked)}
-                            className="accent-sky-500 h-4 w-4 cursor-pointer"
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-0.5">
-                            <span className="text-[9px] font-bold text-slate-700 block">高对比噪点过滤 (Denoise)</span>
-                            <span className="text-[8px] text-slate-400 block">消除漫反射等复杂光影微粒干扰</span>
-                          </div>
-                          <input
-                            type="checkbox"
-                            checked={hdDenoise}
-                            onChange={(e) => setHdDenoise(e.target.checked)}
-                            className="accent-sky-500 h-4 w-4 cursor-pointer"
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-0.5">
-                            <span className="text-[9px] font-bold text-slate-700 block">60 FPS 臻彩超平滑插帧</span>
-                            <span className="text-[8px] text-slate-400 block">丝滑播放，杜绝闪烁震荡</span>
-                          </div>
-                          <input
-                            type="checkbox"
-                            checked={hdFps}
-                            onChange={(e) => setHdFps(e.target.checked)}
-                            className="accent-sky-500 h-4 w-4 cursor-pointer"
-                          />
-                        </div>
-                      </div>
-
-                    </div>
-
-                    {hdSuccessMsg && (
-                      <div className="bg-sky-50 border border-sky-200 text-sky-700 text-[10px] p-3 rounded-xl flex items-start gap-2">
-                        <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-sky-600" />
-                        <span>{hdSuccessMsg}</span>
-                      </div>
-                    )}
-
-                    <div className="pt-1">
-                      <button
-                        onClick={handleHDEnhance}
-                        disabled={isHdRunning}
-                        className="w-full bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-md"
-                      >
-                        {isHdRunning ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>超分重绘算力渲染中...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Tv className="w-4 h-4" />
-                            <span>启动 4K 高清画质渲染 (预计扣除 25 积分)</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* 4. Video Details Info Tab (视频详情信息) */}
-                {activeEditTab === "info" && (
-                  <div className="space-y-4 text-xs">
-                    <div className="space-y-1">
-                      <h4 className="text-xs font-bold text-slate-800">视频源文件详细数据</h4>
-                      <p className="text-[10px] text-slate-500">读取到的视频文件底层元数据信息</p>
-                    </div>
-
-                    <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-2.5 text-slate-600 font-mono">
-                      <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                        <span className="text-slate-400">文件名:</span>
-                        <span className="text-slate-700">AI_Gen_{editingVideo.id}.mp4</span>
-                      </div>
-                      <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                        <span className="text-slate-400">画幅尺寸:</span>
-                        <span className="text-slate-700">1080 x 1920 (竖屏 9:16)</span>
-                      </div>
-                      <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                        <span className="text-slate-400">时幅 / 帧率:</span>
-                        <span className="text-slate-700">{editingVideo.duration || "15s"} ｜ 30.00 fps</span>
-                      </div>
-                      <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                        <span className="text-slate-400">编码格式:</span>
-                        <span className="text-slate-700">AVC H.264 / High Profile</span>
-                      </div>
-                      <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                        <span className="text-slate-400">音频编码:</span>
-                        <span className="text-slate-700">AAC Stereo (48000 Hz)</span>
-                      </div>
-                      <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                        <span className="text-slate-400">存储体积:</span>
-                        <span className="text-slate-700">14.24 MB</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">算力模型:</span>
-                        <span className="text-slate-700">Veo-3.1-Lite Engine</span>
-                      </div>
-                    </div>
-
-                    {/* Associated Reference Images */}
-                    <div className="space-y-1.5">
-                      <span className="text-[10px] text-slate-500 font-bold block uppercase">关联的参考附件图片 / Associated Reference Attachments</span>
-                      <div className="flex flex-wrap gap-2">
-                        {(editingVideo.inputFiles && editingVideo.inputFiles.length > 0 ? editingVideo.inputFiles : [
-                          "./assets/prototype/skincare-product.jpg",
-                          "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&auto=format&fit=crop&q=80"
-                        ]).map((url: string, index: number) => (
-                          <div 
-                            key={index}
-                            onClick={() => setPreviewImageUrl(url)}
-                            className="w-14 h-14 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-pointer hover:border-purple-500 hover:shadow-sm transition-all relative group"
-                            title="点击查看原高清大图"
-                          >
-                            <img src={url} alt="attached asset" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[9px] font-bold">
-                              预览
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Original Prompt Block */}
-                    <div className="space-y-1.5">
-                      <span className="text-[10px] text-slate-500 font-bold block">生成创意描述词 / Original Generator Prompt</span>
-                      <div className="p-3 bg-slate-100 border border-slate-200 rounded-xl max-h-24 overflow-y-auto text-slate-600 leading-normal font-sans text-[11px]">
-                        {editingVideo.prompt || "（智能扩展分镜：该视频通过上传参考图主体，由AI视频模型根据前向光照与漫反射物理模拟进行三维一致性动态延伸生成）"}
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(editingVideo.prompt || "智能扩展分镜");
-                        alert("提示词已成功复制到剪贴板！");
-                      }}
-                      className="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 text-[11px] font-bold py-2 rounded-xl border border-slate-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>复制生成提示词</span>
-                    </button>
-                  </div>
-                )}
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-      </div>
-    );
-  }
-
-  // --- RENDERING GENERATION (STANDARD MODE) ---
-  return (
-    <div className="flex-1 bg-slate-50 p-6 overflow-y-auto">
-      <div className="max-w-6xl mx-auto space-y-6 pb-12">
-        
-        {/* Title */}
-        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-          <div className="flex items-center gap-2">
-            <h1 className="text-base font-bold text-slate-800 flex items-center gap-2">
-              AI 视频生成
-              <span className="text-[10px] bg-purple-50 border border-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider font-mono">
-                VEO GENERATIVE ENGINE
-              </span>
-            </h1>
-          </div>
-        </div>
-
-        {/* Form panel */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
-          {/* Config left: 7 cols */}
-          <div className="lg:col-span-7 space-y-5">
-            
-            {/* Input Canvas */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-xs">
-              <div className="flex justify-between items-center text-xs text-slate-500 font-bold">
-                <span>视频创意分镜描述 / Prompt Outline</span>
-                <span className="font-mono text-[10px] text-slate-400">{prompt.length}/2000</span>
-              </div>
-
-              <div className="relative border border-slate-200 rounded-xl bg-slate-50 focus-within:border-purple-500 transition-all p-3 flex items-start gap-3">
-                {references.length > 0 && (
-                  <div className="relative flex-shrink-0 mt-1">
-                    <div 
-                      onClick={() => setPreviewImageUrl(references[0])}
-                      className="w-14 h-14 bg-slate-200 rounded-xl border border-slate-300 overflow-hidden cursor-pointer relative group shadow-sm flex items-center justify-center hover:border-purple-500 transition-all"
-                      title="点击预览附件图片"
-                    >
-                      <img src={references[0]} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      <span className="absolute -top-1.5 -left-1.5 bg-slate-600 text-white font-mono font-bold text-[8px] w-5 h-5 rounded-full flex items-center justify-center border border-white">
-                        {references.length}
-                      </span>
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[8px] font-bold">
-                        预览
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="可连线添加素材并 @引用，描述你想生成的视频。例如：制作 15 秒商品卖点视频，展示开箱、细节特写和使用效果。"
-                  className="flex-1 bg-transparent border-none text-xs p-1 pb-12 text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-0 h-32 resize-none font-sans"
-                />
-
-                {/* functional 'Help Me Write' assist button */}
-                <button
-                  type="button"
-                  onClick={handleAiWrite}
-                  disabled={isExpanding}
-                  className="absolute right-3 bottom-3 bg-purple-50 hover:bg-purple-100 border border-purple-100 text-purple-600 text-[10px] font-bold px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-xs"
-                >
-                  {isExpanding ? (
-                    <>
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      <span>AI 深度扩写中...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-3.5 h-3.5 text-purple-500 group-hover:scale-110" />
-                      <span>帮我写 (Gemini 灵感扩容)</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Reference Upload */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-xs">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                <span>上传参考多媒体素材 (首帧/尾帧/主体) ({references.length}/15)</span>
-                <span className="text-[10px] text-slate-400">支持 3 张以内联合引导</span>
-              </div>
-
-              <div className="grid grid-cols-6 gap-3">
-                {references.map((url, i) => (
-                  <div key={i} className="aspect-square bg-slate-50 border border-slate-200 rounded-xl overflow-hidden relative group">
-                    <img 
-                      src={url} 
-                      alt="reference media" 
-                      className="w-full h-full object-cover cursor-pointer" 
-                      referrerPolicy="no-referrer" 
-                      onClick={() => setPreviewImageUrl(url)}
-                      title="点击预览图片"
-                    />
-                    <button
-                      onClick={() => handleRemoveRef(i)}
-                      className="absolute top-1.5 right-1.5 bg-black/60 hover:bg-black/80 text-white p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
-                      title="删除参考图片"
-                    >
-                      <Trash2 className="w-3 h-3 text-red-400" />
-                    </button>
-                    <div 
-                      onClick={() => setPreviewImageUrl(url)}
-                      className="absolute inset-x-0 bottom-0 bg-black/40 text-[9px] text-white py-1 text-center font-bold opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                    >
-                      预览
-                    </div>
-                  </div>
-                ))}
-
-                {references.length < 15 && (
-                  <button
-                    onClick={handleSelectReferences}
-                    className="aspect-square bg-slate-50 hover:bg-slate-100 border border-dashed border-slate-200 hover:border-purple-300 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-purple-600 transition-all cursor-pointer gap-1"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span className="text-[9px]">添加参考</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Settings Row Popover trigger */}
-            <div className="flex flex-wrap items-center gap-3 bg-white border border-slate-200 p-3 rounded-2xl relative shadow-sm">
-              <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono">
-                <Sliders className="w-3.5 h-3.5 text-purple-600" />
-                <select
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  className="bg-transparent border-none text-slate-700 focus:outline-none focus:ring-0 cursor-pointer text-[11px]"
-                >
-                  <option value="seedance_2">Seedance-v2.0 (商业带货微距大模型)</option>
-                  <option value="veo_lite">Veo-3.1-Lite (极速高画质视频)</option>
-                </select>
-              </div>
-
-              {/* Video settings toggle */}
-              <button
-                type="button"
-                onClick={() => setShowSettingsPopover(!showSettingsPopover)}
-                className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl px-4 py-2 flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer"
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
-                <span className="font-mono text-purple-600">{aspectRatio} ｜ {resolution.toUpperCase()} ｜ {duration}s</span>
-              </button>
-
-              {/* Popover content absolute panel */}
-              {showSettingsPopover && (
-                <div className="absolute left-1/3 bottom-16 bg-white border border-slate-200 rounded-2xl p-4 w-72 shadow-2xl z-50 space-y-4 text-slate-700">
-                  <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-                    <span className="text-xs font-bold text-slate-800">视频细节设置</span>
-                    <button
-                      onClick={() => setShowSettingsPopover(false)}
-                      className="text-purple-600 hover:text-purple-700 font-bold text-xs cursor-pointer"
-                    >
-                      确认
-                    </button>
-                  </div>
-
-                  {/* Aspect Ratios */}
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase">画幅比例 / Aspect Ratio</span>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"].map((aspect) => (
-                        <button
-                          key={aspect}
-                          type="button"
-                          onClick={() => setAspectRatio(aspect)}
-                          className={`py-1 rounded text-[10px] font-mono border font-bold ${
-                            aspectRatio === aspect 
-                              ? "bg-purple-50 border-purple-200 text-purple-600" 
-                              : "bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-700"
-                          }`}
-                        >
-                          {aspect}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Resolutions */}
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase">输出质量 / Quality</span>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {["720p", "1080p"].map((res) => (
-                        <button
-                          key={res}
-                          type="button"
-                          onClick={() => setResolution(res)}
-                          className={`py-1 rounded text-[10px] font-mono border font-bold uppercase ${
-                            resolution === res 
-                              ? "bg-purple-50 border-purple-200 text-purple-600" 
-                              : "bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-700"
-                          }`}
-                        >
-                          {res === "720p" ? "720P 高清" : "1080P 超清"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Audio flag */}
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase">环境音轨 / Audio</span>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {["include", "mute"].map((aud) => (
-                        <button
-                          key={aud}
-                          type="button"
-                          onClick={() => setAudio(aud)}
-                          className={`py-1 rounded text-[10px] border font-bold ${
-                            audio === aud 
-                              ? "bg-purple-50 border-purple-200 text-purple-600" 
-                              : "bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-700"
-                          }`}
-                        >
-                          {aud === "include" ? "含AI环境音" : "静音"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Durations */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-[10px] text-slate-400 font-bold">
-                      <span>视频长度 / Duration</span>
-                      <span className="font-mono text-purple-600">{duration}s</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="4"
-                      max="15"
-                      step="1"
-                      value={duration}
-                      onChange={(e) => setDuration(e.target.value)}
-                      className="w-full accent-purple-600 cursor-pointer h-1 rounded bg-slate-100"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Submit CTA */}
-              <button
-                type="button"
-                onClick={handleGenerate}
-                id="btn-ai-video-cta"
-                className="ml-auto bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 text-white font-bold text-xs px-5 py-2 rounded-xl transition-all shadow-lg shadow-purple-600/10 cursor-pointer"
-              >
-                立即生成视频 预计 <span className="font-mono text-sm font-black text-amber-200">{creditsEstimate.toFixed(2)}</span> 积分
-              </button>
-            </div>
-
-          </div>
-
-          {/* Right panel gallery showcase: 5 cols */}
-          <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700 block uppercase tracking-wider">历史生成视频</span>
-              <span className="text-[10px] text-slate-400">点击其中任意一个进入工作台编辑</span>
-            </div>
-            
-            <div className="grid grid-cols-1 gap-4 overflow-y-auto max-h-[500px]">
-              {videoGallery.map((item) => (
-                <div 
-                  key={item.id} 
-                  onClick={() => setEditingVideo(item)}
-                  className="bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-purple-300 rounded-xl overflow-hidden p-2 flex gap-3 cursor-pointer transition-all relative group"
-                  title="点击视频进行精修和段修改"
-                >
-                  <div className="w-24 aspect-video rounded-lg overflow-hidden bg-slate-100 relative flex-shrink-0">
-                    <img src={item.coverUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-black/60 transition-colors">
-                      <Play className="w-4 h-4 text-white fill-white group-hover:scale-110 transition-transform" />
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
-                    <div>
-                      <div className="flex items-center justify-between gap-1">
-                        <p className="text-[11px] font-bold text-slate-700 truncate group-hover:text-purple-600 transition-colors flex-1">{item.title}</p>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const url = (item.inputFiles && item.inputFiles.length > 0) 
-                              ? item.inputFiles[0] 
-                              : "./assets/prototype/skincare-product.jpg";
-                            setPreviewImageUrl(url);
-                          }}
-                          className="flex-shrink-0 bg-purple-50 hover:bg-purple-100 text-purple-600 font-bold border border-purple-100 rounded px-1.5 py-0.5 text-[8px] transition-all cursor-pointer flex items-center gap-0.5"
-                          title="查看该视频附带的参考图片"
-                        >
-                          📎 附件图
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-slate-400 line-clamp-1">{item.prompt || "智能扩展分镜"}</p>
-                    </div>
-                    <div className="flex items-center justify-between text-[9px] text-slate-400">
-                      <span className="flex items-center gap-1.5 font-bold text-slate-500">
-                        时幅: {item.duration || "10s"}
-                        <span className="bg-purple-50 text-purple-600 px-1 rounded text-[8px]">精修编辑 ➔</span>
-                      </span>
-                      <span className="flex items-center gap-1 font-mono">
-                        <Heart className="w-3 h-3 text-pink-500" /> {item.likes}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-          </div>
-
-        </div>
-      </div>
-
-      {/* Lightbox / Image Preview Modal */}
-      {previewImageUrl && (
-        <div className="fixed inset-0 bg-slate-900/85 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setPreviewImageUrl(null)}>
-          <div className="relative max-w-2xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl border border-slate-200/50 flex flex-col text-slate-700 animate-fade-in" onClick={(e) => e.stopPropagation()}>
-            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                <span className="text-purple-600">📎</span> 视频关联参考附件图片预览 / Attachment Preview
-              </span>
-              <button
-                onClick={() => setPreviewImageUrl(null)}
-                className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="p-6 flex items-center justify-center bg-slate-950/5 max-h-[60vh] overflow-hidden">
-              <img 
-                src={previewImageUrl} 
-                alt="Attachment Preview" 
-                className="max-w-full max-h-[50vh] object-contain rounded-xl shadow-lg border border-white" 
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                  e.currentTarget.src = "https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=800&auto=format&fit=crop&q=80";
-                }}
-              />
-            </div>
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center text-[10px] text-slate-400 font-mono">
-              <span>图片来源: MC 素材库 / Unsplash 垫图参考</span>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(previewImageUrl);
-                  alert("图片链接已成功复制到剪贴板！");
-                }}
-                className="text-purple-600 hover:text-purple-500 font-bold transition-all cursor-pointer"
-              >
-                复制图片直链
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+  const startOutfitPreview = () => {
+    const hasClothing = outfitMode === "single" ? Boolean(singleClothing) : Boolean(topClothing && bottomClothing);
+    if (!hasClothing || !modelMedia) return;
+    if (!onConsumeCredits(5, "生成换装搭配预览")) return;
+    setOutfitPreview(true);
+    setOutfitPreviewProgress(0);
+    setOutfitCandidates([]);
+    setSelectedLook(null);
+  };
+
+  const cancelRecord = (task: Task) => {
+    if (task.status !== "queue") return;
+    onCancelTask(task.id);
+    setToast("排队已取消，积分已退回");
+  };
+
+  const reEditTask = (task: Task) => {
+    hydrateSnapshot(task.aiVideoSnapshot || demoSnapshot("reference"));
+    onActiveTaskChange(task.id);
+    setToast("已恢复该任务的全部生成参数");
+  };
+
+  const downloadTask = (task: Task) => {
+    const url = task.aiVideoOutput?.videoUrl || task.outputFiles?.[0] || RESULT_VIDEO_URL;
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.target = "_blank";
+    anchor.rel = "noreferrer";
+    anchor.download = `${task.name}.mp4`;
+    anchor.click();
+    setToast("已开始下载完整视频");
+  };
+
+  const renderMedia = (item: AiVideoMediaItem, className = "") => item.type === "video" ? (
+    <video src={item.url} poster={item.coverUrl} muted className={className} />
+  ) : (
+    <img src={item.url} alt={item.name} referrerPolicy="no-referrer" className={className} />
+  );
+
+  const renderUploadTile = (item: AiVideoMediaItem | null, label: string, onClick: () => void, onRemove?: () => void, compact = false) => (
+    <div className="group relative">
+      <button type="button" onClick={onClick} className={`relative flex w-full flex-col items-center justify-center overflow-hidden rounded-md border border-dashed transition-colors ${compact ? "h-28" : "h-36"} ${item ? "border-slate-200 bg-slate-100" : "border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:bg-violet-50/40 hover:text-violet-700"}`}>
+        {item ? <>{renderMedia(item, "h-full w-full object-cover")}<span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-2 py-1.5 text-left text-[10px] text-white">{item.name}</span></> : <><Plus className="h-5 w-5" /><span className="mt-2 text-xs font-semibold">{label}</span><span className="mt-1 text-[10px] text-slate-400">资源库选择或本地上传</span></>}
+      </button>
+      {item && onRemove && <button type="button" title="移除" onClick={onRemove} className="absolute right-2 top-2 hidden h-7 w-7 items-center justify-center rounded bg-black/65 text-white group-hover:flex"><Trash2 className="h-3.5 w-3.5" /></button>}
     </div>
   );
+
+  const renderPromptEditor = (value: string, onChange: (value: string) => void, placeholder: string, maxLength = 1000) => (
+    <div className="relative rounded-md border border-slate-200 bg-white focus-within:border-violet-400">
+      <textarea value={value} maxLength={maxLength} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-40 w-full resize-none bg-transparent px-3 py-3 pb-10 text-xs leading-6 text-slate-700 outline-none placeholder:text-slate-400" />
+      <div className="absolute inset-x-3 bottom-2 flex items-center justify-between text-[10px] text-slate-400"><button type="button" onClick={() => onChange(DEFAULT_PROMPTS[mode])} className="flex items-center gap-1.5 font-semibold text-violet-600 hover:text-violet-700"><WandSparkles className="h-3.5 w-3.5" />智能帮写</button><span>{value.length}/{maxLength}</span></div>
+    </div>
+  );
+
+  const renderReferenceControls = () => <div className="space-y-4"><div><div className="mb-2 flex items-center justify-between"><label className="text-xs font-bold text-slate-700">参考内容</label><span className="text-[10px] text-slate-400">{references.length}/7</span></div><div className="grid grid-cols-4 gap-2">{references.map((item) => <div key={item.id} className="group relative aspect-square overflow-hidden rounded-md border border-slate-200">{renderMedia(item, "h-full w-full object-cover")}<button onClick={() => setReferences((current) => current.filter((media) => media.id !== item.id))} title="删除" className="absolute right-1.5 top-1.5 hidden h-6 w-6 items-center justify-center rounded bg-black/65 text-white group-hover:flex"><Trash2 className="h-3 w-3" /></button></div>)}{references.length < 7 && <button onClick={() => openPicker("references", "image", 7)} className="flex aspect-square flex-col items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:text-violet-700"><Plus className="h-5 w-5" /><span className="mt-1.5 text-[10px]">添加图片</span></button>}</div></div><div><label className="mb-2 block text-xs font-bold text-slate-700">画面描述</label>{renderPromptEditor(referencePrompt, setReferencePrompt, "描述参考图片中主体的动作、表情、镜头与场景变化")}</div></div>;
+
+  const renderFirstLastControls = () => <div className="space-y-4"><div className="grid grid-cols-[1fr_28px_1fr] items-center gap-2">{renderUploadTile(firstFrame, "首帧图", () => openPicker("firstFrame", "image", 1), () => setFirstFrame(null), true)}<div className="flex items-center justify-center text-slate-400">→</div>{renderUploadTile(lastFrame, "尾帧图", () => openPicker("lastFrame", "image", 1), () => setLastFrame(null), true)}</div><p className="rounded-md bg-blue-50 px-3 py-2 text-[10px] leading-5 text-blue-700">首帧和尾帧均为必填，系统会生成两幅画面间连续自然的过渡。</p><div><label className="mb-2 block text-xs font-bold text-slate-700">画面描述</label>{renderPromptEditor(firstLastPrompt, setFirstLastPrompt, "描述镜头运动、主体动作及首尾画面的衔接方式")}</div></div>;
+
+  const renderDubbingControls = () => <div className="space-y-4"><div className="grid grid-cols-2 gap-3">{renderUploadTile(character, "人物", () => openPicker("character", "image", 1), () => setCharacter(null), true)}<button onClick={() => setVoicePickerOpen(true)} className={`relative flex h-28 flex-col items-center justify-center overflow-hidden rounded-md border ${voice ? "border-violet-300 bg-violet-50" : "border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:text-violet-700"}`}>{voice ? <><img src={voice.avatar} alt="" className="h-12 w-12 rounded-full object-cover" referrerPolicy="no-referrer" /><span className="mt-2 text-xs font-bold text-slate-700">{voice.name}</span><span className="mt-0.5 text-[10px] text-slate-400">{voice.tone}</span></> : <><Volume2 className="h-5 w-5" /><span className="mt-2 text-xs font-semibold">音色</span><span className="mt-1 text-[10px] text-slate-400">选择 1 个音色</span></>}</button></div><div><div className="mb-2 flex items-center justify-between"><label className="text-xs font-bold text-slate-700">说话内容</label><span className="text-[10px] text-slate-400">约 {speechDuration} 秒 · {speech.length}/150</span></div>{renderPromptEditor(speech, setSpeech, "请输入你希望角色说出的口播内容", 150)}</div><div><label className="mb-2 block text-xs font-bold text-slate-700">动作描述 <span className="font-normal text-slate-400">（可选）</span></label><textarea value={dubbingAction} maxLength={300} onChange={(event) => setDubbingAction(event.target.value)} placeholder="描述镜头和人物动作，例如：人物面对镜头自然微笑，手持商品轻轻转动" className="h-20 w-full resize-none rounded-md border border-slate-200 p-3 text-xs leading-5 outline-none focus:border-violet-400" /></div></div>;
+
+  const renderBackgroundControls = () => <div className="space-y-4"><div><div className="mb-2 flex items-center justify-between"><label className="text-xs font-bold text-slate-700">原视频</label><span className="text-[10px] text-slate-400">{backgroundVideos.length}/5</span></div><div className="grid grid-cols-3 gap-2">{backgroundVideos.map((item) => <div key={item.id} className="group relative aspect-[3/4] overflow-hidden rounded-md border border-slate-200">{renderMedia(item, "h-full w-full object-cover")}<span className="absolute bottom-1.5 left-1.5 rounded bg-black/65 px-1.5 py-0.5 text-[9px] text-white">{Math.min(item.durationSeconds || 8, 8)}s{(item.durationSeconds || 0) > 8 ? " · 已截取" : ""}</span><button onClick={() => setBackgroundVideos((current) => current.filter((media) => media.id !== item.id))} title="删除" className="absolute right-1.5 top-1.5 hidden h-6 w-6 items-center justify-center rounded bg-black/65 text-white group-hover:flex"><Trash2 className="h-3 w-3" /></button></div>)}{backgroundVideos.length < 5 && <button onClick={() => openPicker("backgroundVideos", "video", 5)} className="flex aspect-[3/4] flex-col items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:text-violet-700"><Plus className="h-5 w-5" /><span className="mt-2 text-[10px]">添加原视频</span></button>}</div></div><p className="rounded-md bg-amber-50 px-3 py-2 text-[10px] leading-5 text-amber-700">换背景最多处理每个素材的前 8 秒，超过 8 秒将自动截取。</p><div><label className="mb-2 block text-xs font-bold text-slate-700">背景描述 <span className="text-rose-500">*</span></label>{renderPromptEditor(backgroundPrompt, setBackgroundPrompt, "描述需要替换的新背景、光线、景别与环境氛围")}</div></div>;
+
+  const renderOutfitSetup = () => {
+    const hasClothing = outfitMode === "single" ? Boolean(singleClothing) : Boolean(topClothing && bottomClothing);
+    return <div className="space-y-5"><div><label className="mb-2 block text-xs font-bold text-slate-700">添加服装</label><div className="inline-flex rounded-md bg-slate-100 p-1"><button onClick={() => setOutfitMode("single")} className={`rounded px-3 py-1.5 text-xs font-semibold ${outfitMode === "single" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500"}`}>单件服装</button><button onClick={() => setOutfitMode("multiple")} className={`rounded px-3 py-1.5 text-xs font-semibold ${outfitMode === "multiple" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500"}`}>多件服装</button></div></div>{outfitMode === "single" ? renderUploadTile(singleClothing, "服装图", () => openPicker("singleClothing", "image", 1), () => setSingleClothing(null), true) : <div className="grid grid-cols-2 gap-3">{renderUploadTile(topClothing, "上装", () => openPicker("topClothing", "image", 1), () => setTopClothing(null), true)}{renderUploadTile(bottomClothing, "下装", () => openPicker("bottomClothing", "image", 1), () => setBottomClothing(null), true)}</div>}<div><label className="mb-2 block text-xs font-bold text-slate-700">添加模特</label>{renderUploadTile(modelMedia, "模特图片或视频", () => setModelMediaTypePickerOpen(true), () => setModelMedia(null))}</div><button disabled={!hasClothing || !modelMedia} onClick={startOutfitPreview} className="flex w-full items-center justify-center gap-2 rounded-md bg-violet-600 py-3 text-sm font-bold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"><Sparkles className="h-4 w-4" />预览搭配 <span className="text-violet-200">· 5 积分</span></button></div>;
+  };
+
+  const renderOutfitPreview = () => <div className="space-y-5"><button onClick={() => outfitCandidates.length ? setConfirmOutfitReturn(true) : setOutfitPreview(false)} className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-violet-700"><ArrowLeft className="h-4 w-4" />返回</button><div><div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-bold text-slate-800">选择搭配效果</h3><p className="mt-1 text-[10px] text-slate-400">系统将生成 4 张搭配预览</p></div>{outfitCandidates.length > 0 && <button onClick={startOutfitPreview} className="flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-violet-700"><RefreshCw className="h-3.5 w-3.5" />重新生成</button>}</div><div className="grid grid-cols-4 gap-2">{outfitPreviewProgress < 100 ? [0, 1, 2, 3].map((index) => <div key={index} className="relative aspect-[3/5] overflow-hidden rounded-md bg-violet-100"><div className="absolute inset-0 animate-pulse bg-gradient-to-b from-violet-100 to-violet-200" /><span className="absolute left-1.5 top-1.5 rounded bg-white/85 px-1.5 py-0.5 text-[9px] font-semibold text-violet-700">生成中 {outfitPreviewProgress}%</span></div>) : outfitCandidates.map((item) => <button key={item.id} onClick={() => setSelectedLook(item)} className={`relative aspect-[3/5] overflow-hidden rounded-md border-2 ${selectedLook?.id === item.id ? "border-violet-600 ring-2 ring-violet-100" : "border-transparent hover:border-violet-300"}`}><img src={item.url} alt={item.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" />{selectedLook?.id === item.id && <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-white"><Check className="h-3 w-3" /></span>}</button>)}</div></div>{outfitPreviewProgress < 100 ? <div className="rounded-md border border-violet-100 bg-violet-50 p-3"><div className="mb-2 flex justify-between text-[10px] font-semibold text-violet-700"><span>正在生成搭配预览</span><span>{outfitPreviewProgress}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-violet-100"><div className="h-full rounded-full bg-violet-600 transition-all" style={{ width: `${outfitPreviewProgress}%` }} /></div></div> : <div><label className="mb-2 block text-xs font-bold text-slate-700">动作描述</label>{renderPromptEditor(outfitAction, setOutfitAction, "描述模特动作，例如：微微向右侧转动，再缓慢转身展示背面服装")}</div>}</div>;
+
+  const renderControlBody = () => {
+    if (mode === "reference") return renderReferenceControls();
+    if (mode === "first_last") return renderFirstLastControls();
+    if (mode === "dubbing") return renderDubbingControls();
+    if (mode === "background") return renderBackgroundControls();
+    return outfitPreview ? renderOutfitPreview() : renderOutfitSetup();
+  };
+
+  const rangeConfig = mode === "reference"
+    ? { min: 1, max: 10, value: durations.reference, set: (value: number) => setDurations((current) => ({ ...current, reference: value })) }
+    : mode === "first_last"
+      ? { min: 3, max: 12, value: durations.first_last, set: (value: number) => setDurations((current) => ({ ...current, first_last: value })) }
+      : { min: 3, max: 12, value: durations.outfit, set: (value: number) => setDurations((current) => ({ ...current, outfit: value })) };
+
+  return <section className="flex h-full min-h-[720px] flex-col overflow-hidden bg-slate-50 text-slate-800">
+    <div className="grid min-h-0 flex-1 grid-cols-[390px_minmax(0,1fr)] gap-3 p-4 max-xl:grid-cols-[350px_minmax(0,1fr)] max-lg:block max-lg:overflow-y-auto">
+      <aside className="flex min-h-0 flex-col rounded-lg border border-slate-200 bg-white shadow-sm max-lg:min-h-[680px]">
+        <div className="relative flex shrink-0 items-center gap-2 border-b border-slate-200 p-3">
+          <div className="relative">
+            <button
+              ref={modeButtonRef}
+              type="button"
+              aria-expanded={modeMenuOpen}
+              onClick={() => {
+                setModeMenuOpen((open) => !open);
+                setModelMenuOpen(false);
+                setSettingsOpen(false);
+              }}
+              className="flex h-9 min-w-[142px] items-center justify-between gap-2 rounded-md border border-slate-200 px-3 text-sm font-bold text-slate-800 hover:border-violet-300"
+            >
+              <span>{mode === "background" || mode === "outfit" ? "视频编辑" : MODE_LABELS[mode]}</span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${modeMenuOpen ? "rotate-180" : ""}`} />
+            </button>
+            {modeMenuOpen && (
+              <AnchoredPopover
+                anchorRef={modeButtonRef}
+                width={350}
+                onClose={() => setModeMenuOpen(false)}
+                className="rounded-lg border border-slate-200 bg-white p-3 shadow-xl"
+              >
+                <p className="mb-2 text-[11px] font-semibold text-slate-500">视频功能选择</p>
+                <div className="space-y-2">
+                  {MODE_OPTIONS.map((item) => {
+                    const Icon = item.icon;
+                    const active = item.id === mode || (item.id === "video_edit" && (mode === "background" || mode === "outfit"));
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => showMode(item.id === "video_edit" ? "background" : item.id)}
+                        className={`flex w-full items-center gap-3 rounded-md border p-3 text-left ${active ? "border-violet-400 bg-violet-50" : "border-slate-200 hover:border-violet-200 hover:bg-slate-50"}`}
+                      >
+                        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${active ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-500"}`}><Icon className="h-5 w-5" /></span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-2 text-xs font-bold text-slate-800">{item.label}{item.id === "reference" && <b className="rounded bg-cyan-50 px-1.5 py-0.5 text-[9px] text-cyan-700">NEW</b>}</span>
+                          <span className="mt-1 block text-[10px] text-slate-400">{item.description}</span>
+                        </span>
+                        {active && <Check className="h-4 w-4 text-violet-600" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </AnchoredPopover>
+            )}
+          </div>
+          <div className="relative min-w-0 flex-1">
+            <button
+              ref={modelButtonRef}
+              type="button"
+              aria-expanded={modelMenuOpen}
+              onClick={() => {
+                setModelMenuOpen((open) => !open);
+                setModeMenuOpen(false);
+                setSettingsOpen(false);
+              }}
+              className="flex h-9 w-full items-center justify-between gap-2 rounded-md bg-slate-100 px-2.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-200"
+            >
+              <span className="flex min-w-0 items-center gap-1.5"><Box className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{selectedModel.name}</span></span>
+              <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+            </button>
+            {modelMenuOpen && (
+              <AnchoredPopover
+                anchorRef={modelButtonRef}
+                align="end"
+                width={320}
+                onClose={() => setModelMenuOpen(false)}
+                className="rounded-lg border border-slate-200 bg-white p-3 shadow-xl"
+              >
+                <p className="mb-2 text-[11px] font-semibold text-slate-500">选择模型</p>
+                {MODEL_OPTIONS.map((item) => (
+                  <button key={item.id} type="button" onClick={() => { setModel(item.id); setModelMenuOpen(false); }} className={`mb-1 flex w-full items-center gap-3 rounded-md p-2.5 text-left hover:bg-slate-50 ${model === item.id ? "bg-violet-50" : ""}`}>
+                    <span className="flex h-9 w-9 items-center justify-center rounded-md bg-gradient-to-br from-cyan-400 via-violet-500 to-fuchsia-500 text-xs font-black text-white">{item.name.slice(-3)}</span>
+                    <span className="min-w-0 flex-1"><span className="flex items-center gap-2 text-xs font-bold text-slate-700">{item.name}{item.badge && <b className="rounded bg-violet-600 px-1.5 py-0.5 text-[9px] text-white">{item.badge}</b>}</span><span className="mt-1 block text-[10px] text-slate-400">{item.description}</span></span>
+                    {model === item.id && <Check className="h-4 w-4 text-violet-600" />}
+                  </button>
+                ))}
+              </AnchoredPopover>
+            )}
+          </div>
+          <div className="relative">
+            <button
+              ref={settingsButtonRef}
+              type="button"
+              title="视频规格"
+              aria-expanded={settingsOpen}
+              onClick={() => {
+                setSettingsOpen((open) => !open);
+                setModeMenuOpen(false);
+                setModelMenuOpen(false);
+              }}
+              className="flex h-9 items-center gap-1.5 rounded-md bg-slate-100 px-2.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-200"
+            >
+              <span>{ratio}</span>
+              <span>{mode === "dubbing" ? `${speechDuration}s` : mode === "background" ? "≤8s" : `${currentDuration}s`}</span>
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+            </button>
+            {settingsOpen && (
+              <AnchoredPopover
+                anchorRef={settingsButtonRef}
+                align="end"
+                width={340}
+                onClose={() => setSettingsOpen(false)}
+                className="rounded-lg border border-slate-200 bg-white p-4 shadow-xl"
+              >
+                <p className="text-xs font-bold text-slate-700">视频比例</p>
+                <div className="mt-3 grid grid-cols-5 gap-2">
+                  {RATIOS.map((item) => <button key={item} type="button" onClick={() => setRatio(item)} className={`flex h-14 flex-col items-center justify-center rounded-md border text-[10px] font-semibold ${ratio === item ? "border-violet-500 bg-violet-50 text-violet-700" : "border-slate-200 text-slate-500"}`}><span className={`mb-1 block border ${item === "9:16" ? "h-5 w-3" : item === "16:9" ? "h-3 w-5" : item === "4:3" ? "h-4 w-5" : item === "3:4" ? "h-5 w-4" : "h-4 w-4"}`} />{item}</button>)}
+                </div>
+                <div className="mt-5">
+                  <div className="mb-3 flex items-center justify-between"><p className="text-xs font-bold text-slate-700">视频时长</p><span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{mode === "dubbing" ? `${speechDuration} 秒` : mode === "background" ? "自动截取 8 秒" : `${rangeConfig.value} 秒`}</span></div>
+                  {mode === "dubbing" ? <p className="rounded-md bg-slate-50 px-3 py-2 text-[10px] leading-5 text-slate-500">根据说话内容自动计算视频时长与积分。</p> : mode === "background" ? <p className="rounded-md bg-slate-50 px-3 py-2 text-[10px] leading-5 text-slate-500">原视频超过 8 秒时自动截取前 8 秒。</p> : <><input type="range" min={rangeConfig.min} max={rangeConfig.max} step={1} value={rangeConfig.value} onChange={(event) => rangeConfig.set(Number(event.target.value))} className="w-full accent-violet-600" /><div className="mt-1 flex justify-between text-[10px] text-slate-400"><span>{rangeConfig.min} 秒</span><span>{rangeConfig.max} 秒</span></div></>}
+                </div>
+              </AnchoredPopover>
+            )}
+          </div>
+        </div>
+        {(mode === "background" || mode === "outfit") && <div className="flex shrink-0 gap-5 border-b border-slate-100 px-4 pt-3"><button onClick={() => showMode("background")} className={`relative pb-2.5 text-xs font-bold ${mode === "background" ? "text-violet-700" : "text-slate-500"}`}>换背景{mode === "background" && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded bg-violet-600" />}</button><button onClick={() => showMode("outfit")} className={`relative pb-2.5 text-xs font-bold ${mode === "outfit" ? "text-violet-700" : "text-slate-500"}`}>换装{mode === "outfit" && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded bg-violet-600" />}</button></div>}
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">{renderControlBody()}</div>
+        {(mode !== "outfit" || outfitPreview) && <div className="shrink-0 border-t border-slate-200 bg-white p-4"><button disabled={!canGenerate || (mode === "outfit" && outfitPreviewProgress < 100)} onClick={submitGeneration} className="flex w-full items-center justify-center gap-2 rounded-md bg-violet-600 py-3 text-sm font-bold text-white shadow-sm hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"><Sparkles className="h-4 w-4" />立即生成 <span className="text-violet-200">· {currentCost} 积分</span></button></div>}
+      </aside>
+      <main className="flex min-h-0 flex-col rounded-lg border border-slate-200 bg-white shadow-sm max-lg:mt-3 max-lg:min-h-[700px]"><div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-950 text-white"><Sparkles className="h-5 w-5 text-violet-300" /></span><div><h2 className="text-sm font-bold text-slate-900">{mode === "background" || mode === "outfit" ? "AI视频编辑工作台" : `${MODE_LABELS[mode]}工作台`}</h2><p className="mt-1 text-[11px] text-slate-400">当前类别共 {modeRecords.length} 条生成记录</p></div></div><button onClick={onOpenTaskQueue} className="flex items-center gap-2 rounded-md bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-violet-50 hover:text-violet-700"><ListTodo className="h-4 w-4" />任务队列</button></div><div className="min-h-0 flex-1 overflow-y-auto px-5 pb-8">{modeRecords.length === 0 ? <div className="flex h-full min-h-[420px] flex-col items-center justify-center text-center"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400"><Video className="h-6 w-6" /></span><p className="mt-4 text-sm font-bold text-slate-700">还没有生成记录</p><p className="mt-1 text-xs text-slate-400">配置左侧内容后即可创建第一条视频原料</p></div> : <div className="divide-y divide-slate-100">{modeRecords.map((task) => <GenerationRecordCard key={task.id} task={task} selected={activeTaskId === task.id} onSelect={() => onActiveTaskChange(task.id)} onCancel={() => cancelRecord(task)} onPreview={() => setPreviewTask(task)} onDownload={() => downloadTask(task)} onUpload={() => setUploadTask(task)} onReEdit={() => reEditTask(task)} />)}</div>}</div></main>
+    </div>
+    {modelMediaTypePickerOpen && <MediaTypeChoiceModal onClose={() => setModelMediaTypePickerOpen(false)} onSelect={(allowed) => { setModelMediaTypePickerOpen(false); openPicker("modelMedia", allowed, 1); }} />}
+    {picker && <MediaPickerModal allowed={picker.allowed} maxSelections={picker.max} initialSelected={pickerSelection()} items={libraryItems} onClose={() => setPicker(null)} onConfirm={applyPickerSelection} />}
+    {voicePickerOpen && <VoicePickerModal selected={voice} onClose={() => setVoicePickerOpen(false)} onConfirm={(item) => { setVoice(item); setVoicePickerOpen(false); }} />}
+    {previewTask && <VideoPreviewModal task={previewTask} onClose={() => setPreviewTask(null)} />}
+    {uploadTask && <UploadFinishedVideoModal isOpen onClose={() => setUploadTask(null)} initialFiles={[{ name: `${uploadTask.name}.mp4`, type: "video/mp4" }]} onPublishSuccess={(message) => { onUploadVideos([{ name: `${uploadTask.name}.mp4`, cover: uploadTask.aiVideoOutput?.coverUrl || "/assets/prototype/luxury-skincare-set.jpg" }]); setToast(message); }} />}
+    {confirmOutfitReturn && <ConfirmDialog title="确认返回？" description="返回后当前搭配预览将无法找回，预览积分无法退还；已提交的视频任务仍会在后台继续。" onCancel={() => setConfirmOutfitReturn(false)} onConfirm={() => { setConfirmOutfitReturn(false); setOutfitPreview(false); setOutfitCandidates([]); setSelectedLook(null); }} />}
+    {toast && <OverlayPortal layer="toast" className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-md bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xl">{toast}</OverlayPortal>}
+  </section>;
+}
+
+function GenerationRecordCard({ task, selected, onSelect, onCancel, onPreview, onDownload, onUpload, onReEdit }: { task: Task; selected: boolean; onSelect: () => void; onCancel: () => void; onPreview: () => void; onDownload: () => void; onUpload: () => void; onReEdit: () => void }) {
+  const output = task.aiVideoOutput || (task.status === "completed" ? { videoUrl: task.outputFiles?.[0] || RESULT_VIDEO_URL, coverUrl: task.aiVideoSnapshot?.references?.[0]?.url || "/assets/prototype/luxury-skincare-set.jpg", duration: task.aiVideoSnapshot?.duration || 8 } : null);
+  const statusHeading = task.status === "queue" ? "正在排队，预计很快开始生成" : task.status === "generating" ? "正在生成视频，预计 5 秒内完成" : task.status === "completed" ? "已为你生成 1 个视频" : task.status === "failed" ? "生成遇到问题，请重新编辑后再试" : "排队已取消";
+  return <article id={`ai-video-record-${task.id}`} onClick={onSelect} className={`my-5 rounded-lg border p-4 transition-all ${selected ? "border-violet-500 bg-violet-50/30 ring-2 ring-violet-100" : "border-slate-200 bg-white hover:border-slate-300"}`}><div className="flex items-start justify-between gap-4"><div className="flex min-w-0 items-start gap-3"><span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${task.status === "failed" ? "bg-rose-50 text-rose-600" : task.status === "cancelled" ? "bg-amber-50 text-amber-600" : "bg-slate-950 text-violet-300"}`}>{task.status === "failed" ? <AlertCircle className="h-4 w-4" /> : task.status === "cancelled" ? <Ban className="h-4 w-4" /> : task.status === "generating" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}</span><div className="min-w-0"><h3 className="text-sm font-bold text-slate-800">{statusHeading}</h3><p className="mt-1 truncate text-[10px] text-slate-400">任务名称：{task.name}　·　{task.createdAt}　·　ID：{task.id.replace(/\D/g, "").slice(-11) || task.id.slice(-11)}</p></div></div>{task.status === "completed" ? <div className="flex shrink-0 items-center justify-end gap-2"><button onClick={(event) => { event.stopPropagation(); onPreview(); }} className="flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"><Play className="h-3.5 w-3.5" />预览</button><button onClick={(event) => { event.stopPropagation(); onDownload(); }} className="flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"><Download className="h-3.5 w-3.5" />下载</button><button onClick={(event) => { event.stopPropagation(); onUpload(); }} className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-violet-700"><CloudUpload className="h-3.5 w-3.5" />上传资源库</button><button onClick={(event) => { event.stopPropagation(); onReEdit(); }} className="flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:border-violet-300 hover:text-violet-700"><Edit3 className="h-3.5 w-3.5" />重新编辑</button></div> : <span className={`shrink-0 rounded px-2 py-1 text-[10px] font-semibold ${task.status === "failed" ? "bg-rose-50 text-rose-700" : task.status === "cancelled" ? "bg-amber-50 text-amber-700" : task.status === "generating" ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600"}`}>{task.status === "queue" ? "排队中" : task.status === "generating" ? "生成中" : task.status === "failed" ? "生成失败" : "已取消"}</span>}</div>
+    {task.status === "queue" && <div className="mt-4 flex h-48 flex-col items-center justify-center rounded-md bg-slate-100 text-slate-500"><Clock3 className="h-7 w-7" /><p className="mt-2 text-xs font-bold">排队中</p><p className="mt-1 text-[10px] text-slate-400">正在等待可用计算资源</p><button onClick={(event) => { event.stopPropagation(); onCancel(); }} className="mt-4 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:border-rose-300 hover:text-rose-600">取消排队</button></div>}
+    {task.status === "generating" && <div className="mt-4 flex h-48 flex-col items-center justify-center rounded-md bg-slate-100"><span className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-950 text-violet-300"><Sparkles className="h-6 w-6" /></span><div className="mt-5 flex w-72 items-center gap-3"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-violet-600 transition-all" style={{ width: `${task.progress}%` }} /></div><span className="w-8 text-right text-[10px] font-bold text-slate-600">{task.progress}%</span></div><p className="mt-2 text-[10px] text-slate-400">正在渲染合成视频...</p></div>}
+    {task.status === "failed" && <div className="mt-4 flex h-44 flex-col items-center justify-center rounded-md bg-rose-50/60 px-8 text-center"><AlertCircle className="h-8 w-8 text-rose-500" /><p className="mt-3 text-xs font-bold text-rose-700">任务生成失败</p><p className="mt-1 text-[11px] leading-5 text-rose-500">{task.failureReason || "生成服务发生异常，请检查素材后重试。"}</p>{task.refundedCredits === task.creditsCost && <p className="mt-2 text-[10px] font-semibold text-emerald-600">本次消耗的 {task.creditsCost} 积分已退还</p>}</div>}
+    {task.status === "cancelled" && <div className="mt-4 flex h-40 flex-col items-center justify-center rounded-md bg-amber-50/60 text-center"><Ban className="h-7 w-7 text-amber-500" /><p className="mt-2 text-xs font-bold text-amber-700">已取消排队</p><p className="mt-1 text-[10px] text-amber-600">积分已退还，点击重新编辑可再次提交</p></div>}
+    {task.status === "completed" && output && <div className="mt-4"><button onClick={(event) => { event.stopPropagation(); onPreview(); }} className="group relative block w-36 overflow-hidden rounded-md border border-slate-200 bg-slate-950 text-left"><img src={output.coverUrl} alt="" className="aspect-[9/16] w-full object-cover" referrerPolicy="no-referrer" /><span className="absolute inset-0 flex items-center justify-center bg-black/15 opacity-0 transition-opacity group-hover:opacity-100"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-violet-700"><Play className="ml-0.5 h-4 w-4 fill-current" /></span></span><span className="absolute bottom-2 left-2 rounded bg-black/65 px-1.5 py-0.5 text-[9px] text-white">00:{String(output.duration).padStart(2, "0")}</span><span className="absolute bottom-2 right-2 rounded bg-black/65 px-1.5 py-0.5 text-[9px] text-white">AI生成</span></button><p className="mt-2 flex items-center gap-1.5 text-[10px] text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" />已通过素材初审，具体请以最终投放平台规则为准</p></div>}
+    {(task.status === "failed" || task.status === "cancelled") && <div className="mt-3 flex justify-end"><button onClick={(event) => { event.stopPropagation(); onReEdit(); }} className="flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:border-violet-300 hover:text-violet-700"><Edit3 className="h-3.5 w-3.5" />重新编辑</button></div>}
+  </article>;
+}
+
+interface MediaPickerModalProps {
+  allowed: "image" | "video" | "both";
+  maxSelections: number;
+  initialSelected: AiVideoMediaItem[];
+  items: AiVideoMediaItem[];
+  onClose: () => void;
+  onConfirm: (items: AiVideoMediaItem[]) => void;
+}
+
+interface MediaPickerRowMeta {
+  primaryCategory: string;
+  secondaryCategory: string;
+  tag: string;
+  status: string;
+  author: string;
+  section: "成片" | "素材";
+  resolution: string;
+  size: string;
+}
+
+const mediaPickerSeed = (value: string) => Array.from(value).reduce((total, character) => total + character.charCodeAt(0), 0);
+
+function getMediaPickerRowMeta(item: AiVideoMediaItem): MediaPickerRowMeta {
+  const seed = mediaPickerSeed(item.id);
+  const authors = ["徐振", "致上互娱", "汤小真", "美妆设计组"];
+  const imageStatuses = ["审核通过", "待审核", "未审核"];
+  const videoStatuses = ["已通过", "待审核", "未审核"];
+  const imageResolutions = ["1080x1440", "800x1200", "1920x1080", "1080x1920"];
+  const lowerName = item.name.toLowerCase();
+  const isBeauty = /护肤|精华|美妆|防晒|礼盒/.test(lowerName);
+  const isFashion = /服|裙|裤|模特|通勤|针织/.test(lowerName);
+  const isHome = /家居|厨房|客厅|日用/.test(lowerName);
+  const primaryCategory = isBeauty ? "美妆护肤" : isFashion ? "服饰内衣" : isHome ? "日用百货" : "通用素材";
+  const secondaryCategory = isBeauty
+    ? (seed % 2 ? "商品主图" : "成分展示")
+    : isFashion
+      ? (seed % 2 ? "模特展示" : "服饰实拍")
+      : isHome
+        ? "场景展示"
+        : "营销素材";
+  const tag = isBeauty ? (seed % 2 ? "产品实拍" : "高端质感") : isFashion ? "模特展示" : "商品展示";
+  const section: "成片" | "素材" = seed % 4 === 0 ? "成片" : "素材";
+
+  return {
+    primaryCategory,
+    secondaryCategory,
+    tag,
+    status: item.type === "image" ? imageStatuses[seed % imageStatuses.length] : videoStatuses[seed % videoStatuses.length],
+    author: authors[seed % authors.length],
+    section,
+    resolution: imageResolutions[seed % imageResolutions.length],
+    size: item.type === "image" ? `${(1.2 + (seed % 35) / 10).toFixed(1)} MB` : `${(12.4 + (seed % 53)).toFixed(1)} MB`
+  };
+}
+
+function MediaPickerModal(props: MediaPickerModalProps) {
+  if (props.allowed === "both") return <MixedMediaPickerModal {...props} />;
+  return <StandardMediaPickerModal {...props} allowed={props.allowed} />;
+}
+
+function MediaTypeChoiceModal({ onClose, onSelect }: { onClose: () => void; onSelect: (allowed: "image" | "video") => void }) {
+  return <OverlayPortal layer="modal" className="fixed inset-0 flex items-center justify-center bg-slate-900/45 p-5 backdrop-blur-sm">
+    <div className="w-full max-w-md overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl">
+      <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><h3 className="text-sm font-bold text-slate-800">选择模特素材类型</h3><button onClick={onClose} title="关闭" className="rounded p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="h-4 w-4" /></button></div>
+      <div className="grid grid-cols-2 gap-3 p-5">
+        <button onClick={() => onSelect("image")} className="flex h-32 flex-col items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:border-violet-400 hover:bg-violet-50/40 hover:text-violet-700"><Images className="h-6 w-6" /><span className="mt-3 text-sm font-bold">选择图片</span><span className="mt-1 text-[10px] text-slate-400">图片管理或本地上传</span></button>
+        <button onClick={() => onSelect("video")} className="flex h-32 flex-col items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:border-violet-400 hover:bg-violet-50/40 hover:text-violet-700"><Video className="h-6 w-6" /><span className="mt-3 text-sm font-bold">选择视频</span><span className="mt-1 text-[10px] text-slate-400">资源库或本地上传</span></button>
+      </div>
+      <div className="flex justify-end border-t border-slate-200 bg-slate-50 px-5 py-4"><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">取消</button></div>
+    </div>
+  </OverlayPortal>;
+}
+
+function StandardMediaPickerModal({ allowed, maxSelections, initialSelected, items, onClose, onConfirm }: MediaPickerModalProps & { allowed: "image" | "video" }) {
+  const [tab, setTab] = useState<"library" | "local">("library");
+  const [section, setSection] = useState<"全部" | "成片" | "素材">("全部");
+  const [primaryCategory, setPrimaryCategory] = useState("全部一级分类");
+  const [secondaryCategory, setSecondaryCategory] = useState("全部二级分类");
+  const [tag, setTag] = useState("全部标签");
+  const [status, setStatus] = useState("全部状态");
+  const [author, setAuthor] = useState("全部上传人");
+  const [onlyMine, setOnlyMine] = useState(false);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [selected, setSelected] = useState<AiVideoMediaItem[]>(() => initialSelected.filter((item) => item.type === allowed));
+  const [localItems, setLocalItems] = useState<AiVideoMediaItem[]>(() => initialSelected.filter((item) => item.type === allowed && item.source === "local"));
+  const [notice, setNotice] = useState("");
+  const uploadRef = useRef<HTMLInputElement | null>(null);
+  const rows = items
+    .filter((item) => item.type === allowed)
+    .map((item) => ({ item, meta: getMediaPickerRowMeta(item) }));
+  const primaryCategories = Array.from(new Set(rows.map(({ meta }) => meta.primaryCategory)));
+  const secondaryCategories = Array.from(new Set(rows.map(({ meta }) => meta.secondaryCategory)));
+  const tags = Array.from(new Set(rows.map(({ meta }) => meta.tag)));
+  const statuses = Array.from(new Set(rows.map(({ meta }) => meta.status)));
+  const authors = Array.from(new Set(rows.map(({ meta }) => meta.author)));
+  const filteredRows = rows.filter(({ item, meta }) =>
+    (allowed === "image" || section === "全部" || meta.section === section) &&
+    (primaryCategory === "全部一级分类" || meta.primaryCategory === primaryCategory) &&
+    (secondaryCategory === "全部二级分类" || meta.secondaryCategory === secondaryCategory) &&
+    (tag === "全部标签" || meta.tag === tag) &&
+    (status === "全部状态" || meta.status === status) &&
+    (author === "全部上传人" || meta.author === author) &&
+    (!onlyMine || meta.author === "徐振") &&
+    `${item.name}${item.id}${meta.primaryCategory}${meta.secondaryCategory}${meta.tag}`.toLowerCase().includes(search.toLowerCase())
+  );
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(filteredRows.length / pageSize)));
+  const pagedRows = filteredRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const label = allowed === "image" ? "图片" : "视频";
+
+  const toggle = (item: AiVideoMediaItem) => {
+    setNotice("");
+    if (selected.some((media) => media.id === item.id)) {
+      setSelected((current) => current.filter((media) => media.id !== item.id));
+      return;
+    }
+    if (maxSelections === 1) {
+      setSelected([item]);
+      return;
+    }
+    if (selected.length >= maxSelections) {
+      setNotice(`最多选择 ${maxSelections} 个${label}`);
+      return;
+    }
+    setSelected((current) => [...current, item]);
+  };
+
+  const upload = (files?: FileList | null) => {
+    if (!files?.length) return;
+    const remaining = maxSelections === 1 ? 1 : Math.max(0, maxSelections - selected.length);
+    if (remaining === 0) {
+      setNotice(`最多选择 ${maxSelections} 个${label}`);
+      return;
+    }
+    const accepted: AiVideoMediaItem[] = [];
+    for (const file of Array.from(files)) {
+      const isVideo = file.type.startsWith("video/") || /\.(mp4|mpeg|mov)$/i.test(file.name);
+      const fileType: AiVideoMediaItem["type"] = isVideo ? "video" : "image";
+      const formatValid = allowed === "image"
+        ? /\.(jpe?g|png|webp|bmp|tiff?|gif)$/i.test(file.name)
+        : /\.(mp4|mpeg|mov)$/i.test(file.name);
+      const sizeValid = allowed === "image" ? file.size < 30 * 1024 * 1024 : file.size < 1000 * 1024 * 1024;
+      if (fileType !== allowed || !formatValid || !sizeValid || accepted.length >= remaining) continue;
+      accepted.push({
+        id: `local-${Date.now()}-${accepted.length}`,
+        name: file.name,
+        type: allowed,
+        url: URL.createObjectURL(file),
+        coverUrl: allowed === "video" ? STOCK_IMAGES[(accepted.length + 3) % STOCK_IMAGES.length].url : undefined,
+        durationSeconds: allowed === "video" ? 12 : undefined,
+        source: "local"
+      });
+    }
+    if (maxSelections === 1) setSelected(accepted.slice(0, 1));
+    else setSelected((current) => [...current, ...accepted].slice(0, maxSelections));
+    setLocalItems((current) => [...current, ...accepted]);
+    if (accepted.length < files.length) setNotice(`仅保留符合格式、大小及数量限制的${label}`);
+    if (uploadRef.current) uploadRef.current.value = "";
+  };
+
+  const removeLocalItem = (item: AiVideoMediaItem) => {
+    setLocalItems((current) => current.filter((media) => media.id !== item.id));
+    setSelected((current) => current.filter((media) => media.id !== item.id));
+  };
+
+  const formatDuration = (seconds = 8) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainder = seconds % 60;
+    return `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
+  };
+
+  return <OverlayPortal layer="modal" className="fixed inset-0 flex items-center justify-center bg-slate-900/45 p-5 backdrop-blur-sm">
+    <div className="flex h-[min(760px,88vh)] w-full max-w-6xl flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl">
+      <div className="flex min-h-0 flex-1 flex-col p-5">
+        <div className="mb-5 flex shrink-0 items-center justify-between border-b border-slate-200">
+          <div className="flex items-center gap-1">
+            <button onClick={() => { setTab("library"); setPage(1); }} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${tab === "library" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>{allowed === "image" ? "图片管理" : "资源库"}</button>
+            <button onClick={() => { setTab("local"); setPage(1); }} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${tab === "local" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>本地上传</button>
+          </div>
+          <button onClick={onClose} title="关闭" className="mb-1 rounded p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="h-4 w-4" /></button>
+        </div>
+
+        {tab === "library" ? <>
+          {allowed === "video" && <div className="mb-4 flex shrink-0 items-center gap-1 border-b border-slate-200">{(["全部", "成片", "素材"] as const).map((item) => <button key={item} onClick={() => { setSection(item); setPage(1); }} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${section === item ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>{item}</button>)}</div>}
+          <div className="mb-4 flex shrink-0 flex-nowrap items-center gap-2 overflow-x-auto pb-1">
+            <select value={primaryCategory} onChange={(event) => { setPrimaryCategory(event.target.value); setPage(1); }} className="h-9 w-[130px] shrink-0 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部一级分类</option>{primaryCategories.map((item) => <option key={item}>{item}</option>)}</select>
+            <select value={secondaryCategory} onChange={(event) => { setSecondaryCategory(event.target.value); setPage(1); }} className="h-9 w-[130px] shrink-0 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部二级分类</option>{secondaryCategories.map((item) => <option key={item}>{item}</option>)}</select>
+            <select value={tag} onChange={(event) => { setTag(event.target.value); setPage(1); }} className="h-9 w-[130px] shrink-0 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部标签</option>{tags.map((item) => <option key={item}>{item}</option>)}</select>
+            <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} className="h-9 w-[130px] shrink-0 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部状态</option>{statuses.map((item) => <option key={item}>{item}</option>)}</select>
+            <select value={author} onChange={(event) => { setAuthor(event.target.value); setPage(1); }} className="h-9 w-[130px] shrink-0 whitespace-nowrap rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部上传人</option>{authors.map((item) => <option key={item}>{item}</option>)}</select>
+            <div className="relative min-w-[180px] flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder={`搜索${allowed === "image" ? "图片" : "文件"}名称或 ID`} className="h-9 w-full rounded-md border border-slate-200 pl-9 pr-3 text-xs outline-none focus:border-violet-400" /></div>
+            <label className="flex h-9 shrink-0 items-center gap-2 whitespace-nowrap px-2 text-xs text-slate-600"><input type="checkbox" checked={onlyMine} onChange={(event) => { setOnlyMine(event.target.checked); setPage(1); }} className="accent-violet-600" />仅看我的</label>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-auto rounded-md border border-slate-200">
+            <table className="w-full min-w-[900px] text-left text-xs">
+              <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500"><tr><th className="w-12 px-4 py-3"></th><th className="px-3 py-3">{allowed === "image" ? "图片缩略图" : "文件缩略图"}</th><th className="px-3 py-3">文件名称 / ID</th><th className="px-3 py-3">状态</th><th className="px-3 py-3">{allowed === "image" ? "分类 / 标签" : "所在分类"}</th><th className="px-3 py-3">上传人</th><th className="px-3 py-3">{allowed === "image" ? "分辨率" : "时长"}</th><th className="px-3 py-3">大小</th></tr></thead>
+              <tbody>{pagedRows.map(({ item, meta }) => { const checked = selected.some((media) => media.id === item.id); return <tr key={item.id} onClick={() => toggle(item)} className={`cursor-pointer border-t border-slate-100 ${checked ? "bg-violet-50" : "hover:bg-slate-50"}`}>
+                <td className="px-4 py-3"><span className={`flex h-4 w-4 items-center justify-center border ${maxSelections === 1 ? "rounded-full" : "rounded"} ${checked ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300"}`}>{checked && <Check className="h-2.5 w-2.5" />}</span></td>
+                <td className="px-3 py-2">{allowed === "image" ? <img src={item.url} alt="" className="h-12 w-12 rounded object-cover" referrerPolicy="no-referrer" /> : <img src={item.coverUrl || item.url} alt="" className="h-10 w-16 rounded object-cover" referrerPolicy="no-referrer" />}</td>
+                <td className="max-w-[220px] px-3 py-3"><p className="truncate font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.id}</p></td>
+                <td className="px-3 py-3"><span className="rounded bg-slate-100 px-2 py-1 text-[10px] text-slate-600">{meta.status}</span></td>
+                <td className="px-3 py-3"><p className="font-semibold text-slate-700">{allowed === "image" ? `${meta.primaryCategory} / ${meta.secondaryCategory}` : meta.section}</p><p className="mt-1 text-[10px] text-slate-400">{allowed === "image" ? meta.tag : `${meta.primaryCategory} / ${meta.secondaryCategory}`}</p></td>
+                <td className="px-3 py-3 text-slate-500">{meta.author}</td>
+                <td className="px-3 py-3 text-slate-500">{allowed === "image" ? meta.resolution : formatDuration(item.durationSeconds)}</td>
+                <td className="px-3 py-3 text-slate-500">{meta.size}</td>
+              </tr>; })}</tbody>
+            </table>
+            {!pagedRows.length && <div className="flex h-full min-h-48 flex-col items-center justify-center text-slate-400"><FolderOpen className="h-8 w-8" /><p className="mt-3 text-xs">没有找到匹配素材</p></div>}
+          </div>
+          <AssetPagination total={filteredRows.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(value) => { setPageSize(value); setPage(1); }} />
+        </> : <div className="min-h-0 flex-1 overflow-y-auto">
+          <button onClick={() => uploadRef.current?.click()} className="flex h-48 w-full flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:text-violet-700"><Upload className="h-6 w-6" /><span className="mt-3 text-xs font-semibold">点击选择本地{label}</span></button>
+          <input ref={uploadRef} type="file" multiple={maxSelections > 1} accept={allowed === "image" ? ".jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff,.gif,image/*" : ".mp4,.mpeg,.mov,video/mp4,video/mpeg,video/quicktime"} className="hidden" onChange={(event) => upload(event.target.files)} />
+          <p className="mt-3 text-center text-xs leading-6 text-slate-400">{allowed === "image" ? <>支持 jpeg、png、webp、bmp、tiff、gif，单张图片大小&lt;30MB。<br />请确保您上传素材为您原创或已取得合法授权。</> : <>视频格式：mp4、mpeg、mov，宽高无限制，大小&lt;1000MB。<br />建议 1280x720&lt;尺寸&lt;3840x2160，2s&lt;时长&lt;600s。<br />请确保您上传素材为您原创或已取得合法授权。</>}</p>
+          {localItems.length > 0 && <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">{localItems.map((item) => <div key={item.id} className="flex min-w-0 items-center gap-2 rounded-md border border-slate-200 p-2">{item.type === "image" ? <img src={item.url} alt="" className="h-11 w-11 rounded object-cover" /> : <video src={item.url} poster={item.coverUrl} muted className="h-11 w-16 rounded object-cover" />}<div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">本地文件</p></div><button onClick={() => removeLocalItem(item)} title="删除" className="p-1 text-slate-400 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div>}
+        </div>}
+      </div>
+      <div className="flex shrink-0 items-center gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4"><p className="mr-auto text-xs text-slate-500">已选择 <b className="text-violet-700">{selected.length}</b> 个{label}{maxSelections > 1 && <> · 还可添加 {Math.max(0, maxSelections - selected.length)} 个</>}</p>{notice && <p className="text-[11px] text-amber-600">{notice}</p>}<button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">取消</button><button disabled={!selected.length} onClick={() => onConfirm(selected)} className="rounded-md bg-violet-600 px-5 py-2 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-40">确认选择</button></div>
+    </div>
+  </OverlayPortal>;
+}
+
+function MixedMediaPickerModal({ allowed, maxSelections, initialSelected, items, onClose, onConfirm }: MediaPickerModalProps) {
+  const [tab, setTab] = useState<"library" | "local">("library");
+  const [selected, setSelected] = useState<AiVideoMediaItem[]>(initialSelected);
+  const [localItems, setLocalItems] = useState<AiVideoMediaItem[]>([]);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
+  const [notice, setNotice] = useState("");
+  const uploadRef = useRef<HTMLInputElement | null>(null);
+  const filtered = items.filter((item) => (allowed === "both" || item.type === allowed) && item.name.toLowerCase().includes(search.toLowerCase()));
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / pageSize)));
+  const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const toggle = (item: AiVideoMediaItem) => {
+    if (selected.some((media) => media.id === item.id)) return setSelected((current) => current.filter((media) => media.id !== item.id));
+    if (maxSelections === 1) return setSelected([item]);
+    if (selected.length >= maxSelections) return setNotice(`最多选择 ${maxSelections} 个素材`);
+    setSelected((current) => [...current, item]);
+  };
+  const upload = (files?: FileList | null) => {
+    if (!files?.length) return;
+    const accepted: AiVideoMediaItem[] = [];
+    for (const file of Array.from(files)) {
+      const type: AiVideoMediaItem["type"] = file.type.startsWith("video/") ? "video" : "image";
+      if (allowed !== "both" && type !== allowed) continue;
+      accepted.push({ id: `local-${Date.now()}-${accepted.length}`, name: file.name, type, url: URL.createObjectURL(file), coverUrl: type === "video" ? STOCK_IMAGES[(accepted.length + 3) % STOCK_IMAGES.length].url : undefined, durationSeconds: type === "video" ? 12 : undefined, source: "local" });
+    }
+    const next = maxSelections === 1 ? accepted.slice(0, 1) : [...selected, ...accepted].slice(0, maxSelections);
+    setLocalItems((current) => [...current, ...accepted]);
+    setSelected(next);
+    if (accepted.length < files.length) setNotice(`仅保留符合类型与数量限制的素材，最多 ${maxSelections} 个`);
+    if (uploadRef.current) uploadRef.current.value = "";
+  };
+  const accept = allowed === "image" ? "image/*" : allowed === "video" ? "video/*" : "image/*,video/*";
+  const label = allowed === "image" ? "图片" : allowed === "video" ? "视频" : "图片或视频";
+  return <OverlayPortal layer="modal" className="fixed inset-0 flex items-center justify-center bg-slate-900/45 p-5 backdrop-blur-sm"><div className="flex h-[min(720px,88vh)] w-full max-w-5xl flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl"><div className="flex shrink-0 items-end justify-between border-b border-slate-200 px-5 pt-3"><div className="flex gap-1"><button onClick={() => { setTab("library"); setPage(1); }} className={`border-b-2 px-4 py-3 text-xs font-bold ${tab === "library" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>资源库</button><button onClick={() => setTab("local")} className={`border-b-2 px-4 py-3 text-xs font-bold ${tab === "local" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>本地上传</button></div><button onClick={onClose} title="关闭" className="mb-2 rounded p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="h-4 w-4" /></button></div>
+    {tab === "library" ? <><div className="flex shrink-0 items-center gap-3 border-b border-slate-100 px-5 py-3"><div className="relative min-w-0 flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder={`搜索${label}名称或 ID`} className="h-9 w-full rounded-md border border-slate-200 pl-9 pr-3 text-xs outline-none focus:border-violet-400" /></div><span className="shrink-0 text-[11px] text-slate-400">最多选择 {maxSelections} 项</span></div><div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/60 p-5">{paged.length ? <div className="grid grid-cols-4 gap-3">{paged.map((item) => { const checked = selected.some((media) => media.id === item.id); return <button key={item.id} onClick={() => toggle(item)} className={`overflow-hidden rounded-md border bg-white text-left transition-all ${checked ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200 hover:border-slate-300"}`}><div className="relative aspect-video bg-slate-100">{item.type === "video" ? <video src={item.url} poster={item.coverUrl} muted className="h-full w-full object-cover" /> : <img src={item.url} alt={item.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" />}{item.type === "video" && <span className="absolute right-2 top-2 rounded bg-black/65 px-1.5 py-0.5 text-[9px] text-white">视频</span>}{checked && <span className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-white"><Check className="h-3 w-3" /></span>}</div><div className="p-2.5"><p className="truncate text-xs font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.type === "video" ? `${item.durationSeconds || 8} 秒` : "图片素材"} · 资源库</p></div></button>; })}</div> : <div className="flex h-full flex-col items-center justify-center text-slate-400"><FolderOpen className="h-8 w-8" /><p className="mt-3 text-xs">没有找到匹配素材</p></div>}</div><div className="shrink-0 border-t border-slate-100 px-5"><AssetPagination total={filtered.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(value) => { setPageSize(value); setPage(1); }} /></div></> : <div className="min-h-0 flex-1 overflow-y-auto p-5"><button onClick={() => uploadRef.current?.click()} className="flex h-52 w-full flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:bg-violet-50/30 hover:text-violet-700"><Upload className="h-7 w-7" /><span className="mt-3 text-sm font-bold">点击选择本地{label}</span><span className="mt-2 text-[11px] text-slate-400">单次最多选择 {maxSelections} 项，请确保素材已取得合法授权</span></button><input ref={uploadRef} type="file" multiple={maxSelections > 1} accept={accept} className="hidden" onChange={(event) => upload(event.target.files)} />{localItems.length > 0 && <div className="mt-5 grid grid-cols-4 gap-3">{localItems.map((item) => { const checked = selected.some((media) => media.id === item.id); return <button key={item.id} onClick={() => toggle(item)} className={`overflow-hidden rounded-md border text-left ${checked ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200"}`}><div className="relative aspect-video bg-slate-100">{item.type === "image" ? <img src={item.url} alt="" className="h-full w-full object-cover" /> : <video src={item.url} poster={item.coverUrl} muted className="h-full w-full object-cover" />}{checked && <span className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-white"><Check className="h-3 w-3" /></span>}</div><p className="truncate p-2 text-xs font-semibold text-slate-600">{item.name}</p></button>; })}</div>}</div>}
+    <div className="flex shrink-0 items-center gap-3 border-t border-slate-200 bg-white px-5 py-4"><p className="mr-auto text-xs text-slate-500">已选择 <b className="text-violet-700">{selected.length}</b> / {maxSelections}</p>{notice && <p className="text-[11px] text-amber-600">{notice}</p>}<button onClick={onClose} className="rounded-md border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">取消</button><button disabled={!selected.length} onClick={() => onConfirm(selected)} className="rounded-md bg-violet-600 px-5 py-2 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-40">确认选择</button></div></div></OverlayPortal>;
+}
+
+function VoicePickerModal({ selected, onClose, onConfirm }: { selected: VoiceOption | null; onClose: () => void; onConfirm: (voice: VoiceOption) => void }) {
+  const [tab, setTab] = useState<"system" | "clone">("system");
+  const [draft, setDraft] = useState<VoiceOption | null>(selected);
+  const [search, setSearch] = useState("");
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const visible = VOICES.filter((voice) => voice.source === tab && `${voice.name}${voice.scene}${voice.tone}`.includes(search));
+  const playVoice = (voice: VoiceOption) => {
+    if (playingId === voice.id) { window.speechSynthesis?.cancel(); setPlayingId(null); return; }
+    window.speechSynthesis?.cancel();
+    const utterance = new SpeechSynthesisUtterance(`你好，我是${voice.name}，欢迎体验这款精选商品。`);
+    utterance.lang = "zh-CN";
+    utterance.rate = voice.id.includes("male") ? 0.9 : 1;
+    utterance.onend = () => setPlayingId(null);
+    setPlayingId(voice.id);
+    window.speechSynthesis?.speak(utterance);
+  };
+  return <OverlayPortal layer="modal" className="fixed inset-0 flex items-center justify-center bg-slate-900/45 p-5 backdrop-blur-sm"><div className="flex h-[min(650px,86vh)] w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl"><div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4"><h3 className="text-sm font-bold text-slate-800">选择音色</h3><button onClick={onClose} title="关闭" className="rounded p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></div><div className="flex shrink-0 items-center gap-3 border-b border-slate-100 px-5 py-3"><div className="flex rounded-md bg-slate-100 p-1"><button onClick={() => setTab("system")} className={`rounded px-4 py-1.5 text-xs font-semibold ${tab === "system" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500"}`}>系统推荐</button><button onClick={() => setTab("clone")} className={`rounded px-4 py-1.5 text-xs font-semibold ${tab === "clone" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500"}`}>我的音色</button></div><div className="relative ml-auto w-64"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索音色" className="h-9 w-full rounded-md border border-slate-200 pl-9 pr-3 text-xs outline-none focus:border-violet-400" /></div></div><div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/50 p-5"><div className="grid grid-cols-3 gap-3">{visible.map((voice) => <button key={voice.id} onClick={() => setDraft(voice)} className={`group relative rounded-md border bg-white p-4 text-left ${draft?.id === voice.id ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200 hover:border-slate-300"}`}><div className="flex items-center gap-3"><div className="relative"><img src={voice.avatar} alt="" className="h-11 w-11 rounded-full object-cover" referrerPolicy="no-referrer" /><span onClick={(event) => { event.stopPropagation(); playVoice(voice); }} className="absolute inset-0 flex items-center justify-center rounded-full bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100">{playingId === voice.id ? <Pause className="h-4 w-4 fill-current" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}</span></div><div className="min-w-0"><p className="truncate text-xs font-bold text-slate-700">{voice.name}</p><p className="mt-1 text-[10px] text-slate-400">{voice.scene}</p></div>{draft?.id === voice.id && <Check className="ml-auto h-4 w-4 text-violet-600" />}</div><p className="mt-3 text-[10px] text-slate-500">音色特点：{voice.tone}</p></button>)}</div></div><div className="flex shrink-0 justify-end gap-2 border-t border-slate-200 px-5 py-4"><button onClick={onClose} className="rounded-md border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!draft} onClick={() => draft && onConfirm(draft)} className="rounded-md bg-violet-600 px-5 py-2 text-xs font-semibold text-white disabled:opacity-40">确认</button></div></div></OverlayPortal>;
+}
+
+function VideoPreviewModal({ task, onClose }: { task: Task; onClose: () => void }) {
+  const output = task.aiVideoOutput || { videoUrl: task.outputFiles?.[0] || RESULT_VIDEO_URL, coverUrl: "/assets/prototype/luxury-skincare-set.jpg", duration: task.aiVideoSnapshot?.duration || 8 };
+  return <OverlayPortal layer="modal" className="fixed inset-0 flex items-center justify-center bg-slate-950/70 p-5 backdrop-blur-sm"><div className="w-full max-w-4xl overflow-hidden rounded-lg bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><div><h3 className="text-sm font-bold text-slate-800">视频预览</h3><p className="mt-1 text-[10px] text-slate-400">{task.name}</p></div><button onClick={onClose} className="rounded p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></div><div className="flex h-[min(620px,76vh)] items-center justify-center bg-slate-950 p-5"><video src={output.videoUrl} poster={output.coverUrl} controls autoPlay className="h-full max-w-full object-contain" /></div></div></OverlayPortal>;
+}
+
+function ConfirmDialog({ title, description, onCancel, onConfirm }: { title: string; description: string; onCancel: () => void; onConfirm: () => void }) {
+  return <OverlayPortal layer="dialog" className="fixed inset-0 flex items-center justify-center bg-slate-900/45 p-5 backdrop-blur-sm"><div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-2xl"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-50 text-amber-600"><AlertCircle className="h-5 w-5" /></div><h3 className="mt-4 text-base font-bold text-slate-900">{title}</h3><p className="mt-2 text-xs leading-6 text-slate-500">{description}</p><div className="mt-6 flex justify-end gap-2"><button onClick={onCancel} className="rounded-md border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button onClick={onConfirm} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white hover:bg-violet-700">确认</button></div></div></OverlayPortal>;
 }

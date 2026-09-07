@@ -8,11 +8,14 @@ import {
 } from "lucide-react";
 import { Task } from "../types";
 import AssetPagination from "./AssetPagination";
+import PrimaryGenerationButton from "./PrimaryGenerationButton";
 import UploadFinishedVideoModal from "./UploadFinishedVideoModal";
+import AnchoredPopover from "./overlays/AnchoredPopover";
+import OverlayPortal from "./overlays/OverlayPortal";
 
 type StepType = "analysis" | "script" | "preview" | "final";
 type SessionStatus = "queue" | "generating" | "completed" | "failed" | "cancelled";
-type HomePromptPart = "product_info" | `product_batch:${string}` | "reference" | "script" | "sources" | "style";
+type HomePromptPart = "product_info" | `product_batch:${string}` | "script" | "sources" | "style";
 
 interface HomePromptPartValue {
   lead: string;
@@ -40,14 +43,6 @@ interface ProductSelection {
 interface ProductImageBatch {
   id: string;
   images: ProductSelection[];
-}
-
-interface ReferenceVideoSelection {
-  id: string;
-  name: string;
-  cover: string;
-  duration: string;
-  size: string;
 }
 
 interface ScriptSelection {
@@ -233,7 +228,6 @@ interface AgentCreationViewProps {
 }
 
 const STORAGE_KEY = "mengchang_agent_sessions_v2";
-const REFERENCE_STORAGE_KEY = "mengchang_agent_reference_videos";
 const HOME_PROMPT_PREFIX = "请结合使用已投放素材和原料库为我生成一个短视频广告，";
 const STEP_META: Array<{ id: StepType; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: "analysis", label: "需求分析", icon: FileText },
@@ -258,12 +252,6 @@ const IMAGE_LIBRARY: ProductSelection[] = [
   { id: "img-6", name: "补水面膜水分提升对比实验图.jpg", image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=600&auto=format&fit=crop&q=80", source: "images", primaryCategory: "美妆护肤", secondaryCategory: "效果对比", tags: ["对比实测"], author: "徐振", status: "审核通过", size: "2.9 MB", resolution: "1080x1440" },
   { id: "img-7", name: "夏日清凉草本展示图.jpg", image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&auto=format&fit=crop&q=80", source: "images", primaryCategory: "食品饮料", secondaryCategory: "商品主图", tags: ["清凉夏日", "产品实拍"], author: "美妆设计组", status: "待审核", size: "5.4 MB", resolution: "2000x2000" },
   { id: "img-8", name: "高奢护肤瓶身渲染特写.jpg", image: "./assets/prototype/luxury-skincare-set.jpg", source: "images", primaryCategory: "美妆护肤", secondaryCategory: "商品主图", tags: ["高端质感", "3D渲染"], author: "汤小真", status: "审核通过", size: "3.8 MB", resolution: "1440x1920" }
-];
-
-const REFERENCE_VIDEOS: ReferenceVideoSelection[] = [
-  { id: "ref-1", name: "夏日防晒实测高转化素材.mp4", cover: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=600&auto=format&fit=crop&q=80", duration: "00:28", size: "24.6 MB" },
-  { id: "ref-2", name: "通勤穿搭口播投放素材.mp4", cover: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&auto=format&fit=crop&q=80", duration: "00:42", size: "38.1 MB" },
-  { id: "ref-3", name: "厨房清洁前后对比素材.mp4", cover: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&auto=format&fit=crop&q=80", duration: "00:35", size: "31.8 MB" }
 ];
 
 const SCRIPT_OPTIONS: ScriptSelection[] = [
@@ -880,11 +868,10 @@ export default function AgentCreationView({
     activeTask ? loadStoredSession(activeTask.id) || makeDemoSession(activeTask) : null
   );
   const [idea, setIdea] = useState("");
-  const [homeMenu, setHomeMenu] = useState<"product" | "reference" | "source" | null>(null);
-  const [homeModal, setHomeModal] = useState<"product_link" | "product_image" | "reference" | "script" | "sources" | "settings" | "style" | null>(null);
+  const [homeMenu, setHomeMenu] = useState<"product" | "source" | null>(null);
+  const [homeModal, setHomeModal] = useState<"product_link" | "product_image" | "script" | "sources" | "settings" | "style" | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<ProductSelection | null>(null);
   const [productImageBatches, setProductImageBatches] = useState<ProductImageBatch[]>([]);
-  const [selectedReference, setSelectedReference] = useState<ReferenceVideoSelection | null>(null);
   const [selectedScript, setSelectedScript] = useState<ScriptSelection | null>(null);
   const [selectedSources, setSelectedSources] = useState<SourceVideoSelection[]>([]);
   const [videoDuration, setVideoDuration] = useState(45);
@@ -893,14 +880,6 @@ export default function AgentCreationView({
   const [selectedStyle, setSelectedStyle] = useState("");
   const [homePromptOrder, setHomePromptOrder] = useState<HomePromptPart[]>([]);
   const homePromptEditorRef = useRef<HTMLSpanElement | null>(null);
-  const [referenceHistory, setReferenceHistory] = useState<ReferenceVideoSelection[]>(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem(REFERENCE_STORAGE_KEY) || "[]") as ReferenceVideoSelection[];
-      return [...stored, ...REFERENCE_VIDEOS.filter((item) => !stored.some((saved) => saved.id === item.id))];
-    } catch {
-      return REFERENCE_VIDEOS;
-    }
-  });
   const [selectedCreativeId, setSelectedCreativeId] = useState(1);
   const [scriptSubjectDetailOpen, setScriptSubjectDetailOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
@@ -925,14 +904,6 @@ export default function AgentCreationView({
   const productForCreation = productImagesForCreation[0] || null;
 
   useEffect(() => {
-    try {
-      localStorage.setItem(REFERENCE_STORAGE_KEY, JSON.stringify(referenceHistory));
-    } catch {
-      // Browser storage is optional for the prototype.
-    }
-  }, [referenceHistory]);
-
-  useEffect(() => {
     if (session?.currentStep !== "script") setScriptSubjectDetailOpen(false);
   }, [session?.currentStep]);
 
@@ -952,7 +923,6 @@ export default function AgentCreationView({
       const batchId = part.slice("product_batch:".length);
       setProductImageBatches((current) => current.filter((batch) => batch.id !== batchId));
     }
-    if (part === "reference") setSelectedReference(null);
     if (part === "script") setSelectedScript(null);
     if (part === "sources") setSelectedSources([]);
     if (part === "style") setSelectedStyle("");
@@ -1055,9 +1025,6 @@ export default function AgentCreationView({
         icon: ImageIcon
       };
     }
-    if (part === "reference" && selectedReference) {
-      return { lead: "用上参考视频", label: selectedReference.name, image: selectedReference.cover, icon: Video };
-    }
     if (part === "script" && selectedScript) {
       const shortLabel = selectedScript.source === "manual" && Array.from(selectedScript.name).length > 8
         ? `${Array.from(selectedScript.name).slice(0, 8).join("")}...`
@@ -1114,7 +1081,7 @@ export default function AgentCreationView({
         awaitingProduct: true,
         conversation: [
           { role: "user", content: prompt },
-          { role: "agent", content: selectedReference ? "我还不清楚您要制作分镜脚本的商品信息，请补充商品名称、相关介绍或商品 ID。" : "为了帮您制作合适的电商营销视频，请补充具体商品信息，例如商品名称、所属品类、品牌或款式。" }
+          { role: "agent", content: "为了帮您制作合适的电商营销视频，请补充具体商品信息，例如商品名称、所属品类、品牌或款式。" }
         ]
       };
       sessionRef.current = waiting;
@@ -1492,7 +1459,6 @@ export default function AgentCreationView({
     setIdea("");
     setSelectedProduct(null);
     setProductImageBatches([]);
-    setSelectedReference(null);
     setSelectedScript(null);
     setSelectedSources([]);
     setSelectedStyle("");
@@ -1503,7 +1469,7 @@ export default function AgentCreationView({
 
   const selectedFinals = useMemo(() => session?.finals.filter((item) => item.selected) || [], [session?.finals]);
   const previewVideoLocked = Boolean(session && previewVideoGeneration?.sessionId === session.id);
-  const canStart = Boolean(idea.trim() || productForCreation || selectedReference || selectedScript || selectedSources.length || selectedStyle);
+  const canStart = Boolean(idea.trim() || productForCreation || selectedScript || selectedSources.length || selectedStyle);
 
   if (uploadOpen) {
     return (
@@ -1531,16 +1497,17 @@ export default function AgentCreationView({
         <header className="flex h-14 shrink-0 items-center justify-end border-b border-slate-200 bg-white px-5">
           <button onClick={onOpenQueue} className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><History className="h-4 w-4" />历史任务</button>
         </header>
-        <main className="flex flex-1 justify-center overflow-y-auto px-5 py-12">
-          <div className="w-full max-w-4xl">
+        <main className="min-h-0 flex-1 overflow-y-auto px-6">
+          <div className="flex min-h-full items-center justify-center py-8">
+          <div className="w-full max-w-5xl">
             <div className="mb-8 text-center">
-              <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-violet-600 text-white"><Sparkles className="h-5 w-5" /></div>
               <h1 className="text-2xl font-bold text-slate-900">想做什么视频？</h1>
+              <p className="mt-2 text-sm text-slate-500">告诉 Agent 你的创作需求，从素材到成片一站式完成</p>
             </div>
 
-            <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-colors focus-within:border-violet-400">
+            <div className="mx-auto max-w-4xl rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-colors focus-within:border-violet-400">
               <div
-                className="flex min-h-[120px] flex-wrap content-start items-center gap-x-1 gap-y-2 text-sm leading-7 text-slate-800"
+                className="flex min-h-40 flex-wrap content-start items-center gap-x-1 gap-y-2 text-sm leading-7 text-slate-800"
                 onClick={(event) => {
                   if (event.target === event.currentTarget) homePromptEditorRef.current?.focus();
                 }}
@@ -1563,22 +1530,16 @@ export default function AgentCreationView({
                   );
                 })}
               </div>
-              <div className="mt-3 flex items-end justify-between gap-3 border-t border-slate-100 pt-3">
-                <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+              <div className="mt-3 flex items-center gap-3 border-t border-slate-100 pt-3">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
                   <HomeMenuButton icon={Package} label="商品" active={homeMenu === "product" || !!selectedProduct || productImageCount > 0} onClick={() => setHomeMenu(homeMenu === "product" ? null : "product")}>
-                    {homeMenu === "product" && <MenuPopup>
+                    {homeMenu === "product" && <MenuPopup onClose={() => setHomeMenu(null)}>
                       <MenuAction icon={Link2} label="输入商品信息" disabled={!!selectedProduct} onClick={() => { setHomeMenu(null); setHomeModal("product_link"); }} />
                       <MenuAction icon={ImageIcon} label="添加商品图" disabled={productImageCount >= 6} onClick={() => { setHomeMenu(null); setHomeModal("product_image"); }} />
                     </MenuPopup>}
                   </HomeMenuButton>
-                  <HomeMenuButton icon={Video} label="参考" active={homeMenu === "reference"} disabled={!!selectedReference} disabledHint="已添加参考视频" onClick={() => setHomeMenu(homeMenu === "reference" ? null : "reference")}>
-                    {homeMenu === "reference" && <MenuPopup>
-                      <MenuAction icon={History} label="历史投放素材" disabled={!!selectedReference} onClick={() => { setHomeMenu(null); setHomeModal("reference"); }} />
-                      <LocalReferenceAction disabled={!!selectedReference} onUploaded={(item) => { setReferenceHistory((items) => [item, ...items]); setSelectedReference(item); appendPromptPart("reference"); setHomeMenu(null); }} showToast={showToast} />
-                    </MenuPopup>}
-                  </HomeMenuButton>
                   <HomeMenuButton icon={FileText} label="脚本/原料" active={homeMenu === "source" || !!selectedScript || selectedSources.length > 0} onClick={() => setHomeMenu(homeMenu === "source" ? null : "source")}>
-                    {homeMenu === "source" && <MenuPopup>
+                    {homeMenu === "source" && <MenuPopup onClose={() => setHomeMenu(null)}>
                       <MenuAction icon={FileText} label="添加脚本" disabled={!!selectedScript} onClick={() => { setHomeMenu(null); setHomeModal("script"); }} />
                       <MenuAction icon={Film} label="添加原料" onClick={() => { setHomeMenu(null); setHomeModal("sources"); }} />
                     </MenuPopup>}
@@ -1586,7 +1547,6 @@ export default function AgentCreationView({
                   <HomeMenuButton icon={Settings} label={`${videoDuration}秒 · ${videoRatio}`} active={homeModal === "settings"} onClick={() => { setHomeMenu(null); setHomeModal("settings"); }} />
                   <HomeMenuButton icon={Palette} label="风格" active={homeModal === "style" || !!selectedStyle} onClick={() => { setHomeMenu(null); setHomeModal("style"); }} />
                 </div>
-                <button onClick={startCreation} disabled={!canStart} title="发送" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-600 text-white hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400"><ArrowUp className="h-4 w-4" /></button>
               </div>
             </div>
 
@@ -1594,12 +1554,15 @@ export default function AgentCreationView({
               <button onClick={() => setIdea("用我的「商品」拍一条营销视频")} className="rounded-md border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-600 hover:border-violet-300 hover:text-violet-700">用商品拍一条营销视频</button>
               <button onClick={() => setIdea("参考「参考视频」的拍法，给「商品」写一份分镜脚本")} className="rounded-md border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-600 hover:border-violet-300 hover:text-violet-700">参考样片写分镜脚本</button>
             </div>
+            <div className="mt-6 flex justify-center">
+              <PrimaryGenerationButton disabled={!canStart} onClick={startCreation}>开始创作</PrimaryGenerationButton>
+            </div>
+          </div>
           </div>
         </main>
 
         {homeModal === "product_link" && <ProductLinkModal onClose={() => setHomeModal(null)} onConfirm={(product) => { setSelectedProduct(product); appendPromptPart("product_info"); setHomeModal(null); }} />}
         {homeModal === "product_image" && <ProductImageModal existingCount={productImageCount} onClose={() => setHomeModal(null)} onConfirm={(images) => addProductImageBatch(images)} showToast={showToast} />}
-        {homeModal === "reference" && <ReferenceVideoModal items={referenceHistory} selected={selectedReference} onDelete={(id) => { setReferenceHistory((items) => items.filter((item) => item.id !== id)); if (selectedReference?.id === id) removePromptPart("reference"); }} onClose={() => setHomeModal(null)} onConfirm={(item) => { setSelectedReference(item); appendPromptPart("reference"); setHomeModal(null); }} />}
         {homeModal === "script" && <ScriptSelectorModal selected={selectedScript} onClose={() => setHomeModal(null)} onConfirm={(item) => { setSelectedScript(item); appendPromptPart("script"); setHomeModal(null); }} />}
         {homeModal === "sources" && <SourceSelectorModal selected={selectedSources} onClose={() => setHomeModal(null)} onConfirm={(items) => { setSelectedSources(items); if (items.length) appendPromptPart("sources"); else removePromptPart("sources"); setHomeModal(null); }} showToast={showToast} />}
         {homeModal === "settings" && <SettingsModal duration={videoDuration} ratio={videoRatio} removeWatermark={removeWatermark} onClose={() => setHomeModal(null)} onConfirm={(settings) => { setVideoDuration(settings.duration); setVideoRatio(settings.ratio); setRemoveWatermark(settings.removeWatermark); setHomeModal(null); }} />}
@@ -1631,7 +1594,7 @@ export default function AgentCreationView({
             <div className="mt-2 flex items-center justify-between">
               <div className="relative">
                 <HomeMenuButton icon={Package} label="商品" active={homeMenu === "product" || !!selectedProduct || productImageCount > 0} onClick={() => setHomeMenu(homeMenu === "product" ? null : "product")}>
-                  {homeMenu === "product" && <MenuPopup>
+                  {homeMenu === "product" && <MenuPopup onClose={() => setHomeMenu(null)}>
                     <MenuAction icon={Link2} label="输入商品信息" disabled={!!selectedProduct} onClick={() => { setHomeMenu(null); setHomeModal("product_link"); }} />
                     <MenuAction icon={ImageIcon} label="添加商品图" disabled={productImageCount >= 6} onClick={() => { setHomeMenu(null); setHomeModal("product_image"); }} />
                   </MenuPopup>}
@@ -1861,9 +1824,9 @@ function AnalysisPanel({ session, setSession, showToast }: { session: AgentSessi
         showToast={showToast}
       />}
       {previewImage && (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-900/65 p-5" onMouseDown={(event) => event.target === event.currentTarget && setPreviewImage(null)}>
+        <OverlayPortal layer="modal" className="fixed inset-0 flex items-center justify-center bg-slate-900/65 p-5" onMouseDown={(event) => event.target === event.currentTarget && setPreviewImage(null)}>
           <div className="relative max-h-[88vh] max-w-4xl overflow-hidden rounded-lg bg-white p-2 shadow-2xl"><img src={previewImage.image} alt={previewImage.name} className="max-h-[82vh] max-w-full object-contain" referrerPolicy="no-referrer" /><button onClick={() => setPreviewImage(null)} title="关闭" className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-md bg-slate-900/70 text-white"><X className="h-4 w-4" /></button></div>
-        </div>
+        </OverlayPortal>
       )}
     </div>
   );
@@ -2222,25 +2185,27 @@ function TruncatedSubjectDescription({ subject, productImages }: { subject: Crea
     const element = textRef.current;
     setShowDetail(Boolean(element && element.scrollWidth > element.clientWidth));
   };
-  return <div className="relative"><p ref={textRef} onMouseEnter={checkOverflow} onMouseLeave={() => setShowDetail(false)} className="mt-1 max-w-[154px] truncate text-[11px] leading-5 text-slate-500">{subject.description}</p>{showDetail && <SubjectTooltip subject={subject} productImages={productImages} compact />}</div>;
+  return <div><p ref={textRef} onMouseEnter={checkOverflow} onMouseLeave={() => setShowDetail(false)} className="mt-1 max-w-[154px] truncate text-[11px] leading-5 text-slate-500">{subject.description}</p>{showDetail && <SubjectTooltip anchorRef={textRef} subject={subject} productImages={productImages} onClose={() => setShowDetail(false)} />}</div>;
 }
 
-function SubjectTooltip({ subject, productImages, compact = false }: { subject: CreativeSubject; productImages: ProductSelection[]; compact?: boolean }) {
+function SubjectTooltip({ anchorRef, subject, productImages, onClose }: { anchorRef: React.RefObject<HTMLElement | null>; subject: CreativeSubject; productImages: ProductSelection[]; onClose: () => void }) {
   const image = subject.kind === "product" ? productImages[0]?.image : subject.image;
   return (
-    <div className={`absolute left-0 top-full z-50 mt-2 hidden w-64 rounded-lg border border-violet-200 bg-white p-3 text-left shadow-xl group-hover:block ${compact ? "block" : ""}`}>
+    <AnchoredPopover anchorRef={anchorRef} width={256} gap={6} onClose={onClose} className="pointer-events-none rounded-lg border border-violet-200 bg-white p-3 text-left shadow-xl">
       <div className="flex gap-3">{image ? <img src={image} alt="" className="h-16 w-12 shrink-0 rounded object-cover" referrerPolicy="no-referrer" /> : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-violet-50 text-violet-600"><Volume2 className="h-5 w-5" /></div>}<div className="min-w-0"><p className="text-xs font-bold text-slate-800">{subject.name}</p><p className="mt-1 text-[11px] leading-5 text-slate-600">{subject.description}</p></div></div>
-    </div>
+    </AnchoredPopover>
   );
 }
 
 function SubjectTag({ subject, productImages, removable = false, onRemove }: { subject: CreativeSubject; productImages: ProductSelection[]; removable?: boolean; onRemove?: () => void }) {
+  const [showDetail, setShowDetail] = useState(false);
+  const anchorRef = useRef<HTMLSpanElement | null>(null);
   return (
-    <span className="group relative inline-flex shrink-0 items-center gap-1 rounded bg-violet-50 px-1.5 py-1 text-[11px] font-semibold text-violet-700">
+    <span ref={anchorRef} onPointerEnter={() => setShowDetail(true)} onPointerLeave={() => setShowDetail(false)} className="relative inline-flex shrink-0 items-center gap-1 rounded bg-violet-50 px-1.5 py-1 text-[11px] font-semibold text-violet-700">
       {subject.kind === "narrator" ? <Volume2 className="h-3 w-3" /> : subject.kind === "product" ? <Package className="h-3 w-3" /> : subject.image ? <img src={subject.image} alt="" className="h-4 w-4 rounded object-cover" referrerPolicy="no-referrer" /> : null}
       {subject.name}
       {removable && <button onClick={onRemove} title={`移除${subject.name}`} className="ml-0.5 flex h-4 w-4 items-center justify-center rounded text-violet-400 hover:bg-violet-100 hover:text-rose-600"><X className="h-3 w-3" /></button>}
-      <SubjectTooltip subject={subject} productImages={productImages} />
+      {showDetail && <SubjectTooltip anchorRef={anchorRef} subject={subject} productImages={productImages} onClose={() => setShowDetail(false)} />}
     </span>
   );
 }
@@ -2250,7 +2215,6 @@ const getSubjectTokenMatches = (value: string) => Array.from(value.matchAll(/\[\
 
 function StoryboardLineEditor({ type, text, subjects, subjectIds, productImages, onTextChange, onSubjectsChange }: { type: "dialogue" | "visual"; text: string; subjects: CreativeSubject[]; subjectIds: string[]; productImages: ProductSelection[]; onTextChange: (text: string) => void; onSubjectsChange?: (subjectIds: string[]) => void }) {
   const [mentionOpen, setMentionOpen] = useState(false);
-  const [mentionPosition, setMentionPosition] = useState({ left: 12, top: 64 });
   const editorRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const mentionRangeRef = useRef<Range | null>(null);
@@ -2347,9 +2311,6 @@ function StoryboardLineEditor({ type, text, subjects, subjectIds, productImages,
     const mentionRange = range.cloneRange();
     mentionRange.setStart(range.startContainer, range.startOffset - match[0].length);
     mentionRangeRef.current = mentionRange;
-    const caretRect = range.getBoundingClientRect();
-    const wrapperRect = wrapperRef.current?.getBoundingClientRect();
-    if (wrapperRect) setMentionPosition({ left: Math.max(8, caretRect.left - wrapperRect.left), top: caretRect.bottom - wrapperRect.top + 6 });
     setMentionOpen(true);
   };
 
@@ -2403,10 +2364,10 @@ function StoryboardLineEditor({ type, text, subjects, subjectIds, productImages,
         className="min-h-[72px] whitespace-pre-wrap break-words text-xs leading-6 text-slate-600 outline-none"
       />
       {mentionOpen && (
-        <div style={{ left: mentionPosition.left, top: mentionPosition.top }} className="absolute z-40 w-48 rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
+        <AnchoredPopover anchorRef={wrapperRef} getAnchorRect={() => mentionRangeRef.current?.getBoundingClientRect() || null} width={192} maxHeight={192} gap={6} onClose={() => setMentionOpen(false)} className="rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
           <p className="px-2 py-1 text-[10px] text-slate-400">选择当前创意主体</p>
           {availableSubjects.length ? availableSubjects.map((subject) => <button key={subject.id} onMouseDown={(event) => event.preventDefault()} onClick={() => insertSubject(subject)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-slate-700 hover:bg-violet-50"><AtSign className="h-3.5 w-3.5 text-violet-500" />{subject.name}</button>) : <p className="px-2 py-2 text-xs text-slate-400">当前主体均已关联</p>}
-        </div>
+        </AnchoredPopover>
       )}
     </div>
   );
@@ -2433,6 +2394,30 @@ function SubjectDetailPanel({ subject, draft, productName, voiceEditorOpen, voic
   );
 }
 
+function PreviewVersionNavItem({ item, active, locked, canDelete, onSelect, onCopy, onDelete }: { item: PreviewItem; active: boolean; locked: boolean; canDelete: boolean; onSelect: () => void; onCopy: () => void; onDelete: () => void }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const anchorRef = useRef<HTMLButtonElement | null>(null);
+  const closeTimerRef = useRef<number | null>(null);
+  const cancelClose = () => {
+    if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = null;
+  };
+  const scheduleClose = () => {
+    cancelClose();
+    closeTimerRef.current = window.setTimeout(() => setMenuOpen(false), 120);
+  };
+
+  useEffect(() => () => cancelClose(), []);
+
+  return <div className="relative" onPointerEnter={() => { cancelClose(); setMenuOpen(true); }} onPointerLeave={scheduleClose}>
+    <button ref={anchorRef} onFocus={() => setMenuOpen(true)} onClick={onSelect} className={`flex w-full flex-col items-center gap-2 rounded-md px-1 py-3 text-[11px] font-semibold transition-colors ${active ? "bg-violet-50 text-violet-700" : "text-slate-500 hover:bg-white hover:text-slate-800"}`}><span className={`flex h-8 w-8 items-center justify-center rounded-md border bg-white ${active ? "border-violet-300" : "border-slate-200"}`}><Video className="h-4 w-4" /></span><span className={menuOpen ? "hidden" : "inline"}>{item.name}</span><span className={menuOpen ? "inline" : "hidden"}>编辑</span></button>
+    {menuOpen && <AnchoredPopover anchorRef={anchorRef} width={96} gap={4} onClose={() => setMenuOpen(false)} onPointerEnter={cancelClose} onPointerLeave={scheduleClose} className="rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
+      <button disabled={locked} onClick={(event) => { event.stopPropagation(); setMenuOpen(false); onCopy(); }} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"><Copy className="h-3.5 w-3.5" />复制</button>
+      <button disabled={locked || !canDelete} onClick={(event) => { event.stopPropagation(); setMenuOpen(false); onDelete(); }} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-slate-600 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:text-slate-300"><Trash2 className="h-3.5 w-3.5" />删除</button>
+    </AnchoredPopover>}
+  </div>;
+}
+
 function PreviewPanel({ session, generation, generationProgress, onGenerateMore, onOpenLibrary, onUploadLocal, onSelectVideo, onCopyPreview, onDeletePreview }: { session: AgentSession; generation: PreviewVideoGeneration | null; generationProgress: number; onGenerateMore: (previewId: string, frameId: string) => void; onOpenLibrary: (previewId: string, frameId: string) => void; onUploadLocal: (previewId: string, frameId: string, file: File) => void; onSelectVideo: (previewId: string, frameId: string, videoId: string) => void; onCopyPreview: (previewId: string) => void; onDeletePreview: (previewId: string) => void }) {
   const [activePreviewId, setActivePreviewId] = useState(session.previews[0]?.id || "");
   const [activeFrameId, setActiveFrameId] = useState("");
@@ -2442,6 +2427,7 @@ function PreviewPanel({ session, generation, generationProgress, onGenerateMore,
   const [previewImage, setPreviewImage] = useState<{ src: string; name: string } | null>(null);
   const candidateScrollRef = useRef<HTMLDivElement | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
+  const addMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const localUploadRef = useRef<HTMLInputElement | null>(null);
   const activeIndex = Math.max(session.previews.findIndex((item) => item.id === activePreviewId), 0);
   const activePreview = session.previews[activeIndex] || session.previews[0];
@@ -2537,7 +2523,7 @@ function PreviewPanel({ session, generation, generationProgress, onGenerateMore,
             <div className="space-y-2">
               {session.previews.map((item) => {
                 const active = item.id === activePreview.id;
-                return <div key={item.id} className="group/version relative"><button onClick={() => setActivePreviewId(item.id)} className={`flex w-full flex-col items-center gap-2 rounded-md px-1 py-3 text-[11px] font-semibold transition-colors ${active ? "bg-violet-50 text-violet-700" : "text-slate-500 hover:bg-white hover:text-slate-800"}`}><span className={`flex h-8 w-8 items-center justify-center rounded-md border bg-white ${active ? "border-violet-300" : "border-slate-200"}`}><Video className="h-4 w-4" /></span><span className="group-hover/version:hidden group-focus-within/version:hidden">{item.name}</span><span className="hidden group-hover/version:inline group-focus-within/version:inline">编辑</span></button><div className="invisible absolute left-0 top-full z-[70] w-24 pt-1 opacity-0 transition group-hover/version:visible group-hover/version:opacity-100 group-focus-within/version:visible group-focus-within/version:opacity-100"><div className="rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl"><button disabled={locked} onClick={(event) => { event.stopPropagation(); onCopyPreview(item.id); }} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"><Copy className="h-3.5 w-3.5" />复制</button><button disabled={locked || session.previews.length <= 1} onClick={(event) => { event.stopPropagation(); onDeletePreview(item.id); }} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-slate-600 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:text-slate-300"><Trash2 className="h-3.5 w-3.5" />删除</button></div></div></div>;
+                return <PreviewVersionNavItem key={item.id} item={item} active={active} locked={locked} canDelete={session.previews.length > 1} onSelect={() => setActivePreviewId(item.id)} onCopy={() => onCopyPreview(item.id)} onDelete={() => onDeletePreview(item.id)} />;
               })}
             </div>
           </aside>
@@ -2555,8 +2541,8 @@ function PreviewPanel({ session, generation, generationProgress, onGenerateMore,
             <h3 className="text-sm font-bold text-slate-900">适合“{activeFrame.name}”的视频</h3>
             <div className="mt-3 flex min-w-0 items-start gap-2">
               <div className="relative shrink-0">
-                <button disabled={locked} onClick={() => setAddMenuOpen((open) => !open)} className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-md border border-dashed border-slate-300 text-[10px] text-slate-500 hover:border-violet-300 hover:text-violet-700 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-300"><Plus className="h-4 w-4" />新增视频</button>
-                {addMenuOpen && <div onMouseDown={(event) => event.stopPropagation()} className="pointer-events-auto absolute left-0 top-full z-[70] mt-1 w-36 rounded-md border border-slate-200 bg-white p-1.5 shadow-xl"><button type="button" onClick={() => { setAddMenuOpen(false); onGenerateMore(activePreview.id, activeFrame.id); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"><Sparkles className="h-3.5 w-3.5" />生成更多</button><button type="button" onClick={() => { setAddMenuOpen(false); onOpenLibrary(activePreview.id, activeFrame.id); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"><Film className="h-3.5 w-3.5" />资源库选择</button><button type="button" onClick={() => { setAddMenuOpen(false); localUploadRef.current?.click(); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"><Upload className="h-3.5 w-3.5" />本地上传</button></div>}
+                <button ref={addMenuButtonRef} disabled={locked} onClick={() => setAddMenuOpen((open) => !open)} className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-md border border-dashed border-slate-300 text-[10px] text-slate-500 hover:border-violet-300 hover:text-violet-700 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-300"><Plus className="h-4 w-4" />新增视频</button>
+                {addMenuOpen && <AnchoredPopover anchorRef={addMenuButtonRef} width={144} gap={4} onClose={() => setAddMenuOpen(false)} className="rounded-md border border-slate-200 bg-white p-1.5 shadow-xl"><button type="button" onClick={() => { setAddMenuOpen(false); onGenerateMore(activePreview.id, activeFrame.id); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"><Sparkles className="h-3.5 w-3.5" />生成更多</button><button type="button" onClick={() => { setAddMenuOpen(false); onOpenLibrary(activePreview.id, activeFrame.id); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"><Film className="h-3.5 w-3.5" />资源库选择</button><button type="button" onClick={() => { setAddMenuOpen(false); localUploadRef.current?.click(); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"><Upload className="h-3.5 w-3.5" />本地上传</button></AnchoredPopover>}
                 <input ref={localUploadRef} type="file" accept=".mp4,.mpeg,.mov,video/mp4,video/mpeg,video/quicktime" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) onUploadLocal(activePreview.id, activeFrame.id, file); event.currentTarget.value = ""; }} />
               </div>
               <div className="relative min-w-0 flex-1">
@@ -2606,7 +2592,7 @@ function PreviewPanel({ session, generation, generationProgress, onGenerateMore,
           </div>
         </div>
       </section>
-      {previewImage && <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/70 p-6" onMouseDown={(event) => event.target === event.currentTarget && setPreviewImage(null)}><div className="relative max-h-[88vh] max-w-[88vw] overflow-hidden rounded-lg bg-white p-2 shadow-2xl"><img src={previewImage.src} alt={previewImage.name} className="max-h-[82vh] max-w-[82vw] object-contain" referrerPolicy="no-referrer" /><button onClick={() => setPreviewImage(null)} title="关闭大图" className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-md bg-slate-900/75 text-white hover:bg-slate-900"><X className="h-4 w-4" /></button></div></div>}
+      {previewImage && <OverlayPortal layer="modal" className="fixed inset-0 flex items-center justify-center bg-slate-900/70 p-6" onMouseDown={(event) => event.target === event.currentTarget && setPreviewImage(null)}><div className="relative max-h-[88vh] max-w-[88vw] overflow-hidden rounded-lg bg-white p-2 shadow-2xl"><img src={previewImage.src} alt={previewImage.name} className="max-h-[82vh] max-w-[82vw] object-contain" referrerPolicy="no-referrer" /><button onClick={() => setPreviewImage(null)} title="关闭大图" className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-md bg-slate-900/75 text-white hover:bg-slate-900"><X className="h-4 w-4" /></button></div></OverlayPortal>}
     </div>
   );
 }
@@ -2626,17 +2612,17 @@ function FinalPanel({ session, setSession, selectedFinals, openUpload, setDetail
 
 function VideoDetail({ video, onClose, onUpload, showToast }: { video: FinalVideoItem; onClose: () => void; onUpload: () => void; showToast: (message: string) => void }) {
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/55 p-5" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <OverlayPortal layer="modal" className="fixed inset-0 flex items-center justify-center bg-slate-900/55 p-5" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <div className="w-full max-w-3xl overflow-hidden rounded-lg bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><div><h3 className="text-sm font-bold text-slate-900">{video.name}</h3><p className="mt-1 text-xs text-slate-400">{video.duration} · 9:16</p></div><button onClick={onClose} title="关闭" className="rounded p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>
         <div className="grid grid-cols-[minmax(0,1fr)_220px]"><div className="relative aspect-video bg-black"><img src={video.cover} alt="" className="h-full w-full object-contain" referrerPolicy="no-referrer" /><button className="absolute inset-0 m-auto flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-violet-700"><Play className="ml-0.5 h-5 w-5 fill-current" /></button></div><div className="p-5"><p className="text-xs font-semibold text-slate-500">视频信息</p><dl className="mt-4 space-y-3 text-xs"><div className="flex justify-between"><dt className="text-slate-400">尺寸</dt><dd className="text-slate-700">1080 × 1920</dd></div><div className="flex justify-between"><dt className="text-slate-400">格式</dt><dd className="text-slate-700">MP4</dd></div><div className="flex justify-between"><dt className="text-slate-400">来源</dt><dd className="text-slate-700">Agent 创作</dd></div></dl><div className="mt-6 space-y-2"><button onClick={onUpload} className="flex w-full items-center justify-center gap-2 rounded-md bg-violet-600 py-2.5 text-xs font-semibold text-white hover:bg-violet-700"><Upload className="h-4 w-4" />上传资源库</button><button onClick={() => showToast("已开始下载")} className="flex w-full items-center justify-center gap-2 rounded-md border border-slate-200 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Download className="h-4 w-4" />下载</button></div></div></div>
       </div>
-    </div>
+    </OverlayPortal>
   );
 }
 
 function Toast({ message }: { message: string }) {
-  return <div className="fixed left-1/2 top-5 z-[150] flex -translate-x-1/2 items-center gap-2 rounded-md bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xl"><CheckCircle2 className="h-4 w-4 text-emerald-400" />{message}</div>;
+  return <OverlayPortal layer="toast" className="fixed left-1/2 top-5 flex -translate-x-1/2 items-center gap-2 rounded-md bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xl"><CheckCircle2 className="h-4 w-4 text-emerald-400" />{message}</OverlayPortal>;
 }
 
 function EditablePromptText({ editorRef, value, onChange, placeholder, inline }: { editorRef?: React.RefObject<HTMLSpanElement | null>; value: string; onChange: (value: string) => void; placeholder: string; inline: boolean }) {
@@ -2675,44 +2661,41 @@ function SelectionChip({ icon: Icon, prefix, label, image, onRemove, compact = f
   );
 }
 
+const HomeMenuAnchorContext = React.createContext<React.RefObject<HTMLButtonElement | null> | null>(null);
+
 function HomeMenuButton({ icon: Icon, label, active, disabled = false, disabledHint, onClick, children }: { icon: React.ComponentType<{ className?: string }>; label: string; active?: boolean; disabled?: boolean; disabledHint?: string; onClick: () => void; children?: React.ReactNode }) {
+  const anchorRef = useRef<HTMLButtonElement | null>(null);
+  const [hintOpen, setHintOpen] = useState(false);
   return (
-    <div className="group/menu relative">
-      <button disabled={disabled} onClick={onClick} className={`flex h-8 items-center gap-1.5 rounded-md px-2.5 font-semibold transition-colors ${disabled ? "cursor-not-allowed text-slate-300" : active ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-slate-100"}`}><Icon className="h-3.5 w-3.5" /><span className="max-w-[120px] truncate">{label}</span></button>
-      {disabled && disabledHint && <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-800 px-2.5 py-1.5 text-[11px] font-medium text-white shadow-lg group-hover/menu:block">{disabledHint}<span className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-slate-800" /></span>}
-      {children}
-    </div>
+    <HomeMenuAnchorContext.Provider value={anchorRef}>
+      <div className="relative" onPointerEnter={() => disabled && disabledHint && setHintOpen(true)} onPointerLeave={() => setHintOpen(false)}>
+        <button ref={anchorRef} disabled={disabled} onClick={onClick} className={`flex items-center gap-1.5 rounded-xl border px-4 py-2 text-xs font-bold transition-all ${disabled ? "cursor-not-allowed border-slate-200/60 bg-slate-50 text-slate-300" : active ? "border-purple-300 bg-purple-50 text-purple-700 shadow-sm" : "border-slate-200/60 bg-slate-50 text-slate-600 hover:bg-slate-100"}`}><Icon className={`h-3.5 w-3.5 ${disabled ? "text-slate-300" : active ? "text-purple-600" : "text-slate-500"}`} /><span className="max-w-[120px] truncate">{label}</span></button>
+        {hintOpen && disabledHint && <AnchoredPopover anchorRef={anchorRef} side="top" align="center" gap={8} onClose={() => setHintOpen(false)} className="pointer-events-none whitespace-nowrap rounded-md bg-slate-800 px-2.5 py-1.5 text-[11px] font-medium text-white shadow-lg">{disabledHint}<span className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-slate-800" /></AnchoredPopover>}
+        {children}
+      </div>
+    </HomeMenuAnchorContext.Provider>
   );
 }
 
-function MenuPopup({ children }: { children: React.ReactNode }) {
-  return <div className="absolute bottom-full left-0 z-40 mb-2 w-52 rounded-md border border-slate-200 bg-white p-1.5 shadow-xl">{children}</div>;
+function MenuPopup({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  const anchorRef = React.useContext(HomeMenuAnchorContext);
+  if (!anchorRef) return null;
+  return <AnchoredPopover anchorRef={anchorRef} side="top" width={208} onClose={onClose} className="rounded-md border border-slate-200 bg-white p-1.5 shadow-xl">{children}</AnchoredPopover>;
 }
 
 function MenuAction({ icon: Icon, label, disabled, onClick }: { icon: React.ComponentType<{ className?: string }>; label: string; disabled?: boolean; onClick: () => void }) {
   return <button disabled={disabled} onClick={onClick} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"><Icon className="h-3.5 w-3.5" />{label}</button>;
 }
 
-function LocalReferenceAction({ disabled, onUploaded, showToast }: { disabled?: boolean; onUploaded: (item: ReferenceVideoSelection) => void; showToast: (message: string) => void }) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const upload = (file?: File) => {
-    if (!file) return;
-    if (!/\.(mp4|mov)$/i.test(file.name)) return showToast("仅支持 MP4、MOV 格式");
-    if (file.size > 500 * 1024 * 1024) return showToast("参考视频不能超过 500MB");
-    onUploaded({ id: `ref-local-${Date.now()}`, name: file.name, cover: SAMPLE_COVERS[1], duration: "00:30", size: `${(file.size / 1024 / 1024).toFixed(1)} MB` });
-  };
-  return <><button disabled={disabled} onClick={() => inputRef.current?.click()} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"><Upload className="h-3.5 w-3.5" />本地上传</button><input ref={inputRef} type="file" accept=".mp4,.mov,video/mp4,video/quicktime" className="hidden" onChange={(event) => upload(event.target.files?.[0])} /></>;
-}
-
 function ModalFrame({ title, width = "max-w-3xl", children, footer, onClose, hideHeader = false, lockBodyScroll = false, fixedHeight = lockBodyScroll }: { title: string; width?: string; children: React.ReactNode; footer?: React.ReactNode; onClose: () => void; hideHeader?: boolean; lockBodyScroll?: boolean; fixedHeight?: boolean }) {
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/45 p-4" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <OverlayPortal layer="modal" className="fixed inset-0 flex items-center justify-center bg-slate-900/45 p-4" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <div className={`flex max-h-[86vh] w-full ${fixedHeight ? "h-[86vh]" : ""} ${width} flex-col overflow-hidden rounded-lg bg-white shadow-2xl`}>
         {!hideHeader && <div className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 px-5"><h3 className="text-sm font-bold text-slate-900">{title}</h3><button onClick={onClose} title="关闭" className="rounded p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>}
         <div className={`min-h-0 flex-1 ${lockBodyScroll ? "overflow-hidden" : "overflow-y-auto"}`}>{children}</div>
         {footer && <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">{footer}</div>}
       </div>
-    </div>
+    </OverlayPortal>
   );
 }
 
@@ -2827,26 +2810,6 @@ function ProductImageModal({ existingCount, mode = "add", excludedIds = [], onCl
         <p className="mt-3 text-center text-xs leading-6 text-slate-400">支持上传本地图片文件，图片格式：jpeg、 png、 webp、 bmp、 tiff、 gif，单张图片大小≤30MB。<br />图片宽高比需在 (0.4, 2.5) 之间，宽高像素需在 (300px, 6000px) 之间。<br />仅支持上传非人脸图，请仔细查看要求并确保上传素材为您原创或已取得合法授权。</p>
         {selected.some((item) => item.source === "local") && <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">{selected.filter((item) => item.source === "local").map((item) => <div key={item.id} className="flex min-w-0 items-center gap-2 rounded-md border border-slate-200 p-2"><img src={item.image} alt="" className="h-11 w-11 rounded object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.resolution} · {item.size}</p></div><button onClick={() => toggle(item)} title="删除" className="p-1 text-slate-400 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div>}
       </div>}
-    </div>
-  </ModalFrame>;
-}
-
-function ReferenceVideoModal({ items, selected, onDelete, onClose, onConfirm }: { items: ReferenceVideoSelection[]; selected: ReferenceVideoSelection | null; onDelete: (id: string) => void; onClose: () => void; onConfirm: (item: ReferenceVideoSelection) => void }) {
-  const [search, setSearch] = useState("");
-  const [draft, setDraft] = useState<ReferenceVideoSelection | null>(selected);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const filtered = items.filter((item) => item.name.toLowerCase().includes(search.toLowerCase()));
-  const currentPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / pageSize)));
-  const pagedItems = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  return <ModalFrame title="" hideHeader lockBodyScroll onClose={onClose} width="max-w-4xl" footer={<><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!draft} onClick={() => draft && onConfirm(draft)} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">确认选择</button></>}>
-    <div className="flex h-[calc(86vh-57px)] min-h-0 flex-col p-5">
-      <div className="mb-4 flex shrink-0 items-center gap-3 border-b border-slate-200 pb-4">
-        <div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="搜索历史投放素材" className="h-10 w-full rounded-md border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-violet-400" /></div>
-        <button onClick={onClose} title="关闭" className="rounded p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto pr-1"><div className="grid grid-cols-3 gap-3">{pagedItems.map((item) => <button key={item.id} onClick={() => setDraft(item)} className={`group overflow-hidden rounded-md border bg-white text-left ${draft?.id === item.id ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200 hover:border-slate-300"}`}><div className="relative aspect-video"><img src={item.cover} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" /><span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">{item.duration}</span><span onClick={(event) => { event.stopPropagation(); onDelete(item.id); if (draft?.id === item.id) setDraft(null); }} title="删除历史素材" className="absolute right-2 top-2 hidden h-7 w-7 items-center justify-center rounded bg-black/65 text-white group-hover:flex"><Trash2 className="h-3.5 w-3.5" /></span>{draft?.id === item.id && <span className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-white"><Check className="h-3 w-3" /></span>}</div><div className="p-2.5"><p className="truncate text-xs font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.size}</p></div></button>)}</div></div>
-      <AssetPagination total={filtered.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(value) => { setPageSize(value); setPage(1); }} />
     </div>
   </ModalFrame>;
 }

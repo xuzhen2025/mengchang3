@@ -1,5 +1,6 @@
 import React from "react";
 import { LogOut, X } from "lucide-react";
+import OverlayPortal from "./overlays/OverlayPortal";
 
 interface LogoutConfirmDialogProps {
   open: boolean;
@@ -11,7 +12,7 @@ export default function LogoutConfirmDialog({ open, onCancel, onConfirm }: Logou
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="logout-title">
+    <OverlayPortal layer="dialog" className="fixed inset-0 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="logout-title">
       <div className="w-full max-w-sm overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
           <div className="flex items-center gap-2.5">
@@ -30,6 +31,6 @@ export default function LogoutConfirmDialog({ open, onCancel, onConfirm }: Logou
           <button type="button" onClick={onConfirm} className="rounded-md bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800">确认退出</button>
         </div>
       </div>
-    </div>
+    </OverlayPortal>
   );
 }

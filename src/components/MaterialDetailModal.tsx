@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import ReferencedVideosProduced from "./ReferencedVideosProduced";
+import OverlayPortal from "./overlays/OverlayPortal";
 import {
   X,
   Play,
@@ -84,7 +85,7 @@ export default function MaterialDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <OverlayPortal layer="modal" className="fixed inset-0 bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       <div className="bg-white rounded-3xl shadow-2xl border border-slate-200/90 w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         
         {/* Modal Header */}
@@ -360,6 +361,6 @@ export default function MaterialDetailModal({
         </div>
 
       </div>
-    </div>
+    </OverlayPortal>
   );
 }

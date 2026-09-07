@@ -17,6 +17,7 @@ import {
   X
 } from "lucide-react";
 import { GenerationTaskCategory, Task } from "../types";
+import OverlayPortal from "./overlays/OverlayPortal";
 
 interface TaskQueuePanelProps {
   tasks: Task[];
@@ -36,7 +37,7 @@ const CATEGORY_META: Record<GenerationTaskCategory, { label: string; shortLabel:
   digital_human: { label: "数字人分身", shortLabel: "数字人分身" },
   model_change: { label: "模特换衣", shortLabel: "模特换衣" },
   fission: { label: "爆款复刻", shortLabel: "爆款复刻" },
-  ai_video: { label: "AI视频素材", shortLabel: "AI视频素材" },
+  ai_video: { label: "AI视频原料", shortLabel: "AI视频原料" },
   ai_image: { label: "AI图片素材", shortLabel: "AI图片素材" }
 };
 
@@ -140,19 +141,23 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
 
   if (!isOpen) {
     return (
-      <button
+      <OverlayPortal
+        layer="drawer"
         onClick={() => setIsOpen(true)}
         title={activeCount > 0 ? `当前有 ${activeCount} 个任务进行中` : "打开任务队列"}
-        className="fixed right-0 top-1/2 z-50 flex min-h-32 -translate-y-1/2 flex-col items-center justify-center gap-2 rounded-l-lg border border-r-0 border-violet-200 bg-white px-2.5 py-3 text-violet-700 shadow-lg transition-colors hover:bg-violet-50"
+        className="fixed right-0 top-1/2 flex min-h-32 -translate-y-1/2 cursor-pointer flex-col items-center justify-center gap-2 rounded-l-lg border border-r-0 border-violet-200 bg-white px-2.5 py-3 text-violet-700 shadow-lg transition-colors hover:bg-violet-50"
+        role="button"
+        tabIndex={0}
+        onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setIsOpen(true); }}
       >
         {activeCount > 0 && <Loader2 className="h-4 w-4 animate-spin" />}
         <span className="text-[11px] font-bold [writing-mode:vertical-lr]">{activeCount > 0 ? `${activeCount}个任务` : "任务队列"}</span>
-      </button>
+      </OverlayPortal>
     );
   }
 
   return (
-    <aside className="fixed right-0 top-0 z-[70] flex h-screen w-[390px] flex-col border-l border-slate-200 bg-white text-slate-800 shadow-2xl">
+    <OverlayPortal layer="drawer" className="fixed right-0 top-0 flex h-screen w-[390px] flex-col border-l border-slate-200 bg-white text-slate-800 shadow-2xl" role="complementary">
       <header className="border-b border-slate-200">
         <div className="flex items-center justify-between px-4 py-3.5">
           <div className="flex items-center gap-2">
@@ -202,14 +207,23 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
                 const category = getTaskCategory(task);
                 const stageLabel = getTaskStageLabel(task, category);
                 const isAgent = category === "agent";
+                const isRemake = category === "fission";
+                const isAiVideo = category === "ai_video";
                 const status = STATUS_META[task.status];
-                const canCancel = task.cancellable !== false && (task.status === "queue" || task.status === "generating");
+                const canCancel = task.cancellable !== false && (task.status === "queue" || (!isAiVideo && task.status === "generating"));
                 const canRestart = task.restartable !== false && (task.status === "failed" || task.status === "cancelled");
-                const preview = task.outputFiles?.[0] || task.inputFiles.find((file) => /^https?:\/\//.test(file));
+                const preview = task.aiVideoOutput?.coverUrl || task.outputFiles?.[0] || task.inputFiles.find((file) => /^https?:\/\//.test(file));
                 const estimatedMinutes = Math.max(1, Math.ceil((100 - task.progress) / 12));
                 const PreviewIcon = category === "agent" ? Bot : category === "ai_image" ? ImageIcon : category === "ai_video" ? Video : WandSparkles;
                 return (
-                  <article key={task.id} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-slate-300">
+                  <article
+                    key={task.id}
+                    role={isAiVideo ? "button" : undefined}
+                    tabIndex={isAiVideo ? 0 : undefined}
+                    onClick={isAiVideo ? () => viewResult(task.id) : undefined}
+                    onKeyDown={isAiVideo ? (event) => { if (event.key === "Enter" || event.key === " ") viewResult(task.id); } : undefined}
+                    className={`rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-slate-300 ${isAiVideo ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-200" : ""}`}
+                  >
                     <div className="flex gap-3">
                       <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-50">
                         {preview ? <img src={preview} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : <PreviewIcon className="h-6 w-6 text-slate-300" />}
@@ -231,11 +245,12 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
                     {task.status === "cancelled" && <p className="mt-2 flex items-start gap-1.5 rounded bg-amber-50 p-2 text-[10px] leading-4 text-amber-700"><Ban className="mt-0.5 h-3 w-3 shrink-0" />{task.refundedCredits === task.creditsCost ? "排队阶段取消，积分已全额退回。" : "生成阶段取消，已发生的计算消耗不退回。"}</p>}
 
                     <div className="mt-2.5 flex justify-end gap-1.5 border-t border-slate-100 pt-2.5">
-                      {canCancel && <button onClick={() => cancelTask(task.id)} className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><X className="h-3 w-3" />取消任务</button>}
-                      {task.remakeSessionId && <button onClick={() => viewResult(task.id)} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><Eye className="h-3 w-3" />{task.status === "completed" ? "查看任务" : "进入任务"}</button>}
+                      {canCancel && <button onClick={(event) => { event.stopPropagation(); cancelTask(task.id); }} className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><X className="h-3 w-3" />取消任务</button>}
+                      {isRemake && <button onClick={() => viewResult(task.id)} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><Eye className="h-3 w-3" />查看任务</button>}
                       {isAgent && <button onClick={() => viewResult(task.id)} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><Eye className="h-3 w-3" />{canRestart ? "继续创作" : "进入会话"}</button>}
-                      {!task.remakeSessionId && !isAgent && canRestart && <button onClick={() => restartTask(task.id)} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><RotateCcw className="h-3 w-3" />重新生成</button>}
-                      {!task.remakeSessionId && !isAgent && task.status === "completed" && <><button onClick={() => viewResult(task.id)} className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><Eye className="h-3 w-3" />查看结果</button><button className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><Download className="h-3 w-3" />下载</button></>}
+                      {isAiVideo && <button onClick={(event) => { event.stopPropagation(); viewResult(task.id); }} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><Eye className="h-3 w-3" />{task.status === "failed" || task.status === "cancelled" ? "重新编辑" : "查看任务"}</button>}
+                      {!isRemake && !isAgent && !isAiVideo && canRestart && <button onClick={() => restartTask(task.id)} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><RotateCcw className="h-3 w-3" />重新生成</button>}
+                      {!isRemake && !isAgent && !isAiVideo && task.status === "completed" && <><button onClick={() => viewResult(task.id)} className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><Eye className="h-3 w-3" />查看结果</button><button className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><Download className="h-3 w-3" />下载</button></>}
                     </div>
                   </article>
                 );
@@ -248,6 +263,6 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
       <footer className="border-t border-slate-200 bg-slate-50 px-4 py-3 text-center text-[11px] text-slate-500">
         {tab === "recent" ? <>近期任务仅展示最近20条，更多请查看 <button onClick={() => setTab("all")} className="font-bold text-violet-700 hover:underline">全部任务</button></> : <>当前共 {visibleTasks.length} 条任务，全部历史任务长期保留</>}
       </footer>
-    </aside>
+    </OverlayPortal>
   );
 }

@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import UploadFinishedVideoModal from "./UploadFinishedVideoModal";
 import {
   AlertCircle,
+  AtSign,
   AudioLines,
   ArrowLeft,
   Check,
@@ -21,6 +23,7 @@ import {
   Loader2,
   Mic2,
   Package,
+  Pause,
   Pencil,
   Play,
   Plus,
@@ -31,11 +34,16 @@ import {
   Upload,
   UserRound,
   Video,
+  Maximize,
   Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import { Asset, Task } from "../types";
 import AssetPagination from "./AssetPagination";
+import PrimaryGenerationButton from "./PrimaryGenerationButton";
+import AnchoredPopover from "./overlays/AnchoredPopover";
+import OverlayPortal from "./overlays/OverlayPortal";
 
 type Step = "source" | "subjects" | "storyboard" | "final";
 type SubjectType = "person" | "scene" | "product";
@@ -100,6 +108,7 @@ interface RemakeSubject {
   prompt: string;
   originalImage: string;
   originalName: string;
+  replacementName?: string;
   candidates: CandidateImage[];
   referenceImages?: CandidateImage[];
   selectedCandidateId?: string;
@@ -112,6 +121,7 @@ interface StoryboardShot {
   title: string;
   duration: number;
   description: string;
+  manuallyAdded?: boolean;
   dialogue: string;
   subjectIds: string[];
   status: GenerationStatus;
@@ -155,6 +165,7 @@ interface VideoRemakeViewProps {
   credits: number;
   assets: Asset[];
   activeSessionId: string | null;
+  activeTask?: Task;
   onSessionChange: (sessionId: string) => void;
   onCreateSession: () => void;
   onOpenTaskQueue: () => void;
@@ -232,8 +243,9 @@ const VIDEO_COVERS = [
   "https://images.unsplash.com/photo-1556229010-6c3f2c9ca5f8?w=700&auto=format&fit=crop&q=80",
 ];
 
-const STORYBOARD_GENERATION_COST = 3405;
+const STORYBOARD_GENERATION_COST = 10;
 const STORYBOARD_VIDEO_MODELS = ["Doubao-Seedance-2.5", "Doubao-Seedance-2.0-Pro", "Vidu-Q2"] as const;
+const STORYBOARD_MAX_DURATIONS = [15, 20, 30] as const;
 
 const IMAGE_PICKER_SAMPLES: ImageLibraryItem[] = [
   { candidate: { id: "lib-img-01", name: "精华空瓶商品主体.png", image: "./assets/prototype/skincare-product.jpg", source: "图片管理" }, primaryCategory: "美妆护肤", secondaryCategory: "商品主图", tags: ["产品名称", "白底图"], status: "已通过", author: "徐振", resolution: "1200x800", size: "1.2 MB" },
@@ -411,7 +423,7 @@ const getStoryboardVersions = (shot: StoryboardShot): StoryboardVideoVersion[] =
   return shot.cover ? [{ id: `${shot.id}-legacy`, cover: shot.cover, createdAt: 0 }] : [];
 };
 
-const getInitialState = (sessionId: string): SavedRemakeState => {
+const getInitialState = (sessionId: string, activeTask?: Task): SavedRemakeState => {
   try {
     const stored = window.localStorage.getItem(`${STORAGE_PREFIX}${sessionId}`)
       || window.localStorage.getItem(`${LEGACY_STORAGE_PREFIX}${sessionId}`);
@@ -425,11 +437,57 @@ const getInitialState = (sessionId: string): SavedRemakeState => {
           ...subject,
           prompt: subject.type === "person" && !subject.prompt.includes("- 时代基底：") ? CHARACTER_GENERATION_PROMPT : subject.prompt,
           referenceImages: subject.referenceImages ?? [],
+          replacementName: subject.replacementName ?? (subject.candidates.length ? subject.originalName : undefined),
         })),
       };
     }
   } catch {
     // Ignore malformed prototype persistence.
+  }
+  if (activeTask && (activeTask.category === "fission" || activeTask.type === "fission")) {
+    const restoredStep: Step = activeTask.remakeStage === "final"
+      ? "final"
+      : activeTask.remakeStage === "storyboard"
+        ? "storyboard"
+        : "subjects";
+    const cover = activeTask.outputFiles?.[0]
+      || activeTask.inputFiles.find((file) => /^https?:\/\//.test(file))
+      || VIDEO_COVERS[0];
+    const restoredShots = restoredStep === "subjects"
+      ? []
+      : INITIAL_SHOTS.map((shot, index) => {
+        const shotCover = VIDEO_COVERS[index % VIDEO_COVERS.length];
+        const completed = restoredStep === "final" || activeTask.status === "completed";
+        return completed
+          ? { ...shot, status: "completed" as const, progress: 100, cover: shotCover, versions: [{ id: `${shot.id}-restored`, cover: shotCover, createdAt: 0 }], currentVersionId: `${shot.id}-restored` }
+          : { ...shot };
+      });
+    return {
+      step: restoredStep,
+      source: {
+        id: `${sessionId}-source`,
+        name: activeTask.name.replace(/\s*·.*$/, "") + ".mp4",
+        url: cover,
+        cover,
+        size: "86.4 MB",
+        duration: formatDuration(restoredShots.reduce((total, shot) => total + shot.duration, 0) || 25),
+        section: "成片",
+      },
+      language: "中文",
+      videoRatio: "9:16",
+      resolution: "720p",
+      projectName: activeTask.name.replace(/\s*·.*$/, ""),
+      subjects: INITIAL_SUBJECTS.map((subject) => ({ ...subject, candidates: [], referenceImages: [] })),
+      shots: restoredShots,
+      selectedSubjectId: null,
+      selectedShotId: restoredShots[0]?.id || null,
+      finalStatus: restoredStep === "final" ? "completed" : "pending",
+      finalProgress: restoredStep === "final" ? 100 : 0,
+      finalName: `爆款复刻成片_${formatDate()}_${sessionId.slice(-6)}_0.mp4`,
+      spentCredits: activeTask.creditsCost,
+      videoFailureShown: false,
+      backgroundOperation: null,
+    };
   }
   return {
     step: "source",
@@ -456,6 +514,7 @@ export default function VideoRemakeView({
   credits,
   assets,
   activeSessionId,
+  activeTask,
   onSessionChange,
   onCreateSession,
   onOpenTaskQueue,
@@ -463,7 +522,7 @@ export default function VideoRemakeView({
   onUploadVideos,
 }: VideoRemakeViewProps) {
   const [sessionId] = useState(() => activeSessionId || `remake-${Date.now()}`);
-  const initial = useMemo(() => getInitialState(sessionId), [sessionId]);
+  const initial = useMemo(() => getInitialState(sessionId, activeTask), [activeTask, sessionId]);
   const [step, setStep] = useState<Step>(initial.step);
   const [source, setSource] = useState<SourceVideo | null>(initial.source);
   const [language, setLanguage] = useState(initial.language);
@@ -502,9 +561,9 @@ export default function VideoRemakeView({
   const selectedSubject = subjects.find((item) => item.id === selectedSubjectId) || (selectedSubjectId ? subjects[0] : null);
   const selectedShot = shots.find((item) => item.id === selectedShotId) || shots[0] || null;
   const currentCandidate = selectedSubject?.candidates.find((item) => item.id === selectedSubject.selectedCandidateId);
-  const allShotsReady = shots.length > 0 && shots.every((item) => item.status === "completed");
   const generatedShotCount = shots.filter((item) => item.status === "completed").length;
   const replacedSubjects = subjects.filter((item) => item.selectedCandidateId);
+  const queueTaskId = activeTask?.id || `remake-task-${sessionId}`;
 
   const showToast = (message: string) => {
     setToast(message);
@@ -571,7 +630,7 @@ export default function VideoRemakeView({
   const syncTask = (label: string, status: Task["status"], progress: number, totalCredits: number, remakeStage: NonNullable<Task["remakeStage"]>, failureReason?: string) => {
     const now = new Date().toISOString().replace("T", " ").slice(0, 16);
     onSyncTask({
-      id: `remake-task-${sessionId}`,
+      id: queueTaskId,
       name: `${projectName} · ${label}`,
       type: "fission",
       status,
@@ -615,7 +674,7 @@ export default function VideoRemakeView({
     syncTask(label, "generating", 6, nextSpent, remakeStage);
     if (cost > 0) {
       onSyncTask({
-        id: `remake-task-${sessionId}`,
+        id: queueTaskId,
         name: `${projectName} · ${label}`,
         type: "fission",
         status: "generating",
@@ -682,7 +741,7 @@ export default function VideoRemakeView({
       }));
       const latestSubjects = getInitialState(sessionId).subjects;
       const nextSubjects = latestSubjects.map((item) => item.id === subject.id
-        ? { ...item, candidates: [...item.candidates, ...candidates], selectedCandidateId: candidates[0].id }
+        ? { ...item, replacementName: item.replacementName ?? item.originalName, candidates: [...item.candidates, ...candidates], selectedCandidateId: candidates[0].id }
         : item);
       persistPatch({ subjects: nextSubjects });
       setSubjects(nextSubjects);
@@ -690,19 +749,19 @@ export default function VideoRemakeView({
     });
   };
 
-  const startStoryboardAnalysis = () => {
+  const startStoryboardAnalysis = (model: (typeof STORYBOARD_VIDEO_MODELS)[number], maxSegmentDuration: (typeof STORYBOARD_MAX_DURATIONS)[number]) => {
     setReviewOpen(false);
-    runOperation("storyboard-analysis", "分镜解析中", 0, () => {
+    runOperation("storyboard-analysis", "正在分析电商视频并拆分分镜", 0, () => {
       const totalDuration = Math.max(4, parseDurationSeconds(source?.duration || "00:30"));
-      const shotCount = Math.max(1, Math.ceil(totalDuration / 30));
+      const shotCount = Math.max(1, Math.ceil(totalDuration / maxSegmentDuration));
       const availableSubjectIds = new Set(subjects.map((item) => item.id));
       const shotResolution: Exclude<VideoResolution, "4K"> = resolution === "4K" ? "1080p" : resolution;
       const createdAt = Date.now();
       const nextShots: StoryboardShot[] = Array.from({ length: shotCount }, (_, index) => {
         const template = INITIAL_SHOTS[index % INITIAL_SHOTS.length];
-        const segmentStart = index * 30;
+        const segmentStart = index * maxSegmentDuration;
         const remainingDuration = totalDuration - segmentStart;
-        const duration = Math.max(4, Math.min(30, remainingDuration));
+        const duration = Math.max(4, Math.min(maxSegmentDuration, remainingDuration));
         const segmentEnd = Math.min(totalDuration, segmentStart + duration);
         return {
           ...template,
@@ -726,7 +785,7 @@ export default function VideoRemakeView({
       setSelectedShotId(nextShots[0].id);
       setStep("storyboard");
       persistPatch({ shots: nextShots, selectedShotId: nextShots[0].id, step: "storyboard" });
-      showToast("分镜解析完成");
+      showToast(`${model} 分镜解析完成`);
     }, { duration: 230 });
   };
 
@@ -778,21 +837,6 @@ export default function VideoRemakeView({
       setShots(nextShots);
       showToast(`${shot.title}生成完成`);
     });
-  };
-
-  const generateFinal = () => {
-    if (!allShotsReady) return showToast("请先完成全部分镜视频");
-    if (credits < 10) return showToast("积分不足，本次操作需要 10 积分");
-    setStep("final");
-    setFinalStatus("generating");
-    setFinalProgress(6);
-    persistPatch({ step: "final", finalStatus: "generating", finalProgress: 6 });
-    runOperation("final", "正在生成视频成片", 10, () => {
-      setFinalStatus("completed");
-      setFinalProgress(100);
-      persistPatch({ step: "final", finalStatus: "completed", finalProgress: 100 });
-      showToast("视频成片生成完成");
-    }, { duration: 320 });
   };
 
   useEffect(() => {
@@ -854,6 +898,7 @@ export default function VideoRemakeView({
       id: `${sourceSubject.id}-independent-${Date.now()}`,
       name: `${sourceSubject.name} 2`,
       originalName: `${sourceSubject.originalName}（独立）`,
+      replacementName: undefined,
       candidates: [],
       selectedCandidateId: undefined,
       voices: sourceSubject.voices?.map((voice) => ({ ...voice })),
@@ -905,6 +950,7 @@ export default function VideoRemakeView({
       title: "",
       duration,
       description: "",
+      manuallyAdded: true,
       dialogue: "",
       subjectIds: [],
       referenceImages: [],
@@ -935,11 +981,29 @@ export default function VideoRemakeView({
   };
 
   const steps: Array<{ id: Step; label: string; enabled: boolean }> = [
-    { id: "source", label: "原视频", enabled: true },
     { id: "subjects", label: "主体设定", enabled: subjects.length > 0 },
-    { id: "storyboard", label: "分镜", enabled: shots.length > 0 },
-    { id: "final", label: "视频成片", enabled: finalStatus !== "pending" || allShotsReady },
+    { id: "storyboard", label: "分镜解析", enabled: shots.length > 0 },
+    { id: "final", label: "视频成片", enabled: shots.length > 0 },
   ];
+
+  if (uploadOpen) {
+    return (
+      <div className="relative flex h-full min-h-0 flex-1 flex-col">
+        {toast && <OverlayPortal layer="toast" className="fixed left-1/2 top-20 -translate-x-1/2 rounded-md bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xl">{toast}</OverlayPortal>}
+        <UploadFinishedVideoModal
+          key={finalName}
+          isOpen
+          isPage
+          initialFiles={[{ name: finalName, type: "video/mp4" }]}
+          onClose={() => setUploadOpen(false)}
+          onPublishSuccess={(message) => {
+            onUploadVideos([{ name: finalName, cover: VIDEO_COVERS[0] }]);
+            showToast(message);
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-slate-50 text-slate-800">
@@ -964,7 +1028,6 @@ export default function VideoRemakeView({
           </React.Fragment>)}
         </nav>
         <div className="flex items-center gap-2">
-          <span className="rounded-md bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">可用积分 {credits.toFixed(0)}</span>
           <button onClick={onCreateSession} disabled={!!operation} className="flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"><Plus className="h-4 w-4" />新建任务</button>
           <button onClick={onOpenTaskQueue} className="flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"><ListTodo className="h-4 w-4" />任务队列</button>
         </div>
@@ -977,9 +1040,11 @@ export default function VideoRemakeView({
 
       <main className="min-h-0 flex-1 overflow-hidden">
         {step === "source" && <SourceStep source={source} language={language} videoRatio={videoRatio} resolution={resolution} operation={operation} onLanguage={setLanguage} onVideoRatio={setVideoRatio} onResolution={setResolution} onOpen={() => setSourceModalOpen(true)} onAnalyze={startAnalysis} />}
-        {step === "subjects" && <SubjectsStep subjects={subjects} subjectTab={subjectTab} selectedSubject={selectedSubject} currentCandidate={currentCandidate} operation={operation} onTab={setSubjectTab} onSelect={setSelectedSubjectId} onUpdate={updateSubject} onGenerate={generateSubject} onChooseImage={(id, target = "candidate") => { setImageModalTarget(target); setImageModalSubjectId(id); }} onLightbox={setLightbox} onAdd={setAddSubjectType} onConfigureVoice={setVoiceSubjectId} onMerge={setMergeSubjectId} onIndependent={setIndependentSubjectId} onDelete={deleteSubject} onContinue={openReplacementReview} />}
-        {step === "storyboard" && <StoryboardStep source={source} resolution={resolution} subjects={subjects} shots={shots} selectedShot={selectedShot} operation={operation} seek={seek} generatedShotCount={generatedShotCount} onSeek={setSeek} onSelectShot={setSelectedShotId} onUpdateShot={updateShot} onGenerateAll={generateAllShots} onGenerateShot={generateShot} onAddShot={setAddShotIndex} onDeleteShot={deleteShot} onGenerateFinal={generateFinal} onNotify={showToast} />}
-        {step === "final" && <FinalStep source={source} status={finalStatus} progress={finalProgress} finalName={finalName} onFinalName={setFinalName} onGenerate={generateFinal} onUpload={() => setUploadOpen(true)} onBackStoryboard={() => setStep("storyboard")} />}
+        {step === "subjects" && (operation?.key === "storyboard-analysis"
+          ? <StoryboardAnalysisProgress progress={operation.progress} />
+          : <SubjectsStep subjects={subjects} subjectTab={subjectTab} selectedSubject={selectedSubject} currentCandidate={currentCandidate} operation={operation} onTab={setSubjectTab} onSelect={setSelectedSubjectId} onUpdate={updateSubject} onGenerate={generateSubject} onChooseImage={(id, target = "candidate") => { setImageModalTarget(target); setImageModalSubjectId(id); }} onLightbox={setLightbox} onAdd={setAddSubjectType} onConfigureVoice={setVoiceSubjectId} onMerge={setMergeSubjectId} onIndependent={setIndependentSubjectId} onDelete={deleteSubject} onContinue={openReplacementReview} />)}
+        {step === "storyboard" && <StoryboardStep source={source} resolution={resolution} subjects={subjects} shots={shots} selectedShot={selectedShot} operation={operation} seek={seek} generatedShotCount={generatedShotCount} onSeek={setSeek} onSelectShot={setSelectedShotId} onUpdateShot={updateShot} onGenerateAll={generateAllShots} onGenerateShot={generateShot} onAddShot={setAddShotIndex} onDeleteShot={deleteShot} onNotify={showToast} />}
+        {step === "final" && <FinalStep source={source} shots={shots} finalName={finalName} onUpload={() => setUploadOpen(true)} />}
       </main>
 
       {sourceModalOpen && <SourceVideoModal assets={assets} selected={source} onClose={() => setSourceModalOpen(false)} onConfirm={(item) => { setSource(item); setProjectName(item.name.replace(/\.[^.]+$/, "")); setSubjects([]); setShots([]); setSelectedSubjectId(null); setSelectedShotId(null); setFinalStatus("pending"); setFinalProgress(0); setStep("source"); setSourceModalOpen(false); }} showToast={showToast} />}
@@ -1006,7 +1071,7 @@ export default function VideoRemakeView({
                   .map((image, index) => ({ ...image, name: `图片${index + 1}` }));
                 return { ...item, referenceImages: nextReferenceImages };
               }
-              return { ...item, candidates: [...item.candidates, candidate], selectedCandidateId: candidate.id };
+              return { ...item, replacementName: item.replacementName ?? item.originalName, candidates: [...item.candidates, candidate], selectedCandidateId: candidate.id };
             }));
             setImageModalSubjectId(null);
           }}
@@ -1020,9 +1085,8 @@ export default function VideoRemakeView({
       {emptySubjectsWarningOpen && <ConfirmationModal title="请先完成替换关系设定" description="当前没有可用于分镜解析的主体，请先添加角色、场景或道具后再继续。" confirmLabel="知道了" hideCancel onClose={() => setEmptySubjectsWarningOpen(false)} onConfirm={() => setEmptySubjectsWarningOpen(false)} />}
       {reviewOpen && <ReplacementReviewModal subjects={subjects} onClose={() => setReviewOpen(false)} onConfirm={startStoryboardAnalysis} />}
       {addShotIndex !== null && <AddShotModal onClose={() => setAddShotIndex(null)} onConfirm={addShot} />}
-      {uploadOpen && <UploadFinalModal name={finalName} onClose={() => setUploadOpen(false)} onPublish={(name) => { setFinalName(name); onUploadVideos([{ name, cover: VIDEO_COVERS[0] }]); setUploadOpen(false); showToast("上传成功"); }} />}
-      {lightbox && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-8" onClick={() => setLightbox(null)}><button title="关闭" className="absolute right-6 top-6 rounded bg-white/90 p-2 text-slate-700"><X className="h-5 w-5" /></button><img src={lightbox} alt="查看大图" className="max-h-full max-w-full rounded object-contain" referrerPolicy="no-referrer" /></div>}
-      {toast && <div className="fixed left-1/2 top-20 z-[120] -translate-x-1/2 rounded-md bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xl">{toast}</div>}
+      {lightbox && <OverlayPortal layer="modal" className="fixed inset-0 flex items-center justify-center bg-black/70 p-8" onClick={() => setLightbox(null)}><button title="关闭" className="absolute right-6 top-6 rounded bg-white/90 p-2 text-slate-700"><X className="h-5 w-5" /></button><img src={lightbox} alt="查看大图" className="max-h-full max-w-full rounded object-contain" referrerPolicy="no-referrer" /></OverlayPortal>}
+      {toast && <OverlayPortal layer="toast" className="fixed left-1/2 top-20 -translate-x-1/2 rounded-md bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xl">{toast}</OverlayPortal>}
     </div>
   );
 }
@@ -1033,9 +1097,9 @@ function SourceStep({ source, language, videoRatio, resolution, operation, onLan
     <div className="mb-6 text-center"><h2 className="text-2xl font-bold text-slate-900">复刻爆款，让好内容持续转化</h2><p className="mt-2 text-sm text-slate-500">上传电商爆款视频，替换角色、场景、商品和道具，生成属于你的全新带货视频。</p></div>
     <section className="mx-auto max-w-4xl rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="p-4">{!source ? <button disabled={!!operation} onClick={onOpen} className="flex h-40 w-full flex-col items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:text-violet-700 disabled:opacity-50"><Upload className="h-7 w-7" /><span className="mt-3 text-sm font-semibold">选择一个原视频</span><span className="mt-1 text-xs text-slate-400">资源库选择或本地上传</span></button> : <div className="flex h-40 flex-col items-center justify-center"><div className="flex min-w-80 max-w-full items-center gap-3 rounded-lg bg-slate-50 px-4 py-3"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-violet-50 text-violet-600"><Film className="h-5 w-5" /></span><p className="min-w-0 truncate text-sm font-semibold text-slate-800">{source.name}</p></div><button disabled={!!operation} onClick={onOpen} className="mt-3 flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 hover:border-violet-300 hover:text-violet-700 disabled:opacity-50"><RefreshCw className="h-3.5 w-3.5" />重选视频</button></div>}</div>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/70 px-4 py-3"><CompactSourceSetting label="目标语种" icon={<Languages className="h-4 w-4" />}><select value={language} onChange={(event) => onLanguage(event.target.value)} disabled={!!operation} className="min-w-20 bg-transparent text-xs font-medium text-slate-700 outline-none"><option>中文</option><option>英语</option><option>日语</option><option>韩语</option><option>西班牙语</option><option>葡萄牙语</option><option>印尼语</option><option>越南语</option><option>泰语</option><option>马来语</option></select></CompactSourceSetting><div className="flex flex-wrap items-center gap-2"><RatioDropdown value={videoRatio} disabled={!!operation} onChange={onVideoRatio} /><CompactSourceSetting label="分辨率" icon={<ImageIcon className="h-4 w-4" />}><select value={resolution} onChange={(event) => onResolution(event.target.value as VideoResolution)} disabled={!!operation} className="min-w-24 bg-transparent text-xs font-medium text-slate-700 outline-none"><option value="480p">480p</option><option value="720p">720p（标清）</option><option value="1080p">1080p（高清）</option><option value="4K">4K</option></select></CompactSourceSetting></div></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-white px-4 py-3"><CompactSourceSetting label="目标语种" icon={<Languages className="h-3.5 w-3.5" />}><select value={language} onChange={(event) => onLanguage(event.target.value)} disabled={!!operation} className="min-w-20 bg-transparent text-xs font-bold text-slate-600 outline-none"><option>中文</option><option>英语</option><option>日语</option><option>韩语</option><option>西班牙语</option><option>葡萄牙语</option><option>印尼语</option><option>越南语</option><option>泰语</option><option>马来语</option></select></CompactSourceSetting><div className="flex flex-wrap items-center gap-2"><RatioDropdown value={videoRatio} disabled={!!operation} onChange={onVideoRatio} /><CompactSourceSetting label="分辨率" icon={<ImageIcon className="h-3.5 w-3.5" />}><select value={resolution} onChange={(event) => onResolution(event.target.value as VideoResolution)} disabled={!!operation} className="min-w-24 bg-transparent text-xs font-bold text-slate-600 outline-none"><option value="480p">480p</option><option value="720p">720p（标清）</option><option value="1080p">1080p（高清）</option><option value="4K">4K</option></select></CompactSourceSetting></div></div>
     </section>
-    <div className="mt-6 flex justify-center"><button disabled={!source || !!operation} onClick={onAnalyze} className="flex min-w-72 items-center justify-center gap-2 rounded-md bg-violet-600 px-12 py-3 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"><Sparkles className="h-5 w-5" />开始解析</button></div>
+    <div className="mt-6 flex justify-center"><PrimaryGenerationButton disabled={!source || !!operation} onClick={onAnalyze}>开始解析</PrimaryGenerationButton></div>
   </div></div></div>;
 }
 
@@ -1044,27 +1108,23 @@ function VideoAnalysisProgress({ progress }: { progress: number }) {
   return <div className="flex h-full min-h-0 items-center justify-center overflow-y-auto px-6 py-8"><div className="w-full max-w-3xl text-center"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-lg bg-white text-violet-600 shadow-sm"><FileSearch className="h-8 w-8" /></div><h2 className="mt-5 text-xl font-bold text-slate-900">视频分析中</h2><p className="mt-2 text-sm text-slate-400">正在分析爆款结构、角色、场景、商品与道具，请耐心等待...</p><section className="mt-8 grid grid-cols-4 gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">{items.map((label, index) => { const value = Math.max(0, Math.min(100, progress - index * 6)); return <div key={label} className="flex flex-col items-center"><div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: `conic-gradient(#7c3aed ${value * 3.6}deg, #e2e8f0 0deg)` }}><span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-xs font-bold text-slate-700">{value}%</span></div><p className="mt-3 text-xs font-semibold text-slate-600">{label}</p></div>; })}</section></div></div>;
 }
 
+function StoryboardAnalysisProgress({ progress }: { progress: number }) {
+  const items = ["视频内容拆分", "镜头描述生成", "主体引用匹配", "台词旁白整理"];
+  return <div className="flex h-full min-h-0 items-center justify-center overflow-y-auto px-6 py-8"><div className="w-full max-w-3xl text-center"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-lg bg-white text-violet-600 shadow-sm"><FileSearch className="h-8 w-8" /></div><h2 className="mt-5 text-xl font-bold text-slate-900">分镜解析中</h2><p className="mt-2 text-sm text-slate-400">正在拆分电商视频内容并生成分镜描述，请耐心等待...</p><section className="mt-8 grid grid-cols-4 gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">{items.map((label, index) => { const value = Math.max(0, Math.min(100, progress - index * 7)); return <div key={label} className="flex flex-col items-center"><div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: `conic-gradient(#7c3aed ${value * 3.6}deg, #e2e8f0 0deg)` }}><span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-xs font-bold text-slate-700">{value}%</span></div><p className="mt-3 text-xs font-semibold text-slate-600">{label}</p></div>; })}</section></div></div>;
+}
+
 function CompactSourceSetting({ label, icon, children }: { label: string; icon: React.ReactNode; children: React.ReactNode }) {
-  return <label className="flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5"><span className="text-slate-400">{icon}</span><span className="whitespace-nowrap text-[11px] font-medium text-slate-500">{label}</span><span className="h-4 border-l border-slate-200" />{children}</label>;
+  return <label className="flex items-center gap-1.5 rounded-xl border border-slate-200/60 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-600 transition-all hover:bg-slate-100"><span className="text-slate-500">{icon}</span><span className="whitespace-nowrap">{label}</span><span className="mx-1 h-4 border-l border-slate-200" />{children}</label>;
 }
 
 function RatioDropdown({ value, disabled, onChange }: { value: VideoRatio; disabled: boolean; onChange: (value: VideoRatio) => void }) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
   const options: VideoRatio[] = ["16:9", "4:3", "3:4", "9:16", "21:9"];
 
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [open]);
-
-  return <div ref={rootRef} className="relative">
-    <button type="button" disabled={disabled} onClick={() => setOpen((current) => !current)} className="flex h-9 min-w-40 items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 text-left disabled:opacity-50"><Video className="h-4 w-4 text-slate-400" /><span className="text-[11px] font-medium text-slate-500">比例</span><span className="h-4 border-l border-slate-200" /><span className="flex-1 text-xs font-medium text-slate-700">{value}</span><ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} /></button>
-    {open && <div className="absolute right-0 top-11 z-50 w-44 rounded-lg border border-slate-200 bg-white p-2 shadow-xl"><p className="px-2 pb-1.5 pt-0.5 text-xs text-slate-400">比例</p><div className="space-y-0.5">{options.map((option) => <button key={option} type="button" onClick={() => { onChange(option); setOpen(false); }} className={`flex h-10 w-full items-center gap-3 rounded-md px-2.5 text-sm font-medium ${value === option ? "bg-slate-100 text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}><RatioGlyph ratio={option} /><span>{option}</span></button>)}</div></div>}
+  return <div className="relative">
+    <button ref={buttonRef} type="button" disabled={disabled} aria-expanded={open} onClick={() => setOpen((current) => !current)} className="flex min-w-40 items-center gap-1.5 rounded-xl border border-slate-200/60 bg-slate-50 px-3.5 py-2 text-left text-xs font-bold text-slate-600 transition-all hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"><Video className="h-3.5 w-3.5 text-slate-500" /><span>比例</span><span className="mx-1 h-4 border-l border-slate-200" /><span className="flex-1">{value}</span><ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} /></button>
+    {open && <AnchoredPopover anchorRef={buttonRef} align="end" width={176} onClose={() => setOpen(false)} className="rounded-lg border border-slate-200 bg-white p-2 shadow-xl"><p className="px-2 pb-1.5 pt-0.5 text-xs text-slate-400">比例</p><div className="space-y-0.5">{options.map((option) => <button key={option} type="button" onClick={() => { onChange(option); setOpen(false); }} className={`flex h-10 w-full items-center gap-3 rounded-md px-2.5 text-sm font-medium ${value === option ? "bg-slate-100 text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}><RatioGlyph ratio={option} /><span>{option}</span></button>)}</div></AnchoredPopover>}
   </div>;
 }
 
@@ -1143,7 +1203,7 @@ function SubjectsStep({ subjects, subjectTab, selectedSubject, currentCandidate,
         const stacked = subjectTab === "person" && stackSize > 1;
         return <div key={item.id} className={`relative min-w-0 ${stacked ? "mb-2 mr-2" : ""}`}>
           {stacked && <><span className="absolute inset-0 translate-x-2 translate-y-2 rounded-lg border border-slate-200 bg-white" /><span className="absolute inset-0 translate-x-1 translate-y-1 rounded-lg border border-slate-200 bg-white" /></>}
-          <RemakeSubjectCard subject={item} selected={selectedSubject?.id === item.id} personCount={subjects.filter((entry) => entry.type === "person").length} stacked={stacked} isPrimaryPerson={groupPrimary} showVoiceButton={groupPrimary} onSelect={() => { if (stacked) { expandPersonGroup(groupKey); return; } openSubjectSettings(item.id); }} onReplaceOriginal={() => onChooseImage(item.id, "original")} onReplaceCandidate={() => onChooseImage(item.id, "candidate")} onRenameOriginal={(name) => onUpdate(item.id, { originalName: name })} onRenameCandidate={(name) => { const selectedId = item.selectedCandidateId; if (!selectedId) return; onUpdate(item.id, { candidates: item.candidates.map((candidate) => candidate.id === selectedId ? { ...candidate, name } : candidate) }); }} onConfigureVoice={() => onConfigureVoice(item.id)} onMerge={() => onMerge(item.id)} onIndependent={() => onIndependent(item.id)} onDelete={() => onDelete(item.id, item.type === "person" && groupPrimary)} />
+          <RemakeSubjectCard subject={item} selected={selectedSubject?.id === item.id} personCount={subjects.filter((entry) => entry.type === "person").length} stacked={stacked} isPrimaryPerson={groupPrimary} showVoiceButton={groupPrimary} onSelect={() => { if (stacked) { expandPersonGroup(groupKey); return; } openSubjectSettings(item.id); }} onReplaceOriginal={() => onChooseImage(item.id, "original")} onReplaceCandidate={() => onChooseImage(item.id, "candidate")} onRenameOriginal={(name) => onUpdate(item.id, { originalName: name })} onRenameCandidate={(name) => onUpdate(item.id, { replacementName: name })} onConfigureVoice={() => onConfigureVoice(item.id)} onMerge={() => onMerge(item.id)} onIndependent={() => onIndependent(item.id)} onDelete={() => onDelete(item.id, item.type === "person" && groupPrimary)} />
         </div>;
       })}</div> : <div className="flex h-full min-h-56 flex-col items-center justify-center text-center"><div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-300"><ImageIcon className="h-5 w-5" /></div><p className="mt-3 text-xs font-semibold text-slate-500">暂无{TYPE_META[subjectTab].label}</p><button onClick={() => onAdd(subjectTab)} className="mt-3 text-xs font-semibold text-violet-700">{addLabel[subjectTab]}</button></div>}</div>
       {settingsOpen && selectedSubject && <SubjectSettingsPanel subject={selectedSubject} currentCandidate={currentCandidate} operation={operation} onClose={() => { setSettingsOpen(false); onSelect(null); }} onUpdate={onUpdate} onGenerate={onGenerate} onChooseImage={onChooseImage} onLightbox={onLightbox} />}
@@ -1175,9 +1235,10 @@ function SubjectSettingsPanel({ subject, currentCandidate, operation, onClose, o
 
   const previewCandidate = subject.candidates.find((item) => item.id === previewCandidateId);
   const displayImage = previewCandidate?.image;
-  const displayName = previewCandidate?.name || "暂未配置新图片";
+  const replacementName = subject.replacementName || subject.originalName;
+  const displayName = previewCandidate ? replacementName : "暂未配置新图片";
   const currentImage = currentCandidate?.image;
-  const currentName = currentCandidate?.name || "暂未配置新图片";
+  const currentName = currentCandidate ? replacementName : "暂未配置新图片";
   const otherCandidates = [...subject.candidates]
     .reverse()
     .filter((candidate) => candidate.id !== subject.selectedCandidateId);
@@ -1244,8 +1305,8 @@ function SubjectSettingsPanel({ subject, currentCandidate, operation, onClose, o
         <button disabled={!currentImage} onClick={() => setPreviewCandidateId(subject.selectedCandidateId ?? null)} title={currentName} className={`mt-2 block aspect-square w-full overflow-hidden rounded-md border-2 bg-slate-100 disabled:border-slate-200 ${previewIsCurrent ? "border-violet-500" : "border-transparent hover:border-violet-200"}`}>
           {currentImage ? <img src={currentImage} alt={currentName} className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : <ImageIcon className="m-auto h-5 w-5 text-slate-300" />}
         </button>
-        {latestCandidates.length > 0 && <><p className="mt-5 text-xs font-semibold text-slate-500">最新</p><div className="mt-2 space-y-2">{latestCandidates.map((candidate) => <button key={candidate.id} onClick={() => setPreviewCandidateId(candidate.id)} title={candidate.name} className={`relative block aspect-square w-full overflow-hidden rounded-md border-2 bg-slate-100 ${previewCandidateId === candidate.id ? "border-violet-500" : "border-transparent hover:border-violet-200"}`}><img src={candidate.image} alt={candidate.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" /></button>)}</div></>}
-        {historyCandidates.length > 0 && <><p className="mt-5 text-xs font-semibold text-slate-500">历史</p><div className="mt-2 space-y-2">{historyCandidates.map((candidate) => <button key={candidate.id} onClick={() => setPreviewCandidateId(candidate.id)} title={candidate.name} className={`relative block aspect-square w-full overflow-hidden rounded-md border-2 bg-slate-100 ${previewCandidateId === candidate.id ? "border-violet-500" : "border-transparent hover:border-violet-200"}`}><img src={candidate.image} alt={candidate.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" /></button>)}</div></>}
+        {latestCandidates.length > 0 && <><p className="mt-5 text-xs font-semibold text-slate-500">最新</p><div className="mt-2 space-y-2">{latestCandidates.map((candidate) => <button key={candidate.id} onClick={() => setPreviewCandidateId(candidate.id)} title={replacementName} className={`relative block aspect-square w-full overflow-hidden rounded-md border-2 bg-slate-100 ${previewCandidateId === candidate.id ? "border-violet-500" : "border-transparent hover:border-violet-200"}`}><img src={candidate.image} alt={replacementName} className="h-full w-full object-cover" referrerPolicy="no-referrer" /></button>)}</div></>}
+        {historyCandidates.length > 0 && <><p className="mt-5 text-xs font-semibold text-slate-500">历史</p><div className="mt-2 space-y-2">{historyCandidates.map((candidate) => <button key={candidate.id} onClick={() => setPreviewCandidateId(candidate.id)} title={replacementName} className={`relative block aspect-square w-full overflow-hidden rounded-md border-2 bg-slate-100 ${previewCandidateId === candidate.id ? "border-violet-500" : "border-transparent hover:border-violet-200"}`}><img src={candidate.image} alt={replacementName} className="h-full w-full object-cover" referrerPolicy="no-referrer" /></button>)}</div></>}
       </div>
     </div>
   </aside>;
@@ -1253,28 +1314,20 @@ function SubjectSettingsPanel({ subject, currentCandidate, operation, onClose, o
 
 function GenerationSelect<T extends string | number>({ value, options, onChange, disabled = false, formatLabel, className = "", menuClassName = "", icon }: { value: T; options: readonly T[]; onChange: (value: T) => void; disabled?: boolean; formatLabel?: (value: T) => string; className?: string; menuClassName?: string; icon?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
   const label = (item: T) => formatLabel ? formatLabel(item) : String(item);
-
-  useEffect(() => {
-    const closeOnOutsideClick = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", closeOnOutsideClick);
-    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
-  }, []);
 
   useEffect(() => {
     if (disabled) setOpen(false);
   }, [disabled]);
 
-  return <div ref={rootRef} className={`relative shrink-0 ${className}`}>
-    <button type="button" disabled={disabled} aria-expanded={open} onClick={() => setOpen((current) => !current)} className="flex h-8 w-full items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-[10px] font-semibold text-slate-700 hover:border-violet-300 disabled:cursor-not-allowed disabled:opacity-40">
+  return <div className={`relative shrink-0 ${className}`}>
+    <button ref={buttonRef} type="button" disabled={disabled} aria-expanded={open} onClick={() => setOpen((current) => !current)} className="flex h-8 w-full items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-[10px] font-semibold text-slate-700 hover:border-violet-300 disabled:cursor-not-allowed disabled:opacity-40">
       {icon}<span className="min-w-0 flex-1 truncate text-left">{label(value)}</span><ChevronDown className={`h-3 w-3 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
     </button>
-    {open && <div className={`absolute bottom-full left-0 z-50 mb-2 min-w-full rounded-md border border-slate-200 bg-white p-1 shadow-xl ${menuClassName}`}>
+    {open && <AnchoredPopover anchorRef={buttonRef} side="top" matchAnchorWidth onClose={() => setOpen(false)} className={`rounded-md border border-slate-200 bg-white p-1 shadow-xl ${menuClassName}`}>
       {options.map((option) => <button key={String(option)} type="button" onClick={() => { onChange(option); setOpen(false); }} className={`flex w-full items-center rounded px-3 py-2 text-left text-xs whitespace-nowrap ${option === value ? "bg-slate-100 font-semibold text-slate-900" : "text-slate-600 hover:bg-slate-50"}`}>{label(option)}</button>)}
-    </div>}
+    </AnchoredPopover>}
   </div>;
 }
 
@@ -1283,22 +1336,22 @@ function getPersonGroupName(name: string) {
   return normalized.split(/\s*[-—_（(]\s*/)[0] || normalized;
 }
 
+function getSubjectAppearanceLabel(subject: RemakeSubject, allSubjects: RemakeSubject[]) {
+  if (subject.type !== "person") return "主形象";
+  const groupName = getPersonGroupName(subject.name);
+  const groupSubjects = allSubjects.filter((item) => item.type === "person" && getPersonGroupName(item.name) === groupName);
+  const imageIndex = groupSubjects.findIndex((item) => item.id === subject.id);
+  return imageIndex > 0 ? `变装${imageIndex}` : "主形象";
+}
+
 function RemakeSubjectCard({ subject, selected, personCount, stacked = false, isPrimaryPerson = false, showVoiceButton = true, onSelect, onReplaceOriginal, onReplaceCandidate, onRenameOriginal, onRenameCandidate, onConfigureVoice, onMerge, onIndependent, onDelete }: { subject: RemakeSubject; selected: boolean; personCount: number; stacked?: boolean; isPrimaryPerson?: boolean; showVoiceButton?: boolean; onSelect: () => void; onReplaceOriginal: () => void; onReplaceCandidate: () => void; onRenameOriginal: (name: string) => void; onRenameCandidate: (name: string) => void; onConfigureVoice: () => void; onMerge: () => void; onIndependent: () => void; onDelete: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const cardRef = useRef<HTMLElement | null>(null);
+  const moreButtonRef = useRef<HTMLButtonElement | null>(null);
+  const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
   const candidate = subject.candidates.find((entry) => entry.id === subject.selectedCandidateId);
 
-  useEffect(() => {
-    if (!deleteConfirmOpen) return;
-    const closeOnOutsideClick = (event: MouseEvent) => {
-      if (!cardRef.current?.contains(event.target as Node)) setDeleteConfirmOpen(false);
-    };
-    document.addEventListener("mousedown", closeOnOutsideClick);
-    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
-  }, [deleteConfirmOpen]);
-
-  return <article ref={cardRef} onClick={onSelect} onMouseLeave={() => setMenuOpen(false)} className={`relative cursor-pointer rounded-lg border bg-white p-2.5 text-left ${selected ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200 hover:border-slate-300"}`}>
+  return <article onClick={onSelect} className={`relative cursor-pointer rounded-lg border bg-white p-2.5 text-left ${selected ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200 hover:border-slate-300"}`}>
     <div className="grid grid-cols-2 gap-2">
       <div className="min-w-0">
         <SubjectImage label="原" src={subject.originalImage} onReplace={onReplaceOriginal} />
@@ -1306,27 +1359,27 @@ function RemakeSubjectCard({ subject, selected, personCount, stacked = false, is
       </div>
       <div className="min-w-0">
         <SubjectImage label="新" src={candidate?.image} onReplace={onReplaceCandidate} />
-        {candidate ? <EditableImageName value={candidate.name} onChange={onRenameCandidate} /> : <div className="mt-2 h-7" />}
+        {candidate ? <EditableImageName value={subject.replacementName || subject.originalName} onChange={onRenameCandidate} /> : <div className="mt-2 h-7" />}
       </div>
     </div>
     <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2">
       {subject.type === "person" ? <>
         {showVoiceButton ? <button onClick={(event) => { event.stopPropagation(); onConfigureVoice(); }} className="flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><Volume2 className="h-3.5 w-3.5" />配置音色</button> : <span />}
         <div className="relative">
-          <button onClick={(event) => { event.stopPropagation(); setMenuOpen((current) => !current); }} title="更多操作" className="rounded-md border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"><Ellipsis className="h-4 w-4" /></button>
-          {menuOpen && <div onClick={(event) => event.stopPropagation()} className="absolute bottom-10 right-0 z-30 w-32 rounded-md border border-slate-200 bg-white p-1.5 shadow-xl">
+          <button ref={moreButtonRef} onClick={(event) => { event.stopPropagation(); setMenuOpen((current) => !current); }} title="更多操作" className="rounded-md border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"><Ellipsis className="h-4 w-4" /></button>
+          {menuOpen && <AnchoredPopover anchorRef={moreButtonRef} side="top" align="end" width={128} onClose={() => setMenuOpen(false)} className="rounded-md border border-slate-200 bg-white p-1.5 shadow-xl" onClick={(event) => event.stopPropagation()}>
             <button disabled={personCount < 2} onClick={() => { setMenuOpen(false); onMerge(); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"><Combine className="h-3.5 w-3.5" />合并去重</button>
             <button onClick={() => { setMenuOpen(false); onIndependent(); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-slate-600 hover:bg-slate-50"><Copy className="h-3.5 w-3.5" />独立形象</button>
             <button onClick={() => { setMenuOpen(false); setDeleteConfirmOpen(true); }} className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-rose-600 hover:bg-rose-50"><Trash2 className="h-3.5 w-3.5" />删除</button>
-          </div>}
-          {deleteConfirmOpen && <SubjectDeletePopover type={subject.type} primaryPerson={isPrimaryPerson} onCancel={() => setDeleteConfirmOpen(false)} onConfirm={() => { setDeleteConfirmOpen(false); onDelete(); }} />}
+          </AnchoredPopover>}
+          {deleteConfirmOpen && <SubjectDeletePopover anchorRef={moreButtonRef} type={subject.type} primaryPerson={isPrimaryPerson} onCancel={() => setDeleteConfirmOpen(false)} onConfirm={() => { setDeleteConfirmOpen(false); onDelete(); }} />}
         </div>
-      </> : <><span /><div className="relative"><button onClick={(event) => { event.stopPropagation(); setDeleteConfirmOpen(true); }} className="flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" />删除</button>{deleteConfirmOpen && <SubjectDeletePopover type={subject.type} primaryPerson={false} onCancel={() => setDeleteConfirmOpen(false)} onConfirm={() => { setDeleteConfirmOpen(false); onDelete(); }} />}</div></>}
+      </> : <><span /><div className="relative"><button ref={deleteButtonRef} onClick={(event) => { event.stopPropagation(); setDeleteConfirmOpen(true); }} className="flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" />删除</button>{deleteConfirmOpen && <SubjectDeletePopover anchorRef={deleteButtonRef} type={subject.type} primaryPerson={false} onCancel={() => setDeleteConfirmOpen(false)} onConfirm={() => { setDeleteConfirmOpen(false); onDelete(); }} />}</div></>}
     </div>
   </article>;
 }
 
-function SubjectDeletePopover({ type, primaryPerson, onCancel, onConfirm }: { type: SubjectType; primaryPerson: boolean; onCancel: () => void; onConfirm: () => void }) {
+function SubjectDeletePopover({ anchorRef, type, primaryPerson, onCancel, onConfirm }: { anchorRef: React.RefObject<HTMLElement | null>; type: SubjectType; primaryPerson: boolean; onCancel: () => void; onConfirm: () => void }) {
   const copy = type === "person"
     ? primaryPerson
       ? { title: "确定要删除角色主形象吗？", description: "主形象删除后所有变装和历史生图记录均不可恢复，请谨慎操作！" }
@@ -1335,14 +1388,14 @@ function SubjectDeletePopover({ type, primaryPerson, onCancel, onConfirm }: { ty
       ? { title: "确定要删除场景吗？", description: "场景删除后不可恢复，请谨慎操作！" }
       : { title: "确定要删除道具吗？", description: "道具删除后不可恢复，请谨慎操作！" };
 
-  return <div onClick={(event) => event.stopPropagation()} className="absolute bottom-11 right-0 z-50 w-[360px] max-w-[calc(100vw-48px)] cursor-default rounded-lg border border-slate-200 bg-white p-5 text-left shadow-2xl">
+  return <AnchoredPopover anchorRef={anchorRef} side="top" align="end" width={360} onClose={onCancel} onClick={(event) => event.stopPropagation()} className="cursor-default rounded-lg border border-slate-200 bg-white p-5 text-left shadow-2xl">
     <span className="absolute -bottom-1.5 right-5 h-3 w-3 rotate-45 border-b border-r border-slate-200 bg-white" />
     <div className="flex items-start gap-3">
       <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white"><AlertCircle className="h-3.5 w-3.5" /></span>
       <div className="min-w-0"><p className="text-sm font-semibold text-slate-900">{copy.title}</p><p className="mt-2 text-xs leading-5 text-slate-600">{copy.description}</p></div>
     </div>
     <div className="mt-5 flex justify-end gap-2.5"><button type="button" onClick={onCancel} className="rounded-md bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200">取消</button><button type="button" onClick={onConfirm} className="rounded-md bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700">删除</button></div>
-  </div>;
+  </AnchoredPopover>;
 }
 
 function EditableImageName({ value, onChange }: { value: string; onChange: (value: string) => void }) {
@@ -1381,7 +1434,7 @@ function EditableVideoName({ value, disabled, onChange }: { value: string; disab
   return <button disabled={disabled} onClick={() => setEditing(true)} title="修改视频名称" className="flex h-6 max-w-64 items-center gap-2 text-left text-sm font-bold text-slate-900 disabled:cursor-default"><span className="truncate">{value}</span><Pencil className="h-3.5 w-3.5 shrink-0 text-slate-400" /></button>;
 }
 
-function StoryboardStep({ source, resolution, subjects, shots, selectedShot, operation, seek, generatedShotCount, onSeek, onSelectShot, onUpdateShot, onGenerateAll, onGenerateShot, onAddShot, onDeleteShot, onGenerateFinal, onNotify }: { source: SourceVideo | null; resolution: VideoResolution; subjects: RemakeSubject[]; shots: StoryboardShot[]; selectedShot: StoryboardShot | null; operation: { key: string; label: string; progress: number } | null; seek: number; generatedShotCount: number; onSeek: (value: number) => void; onSelectShot: (id: string) => void; onUpdateShot: (id: string, patch: Partial<StoryboardShot>) => void; onGenerateAll: () => void; onGenerateShot: (shot: StoryboardShot) => void; onAddShot: (index: number) => void; onDeleteShot: (id: string) => void; onGenerateFinal: () => void; onNotify: (message: string) => void }) {
+function StoryboardStep({ source, resolution, subjects, shots, selectedShot, operation, seek, generatedShotCount, onSeek, onSelectShot, onUpdateShot, onGenerateAll, onGenerateShot, onAddShot, onDeleteShot, onNotify }: { source: SourceVideo | null; resolution: VideoResolution; subjects: RemakeSubject[]; shots: StoryboardShot[]; selectedShot: StoryboardShot | null; operation: { key: string; label: string; progress: number } | null; seek: number; generatedShotCount: number; onSeek: (value: number) => void; onSelectShot: (id: string) => void; onUpdateShot: (id: string, patch: Partial<StoryboardShot>) => void; onGenerateAll: () => void; onGenerateShot: (shot: StoryboardShot) => void; onAddShot: (index: number) => void; onDeleteShot: (id: string) => void; onNotify: (message: string) => void }) {
   const initialBatchAvailable = generatedShotCount === 0 && shots.some((item) => item.status === "pending");
   const [subjectFilter, setSubjectFilter] = useState<"all" | SubjectType>("all");
   const [videoPreviewTab, setVideoPreviewTab] = useState<"generated" | "original">("generated");
@@ -1390,9 +1443,16 @@ function StoryboardStep({ source, resolution, subjects, shots, selectedShot, ope
   const [expandedRoleGroup, setExpandedRoleGroup] = useState<string | null>(null);
   const [subjectSearch, setSubjectSearch] = useState("");
   const [shotSettingsOpen, setShotSettingsOpen] = useState(false);
-  const addSubjectPopoverRef = useRef<HTMLDivElement | null>(null);
-  const shotSettingsRef = useRef<HTMLDivElement | null>(null);
+  const addPersonButtonRef = useRef<HTMLButtonElement | null>(null);
+  const addSceneButtonRef = useRef<HTMLButtonElement | null>(null);
+  const addProductButtonRef = useRef<HTMLButtonElement | null>(null);
+  const shotSettingsButtonRef = useRef<HTMLButtonElement | null>(null);
   const shotReferenceUploadRef = useRef<HTMLInputElement | null>(null);
+  const addSubjectButtonRefs: Record<SubjectType, React.RefObject<HTMLButtonElement | null>> = {
+    person: addPersonButtonRef,
+    scene: addSceneButtonRef,
+    product: addProductButtonRef,
+  };
   const referencedSubjects = selectedShot
     ? selectedShot.subjectIds.map((id) => subjects.find((subject) => subject.id === id)).filter((subject): subject is RemakeSubject => !!subject)
     : [];
@@ -1412,35 +1472,12 @@ function StoryboardStep({ source, resolution, subjects, shots, selectedShot, ope
   }, []);
   const normalizedSubjectSearch = subjectSearch.trim().toLowerCase();
   const searchedRoleGroups = roleGroups.filter((group) => !normalizedSubjectSearch || group.name.toLowerCase().includes(normalizedSubjectSearch) || group.subjects.some((subject) => subject.name.toLowerCase().includes(normalizedSubjectSearch)));
-
-  useEffect(() => {
-    if (!addingSubjectType) return;
-    const closeOnOutsideClick = (event: MouseEvent) => {
-      if (!addSubjectPopoverRef.current?.contains(event.target as Node)) {
-        setAddingSubjectType(null);
-        setExpandedRoleGroup(null);
-        setSubjectSearch("");
-      }
-    };
-    document.addEventListener("mousedown", closeOnOutsideClick);
-    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
-  }, [addingSubjectType]);
-
   useEffect(() => {
     setAddingSubjectType(null);
     setExpandedRoleGroup(null);
     setSubjectSearch("");
     setShotSettingsOpen(false);
   }, [selectedShot?.id]);
-
-  useEffect(() => {
-    if (!shotSettingsOpen) return;
-    const closeOnOutsideClick = (event: MouseEvent) => {
-      if (!shotSettingsRef.current?.contains(event.target as Node)) setShotSettingsOpen(false);
-    };
-    document.addEventListener("mousedown", closeOnOutsideClick);
-    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
-  }, [shotSettingsOpen]);
 
   const addReferencedSubject = (subject: RemakeSubject) => {
     if (!selectedShot || selectedShot.subjectIds.includes(subject.id)) return;
@@ -1498,10 +1535,10 @@ function StoryboardStep({ source, resolution, subjects, shots, selectedShot, ope
           const availableSubjects = subjects.filter((subject) => subject.type === type && !selectedShot?.subjectIds.includes(subject.id) && subject.name.toLowerCase().includes(subjectSearch.trim().toLowerCase()));
           const selectedRoleGroup = roleGroups.find((group) => group.name === expandedRoleGroup);
           return <section key={type}>
-            <div ref={addingSubjectType === type ? addSubjectPopoverRef : undefined} className="relative mb-2 flex items-center justify-between">
+            <div className="relative mb-2 flex items-center justify-between">
               <h3 className="text-xs font-bold text-slate-700">{sectionLabel[type]}</h3>
-              <button type="button" disabled={!!operation} onClick={() => { setAddingSubjectType((current) => current === type ? null : type); setExpandedRoleGroup(null); setSubjectSearch(""); }} title={`添加${sectionLabel[type]}`} className="flex h-6 w-6 items-center justify-center rounded text-slate-500 hover:bg-slate-100 hover:text-violet-700 disabled:opacity-40"><Plus className="h-4 w-4" /></button>
-              {addingSubjectType === type && <div className={`absolute left-0 top-7 z-50 rounded-lg border border-slate-200 bg-white shadow-xl ${type === "person" && expandedRoleGroup ? "w-[416px]" : "w-[208px]"}`}>
+              <button ref={addSubjectButtonRefs[type]} type="button" disabled={!!operation} onClick={() => { setAddingSubjectType((current) => current === type ? null : type); setExpandedRoleGroup(null); setSubjectSearch(""); }} title={`添加${sectionLabel[type]}`} className="flex h-6 w-6 items-center justify-center rounded text-slate-500 hover:bg-slate-100 hover:text-violet-700 disabled:opacity-40"><Plus className="h-4 w-4" /></button>
+              {addingSubjectType === type && <AnchoredPopover anchorRef={addSubjectButtonRefs[type]} align="end" width={type === "person" && expandedRoleGroup ? 416 : 208} onClose={() => { setAddingSubjectType(null); setExpandedRoleGroup(null); setSubjectSearch(""); }} className="rounded-lg border border-slate-200 bg-white shadow-xl">
                 <div className="p-2"><div className="relative"><Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" /><input autoFocus value={subjectSearch} onChange={(event) => setSubjectSearch(event.target.value)} placeholder="请输入" className="h-9 w-full rounded-md border border-slate-200 pl-8 pr-2 text-xs outline-none focus:border-violet-400" /></div></div>
                 {type === "person" ? <div className={`grid min-h-56 border-t border-slate-100 ${expandedRoleGroup ? "grid-cols-2" : "grid-cols-1"}`}>
                   <div className={`max-h-72 overflow-y-auto p-2 ${expandedRoleGroup ? "border-r border-slate-200" : ""}`}>
@@ -1515,7 +1552,7 @@ function StoryboardStep({ source, resolution, subjects, shots, selectedShot, ope
                   {availableSubjects.map((subject) => { const candidate = subject.candidates.find((entry) => entry.id === subject.selectedCandidateId); const image = candidate?.image || subject.originalImage; return <button key={subject.id} type="button" onClick={() => addReferencedSubject(subject)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-slate-50">{image ? <img src={image} alt="" className="h-7 w-7 shrink-0 rounded object-cover" referrerPolicy="no-referrer" /> : <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-slate-100"><ImageIcon className="h-3.5 w-3.5 text-slate-300" /></span>}<span className="min-w-0 flex-1 truncate text-[10px] font-semibold text-slate-700">{subject.name}</span></button>; })}
                   {!availableSubjects.length && <div className="flex h-20 items-center justify-center text-[10px] text-slate-400">暂无可添加主体</div>}
                 </div>}
-              </div>}
+              </AnchoredPopover>}
             </div>
             <div className={`grid gap-x-2 gap-y-3 ${type === "person" ? "grid-cols-2" : "grid-cols-1"}`}>
               {typeSubjects.map((item) => {
@@ -1524,7 +1561,7 @@ function StoryboardStep({ source, resolution, subjects, shots, selectedShot, ope
                 return <div key={item.id} className="min-w-0">
                   {image ? <img src={image} alt="" className={`${type === "person" ? "aspect-square" : "aspect-video"} w-full rounded-md object-cover`} referrerPolicy="no-referrer" /> : <div className={`flex ${type === "person" ? "aspect-square" : "aspect-video"} w-full items-center justify-center rounded-md bg-slate-100`}><ImageIcon className="h-5 w-5 text-slate-300" /></div>}
                   <p className="mt-1 truncate text-[10px] font-semibold text-slate-600">{item.name}</p>
-                  <p className="text-[9px] text-slate-400">{candidate ? "已替换" : item.originalImage ? "沿用原内容" : "待配置"}</p>
+                  <p className="text-[9px] text-slate-400">{getSubjectAppearanceLabel(item, subjects)}</p>
                 </div>;
               })}
               {!typeSubjects.length && <p className="col-span-full py-3 text-center text-[10px] text-slate-400">当前分镜未引用{sectionLabel[type]}</p>}
@@ -1537,10 +1574,10 @@ function StoryboardStep({ source, resolution, subjects, shots, selectedShot, ope
     <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-hidden">
         {selectedShot && <div className="grid h-full min-w-0 grid-cols-[minmax(420px,1fr)_500px] overflow-hidden">
-          <section className="overflow-y-auto p-5">
-            <div className="flex items-center justify-between"><div><h2 className="text-base font-bold text-slate-900">{selectedShot.title}</h2><p className="mt-1 text-xs text-slate-400">内容自动保存</p></div>{initialBatchAvailable && <button disabled={!!operation} onClick={onGenerateAll} className="flex items-center gap-2 rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-40"><Sparkles className="h-4 w-4" />生成全部分镜 <span className="rounded bg-violet-500 px-1.5 py-0.5">{(shots.length * STORYBOARD_GENERATION_COST).toLocaleString()}积分</span></button>}</div>
-            <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
-              <div className="flex flex-wrap items-start gap-2">
+          <section className="flex min-h-0 flex-col overflow-hidden p-5">
+            <div className="flex shrink-0 items-center justify-between"><div><h2 className="text-base font-bold text-slate-900">{selectedShot.title}</h2><p className="mt-1 text-xs text-slate-400">内容自动保存</p></div>{initialBatchAvailable && <button disabled={!!operation} onClick={onGenerateAll} className="flex items-center gap-2 rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-40"><Sparkles className="h-4 w-4" />生成全部分镜 <span className="rounded bg-violet-500 px-1.5 py-0.5">{(shots.length * STORYBOARD_GENERATION_COST).toLocaleString()}积分</span></button>}</div>
+            <div className="mt-4 flex min-h-0 flex-1 flex-col rounded-lg border border-slate-200 bg-white p-4">
+              <div className="flex shrink-0 flex-wrap items-start gap-2">
                 {(selectedShot.referenceImages ?? []).map((image, index) => <div key={image.id} className="group relative w-11 shrink-0">
                   <img src={image.image} alt={image.name} className="h-11 w-11 rounded-md border border-slate-200 object-cover" referrerPolicy="no-referrer" />
                   <button type="button" disabled={!!operation} onClick={() => onUpdateShot(selectedShot.id, { referenceImages: (selectedShot.referenceImages ?? []).filter((item) => item.id !== image.id).map((item, nextIndex) => ({ ...item, name: `图片${nextIndex + 1}` })) })} title="删除参考图" className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded bg-black/65 text-white opacity-0 transition-opacity hover:bg-rose-600 group-hover:opacity-100 disabled:hidden"><Trash2 className="h-3 w-3" /></button>
@@ -1550,18 +1587,18 @@ function StoryboardStep({ source, resolution, subjects, shots, selectedShot, ope
               </div>
               <input ref={shotReferenceUploadRef} type="file" multiple accept=".jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff,.gif,image/*" className="hidden" onChange={(event) => { uploadShotReferences(event.target.files); event.currentTarget.value = ""; }} />
 
-              <StoryboardDescriptionEditor key={selectedShot.id} shot={selectedShot} subjects={referencedSubjects} disabled={!!operation} onChange={(description) => onUpdateShot(selectedShot.id, { description })} />
+              <StoryboardDescriptionEditor key={selectedShot.id} shot={selectedShot} subjects={referencedSubjects} allSubjects={subjects} disabled={!!operation} onChange={(description) => onUpdateShot(selectedShot.id, { description, manuallyAdded: selectedShot.manuallyAdded || !selectedShot.description.trim() })} />
 
               {selectedShot.status === "failed" && <div className="mt-4 rounded-md bg-rose-50 p-3 text-xs text-rose-700"><div className="flex items-start gap-2"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{selectedShot.failureReason}</span></div></div>}
-              <div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-3">
+              <div className="mt-4 flex shrink-0 items-center gap-2 border-t border-slate-100 pt-3">
                 <GenerationSelect<(typeof STORYBOARD_VIDEO_MODELS)[number]> value={storyboardModel} options={STORYBOARD_VIDEO_MODELS} onChange={setStoryboardModel} disabled={!!operation} className="w-[210px]" icon={<Sparkles className="h-3.5 w-3.5" />} />
-                <div ref={shotSettingsRef} className="relative">
-                  <button type="button" disabled={!!operation} onClick={() => setShotSettingsOpen((current) => !current)} className="flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-[10px] font-semibold text-slate-600 hover:border-violet-300 disabled:cursor-not-allowed disabled:opacity-40"><Clock3 className="mr-2 h-3.5 w-3.5 text-slate-400" />{selectedShot.duration}s | {selectedShot.resolution ?? (resolution === "4K" ? "1080p" : resolution)} | {selectedShot.format ?? "mp4"}</button>
-                  {shotSettingsOpen && <div className="absolute bottom-11 left-0 z-50 w-[304px] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
+                <div className="relative">
+                  <button ref={shotSettingsButtonRef} type="button" disabled={!!operation} onClick={() => setShotSettingsOpen((current) => !current)} className="flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-[10px] font-semibold text-slate-600 hover:border-violet-300 disabled:cursor-not-allowed disabled:opacity-40"><Clock3 className="mr-2 h-3.5 w-3.5 text-slate-400" />{selectedShot.duration}s | {selectedShot.resolution ?? (resolution === "4K" ? "1080p" : resolution)} | {selectedShot.format ?? "mp4"}</button>
+                  {shotSettingsOpen && <AnchoredPopover anchorRef={shotSettingsButtonRef} side="top" width={304} onClose={() => setShotSettingsOpen(false)} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
                     <div><p className="text-xs font-semibold text-slate-400">视频时长</p><div className="mt-3 flex items-center gap-4"><input type="range" min="4" max="30" value={selectedShot.duration} onChange={(event) => onUpdateShot(selectedShot.id, { duration: Number(event.target.value) })} className="min-w-0 flex-1 accent-violet-600" /><span className="flex h-12 w-16 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-sm font-bold text-slate-700">{selectedShot.duration} s</span></div></div>
                     <div className="mt-5"><p className="text-xs font-semibold text-slate-400">视频清晰度</p><div className="mt-2 grid grid-cols-3 rounded-xl bg-slate-100 p-1">{(["480p", "720p", "1080p"] as const).map((item) => { const active = (selectedShot.resolution ?? (resolution === "4K" ? "1080p" : resolution)) === item; return <button type="button" key={item} onClick={() => onUpdateShot(selectedShot.id, { resolution: item })} className={`h-10 rounded-lg text-xs font-semibold ${active ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>{item}</button>; })}</div></div>
                     <div className="mt-5"><p className="text-xs font-semibold text-slate-400">视频格式</p><div className="mt-2 grid grid-cols-2 rounded-xl bg-slate-100 p-1">{(["mp4", "mov"] as const).map((item) => <button type="button" key={item} onClick={() => onUpdateShot(selectedShot.id, { format: item })} className={`h-10 rounded-lg text-xs font-semibold ${(selectedShot.format ?? "mp4") === item ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>{item}</button>)}</div></div>
-                  </div>}
+                  </AnchoredPopover>}
                 </div>
                 <button disabled={!!operation || !selectedShot.description.trim()} onClick={() => onGenerateShot(selectedShot)} title={selectedShot.status === "completed" ? "重新生成当前分镜" : "生成当前分镜"} className="ml-auto flex h-8 min-w-[104px] items-center justify-center gap-1.5 rounded-md bg-violet-600 px-4 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-40"><Sparkles className="h-3.5 w-3.5" />{STORYBOARD_GENERATION_COST.toLocaleString()}</button>
               </div>
@@ -1572,16 +1609,129 @@ function StoryboardStep({ source, resolution, subjects, shots, selectedShot, ope
       </div>
 
       <div className="shrink-0 border-t border-slate-200 bg-white p-4">
-        <div className="mb-3 flex items-center justify-between"><span className="text-xs font-bold text-slate-700">{shots.length} 个分镜</span><span className="text-[10px] text-slate-400">顺序固定 · 可在分镜之间新增</span></div>
+        <div className="mb-3 flex items-center justify-between"><span className="text-xs font-bold text-slate-700">{shots.length} 个分镜</span></div>
         <div className="flex items-stretch overflow-x-auto pb-2">{shots.map((shot, index) => <React.Fragment key={shot.id}><button onClick={() => onAddShot(index)} title="新增分镜" className="group flex w-7 shrink-0 items-center justify-center"><span className="hidden h-6 w-6 items-center justify-center rounded-full bg-violet-600 text-white group-hover:flex"><Plus className="h-3.5 w-3.5" /></span></button><article onClick={() => onSelectShot(shot.id)} className={`group relative w-36 shrink-0 cursor-pointer rounded-md border p-1.5 ${selectedShot?.id === shot.id ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200"}`}><div className="relative aspect-video overflow-hidden rounded bg-slate-100">{shot.cover ? <img src={shot.cover} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : <div className="flex h-full items-center justify-center">{shot.status === "generating" ? <Loader2 className="h-5 w-5 animate-spin text-violet-500" /> : shot.status === "failed" ? <AlertCircle className="h-5 w-5 text-rose-500" /> : <Video className="h-5 w-5 text-slate-300" />}</div>}<button onClick={(event) => { event.stopPropagation(); onDeleteShot(shot.id); }} title="删除分镜" className="absolute right-1 top-1 hidden rounded bg-black/65 p-1.5 text-white group-hover:block"><Trash2 className="h-3 w-3" /></button></div><div className="mt-1.5 flex items-center justify-between text-[10px]"><span className="font-semibold text-slate-600">{shot.title}</span><span className="text-slate-400">{shot.duration}s</span></div></article>{index === shots.length - 1 && <button onClick={() => onAddShot(shots.length)} title="新增分镜" className="group flex w-7 shrink-0 items-center justify-center"><span className="hidden h-6 w-6 items-center justify-center rounded-full bg-violet-600 text-white group-hover:flex"><Plus className="h-3.5 w-3.5" /></span></button>}</React.Fragment>)}</div>
-        <div className="mt-2 flex justify-end"><button disabled={!shots.every((item) => item.status === "completed") || !!operation} onClick={onGenerateFinal} className="flex items-center gap-2 rounded-md bg-violet-600 px-5 py-2.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">生成视频成片<ChevronRight className="h-4 w-4" /></button></div>
       </div>
     </div>
   </div>;
 }
 
-function FinalStep({ source, status, progress, finalName, onFinalName, onGenerate, onUpload, onBackStoryboard }: { source: SourceVideo | null; status: GenerationStatus; progress: number; finalName: string; onFinalName: (name: string) => void; onGenerate: () => void; onUpload: () => void; onBackStoryboard: () => void }) {
-  return <div className="h-full overflow-y-auto p-6"><div className="mx-auto max-w-5xl"><div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-bold text-slate-900">视频成片</h2><p className="mt-1 text-xs text-slate-500">全部分镜将按当前顺序合成为一个完整视频。</p></div><button onClick={onBackStoryboard} className="rounded-md border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-white">返回分镜</button></div>{status === "generating" ? <div className="flex h-96 flex-col items-center justify-center rounded-lg border border-slate-200 bg-white"><Loader2 className="h-9 w-9 animate-spin text-violet-600" /><p className="mt-4 text-sm font-semibold text-slate-700">视频成片生成中</p><div className="mt-4 h-1.5 w-72 overflow-hidden rounded bg-slate-100"><div className="h-full rounded bg-violet-600" style={{ width: `${progress}%` }} /></div><p className="mt-2 text-xs text-slate-400">{progress}%</p></div> : status === "completed" ? <div className="rounded-lg border border-slate-200 bg-white p-5"><div className="grid grid-cols-2 gap-6"><FinalVideo label="原视频" cover={source?.cover || ORIGINAL_PERSON} /><FinalVideo label="复刻成片" cover={VIDEO_COVERS[0]} /></div><div className="mt-5 flex items-center gap-3 border-t border-slate-100 pt-4"><input value={finalName} onChange={(event) => onFinalName(event.target.value)} className="h-9 min-w-0 flex-1 rounded-md border border-slate-200 px-3 text-xs text-slate-700 outline-none focus:border-violet-400" /><button onClick={onUpload} className="flex items-center gap-2 rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-700"><Upload className="h-4 w-4" />上传资源库</button></div></div> : <div className="flex h-96 flex-col items-center justify-center rounded-lg border border-slate-200 bg-white"><Film className="h-10 w-10 text-slate-300" /><p className="mt-4 text-sm font-semibold text-slate-600">尚未生成视频成片</p><button onClick={onGenerate} className="mt-5 rounded-md bg-violet-600 px-5 py-2.5 text-xs font-semibold text-white">生成成片</button></div>}</div></div>;
+function FinalStep({ source, shots, finalName, onUpload }: { source: SourceVideo | null; shots: StoryboardShot[]; finalName: string; onUpload: () => void }) {
+  const totalDuration = Math.max(1, shots.reduce((total, shot) => total + shot.duration, 0));
+  const allReady = shots.length > 0 && shots.every((shot) => shot.status === "completed" && !!shot.cover);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [compareOriginal, setCompareOriginal] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const draggingRef = useRef(false);
+  const activeShotIndex = Math.max(0, shots.findIndex((_, index) => {
+    const start = shots.slice(0, index).reduce((total, shot) => total + shot.duration, 0);
+    const end = start + shots[index].duration;
+    return currentTime >= start && (currentTime < end || (index === shots.length - 1 && currentTime <= end));
+  }));
+  const activeShot = shots[activeShotIndex];
+  const formatTime = (seconds: number) => `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
+
+  useEffect(() => {
+    if (!playing || !allReady || dragging) return;
+    const timer = window.setInterval(() => {
+      setCurrentTime((current) => {
+        const next = Math.min(totalDuration, current + 0.25);
+        if (next >= totalDuration) setPlaying(false);
+        return next;
+      });
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [allReady, dragging, playing, totalDuration]);
+
+  useEffect(() => {
+    if (currentTime > totalDuration) setCurrentTime(0);
+  }, [currentTime, totalDuration]);
+
+  const togglePlaying = () => {
+    if (!allReady) return;
+    if (!playing && currentTime >= totalDuration) setCurrentTime(0);
+    setPlaying((current) => !current);
+  };
+
+  const seekToShot = (index: number) => {
+    const start = shots.slice(0, index).reduce((total, shot) => total + shot.duration, 0);
+    setCurrentTime(start);
+  };
+
+  const seekFromPointer = (clientX: number, element: HTMLDivElement) => {
+    const bounds = element.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - bounds.left) / bounds.width));
+    setCurrentTime(ratio * totalDuration);
+  };
+
+  const beginTimelineDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    draggingRef.current = true;
+    setDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    seekFromPointer(event.clientX, event.currentTarget);
+  };
+
+  const moveTimelineDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (draggingRef.current) seekFromPointer(event.clientX, event.currentTarget);
+  };
+
+  const endTimelineDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return;
+    seekFromPointer(event.clientX, event.currentTarget);
+    draggingRef.current = false;
+    setDragging(false);
+    event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
+  const renderPlayerControls = () => <div className="flex h-16 shrink-0 items-center justify-center gap-4 border-t border-slate-200 bg-white">
+    <span className="text-xs font-semibold tabular-nums text-slate-700">{formatTime(currentTime)} <span className="text-slate-400">/ {formatTime(totalDuration)}</span></span>
+    <button disabled={!allReady} onClick={togglePlaying} title={playing ? "暂停" : "播放"} className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-800 text-white disabled:cursor-not-allowed disabled:opacity-35">{playing ? <Pause className="h-4 w-4 fill-current" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}</button>
+  </div>;
+
+  const renderTimelineRuler = () => <div onPointerDown={beginTimelineDrag} onPointerMove={moveTimelineDrag} onPointerUp={endTimelineDrag} onPointerCancel={endTimelineDrag} className="relative h-9 cursor-ew-resize touch-none border-b border-slate-100">
+    {Array.from({ length: Math.ceil(totalDuration) + 1 }, (_, second) => {
+      const major = second % 10 === 0 || second === Math.ceil(totalDuration);
+      return <React.Fragment key={second}><span className={`absolute bottom-1 w-px bg-slate-400 ${major ? "h-3" : "h-1.5"}`} style={{ left: `${Math.min(100, second / totalDuration * 100)}%` }} />{major && <span className={`absolute top-0 text-[10px] tabular-nums text-slate-500 ${second === 0 ? "" : second >= totalDuration ? "-translate-x-full" : "-translate-x-1/2"}`} style={{ left: `${Math.min(100, second / totalDuration * 100)}%` }}>{formatTime(Math.min(second, totalDuration))}</span>}</React.Fragment>;
+    })}
+  </div>;
+
+  const renderTimeline = (original: boolean) => <section className="relative h-44 min-w-0 rounded-lg border border-slate-200 bg-white px-4 pb-5 pt-3">
+    <div className="relative h-full select-none">
+      {renderTimelineRuler()}
+      <div className="relative mt-1 flex h-[104px] overflow-hidden rounded-md">
+        {original ? <button type="button" onClick={() => setCurrentTime(0)} className="w-full min-w-0 rounded-md border border-slate-200 bg-slate-50 p-2 text-left hover:border-violet-300">
+          <div className="flex items-center justify-between gap-1 text-[10px]"><span className="truncate font-semibold text-slate-600">原视频</span><span className="shrink-0 text-slate-400">{formatTime(totalDuration)}</span></div>
+          <div className="mt-2 flex h-[68px] items-center justify-center overflow-hidden rounded bg-white/70">{source?.cover ? <img src={source.cover} alt="原视频" className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : <span className="text-[10px] text-slate-400">原视频不可用</span>}</div>
+        </button> : shots.map((shot, index) => {
+          const selected = index === activeShotIndex;
+          return <button key={shot.id} type="button" onClick={(event) => { event.stopPropagation(); seekToShot(index); }} style={{ width: `${shot.duration / totalDuration * 100}%` }} className={`group min-w-0 border p-2 text-left first:rounded-l-md last:rounded-r-md ${selected ? "z-10 border-violet-500 bg-violet-50" : "border-slate-200 bg-slate-50 hover:border-violet-300"}`}>
+            <div className="flex items-center justify-between gap-1 text-[10px]"><span className="truncate font-semibold text-slate-600">{shot.title}</span><span className="shrink-0 text-slate-400">{formatTime(shot.duration)}</span></div>
+            <div className="mt-2 flex h-[68px] items-center justify-center overflow-hidden rounded bg-white/70">{shot.status === "completed" && shot.cover ? <img src={shot.cover} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : <span className="px-1 text-center text-[10px] text-slate-400">分镜视频未生成</span>}</div>
+          </button>;
+        })}
+      </div>
+      <span className="pointer-events-none absolute bottom-0 top-5 z-20 w-px bg-slate-900" style={{ left: `${Math.min(100, currentTime / totalDuration * 100)}%` }}><span className="absolute -left-1 -top-1 h-2.5 w-2 rounded-b-sm bg-slate-900" /></span>
+    </div>
+  </section>;
+
+  return <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-50 p-5">
+    <div className="mb-4 flex shrink-0 items-center gap-3">
+      <button type="button" role="switch" aria-checked={compareOriginal} onClick={() => setCompareOriginal((current) => !current)} className="ml-auto flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:border-violet-300"><span>对比原视频</span><span className={`relative h-5 w-9 rounded-full transition-colors ${compareOriginal ? "bg-violet-600" : "bg-slate-300"}`}><span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${compareOriginal ? "translate-x-4" : "translate-x-0"}`} /></span></button>
+      {allReady && activeShot?.cover ? <a href={activeShot.cover} download={finalName} className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:border-violet-300 hover:text-violet-700"><Download className="h-4 w-4" />下载完整视频</a> : <button disabled className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-400 opacity-60"><Download className="h-4 w-4" />下载完整视频</button>}
+      <button disabled={!allReady} onClick={onUpload} className="flex items-center gap-2 rounded-md bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"><Upload className="h-4 w-4" />上传资源库</button>
+    </div>
+
+    <div className={`grid min-h-0 flex-1 gap-3 ${compareOriginal ? "grid-cols-2" : "grid-cols-1"}`}>
+      {compareOriginal && <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white"><div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black">{source?.cover ? <img src={source.cover} alt="原视频" className="h-full w-full object-contain" referrerPolicy="no-referrer" /> : <div className="text-sm font-semibold text-slate-400">原视频不可用</div>}<span className="absolute left-4 top-4 rounded bg-black/55 px-3 py-1.5 text-xs font-semibold text-white">原视频</span></div>{renderPlayerControls()}</section>}
+      <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white"><div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black">{activeShot?.status === "completed" && activeShot.cover ? <img src={activeShot.cover} alt={activeShot.title} className="h-full w-full object-contain" referrerPolicy="no-referrer" /> : <div className="flex flex-col items-center text-slate-400"><Video className="h-9 w-9" /><p className="mt-3 text-sm font-semibold">分镜视频未生成</p></div>}<span className="absolute right-4 top-4 rounded bg-black/55 px-3 py-1.5 text-xs font-semibold text-white">{activeShot?.title || "分镜"}</span></div>{renderPlayerControls()}</section>
+    </div>
+
+    <div className={`mt-4 grid shrink-0 gap-3 ${compareOriginal ? "grid-cols-2" : "grid-cols-1"}`}>
+      {compareOriginal && renderTimeline(true)}
+      {renderTimeline(false)}
+    </div>
+  </div>;
 }
 
 function SourceVideoModal({ assets, selected, onClose, onConfirm, showToast }: { assets: Asset[]; selected: SourceVideo | null; onClose: () => void; onConfirm: (item: SourceVideo) => void; showToast: (message: string) => void }) {
@@ -1834,10 +1984,12 @@ function VoiceConfigModal({ subject, generating, onClose, onGenerate, onApply, s
   return <Modal title={`配置音色 · ${subject.name}`} onClose={() => { stop(); onClose(); }} width="max-w-2xl" footer={<><button onClick={() => { stop(); onClose(); }} className="ml-auto rounded-md border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={generating || !activeVoiceId} onClick={() => { stop(); onApply(voices, activeVoiceId); }} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">应用</button></>}><div className="p-5"><div className="flex items-center justify-between"><p className="text-xs font-bold text-slate-700">选择音色</p><button disabled={generating} onClick={() => setAdding((current) => !current)} className="flex min-w-20 items-center justify-end gap-1.5 text-xs font-semibold text-violet-700 disabled:cursor-not-allowed disabled:text-violet-400">{generating ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />生成中...</> : adding ? "取消" : "新增音色"}</button></div><div className="mt-4 grid grid-cols-3 gap-3">{voices.map((voice) => { const playing = playingVoiceId === voice.id; return <div key={voice.id} className="group/voice relative"><button disabled={generating} onClick={() => setActiveVoiceId(voice.id)} className={`h-14 w-full rounded-md border px-4 text-center text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-55 ${activeVoiceId === voice.id ? "border-violet-500 bg-violet-50 text-violet-700" : "border-slate-200 text-slate-600 hover:border-violet-200"}`}>{voice.name}</button><button disabled={generating} onClick={() => preview(voice)} title={playing ? "停止试听" : "试听音色"} className={`absolute left-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded text-violet-700 transition-opacity hover:bg-violet-100 disabled:cursor-not-allowed ${playing ? "opacity-100" : "opacity-0 group-hover/voice:opacity-100"}`}>{playing ? <AudioLines className="h-4 w-4" /> : <Play className="h-3.5 w-3.5 fill-current" />}</button></div>; })}</div>{adding && !generating && <section className="mt-4 rounded-md border border-violet-200 bg-violet-50/30 p-3"><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} placeholder="描述希望生成的音色，例如：年轻女性，表达自然，语速稍快" className="w-full resize-none rounded-md border border-slate-200 bg-white p-3 text-xs leading-6 outline-none focus:border-violet-400" /><div className="mt-2 flex justify-end"><button disabled={!description.trim()} onClick={addVoice} className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"><Mic2 className="h-3.5 w-3.5" />生成音色</button></div></section>}</div></Modal>;
 }
 
-function ReplacementReviewModal({ subjects, onClose, onConfirm }: { subjects: RemakeSubject[]; onClose: () => void; onConfirm: () => void }) {
+function ReplacementReviewModal({ subjects, onClose, onConfirm }: { subjects: RemakeSubject[]; onClose: () => void; onConfirm: (model: (typeof STORYBOARD_VIDEO_MODELS)[number], maxSegmentDuration: (typeof STORYBOARD_MAX_DURATIONS)[number]) => void }) {
   const replaced = subjects.filter((item) => item.selectedCandidateId);
   const unchanged = subjects.filter((item) => !item.selectedCandidateId);
-  return <Modal title="确认主体替换情况" onClose={onClose} width="max-w-xl" footer={<><button onClick={onClose} className="rounded-md border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">返回修改</button><button onClick={onConfirm} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white">确认并解析分镜</button></>}><div className="space-y-5 p-5"><div><div className="mb-2 flex items-center gap-2 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-4 w-4" />已替换 {replaced.length}</div><div className="space-y-2">{replaced.length ? replaced.map((item) => <ReviewRow key={item.id} subject={item} status="已替换" />) : <p className="rounded bg-slate-50 p-3 text-xs text-slate-400">暂无已替换主体</p>}</div></div><div><div className="mb-2 flex items-center gap-2 text-xs font-bold text-amber-700"><AlertCircle className="h-4 w-4" />未替换 {unchanged.length}</div><div className="space-y-2">{unchanged.length ? unchanged.map((item) => <ReviewRow key={item.id} subject={item} status="沿用原视频" />) : <p className="rounded bg-slate-50 p-3 text-xs text-slate-400">全部主体均已替换</p>}</div></div>{unchanged.length > 0 && <p className="rounded-md bg-amber-50 p-3 text-xs leading-5 text-amber-700">确认后，未配置新图片的主体将继续沿用原视频内容。</p>}</div></Modal>;
+  const [model, setModel] = useState<(typeof STORYBOARD_VIDEO_MODELS)[number]>(STORYBOARD_VIDEO_MODELS[0]);
+  const [maxSegmentDuration, setMaxSegmentDuration] = useState<(typeof STORYBOARD_MAX_DURATIONS)[number]>(30);
+  return <Modal title="分镜解析设置" onClose={onClose} width="max-w-2xl" footer={<><div className="flex min-w-0 items-center gap-2"><label className="flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3"><span className="shrink-0 text-[10px] font-semibold text-slate-400">预设模型</span><select value={model} onChange={(event) => setModel(event.target.value as (typeof STORYBOARD_VIDEO_MODELS)[number])} className="min-w-0 bg-transparent text-xs font-semibold text-slate-700 outline-none">{STORYBOARD_VIDEO_MODELS.map((item) => <option key={item}>{item}</option>)}</select></label><label title="每段拆分分镜最大时长设置" className="flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3"><span className="shrink-0 text-[10px] font-semibold text-slate-400">每段最长</span><select value={maxSegmentDuration} onChange={(event) => setMaxSegmentDuration(Number(event.target.value) as (typeof STORYBOARD_MAX_DURATIONS)[number])} className="bg-transparent text-xs font-semibold text-slate-700 outline-none">{STORYBOARD_MAX_DURATIONS.map((item) => <option key={item} value={item}>{item}s</option>)}</select></label></div><button onClick={onClose} className="ml-auto rounded-md border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button onClick={() => onConfirm(model, maxSegmentDuration)} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white">开始解析</button></>}><div className="space-y-5 p-5"><div><div className="mb-2 flex items-center gap-2 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-4 w-4" />已替换 {replaced.length}</div><div className="space-y-2">{replaced.length ? replaced.map((item) => <ReviewRow key={item.id} subject={item} status="已替换" />) : <p className="rounded bg-slate-50 p-3 text-xs text-slate-400">暂无已替换主体</p>}</div></div><div><div className="mb-2 flex items-center gap-2 text-xs font-bold text-amber-700"><AlertCircle className="h-4 w-4" />未替换 {unchanged.length}</div><div className="space-y-2">{unchanged.length ? unchanged.map((item) => <ReviewRow key={item.id} subject={item} status="沿用原视频" />) : <p className="rounded bg-slate-50 p-3 text-xs text-slate-400">全部主体均已替换</p>}</div></div>{unchanged.length > 0 && <p className="rounded-md bg-amber-50 p-3 text-xs leading-5 text-amber-700">确认后，未配置新图片的主体将继续沿用原视频内容。</p>}</div></Modal>;
 }
 
 function AddShotModal({ onClose, onConfirm }: { onClose: () => void; onConfirm: (duration: number) => void }) {
@@ -1845,17 +1997,8 @@ function AddShotModal({ onClose, onConfirm }: { onClose: () => void; onConfirm: 
   return <Modal title="新增分镜" onClose={onClose} width="max-w-md" footer={<><button onClick={onClose} className="rounded-md border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button onClick={() => onConfirm(duration)} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white">确认新增</button></>}><div className="p-5"><div className="flex items-center justify-between"><label className="text-xs font-semibold text-slate-700">视频时长</label><span className="rounded-md border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700">{duration}s</span></div><input type="range" min="4" max="30" value={duration} onChange={(event) => setDuration(Number(event.target.value))} className="mt-5 w-full accent-violet-600" /><div className="mt-2 flex justify-between text-[10px] text-slate-400"><span>4s</span><span>30s</span></div></div></Modal>;
 }
 
-function UploadFinalModal({ name, onClose, onPublish }: { name: string; onClose: () => void; onPublish: (name: string) => void }) {
-  const [draftName, setDraftName] = useState(name);
-  const [category, setCategory] = useState("美妆护肤 / 面部护理");
-  const [tags, setTags] = useState("爆款复刻,电商成片");
-  const [submitting, setSubmitting] = useState(false);
-  const publish = () => { setSubmitting(true); window.setTimeout(() => onPublish(draftName), 500); };
-  return <Modal title="上传资源库" onClose={onClose} width="max-w-xl" footer={<><button onClick={onClose} className="rounded-md border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!draftName.trim() || submitting} onClick={publish} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">{submitting ? "正在发布..." : "发布"}</button></>}><div className="space-y-4 p-5"><FormField label="上传类型"><input value="上传视频（默认成片）" disabled className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-xs text-slate-500" /></FormField><FormField label="文件名称"><input value={draftName} onChange={(event) => setDraftName(event.target.value)} className="h-9 w-full rounded-md border border-slate-200 px-3 text-xs outline-none focus:border-violet-400" /></FormField><FormField label="分类"><input value={category} onChange={(event) => setCategory(event.target.value)} className="h-9 w-full rounded-md border border-slate-200 px-3 text-xs outline-none focus:border-violet-400" /></FormField><FormField label="标签"><input value={tags} onChange={(event) => setTags(event.target.value)} className="h-9 w-full rounded-md border border-slate-200 px-3 text-xs outline-none focus:border-violet-400" /></FormField></div></Modal>;
-}
-
 function Modal({ title, onClose, width, footer, children, hideHeader = false, lockBodyScroll = false }: { title: string; onClose: () => void; width: string; footer: React.ReactNode; children: React.ReactNode; hideHeader?: boolean; lockBodyScroll?: boolean }) {
-  return <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/35 p-6"><div className={`flex max-h-[88vh] w-full flex-col overflow-hidden rounded-lg bg-white shadow-2xl ${lockBodyScroll ? "h-[88vh]" : ""} ${width}`}>{!hideHeader && <div className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 px-5"><h3 className="text-sm font-bold text-slate-900">{title}</h3><button onClick={onClose} title="关闭" className="rounded p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>}<div className={`min-h-0 flex-1 ${lockBodyScroll ? "overflow-hidden" : "overflow-y-auto"}`}>{children}</div><div className="flex h-16 shrink-0 items-center gap-2 border-t border-slate-200 px-5">{footer}</div></div></div>;
+  return <OverlayPortal layer="modal" className="fixed inset-0 flex items-center justify-center bg-slate-900/35 p-6"><div className={`flex max-h-[88vh] w-full flex-col overflow-hidden rounded-lg bg-white shadow-2xl ${lockBodyScroll ? "h-[88vh]" : ""} ${width}`}>{!hideHeader && <div className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 px-5"><h3 className="text-sm font-bold text-slate-900">{title}</h3><button onClick={onClose} title="关闭" className="rounded p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>}<div className={`min-h-0 flex-1 ${lockBodyScroll ? "overflow-hidden" : "overflow-y-auto"}`}>{children}</div><div className="flex h-16 shrink-0 items-center gap-2 border-t border-slate-200 px-5">{footer}</div></div></OverlayPortal>;
 }
 
 function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -1870,41 +2013,193 @@ function SubjectImage({ label, src, onReplace }: { label: "原" | "新"; src?: s
   </div>;
 }
 
-function StoryboardDescriptionEditor({ shot, subjects, disabled, onChange }: { shot: StoryboardShot; subjects: RemakeSubject[]; disabled: boolean; onChange: (description: string) => void }) {
+function StoryboardDescriptionEditor({ shot, subjects, allSubjects, disabled, onChange }: { shot: StoryboardShot; subjects: RemakeSubject[]; allSubjects: RemakeSubject[]; disabled: boolean; onChange: (description: string) => void }) {
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [editorHasContent, setEditorHasContent] = useState(Boolean(shot.description.trim()));
+  const editorRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const mentionRangeRef = useRef<Range | null>(null);
+  const roleNames = subjects.filter((subject) => subject.type === "person").map((subject) => subject.name);
   const sceneNames = subjects.filter((subject) => subject.type === "scene").map((subject) => subject.name);
-  const featuredNames = subjects.filter((subject) => subject.type !== "scene").map((subject) => subject.name);
-  const formattedDescription = shot.description.trim().startsWith("画风：")
+  const productNames = subjects.filter((subject) => subject.type === "product").map((subject) => subject.name);
+  const primaryRole = roleNames[0] || "出镜角色";
+  const secondaryRole = roleNames[1] || primaryRole;
+  const primaryScene = sceneNames[0] || "现代电商展示空间";
+  const primaryProduct = productNames[0] || "核心商品";
+  const cameraCount = Math.max(2, Math.min(6, Math.ceil(shot.duration / 3)));
+  const cameraTemplates = [
+    (start: number, end: number) => `镜头1（${start}-${end}秒）：[现代·白天·明亮通透·${primaryScene}，室内]\n[机位] 机位与${primaryRole}胸部齐平，平拍朝向${primaryRole}，固定不动，背景保留完整商品展示区。\n[站位] ${primaryRole}位于镜头正前方，面朝镜头，近距离，${primaryProduct}摆放在人物右手可自然拿取的位置。\n[动作] 中近景，浅景深。${primaryRole}拿起${primaryProduct}进入画面，先展示包装正面，再把产品靠近镜头，眉眼自然放松，动作真实利落。\n角色台词（${primaryRole}）：“最近很多人问我，怎样用更简单的方法做好日常护理，今天直接把真实体验讲清楚。”`,
+    (start: number, end: number) => `镜头2（${start}-${end}秒）：[现代·白天·产品细节展示·${primaryScene}，室内]\n[机位] 镜头切至桌面上方四十五度俯拍，缓慢推进至${primaryProduct}瓶身和质地细节。\n[站位] ${primaryRole}的双手从画面下方进入，人物面部不入镜，产品位于画面视觉中心。\n[动作] 特写，${primaryRole}打开${primaryProduct}并取出适量内容，缓慢展示流动性、延展度和吸收后的肤感，包装文字保持清晰。\n旁白：“质地轻盈好推开，接触皮肤后能快速铺匀，日常使用不会给肌肤增加厚重负担。”`,
+    (start: number, end: number) => `镜头3（${start}-${end}秒）：[现代·白天·真实使用演示·${primaryScene}，室内]\n[机位] 机位回到${primaryRole}正前方，面部近景，镜头轻微跟随手部动作。\n[站位] ${primaryRole}面对镜头坐于展示台前，${primaryProduct}置于画面前景。\n[动作] ${primaryRole}将产品均匀涂抹在面部或手背，轻拍至吸收，随后转动角度展示使用前后的光泽和细腻感。\n角色台词（${primaryRole}）：“上脸很清爽，吸收以后摸起来是润的，但不会有黏腻感。”`,
+    (start: number, end: number) => `镜头4（${start}-${end}秒）：[现代·白天·体验反馈·${primaryScene}，室内]\n[机位] 双人中景，镜头平视，构图保留人物互动和桌面的${primaryProduct}。\n[站位] ${primaryRole}位于画面左侧，${secondaryRole}位于右侧，两人自然面向彼此后转向镜头。\n[动作] ${secondaryRole}观察使用效果并轻触手背，${primaryRole}同步补充使用方法，表情自然可信，避免夸张表演。\n角色台词（${secondaryRole}）：“肤感比我预想得更轻，白天用也不会影响后续上妆。”`,
+    (start: number, end: number) => `镜头5（${start}-${end}秒）：[现代·白天·核心卖点强化·${primaryScene}，室内]\n[机位] 产品微距特写与人物面部近景自然切换，焦点从${primaryProduct}平稳过渡到${primaryRole}。\n[站位] ${primaryProduct}立于前景，${primaryRole}处于后景右侧，画面层次清晰。\n[动作] ${primaryRole}指向包装上的关键信息，再展示肌肤细节；镜头停留足够时间，让观众看清产品和使用效果。\n旁白：“从质地、使用步骤到实际肤感都清楚呈现，适合希望精简护理流程、同时重视体验感的人群。”`,
+    (start: number, end: number) => `镜头6（${start}-${end}秒）：[现代·白天·购买引导·${primaryScene}，室内]\n[机位] 机位略低于产品，缓慢拉远形成完整收尾构图。\n[站位] ${primaryRole}站在${primaryProduct}后方，产品保持在画面中心，人物视线看向镜头。\n[动作] ${primaryRole}将${primaryProduct}稳稳托在胸前，微笑点头，随后用手势指向购买入口，画面最后定格在商品包装正面。\n角色台词（${primaryRole}）：“想认真体验的可以从现在开始，坚持使用一段时间，再看肌肤状态的真实变化。”`,
+  ];
+  const cameraDescriptions = Array.from({ length: cameraCount }, (_, index) => {
+    const start = Math.round(index * shot.duration / cameraCount);
+    const end = Math.round((index + 1) * shot.duration / cameraCount);
+    return cameraTemplates[index](start, end);
+  });
+  const formattedDescription = shot.manuallyAdded || !shot.description.trim()
+    ? shot.description
+    : shot.description.includes("[机位]")
     ? shot.description
     : [
       "画风：写实风格，细节刻画逼真，参考院线电影，真人电影风格，影视大片，真实透视比例，细节清晰不过度锐化",
-      `分镜场景设定在：${sceneNames.length ? sceneNames.join("、") : "现代电商展示空间"}`,
+      `分镜场景设定在：${sceneNames.length ? sceneNames.join("、") : primaryScene}`,
       "分镜具体动作描述：",
       "整体视觉基调：画面明亮，色彩饱和，质感细腻，景深较浅以突出人物和产品。",
-      `镜头1（0-${shot.duration}秒）：${featuredNames.length ? `${featuredNames.join("、")}，` : ""}${shot.description}`,
+      `原视频内容分析：${shot.description}`,
+      ...cameraDescriptions,
+      "视频中保留角色台词与旁白，不叠加额外字幕，不使用纯色空镜，不添加无关背景音乐。",
     ].join("\n\n");
   const subjectByName = new Map(subjects.map((subject) => [subject.name, subject]));
   const subjectNames = Array.from(subjectByName.keys()).sort((a, b) => b.length - a.length);
   const tokenPattern = subjectNames.length ? new RegExp(`(${subjectNames.map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "g") : null;
-  const parts = tokenPattern ? formattedDescription.split(tokenPattern) : [formattedDescription];
+  const mentionSubjects = subjects.filter((subject) => subject.name.toLowerCase().includes(mentionQuery.toLowerCase()));
+  const mentionTypeLabel: Record<SubjectType, string> = { person: "角色", scene: "场景", product: "道具" };
 
-  return <div
-    contentEditable={!disabled}
-    suppressContentEditableWarning
-    role="textbox"
-    aria-label="分镜描述"
-    onBlur={(event) => {
-      const nextDescription = event.currentTarget.innerText.replace(/\n{3,}/g, "\n\n").trim();
-      if (nextDescription && nextDescription !== formattedDescription) onChange(nextDescription);
-    }}
-    className={`mt-4 min-h-64 whitespace-pre-wrap rounded-md px-0 py-1 text-xs leading-7 text-slate-700 outline-none ${disabled ? "cursor-not-allowed opacity-60" : "focus:bg-violet-50/20"}`}
-  >
-    {parts.map((part, index) => {
+  const createSubjectChip = (subject: RemakeSubject) => {
+    const chip = document.createElement("span");
+    chip.contentEditable = "false";
+    chip.dataset.subjectId = subject.id;
+    chip.title = subject.name;
+    chip.className = "mx-1 inline-flex h-6 select-none items-center gap-1 whitespace-nowrap rounded-md bg-violet-50 px-1.5 align-middle text-[11px] font-semibold leading-none text-violet-700";
+    const candidate = subject.candidates.find((item) => item.id === subject.selectedCandidateId);
+    const imageUrl = candidate?.image || subject.originalImage;
+    if (imageUrl) {
+      const image = document.createElement("img");
+      image.src = imageUrl;
+      image.alt = "";
+      image.className = "h-4 w-4 rounded object-cover";
+      chip.appendChild(image);
+    }
+    chip.appendChild(document.createTextNode(subject.name));
+    return chip;
+  };
+
+  const serializeEditor = () => {
+    const editor = editorRef.current;
+    if (!editor) return "";
+    const serializeNode = (node: Node): string => {
+      if (node.nodeType === Node.TEXT_NODE) return node.textContent || "";
+      if (!(node instanceof HTMLElement)) return "";
+      if (node.dataset.subjectId) return node.textContent || "";
+      if (node.tagName === "BR") return "\n";
+      const content = Array.from(node.childNodes).map(serializeNode).join("");
+      return node.tagName === "DIV" || node.tagName === "P" ? `${content}\n` : content;
+    };
+    return Array.from(editor.childNodes).map(serializeNode).join("").replace(/\n$/, "");
+  };
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || document.activeElement === editor) return;
+    if (serializeEditor() === formattedDescription) return;
+    editor.replaceChildren();
+    const descriptionParts = tokenPattern ? formattedDescription.split(tokenPattern) : [formattedDescription];
+    descriptionParts.forEach((part) => {
       const subject = subjectByName.get(part);
-      if (!subject) return <React.Fragment key={`${index}-${part.slice(0, 8)}`}>{part}</React.Fragment>;
-      const candidate = subject.candidates.find((item) => item.id === subject.selectedCandidateId);
-      const image = candidate?.image || subject.originalImage;
-      return <span key={`${subject.id}-${index}`} contentEditable={false} title={subject.name} className="mx-0.5 inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 align-middle font-semibold text-slate-700">{image && <img src={image} alt="" className="h-4 w-4 rounded object-cover" referrerPolicy="no-referrer" />}{subject.name}</span>;
-    })}
+      editor.appendChild(subject ? createSubjectChip(subject) : document.createTextNode(part));
+    });
+    setEditorHasContent(Boolean(formattedDescription.trim()));
+  }, [formattedDescription, subjects]);
+
+  const updateMentionRange = () => {
+    const selection = window.getSelection();
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    const editor = editorRef.current;
+    if (!range || !range.collapsed || !editor?.contains(range.startContainer) || range.startContainer.nodeType !== Node.TEXT_NODE) {
+      setMentionOpen(false);
+      return;
+    }
+    const content = range.startContainer.textContent?.slice(0, range.startOffset) || "";
+    const match = content.match(/@([^@\s]*)$/);
+    if (!match) {
+      setMentionOpen(false);
+      return;
+    }
+    const mentionRange = range.cloneRange();
+    mentionRange.setStart(range.startContainer, range.startOffset - match[0].length);
+    mentionRangeRef.current = mentionRange;
+    setMentionQuery(match[1]);
+    setMentionIndex(0);
+    setMentionOpen(true);
+  };
+
+  const insertSubject = (subject: RemakeSubject) => {
+    const range = mentionRangeRef.current;
+    const editor = editorRef.current;
+    if (!range || !editor) return;
+    range.deleteContents();
+    const chip = createSubjectChip(subject);
+    const space = document.createTextNode(" ");
+    range.insertNode(space);
+    range.insertNode(chip);
+    range.setStartAfter(space);
+    range.collapse(true);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    setMentionOpen(false);
+    setMentionQuery("");
+    setEditorHasContent(true);
+    onChange(serializeEditor().replace(/\n{3,}/g, "\n\n").trim());
+  };
+
+  return <div ref={wrapperRef} className="relative mt-4 min-h-0 flex-1">
+    {!editorHasContent && <span className="pointer-events-none absolute left-0 top-1 text-xs text-slate-400">请输入分镜描述，包括画面、动作、角色台词和旁白</span>}
+    <div
+      ref={editorRef}
+      contentEditable={!disabled}
+      suppressContentEditableWarning
+      role="textbox"
+      aria-multiline="true"
+      aria-label="分镜描述"
+      onInput={(event) => {
+        setEditorHasContent(Boolean(event.currentTarget.innerText.trim()));
+        updateMentionRange();
+      }}
+      onMouseUp={updateMentionRange}
+      onKeyUp={(event) => {
+        if (!["ArrowDown", "ArrowUp", "Enter", "Escape"].includes(event.key)) updateMentionRange();
+      }}
+      onKeyDown={(event) => {
+        if (!mentionOpen) return;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setMentionOpen(false);
+        } else if (event.key === "ArrowDown" && mentionSubjects.length) {
+          event.preventDefault();
+          setMentionIndex((current) => (current + 1) % mentionSubjects.length);
+        } else if (event.key === "ArrowUp" && mentionSubjects.length) {
+          event.preventDefault();
+          setMentionIndex((current) => (current - 1 + mentionSubjects.length) % mentionSubjects.length);
+        } else if (event.key === "Enter" && mentionSubjects.length) {
+          event.preventDefault();
+          insertSubject(mentionSubjects[mentionIndex] || mentionSubjects[0]);
+        }
+      }}
+      onBlur={() => {
+        const nextDescription = serializeEditor().replace(/\n{3,}/g, "\n\n").trim();
+        if (nextDescription !== formattedDescription) onChange(nextDescription);
+        setMentionOpen(false);
+      }}
+      className={`h-full overflow-y-auto whitespace-pre-wrap rounded-md px-0 py-1 pr-2 text-xs leading-7 text-slate-700 outline-none ${disabled ? "cursor-not-allowed opacity-60" : "focus:bg-violet-50/20"}`}
+    />
+    {mentionOpen && <AnchoredPopover anchorRef={wrapperRef} getAnchorRect={() => mentionRangeRef.current?.getBoundingClientRect() || null} width={224} maxHeight={192} gap={6} onClose={() => setMentionOpen(false)} className="rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
+      <p className="px-2 py-1 text-[10px] text-slate-400">选择当前分镜主体</p>
+      {mentionSubjects.length ? mentionSubjects.map((subject, index) => {
+        const candidate = subject.candidates.find((item) => item.id === subject.selectedCandidateId);
+        const image = candidate?.image || subject.originalImage;
+        return <button key={subject.id} type="button" onMouseDown={(event) => { event.preventDefault(); insertSubject(subject); }} className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-left ${index === mentionIndex ? "bg-violet-50" : "hover:bg-slate-50"}`}>
+          {image ? <img src={image} alt="" className="h-7 w-7 shrink-0 rounded object-cover" referrerPolicy="no-referrer" /> : <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-slate-100"><AtSign className="h-3.5 w-3.5 text-slate-400" /></span>}
+          <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold text-slate-700">{subject.name}</span><span className="mt-0.5 block text-[9px] text-slate-400">{mentionTypeLabel[subject.type]}-{getSubjectAppearanceLabel(subject, allSubjects)}</span></span>
+        </button>;
+      }) : <p className="px-2 py-3 text-xs text-slate-400">没有匹配的当前分镜主体</p>}
+    </AnchoredPopover>}
   </div>;
 }
 
@@ -1913,14 +2208,54 @@ function StoryboardVideoPreview({ sourceCover, shot, seek, activeTab, onSeek, on
   const versions = getStoryboardVersions(shot);
   const currentVersionId = shot.currentVersionId || versions[0]?.id || "";
   const [previewVersionId, setPreviewVersionId] = useState(currentVersionId);
+  const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const seekRef = useRef(seek);
   const previewVersion = versions.find((version) => version.id === previewVersionId) || versions[0];
   const cover = showingGenerated ? previewVersion?.cover : sourceCover;
   const ready = showingGenerated ? !!cover : true;
   const previewIsCurrent = !!previewVersion && previewVersion.id === currentVersionId;
+  const currentSeconds = Math.min(shot.duration, Math.round(shot.duration * seek / 100));
+  const formatVideoTime = (seconds: number) => `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 
   useEffect(() => {
     setPreviewVersionId(currentVersionId);
   }, [currentVersionId, shot.id]);
+
+  useEffect(() => {
+    seekRef.current = seek;
+  }, [seek]);
+
+  useEffect(() => {
+    setPlaying(false);
+  }, [activeTab, previewVersionId, shot.id]);
+
+  useEffect(() => {
+    if (!playing || !ready) return;
+    const timer = window.setInterval(() => {
+      const nextSeek = Math.min(100, seekRef.current + (100 / Math.max(shot.duration, 1)) * 0.25 * playbackRate);
+      seekRef.current = nextSeek;
+      onSeek(nextSeek);
+      if (nextSeek >= 100) setPlaying(false);
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [onSeek, playbackRate, playing, ready, shot.duration]);
+
+  const togglePlaying = () => {
+    if (!ready) return;
+    if (!playing && seekRef.current >= 100) {
+      seekRef.current = 0;
+      onSeek(0);
+    }
+    setPlaying((current) => !current);
+  };
+
+  const cyclePlaybackRate = () => {
+    const rates = [1, 1.5, 2, 0.5];
+    setPlaybackRate((current) => rates[(rates.indexOf(current) + 1) % rates.length]);
+  };
 
   return <section className="min-h-0 overflow-y-auto border-l border-slate-200 bg-white p-5">
     <div className="flex justify-center gap-8 border-b border-slate-100">
@@ -1928,26 +2263,34 @@ function StoryboardVideoPreview({ sourceCover, shot, seek, activeTab, onSeek, on
       <button type="button" onClick={() => onTab("original")} className={`relative pb-2 text-sm font-semibold ${!showingGenerated ? "text-slate-900" : "text-slate-500 hover:text-slate-700"}`}>原视频{!showingGenerated && <span className="absolute inset-x-0 -bottom-px h-0.5 bg-violet-600" />}</button>
     </div>
 
-    <div className="relative mt-3 flex aspect-[16/10] w-full items-center justify-center overflow-hidden rounded-lg bg-[#08090d]">
+    <div ref={previewRef} className="group/video relative mt-3 flex aspect-[16/10] w-full items-center justify-center overflow-hidden rounded-lg bg-[#08090d]">
       {ready && cover ? <>
         <img src={cover} alt={showingGenerated ? "分镜生成视频" : "原视频"} className="h-full w-auto max-w-full object-cover" referrerPolicy="no-referrer" />
         {showingGenerated && !previewIsCurrent && previewVersion && <button type="button" onClick={() => onMakeCurrent(previewVersion.id)} className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-md bg-slate-900/85 px-4 py-2 text-xs font-semibold text-white shadow-lg hover:bg-slate-900"><Sparkles className="h-3.5 w-3.5" />选为分镜</button>}
-        <button type="button" title="播放" className="absolute inset-0 m-auto flex h-12 w-12 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm"><Play className="ml-1 h-5 w-5 fill-current" /></button>
+        {!playing && <button type="button" onClick={togglePlaying} title="播放" className="absolute inset-0 m-auto flex h-12 w-12 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/60"><Play className="ml-1 h-5 w-5 fill-current" /></button>}
+        <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/90 via-black/55 to-transparent px-3 pb-2 pt-8 text-white">
+          <input type="range" min="0" max="100" step="0.1" value={seek} onChange={(event) => { const value = Number(event.target.value); seekRef.current = value; onSeek(value); }} aria-label="视频播放进度" className="h-1 w-full cursor-pointer accent-violet-500" />
+          <div className="mt-2 flex h-7 items-center gap-3">
+            <button type="button" onClick={togglePlaying} title={playing ? "暂停" : "播放"} className="flex h-7 w-7 items-center justify-center rounded hover:bg-white/15">{playing ? <Pause className="h-4 w-4 fill-current" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}</button>
+            <span className="text-xs font-medium tabular-nums"><strong>{formatVideoTime(currentSeconds)}</strong><span className="text-white/60"> / {formatVideoTime(shot.duration)}</span></span>
+            <div className="ml-auto flex items-center gap-2">
+              <button type="button" onClick={cyclePlaybackRate} title="切换播放速度" className="min-w-10 rounded bg-black/35 px-2 py-1 text-xs font-medium hover:bg-white/15">{playbackRate}x</button>
+              {showingGenerated && <a href={cover} download title="下载视频" className="flex h-7 w-7 items-center justify-center rounded hover:bg-white/15"><Download className="h-4 w-4" /></a>}
+              <button type="button" onClick={() => setMuted((current) => !current)} title={muted ? "打开声音" : "静音"} className="flex h-7 w-7 items-center justify-center rounded hover:bg-white/15">{muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}</button>
+              <button type="button" onClick={() => previewRef.current?.requestFullscreen?.()} title="全屏" className="flex h-7 w-7 items-center justify-center rounded hover:bg-white/15"><Maximize className="h-4 w-4" /></button>
+            </div>
+          </div>
+        </div>
       </> : <div className="flex h-full flex-col items-center justify-center px-4 text-center">
         {shot.status === "generating" ? <><Loader2 className="h-7 w-7 animate-spin text-violet-400" /><span className="mt-3 text-xs text-violet-200">生成中 {shot.progress}%</span></> : shot.status === "failed" ? <><AlertCircle className="h-7 w-7 text-rose-400" /><span className="mt-3 text-xs text-rose-200">生成失败</span></> : <><Video className="h-7 w-7 text-slate-600" /><span className="mt-3 text-xs text-slate-500">待生成</span></>}
       </div>}
     </div>
 
-    {showingGenerated && versions.length > 0 && <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+    {showingGenerated && versions.length > 0 && <div className="mt-3 flex max-h-36 flex-wrap content-start gap-2 overflow-y-auto pr-1">
       {versions.map((version) => { const isCurrent = version.id === currentVersionId; const isPreviewing = version.id === previewVersion?.id; return <button key={version.id} type="button" onClick={() => setPreviewVersionId(version.id)} title={isCurrent ? "当前分镜" : "预览历史分镜"} className={`relative h-16 w-12 shrink-0 overflow-hidden rounded-md border bg-slate-100 ${isPreviewing ? "border-slate-900 ring-1 ring-slate-300" : "border-slate-200 hover:border-violet-300"}`}><img src={version.cover} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />{isCurrent && <span className="absolute inset-x-0 bottom-0 bg-black/75 py-0.5 text-center text-[8px] font-semibold text-white">当前分镜</span>}</button>; })}
     </div>}
 
-    <div className="mt-3"><input type="range" min="0" max="100" value={seek} onChange={(event) => onSeek(Number(event.target.value))} className="w-full accent-violet-600" /><div className="mt-1 flex justify-between text-[10px] text-slate-400"><span>{Math.round(shot.duration * seek / 100)}s</span><span>{shot.duration}s</span></div></div>
   </section>;
-}
-
-function FinalVideo({ label, cover }: { label: string; cover: string }) {
-  return <div><p className="mb-2 text-xs font-semibold text-slate-600">{label}</p><div className="relative mx-auto w-48 overflow-hidden rounded-md bg-slate-900 aspect-[9/16]"><img src={cover} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" /><button className="absolute inset-0 m-auto flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-violet-700"><Play className="ml-0.5 h-4 w-4 fill-current" /></button></div></div>;
 }
 
 function ReviewRow({ subject, status }: { subject: RemakeSubject; status: string }) {

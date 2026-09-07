@@ -88,6 +88,45 @@ export type GenerationTaskCategory =
   | "ai_video"
   | "ai_image";
 
+export type AiVideoMode = "reference" | "first_last" | "dubbing" | "background" | "outfit";
+
+export interface AiVideoMediaItem {
+  id: string;
+  name: string;
+  type: "image" | "video";
+  url: string;
+  coverUrl?: string;
+  durationSeconds?: number;
+  source?: "library" | "local" | "generated";
+}
+
+export interface AiVideoTaskSnapshot {
+  mode: AiVideoMode;
+  model: string;
+  ratio: "9:16" | "16:9" | "4:3" | "3:4" | "1:1";
+  duration: number;
+  prompt?: string;
+  references?: AiVideoMediaItem[];
+  firstFrame?: AiVideoMediaItem | null;
+  lastFrame?: AiVideoMediaItem | null;
+  character?: AiVideoMediaItem | null;
+  voiceId?: string;
+  voiceName?: string;
+  speech?: string;
+  actionDescription?: string;
+  sourceVideos?: AiVideoMediaItem[];
+  outfitMode?: "single" | "multiple";
+  clothingImages?: AiVideoMediaItem[];
+  modelMedia?: AiVideoMediaItem | null;
+  selectedLook?: AiVideoMediaItem | null;
+}
+
+export interface AiVideoTaskOutput {
+  videoUrl: string;
+  coverUrl: string;
+  duration: number;
+}
+
 export interface Task {
   id: string;
   name: string;
@@ -109,6 +148,9 @@ export interface Task {
   remakeSessionId?: string;
   cancellable?: boolean;
   restartable?: boolean;
+  aiVideoSnapshot?: AiVideoTaskSnapshot;
+  aiVideoOutput?: AiVideoTaskOutput;
+  simulationStartedAt?: number;
 }
 
 export interface CreditTransaction {

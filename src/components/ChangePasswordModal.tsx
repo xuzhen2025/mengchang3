@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { AlertTriangle, Key, Lock, X } from "lucide-react";
+import OverlayPortal from "./overlays/OverlayPortal";
 
 interface ChangePasswordModalProps {
   open: boolean;
@@ -41,7 +42,7 @@ export default function ChangePasswordModal({ open, onClose, onSuccess }: Change
   const inputClass = "w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-mono text-slate-800 focus:border-purple-600 focus:bg-white focus:outline-none";
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/70 p-4 font-sans backdrop-blur-xs" onMouseDown={(event) => event.target === event.currentTarget && close()}>
+    <OverlayPortal layer="modal" className="fixed inset-0 flex items-center justify-center bg-slate-950/70 p-4 font-sans backdrop-blur-xs" onMouseDown={(event) => event.target === event.currentTarget && close()}>
       <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white text-slate-800 shadow-2xl">
         <div className="flex items-center justify-between bg-slate-900 p-4 text-white">
           <span className="flex items-center gap-2 text-sm font-black"><Key className="h-4 w-4 text-amber-400" />修改个人登录密码</span>
@@ -66,6 +67,6 @@ export default function ChangePasswordModal({ open, onClose, onSuccess }: Change
           </div>
         </form>
       </div>
-    </div>
+    </OverlayPortal>
   );
 }

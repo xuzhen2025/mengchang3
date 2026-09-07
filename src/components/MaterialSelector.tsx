@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { X, Search, FileUp, Image, Video, Music, Check, FolderHeart } from "lucide-react";
 import { Asset } from "../types";
 import AssetPagination from "./AssetPagination";
+import OverlayPortal from "./overlays/OverlayPortal";
 
 interface MaterialSelectorProps {
   isOpen: boolean;
@@ -84,7 +85,7 @@ export default function MaterialSelector({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+    <OverlayPortal layer="modal" className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl flex flex-col h-[550px] shadow-2xl overflow-hidden animate-fade-in text-slate-700">
         {/* Header */}
         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
@@ -256,6 +257,6 @@ export default function MaterialSelector({
           </div>
         </div>
       </div>
-    </div>
+    </OverlayPortal>
   );
 }

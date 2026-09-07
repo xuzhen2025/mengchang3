@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { X, Search, ChevronDown, Calendar } from "lucide-react";
+import OverlayPortal from "./overlays/OverlayPortal";
 
 export interface ScriptResourceItem {
   id: string;
@@ -276,7 +277,7 @@ export default function LinkScriptModal({
       : `已选择 ${selectedIds.length} 项脚本: ID ${selectedIds.join(", ")}`;
 
   return (
-    <div className={`fixed inset-0 ${zIndexClass} bg-black/40 backdrop-blur-2xs flex items-center justify-center p-4 animate-in fade-in duration-150`}>
+    <OverlayPortal layer="modal" className={`fixed inset-0 ${zIndexClass} bg-black/40 backdrop-blur-2xs flex items-center justify-center p-4 animate-in fade-in duration-150`}>
       <div className="bg-white rounded-3xl max-w-5xl w-full shadow-2xl border border-slate-100 overflow-hidden flex flex-col p-6 space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -605,6 +606,6 @@ export default function LinkScriptModal({
           </div>
         </div>
       </div>
-    </div>
+    </OverlayPortal>
   );
 }

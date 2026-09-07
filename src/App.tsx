@@ -35,7 +35,7 @@ import {
   INITIAL_TRANSACTIONS,
   INITIAL_MESSAGES
 } from "./data";
-import { Asset, Task, CreditTransaction, GalleryItem, ActiveScreen, AppMessage, ResourceSearchIntent } from "./types";
+import { Asset, Task, CreditTransaction, GalleryItem, ActiveScreen, AppMessage, ResourceSearchIntent, AiVideoTaskSnapshot } from "./types";
 import { Sparkles, Layers, Sliders, ChevronRight, Play } from "lucide-react";
 
 const AUTH_STORAGE_KEY = "mengchang_prototype_session";
@@ -100,6 +100,7 @@ export default function App() {
   const [resourceSearchIntent, setResourceSearchIntent] = useState<ResourceSearchIntent | null>(null);
   const [activeAgentSessionId, setActiveAgentSessionId] = useState<string | null>(null);
   const [activeRemakeSessionId, setActiveRemakeSessionId] = useState<string | null>(null);
+  const [activeAiVideoTaskId, setActiveAiVideoTaskId] = useState<string | null>(null);
 
   const handleNavigate = (screen: ActiveScreen) => {
     setScreenHistory((prev) => {
@@ -126,6 +127,9 @@ export default function App() {
     }
     if (screen === "video_remake") {
       setActiveRemakeSessionId(null);
+    }
+    if (screen === "ai_video") {
+      setActiveAiVideoTaskId(null);
     }
     setScreenHistory([screen]);
   };
@@ -170,13 +174,27 @@ export default function App() {
   };
 
   // App core states
-  const [credits, setCredits] = useState(100.00);
-  const [extraRequestedCredits, setExtraRequestedCredits] = useState(350.00);
+  const [credits, setCredits] = useState(10099.00);
+  const [extraRequestedCredits, setExtraRequestedCredits] = useState(10349.00);
   const [transactions, setTransactions] = useState<CreditTransaction[]>(INITIAL_TRANSACTIONS);
   const [assets, setAssets] = useState<Asset[]>(INITIAL_ASSETS);
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>(INITIAL_GALLERY);
   const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
   const [messages, setMessages] = useState<AppMessage[]>(INITIAL_MESSAGES);
+  const availableCredits = credits + extraRequestedCredits;
+
+  const deductAvailableCredits = (amount: number) => {
+    if (amount <= 0) return true;
+    if (availableCredits < amount) return false;
+
+    const monthlyDeduction = Math.min(credits, amount);
+    const extraDeduction = amount - monthlyDeduction;
+    setCredits((current) => Math.max(0, current - monthlyDeduction));
+    if (extraDeduction > 0) {
+      setExtraRequestedCredits((current) => Math.max(0, current - extraDeduction));
+    }
+    return true;
+  };
 
   // Credit Application Workflow (Closed-Loop)
   const handleRequestCredits = (amount: number, reason: string) => {
@@ -402,6 +420,60 @@ export default function App() {
     return () => clearInterval(interval);
   }, [tasks]);
 
+  // AI video raw-material tasks use a deterministic five-second prototype lifecycle.
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      const now = Date.now();
+      setTasks((current) => {
+        let changed = false;
+        const next = current.map((task) => {
+          if (task.category !== "ai_video" || task.autoProgress !== false || !task.simulationStartedAt || !["queue", "generating"].includes(task.status)) {
+            return task;
+          }
+
+          const elapsed = now - task.simulationStartedAt;
+          if (elapsed < 1200) {
+            return task;
+          }
+
+          if (elapsed < 5000) {
+            const nextProgress = Math.min(96, Math.max(8, Math.round(((elapsed - 1200) / 3800) * 100)));
+            if (task.status !== "generating" || task.progress !== nextProgress) changed = true;
+            return { ...task, status: "generating" as const, progress: nextProgress };
+          }
+
+          const snapshot = task.aiVideoSnapshot;
+          const previewMedia = snapshot?.selectedLook
+            || snapshot?.character
+            || snapshot?.firstFrame
+            || snapshot?.references?.[0]
+            || snapshot?.sourceVideos?.[0]
+            || snapshot?.modelMedia
+            || snapshot?.clothingImages?.[0];
+          const coverUrl = previewMedia?.coverUrl
+            || (previewMedia?.type === "image" ? previewMedia.url : "")
+            || "/assets/prototype/luxury-skincare-set.jpg";
+          const videoUrl = "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4";
+          changed = true;
+          return {
+            ...task,
+            status: "completed" as const,
+            progress: 100,
+            outputFiles: [videoUrl],
+            aiVideoOutput: {
+              videoUrl,
+              coverUrl,
+              duration: snapshot?.duration || 8
+            }
+          };
+        });
+        return changed ? next : current;
+      });
+    }, 160);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
   const triggerTaskCompletedEffects = (task: Task) => {
     // Generate beautiful assets dynamically upon completion
     const timestamp = new Date().toISOString().replace("T", " ").slice(0, 16);
@@ -541,13 +613,10 @@ export default function App() {
     creditsCost: number,
     source: "agent" | "tool" = "tool"
   ) => {
-    if (credits < creditsCost) {
+    if (!deductAvailableCredits(creditsCost)) {
       alert("余额不足！请开通 VIP 订阅方案或在可用积分中心兑换卡密添加额度。");
       return;
     }
-
-    // Deduct points
-    setCredits((prev) => prev - creditsCost);
 
     // Create task
     const id = "t_" + Date.now();
@@ -585,7 +654,7 @@ export default function App() {
       type === "digital_human" ? "数字人分身" :
       type === "model_change" ? "模特换衣" :
       type === "fission" ? "爆款复刻" :
-      type === "video_gen" ? (source === "agent" ? "Agent创作" : "AI视频素材") :
+      type === "video_gen" ? (source === "agent" ? "Agent创作" : "AI视频原料") :
       type === "image_gen" ? (source === "agent" ? "Agent创作" : "AI图片素材") : "快速创作";
 
     const newTx: CreditTransaction = {
@@ -603,7 +672,86 @@ export default function App() {
     // setIsQueueOpen(true);
   };
 
+  const handleCreateAiVideoTask = (snapshot: AiVideoTaskSnapshot, creditsCost: number) => {
+    if (!deductAvailableCredits(creditsCost)) {
+      alert("余额不足！请前往个人中心申请或补充积分。");
+      return null;
+    }
+
+    const now = new Date();
+    const id = `ai-video-${now.getTime()}`;
+    const timestamp = now.toISOString().replace("T", " ").slice(0, 19);
+    const modeLabels: Record<AiVideoTaskSnapshot["mode"], string> = {
+      reference: "参考生视频",
+      first_last: "首尾帧生视频",
+      dubbing: "配音生视频",
+      background: "视频编辑-换背景",
+      outfit: "视频编辑-换装"
+    };
+    const inputFiles = [
+      ...(snapshot.references || []),
+      ...(snapshot.firstFrame ? [snapshot.firstFrame] : []),
+      ...(snapshot.lastFrame ? [snapshot.lastFrame] : []),
+      ...(snapshot.character ? [snapshot.character] : []),
+      ...(snapshot.sourceVideos || []),
+      ...(snapshot.clothingImages || []),
+      ...(snapshot.modelMedia ? [snapshot.modelMedia] : [])
+    ].map((item) => item.url);
+    const task: Task = {
+      id,
+      name: `AI视频原料_${modeLabels[snapshot.mode]}_${timestamp.slice(0, 10).replace(/-/g, "")}_${timestamp.slice(11, 19).replace(/:/g, "")}`,
+      type: "video_gen",
+      status: "queue",
+      progress: 0,
+      inputFiles,
+      createdAt: timestamp,
+      creditsCost,
+      source: "tool",
+      category: "ai_video",
+      autoProgress: false,
+      cancellable: true,
+      restartable: false,
+      aiVideoSnapshot: snapshot,
+      simulationStartedAt: now.getTime()
+    };
+
+    setTasks((current) => [task, ...current]);
+    setTransactions((current) => [{
+      id: `tx_ai_video_${now.getTime()}`,
+      type: "consume",
+      tool: "AI视频原料",
+      amount: -creditsCost,
+      time: timestamp,
+      remark: `生成视频：${task.name}`
+    }, ...current]);
+    return id;
+  };
+
+  const handleConsumeAiVideoCredits = (creditsCost: number, remark: string) => {
+    if (!deductAvailableCredits(creditsCost)) {
+      alert("积分不足，无法执行当前操作。");
+      return false;
+    }
+
+    const now = new Date();
+    const timestamp = now.toISOString().replace("T", " ").slice(0, 19);
+    setTransactions((current) => [{
+      id: `tx_ai_video_preview_${now.getTime()}`,
+      type: "consume",
+      tool: "AI视频原料",
+      amount: -creditsCost,
+      time: timestamp,
+      remark
+    }, ...current]);
+    return true;
+  };
+
   const handleSyncAgentTask = (nextTask: Task, creditsCharge: number = 0) => {
+    if (creditsCharge > 0 && !deductAvailableCredits(creditsCharge)) {
+      alert("积分不足，无法执行当前生成操作");
+      return;
+    }
+
     setTasks((current) => {
       const exists = current.some((task) => task.id === nextTask.id);
       return exists
@@ -612,7 +760,6 @@ export default function App() {
     });
 
     if (creditsCharge > 0) {
-      setCredits((current) => current - creditsCharge);
       setTransactions((current) => [{
         id: `tx_agent_${Date.now()}`,
         type: "consume",
@@ -699,6 +846,7 @@ export default function App() {
   const handleCancelGenerationTask = (taskId: string) => {
     const target = tasks.find((task) => task.id === taskId);
     if (!target || !["queue", "generating"].includes(target.status)) return;
+    if (target.category === "ai_video" && target.status !== "queue") return;
 
     const cancelledAt = new Date().toISOString().replace("T", " ").slice(0, 19);
     const refund = target.status === "queue" ? target.creditsCost : 0;
@@ -725,13 +873,12 @@ export default function App() {
   const handleRestartGenerationTask = (taskId: string) => {
     const target = tasks.find((task) => task.id === taskId);
     if (!target || !["failed", "cancelled"].includes(target.status)) return;
-    if (credits < target.creditsCost) {
+    if (!deductAvailableCredits(target.creditsCost)) {
       alert("积分不足，无法重新生成");
       return;
     }
 
     const restartedAt = new Date().toISOString().replace("T", " ").slice(0, 19);
-    setCredits((current) => current - target.creditsCost);
     setTasks((current) => current.map((task) => task.id === taskId ? {
       ...task,
       status: "queue",
@@ -844,14 +991,15 @@ export default function App() {
       case "ai_video":
         return (
           <AiVideoView
-            onBack={() => {
-              setPresetPrompt("");
-              setPresetReferences([]);
-              handleBack();
-            }}
-            onAddTask={handleAddTask}
-            onOpenMaterialSelector={handleOpenMaterialSelector}
             galleryItems={galleryItems}
+            tasks={tasks}
+            activeTaskId={activeAiVideoTaskId}
+            onActiveTaskChange={setActiveAiVideoTaskId}
+            onCreateTask={handleCreateAiVideoTask}
+            onConsumeCredits={handleConsumeAiVideoCredits}
+            onCancelTask={handleCancelGenerationTask}
+            onOpenTaskQueue={() => setIsQueueOpen(true)}
+            onUploadVideos={handleUploadAgentVideos}
             presetPrompt={presetPrompt}
             presetReferences={presetReferences}
             onClearPreset={() => {
@@ -981,14 +1129,14 @@ export default function App() {
             onAddTask={(type, name, inputFiles, creditsCost) => {
               handleAddTask(type, name, inputFiles, creditsCost);
             }}
-            credits={credits}
+            credits={availableCredits}
           />
         );
       
       case "agent_creation":
         return (
           <AgentCreationView
-            credits={credits}
+            credits={availableCredits}
             activeTask={activeAgentSessionId ? tasks.find((task) => task.id === activeAgentSessionId) : undefined}
             onSyncTask={handleSyncAgentTask}
             onCancelTask={handleCancelGenerationTask}
@@ -1005,7 +1153,7 @@ export default function App() {
             onBack={handleBack}
             onAddTask={handleAddTask}
             onOpenMaterialSelector={handleOpenMaterialSelector}
-            credits={credits}
+            credits={availableCredits}
           />
         );
 
@@ -1014,9 +1162,10 @@ export default function App() {
           <VideoRemakeView
             key={activeRemakeSessionId || "latest-remake"}
             onBack={() => setActiveRemakeSessionId(null)}
-            credits={credits}
+            credits={availableCredits}
             assets={assets}
             activeSessionId={activeRemakeSessionId}
+            activeTask={activeRemakeSessionId ? tasks.find((task) => task.remakeSessionId === activeRemakeSessionId || task.id === activeRemakeSessionId) : undefined}
             onSessionChange={setActiveRemakeSessionId}
             onCreateSession={() => setActiveRemakeSessionId(`remake-${Date.now()}`)}
             onOpenTaskQueue={() => setIsQueueOpen(true)}
@@ -1043,7 +1192,7 @@ export default function App() {
         setActiveScreen={handleSidebarNavigate}
         collapsed={sidebarCollapsed}
         setCollapsed={setSidebarCollapsed}
-        credits={credits + extraRequestedCredits}
+        credits={availableCredits}
         openCreditsModal={() => handleNavigate("credits")}
         openAdminProfile={() => setAdminActiveScreen("admin_profile")}
         appMode={appMode}
@@ -1074,9 +1223,15 @@ export default function App() {
               setIsQueueOpen(false);
               return;
             }
-            if (task?.remakeSessionId) {
-              setActiveRemakeSessionId(task.remakeSessionId);
+            if (task?.category === "fission" || task?.type === "fission") {
+              setActiveRemakeSessionId(task.remakeSessionId || task.id);
               setScreenHistory(["video_remake"]);
+              setIsQueueOpen(false);
+              return;
+            }
+            if (task?.category === "ai_video") {
+              setActiveAiVideoTaskId(task.id);
+              setScreenHistory(["ai_video"]);
               setIsQueueOpen(false);
               return;
             }
