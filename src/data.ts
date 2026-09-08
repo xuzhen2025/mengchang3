@@ -418,7 +418,13 @@ export const INITIAL_ASSETS: Asset[] = [
     source: "resource_library",
     creator: "徐振",
     publicTags: ["女装", "女声", "轻快"],
-    status: "已通过"
+    status: "已通过",
+    fileInfo: {
+      size: "5.8 MB",
+      resolution: "48kHz / 24bit",
+      duration: "00:32",
+      format: "WAV"
+    }
   },
   {
     id: "a6",

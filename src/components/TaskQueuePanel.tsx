@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   Ban,
@@ -96,6 +96,14 @@ const REMAKE_STAGE_LABELS: Record<NonNullable<Task["remakeStage"]>, string> = {
   final: "成片"
 };
 
+const LAUNCHER_VIEWPORT_MARGIN = 12;
+const LAUNCHER_DRAG_THRESHOLD = 4;
+
+const clampLauncherTop = (top: number, height: number, viewportHeight: number) => {
+  const maxTop = Math.max(LAUNCHER_VIEWPORT_MARGIN, viewportHeight - height - LAUNCHER_VIEWPORT_MARGIN);
+  return Math.min(maxTop, Math.max(LAUNCHER_VIEWPORT_MARGIN, top));
+};
+
 const getTaskStageLabel = (task: Task, category: GenerationTaskCategory) => {
   if (category === "agent" && task.agentStage) return AGENT_STAGE_LABELS[task.agentStage];
   if (category === "fission") {
@@ -111,6 +119,17 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
   const [tab, setTab] = useState<"recent" | "all">("recent");
   const [recentCategory, setRecentCategory] = useState<"agent" | "tool">("agent");
   const [allCategory, setAllCategory] = useState<"all" | GenerationTaskCategory>("all");
+  const [launcherTop, setLauncherTop] = useState<number | null>(null);
+  const [isLauncherDragging, setIsLauncherDragging] = useState(false);
+  const launcherRef = useRef<HTMLDivElement>(null);
+  const launcherDragRef = useRef<{
+    pointerId: number;
+    startY: number;
+    startTop: number;
+    height: number;
+    moved: boolean;
+  } | null>(null);
+  const suppressLauncherClickRef = useRef(false);
 
   const activeCount = tasks.filter((task) => task.status === "queue" || task.status === "generating").length;
   const queueCount = tasks.filter((task) => task.status === "queue").length;
@@ -136,16 +155,82 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
     return groups;
   }, []), [visibleTasks]);
 
+  useEffect(() => {
+    const keepLauncherInView = () => {
+      setLauncherTop((currentTop) => {
+        if (currentTop === null) return null;
+        const height = launcherRef.current?.getBoundingClientRect().height ?? 128;
+        return clampLauncherTop(currentTop, height, window.innerHeight);
+      });
+    };
+
+    window.addEventListener("resize", keepLauncherInView);
+    return () => window.removeEventListener("resize", keepLauncherInView);
+  }, []);
+
+  const handleLauncherPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    launcherDragRef.current = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startTop: bounds.top,
+      height: bounds.height,
+      moved: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleLauncherPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = launcherDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const deltaY = event.clientY - drag.startY;
+    if (!drag.moved && Math.abs(deltaY) < LAUNCHER_DRAG_THRESHOLD) return;
+    if (!drag.moved) {
+      drag.moved = true;
+      setIsLauncherDragging(true);
+    }
+    setLauncherTop(clampLauncherTop(drag.startTop + deltaY, drag.height, window.innerHeight));
+  };
+
+  const finishLauncherDrag = (event: React.PointerEvent<HTMLDivElement>, cancelled = false) => {
+    const drag = launcherDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    launcherDragRef.current = null;
+    setIsLauncherDragging(false);
+    if (!cancelled && drag.moved) {
+      suppressLauncherClickRef.current = true;
+      window.setTimeout(() => { suppressLauncherClickRef.current = false; }, 0);
+    }
+  };
+
+  const openQueueFromLauncher = () => {
+    if (suppressLauncherClickRef.current) {
+      suppressLauncherClickRef.current = false;
+      return;
+    }
+    setIsOpen(true);
+  };
+
   if (!isOpen) {
     return (
       <OverlayPortal
+        ref={launcherRef}
         layer="drawer"
-        onClick={() => setIsOpen(true)}
+        onClick={openQueueFromLauncher}
+        onPointerDown={handleLauncherPointerDown}
+        onPointerMove={handleLauncherPointerMove}
+        onPointerUp={(event) => finishLauncherDrag(event)}
+        onPointerCancel={(event) => finishLauncherDrag(event, true)}
         title={activeCount > 0 ? `当前有 ${activeCount} 个任务进行中` : "打开任务队列"}
-        className="fixed right-0 top-1/2 flex min-h-32 -translate-y-1/2 cursor-pointer flex-col items-center justify-center gap-2 rounded-l-lg border border-r-0 border-violet-200 bg-white px-2.5 py-3 text-violet-700 shadow-lg transition-colors hover:bg-violet-50"
+        style={launcherTop === null ? undefined : { top: launcherTop }}
+        className={`fixed right-0 flex min-h-32 touch-none select-none flex-col items-center justify-center gap-2 rounded-l-lg border border-r-0 border-violet-200 bg-white px-2.5 py-3 text-violet-700 shadow-lg transition-colors hover:bg-violet-50 ${launcherTop === null ? "top-1/2 -translate-y-1/2" : "translate-y-0"} ${isLauncherDragging ? "cursor-grabbing" : "cursor-grab"}`}
         role="button"
         tabIndex={0}
-        onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setIsOpen(true); }}
+        onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setIsOpen(true); } }}
       >
         {activeCount > 0 && <Loader2 className="h-4 w-4 animate-spin" />}
         <span className="text-[11px] font-bold [writing-mode:vertical-lr]">{activeCount > 0 ? `${activeCount}个任务` : "任务队列"}</span>

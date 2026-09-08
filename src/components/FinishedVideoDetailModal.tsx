@@ -262,7 +262,9 @@ const loadAdPushRecords = (): AdPushRecord[] => {
     const stored = window.sessionStorage.getItem(AD_PUSH_RECORDS_STORAGE_KEY);
     if (!stored) return createDefaultAdPushRecords();
     const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) ? parsed : createDefaultAdPushRecords();
+    return Array.isArray(parsed)
+      ? parsed.filter((record: AdPushRecord) => record.kind === "push_video")
+      : createDefaultAdPushRecords();
   } catch {
     return createDefaultAdPushRecords();
   }

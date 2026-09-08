@@ -36,14 +36,17 @@ import UploadFinishedVideoModal from "./UploadFinishedVideoModal";
 import AnchoredPopover from "./overlays/AnchoredPopover";
 import OverlayPortal from "./overlays/OverlayPortal";
 import {
+  Asset,
   AiVideoMediaItem,
   AiVideoMode,
+  AiVideoTaskOutput,
   AiVideoTaskSnapshot,
   GalleryItem,
   Task
 } from "../types";
 
 interface AiVideoViewProps {
+  assets: Asset[];
   galleryItems: GalleryItem[];
   tasks: Task[];
   activeTaskId: string | null;
@@ -80,8 +83,13 @@ interface VoiceOption {
   name: string;
   scene: string;
   tone: string;
-  avatar: string;
-  source: "system" | "clone";
+  avatar?: string;
+  source: "system" | "asset";
+  audioUrl?: string;
+  duration?: string;
+  size?: string;
+  creator?: string;
+  createdAt?: string;
 }
 
 const MODE_OPTIONS: Array<{
@@ -103,6 +111,83 @@ const MODEL_OPTIONS = [
 
 const RATIOS: AiVideoTaskSnapshot["ratio"][] = ["9:16", "16:9", "4:3", "3:4", "1:1"];
 const RESULT_VIDEO_URL = "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4";
+
+type DisplayAiVideoOutput = AiVideoTaskOutput & {
+  id: string;
+  name: string;
+  size: string;
+};
+
+interface AiVideoPreviewSelection {
+  task: Task;
+  output: DisplayAiVideoOutput;
+}
+
+interface AiVideoUploadSelection {
+  task: Task;
+  outputs: DisplayAiVideoOutput[];
+}
+
+const stripFileExtension = (name: string) => name.replace(/\.[^.]+$/, "");
+
+const getAiVideoTaskOutputs = (task: Task): DisplayAiVideoOutput[] => {
+  const snapshot = task.aiVideoSnapshot;
+  const sourceVideos = snapshot?.sourceVideos || [];
+  const rawOutputs: AiVideoTaskOutput[] = task.aiVideoOutputs?.length
+    ? task.aiVideoOutputs
+    : snapshot?.mode === "background" && sourceVideos.length > 1 && task.status === "completed"
+      ? sourceVideos.map((sourceVideo, index) => ({
+          ...(index === 0 ? task.aiVideoOutput : undefined),
+          videoUrl: task.outputFiles?.[index] || task.aiVideoOutput?.videoUrl || RESULT_VIDEO_URL,
+          coverUrl: sourceVideo.coverUrl || "",
+          duration: Math.min(sourceVideo.durationSeconds || snapshot.duration || 8, 8),
+          sourceVideoId: sourceVideo.id
+        }))
+    : task.aiVideoOutput
+      ? [task.aiVideoOutput]
+      : task.status === "completed"
+        ? (task.outputFiles?.length ? task.outputFiles : [RESULT_VIDEO_URL]).map((videoUrl) => ({
+            videoUrl,
+            coverUrl: "",
+            duration: snapshot?.duration || 8
+          }))
+        : [];
+
+  return rawOutputs.map((output, index) => {
+    const sourceVideo = snapshot?.mode === "background" ? sourceVideos[index] : undefined;
+    const fallbackMedia = sourceVideo
+      || snapshot?.selectedLook
+      || snapshot?.character
+      || snapshot?.firstFrame
+      || snapshot?.references?.[0]
+      || snapshot?.modelMedia
+      || snapshot?.clothingImages?.[0];
+    const duration = output.duration || (snapshot?.mode === "background"
+      ? Math.min(sourceVideo?.durationSeconds || snapshot.duration || 8, 8)
+      : snapshot?.duration || 8);
+    const baseName = stripFileExtension(sourceVideo?.name || task.name);
+    const defaultName = snapshot?.mode === "background"
+      ? `${baseName}_换背景.mp4`
+      : `${baseName}${rawOutputs.length > 1 ? `_${index + 1}` : ""}.mp4`;
+
+    return {
+      ...output,
+      id: output.id || `${task.id}-output-${index + 1}`,
+      name: output.name || defaultName,
+      coverUrl: output.coverUrl
+        || fallbackMedia?.coverUrl
+        || (fallbackMedia?.type === "image" ? fallbackMedia.url : "")
+        || "/assets/prototype/luxury-skincare-set.jpg",
+      duration,
+      size: output.size || `${(duration * 1.02 + 0.8 + index * 0.33).toFixed(2)}MB`
+    };
+  });
+};
+
+const formatAiVideoDuration = (duration: number) => {
+  const seconds = Math.max(0, Math.round(duration));
+  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+};
 
 const STOCK_IMAGES: AiVideoMediaItem[] = [
   { id: "stock-1", name: "轻奢护肤礼盒主图.jpg", type: "image", url: "/assets/prototype/luxury-skincare-set.jpg", source: "library" },
@@ -141,9 +226,7 @@ const VOICES: VoiceOption[] = [
   { id: "premium-female", name: "精品有声书", scene: "质感旁白", tone: "沉稳、细腻", avatar: STOCK_IMAGES[6].url, source: "system" },
   { id: "smooth-female", name: "流畅女声", scene: "电商口播", tone: "自然、轻快", avatar: STOCK_IMAGES[15].url, source: "system" },
   { id: "sunny-male", name: "阳光男生", scene: "潮流种草", tone: "活力、年轻", avatar: STOCK_IMAGES[5].url, source: "system" },
-  { id: "warm-aunt", name: "温暖生活家", scene: "生活分享", tone: "松弛、可信", avatar: STOCK_IMAGES[13].url, source: "system" },
-  { id: "clone-xuzhen", name: "我的音色 01", scene: "音色克隆", tone: "自然原声", avatar: STOCK_IMAGES[4].url, source: "clone" },
-  { id: "clone-brand", name: "品牌主播音色", scene: "音色克隆", tone: "专业、明亮", avatar: STOCK_IMAGES[3].url, source: "clone" }
+  { id: "warm-aunt", name: "温暖生活家", scene: "生活分享", tone: "松弛、可信", avatar: STOCK_IMAGES[13].url, source: "system" }
 ];
 
 const MODE_LABELS: Record<AiVideoMode, string> = {
@@ -184,6 +267,7 @@ const demoSnapshot = (mode: AiVideoMode): AiVideoTaskSnapshot => ({
 });
 
 export default function AiVideoView({
+  assets,
   galleryItems,
   tasks,
   activeTaskId,
@@ -229,8 +313,8 @@ export default function AiVideoView({
   const [outfitCandidates, setOutfitCandidates] = useState<AiVideoMediaItem[]>([]);
   const [selectedLook, setSelectedLook] = useState<AiVideoMediaItem | null>(null);
   const [confirmOutfitReturn, setConfirmOutfitReturn] = useState(false);
-  const [previewTask, setPreviewTask] = useState<Task | null>(null);
-  const [uploadTask, setUploadTask] = useState<Task | null>(null);
+  const [previewSelection, setPreviewSelection] = useState<AiVideoPreviewSelection | null>(null);
+  const [uploadSelection, setUploadSelection] = useState<AiVideoUploadSelection | null>(null);
   const [toast, setToast] = useState("");
   const lastFocusedTask = useRef<string | null>(null);
   const modeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -255,6 +339,22 @@ export default function AiVideoView({
       return true;
     });
   }, [galleryItems]);
+
+  const resourceVoices = useMemo<VoiceOption[]>(() => assets
+    .filter((asset) => !asset.deletedAt && Boolean(asset.url) && (asset.type === "audio" || asset.resourceCategory === "音频"))
+    .map((asset) => ({
+      id: `asset-${asset.id}`,
+      name: asset.name,
+      scene: "资源库音频",
+      tone: asset.category || "资源库音频",
+      source: "asset",
+      audioUrl: asset.url,
+      duration: asset.fileInfo?.duration || "--",
+      size: asset.fileInfo?.size || asset.size || "--",
+      creator: asset.creator || "--",
+      createdAt: asset.createdAt || "--"
+    })), [assets]);
+  const availableVoices = useMemo(() => [...VOICES, ...resourceVoices], [resourceVoices]);
 
   const taskRecords = useMemo(() => {
     return tasks
@@ -394,7 +494,7 @@ export default function AiVideoView({
     }
     if (snapshot.mode === "dubbing") {
       setCharacter(snapshot.character || null);
-      setVoice(VOICES.find((item) => item.id === snapshot.voiceId) || null);
+      setVoice(availableVoices.find((item) => item.id === snapshot.voiceId) || null);
       setSpeech(snapshot.speech || "");
       setDubbingAction(snapshot.actionDescription || "");
     }
@@ -486,15 +586,14 @@ export default function AiVideoView({
     setToast("已恢复该任务的全部生成参数");
   };
 
-  const downloadTask = (task: Task) => {
-    const url = task.aiVideoOutput?.videoUrl || task.outputFiles?.[0] || RESULT_VIDEO_URL;
+  const downloadOutput = (output: DisplayAiVideoOutput) => {
     const anchor = document.createElement("a");
-    anchor.href = url;
+    anchor.href = output.videoUrl;
     anchor.target = "_blank";
     anchor.rel = "noreferrer";
-    anchor.download = `${task.name}.mp4`;
+    anchor.download = output.name;
     anchor.click();
-    setToast("已开始下载完整视频");
+    setToast(`已开始下载：${output.name}`);
   };
 
   const renderMedia = (item: AiVideoMediaItem, className = "") => item.type === "video" ? (
@@ -515,7 +614,7 @@ export default function AiVideoView({
   const renderPromptEditor = (value: string, onChange: (value: string) => void, placeholder: string, maxLength = 1000) => (
     <div className="relative rounded-md border border-slate-200 bg-white focus-within:border-violet-400">
       <textarea value={value} maxLength={maxLength} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-40 w-full resize-none bg-transparent px-3 py-3 pb-10 text-xs leading-6 text-slate-700 outline-none placeholder:text-slate-400" />
-      <div className="absolute inset-x-3 bottom-2 flex items-center justify-between text-[10px] text-slate-400"><button type="button" onClick={() => onChange(DEFAULT_PROMPTS[mode])} className="flex items-center gap-1.5 font-semibold text-violet-600 hover:text-violet-700"><WandSparkles className="h-3.5 w-3.5" />智能帮写</button><span>{value.length}/{maxLength}</span></div>
+      <span className="absolute bottom-2 right-3 text-[10px] text-slate-400">{value.length}/{maxLength}</span>
     </div>
   );
 
@@ -523,7 +622,7 @@ export default function AiVideoView({
 
   const renderFirstLastControls = () => <div className="space-y-4"><div className="grid grid-cols-[1fr_28px_1fr] items-center gap-2">{renderUploadTile(firstFrame, "首帧图", () => openPicker("firstFrame", "image", 1), () => setFirstFrame(null), true)}<div className="flex items-center justify-center text-slate-400">→</div>{renderUploadTile(lastFrame, "尾帧图", () => openPicker("lastFrame", "image", 1), () => setLastFrame(null), true)}</div><p className="rounded-md bg-blue-50 px-3 py-2 text-[10px] leading-5 text-blue-700">首帧和尾帧均为必填，系统会生成两幅画面间连续自然的过渡。</p><div><label className="mb-2 block text-xs font-bold text-slate-700">画面描述</label>{renderPromptEditor(firstLastPrompt, setFirstLastPrompt, "描述镜头运动、主体动作及首尾画面的衔接方式")}</div></div>;
 
-  const renderDubbingControls = () => <div className="space-y-4"><div className="grid grid-cols-2 gap-3">{renderUploadTile(character, "人物", () => openPicker("character", "image", 1), () => setCharacter(null), true)}<button onClick={() => setVoicePickerOpen(true)} className={`relative flex h-28 flex-col items-center justify-center overflow-hidden rounded-md border ${voice ? "border-violet-300 bg-violet-50" : "border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:text-violet-700"}`}>{voice ? <><img src={voice.avatar} alt="" className="h-12 w-12 rounded-full object-cover" referrerPolicy="no-referrer" /><span className="mt-2 text-xs font-bold text-slate-700">{voice.name}</span><span className="mt-0.5 text-[10px] text-slate-400">{voice.tone}</span></> : <><Volume2 className="h-5 w-5" /><span className="mt-2 text-xs font-semibold">音色</span><span className="mt-1 text-[10px] text-slate-400">选择 1 个音色</span></>}</button></div><div><div className="mb-2 flex items-center justify-between"><label className="text-xs font-bold text-slate-700">说话内容</label><span className="text-[10px] text-slate-400">约 {speechDuration} 秒 · {speech.length}/150</span></div>{renderPromptEditor(speech, setSpeech, "请输入你希望角色说出的口播内容", 150)}</div><div><label className="mb-2 block text-xs font-bold text-slate-700">动作描述 <span className="font-normal text-slate-400">（可选）</span></label><textarea value={dubbingAction} maxLength={300} onChange={(event) => setDubbingAction(event.target.value)} placeholder="描述镜头和人物动作，例如：人物面对镜头自然微笑，手持商品轻轻转动" className="h-20 w-full resize-none rounded-md border border-slate-200 p-3 text-xs leading-5 outline-none focus:border-violet-400" /></div></div>;
+  const renderDubbingControls = () => <div className="space-y-4"><div className="grid grid-cols-2 gap-3">{renderUploadTile(character, "人物", () => openPicker("character", "image", 1), () => setCharacter(null), true)}<button onClick={() => setVoicePickerOpen(true)} className={`relative flex h-28 flex-col items-center justify-center overflow-hidden rounded-md border ${voice ? "border-violet-300 bg-violet-50" : "border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:text-violet-700"}`}>{voice ? <>{voice.avatar ? <img src={voice.avatar} alt="" className="h-12 w-12 rounded-full object-cover" referrerPolicy="no-referrer" /> : <span className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-100 text-violet-600"><Volume2 className="h-5 w-5" /></span>}<span className="mt-2 max-w-[90%] truncate text-xs font-bold text-slate-700">{voice.name}</span><span className="mt-0.5 text-[10px] text-slate-400">{voice.source === "asset" ? "资源库音频" : voice.tone}</span></> : <><Volume2 className="h-5 w-5" /><span className="mt-2 text-xs font-semibold">音色</span><span className="mt-1 text-[10px] text-slate-400">选择 1 个音色</span></>}</button></div><div><div className="mb-2 flex items-center justify-between"><label className="text-xs font-bold text-slate-700">说话内容</label><span className="text-[10px] text-slate-400">约 {speechDuration} 秒 · {speech.length}/150</span></div>{renderPromptEditor(speech, setSpeech, "请输入你希望角色说出的口播内容", 150)}</div><div><label className="mb-2 block text-xs font-bold text-slate-700">动作描述 <span className="font-normal text-slate-400">（可选）</span></label><textarea value={dubbingAction} maxLength={300} onChange={(event) => setDubbingAction(event.target.value)} placeholder="描述镜头和人物动作，例如：人物面对镜头自然微笑，手持商品轻轻转动" className="h-20 w-full resize-none rounded-md border border-slate-200 p-3 text-xs leading-5 outline-none focus:border-violet-400" /></div></div>;
 
   const renderBackgroundControls = () => <div className="space-y-4"><div><div className="mb-2 flex items-center justify-between"><label className="text-xs font-bold text-slate-700">原视频</label><span className="text-[10px] text-slate-400">{backgroundVideos.length}/5</span></div><div className="grid grid-cols-3 gap-2">{backgroundVideos.map((item) => <div key={item.id} className="group relative aspect-[3/4] overflow-hidden rounded-md border border-slate-200">{renderMedia(item, "h-full w-full object-cover")}<span className="absolute bottom-1.5 left-1.5 rounded bg-black/65 px-1.5 py-0.5 text-[9px] text-white">{Math.min(item.durationSeconds || 8, 8)}s{(item.durationSeconds || 0) > 8 ? " · 已截取" : ""}</span><button onClick={() => setBackgroundVideos((current) => current.filter((media) => media.id !== item.id))} title="删除" className="absolute right-1.5 top-1.5 hidden h-6 w-6 items-center justify-center rounded bg-black/65 text-white group-hover:flex"><Trash2 className="h-3 w-3" /></button></div>)}{backgroundVideos.length < 5 && <button onClick={() => openPicker("backgroundVideos", "video", 5)} className="flex aspect-[3/4] flex-col items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:text-violet-700"><Plus className="h-5 w-5" /><span className="mt-2 text-[10px]">添加原视频</span></button>}</div></div><p className="rounded-md bg-amber-50 px-3 py-2 text-[10px] leading-5 text-amber-700">换背景最多处理每个素材的前 8 秒，超过 8 秒将自动截取。</p><div><label className="mb-2 block text-xs font-bold text-slate-700">背景描述 <span className="text-rose-500">*</span></label>{renderPromptEditor(backgroundPrompt, setBackgroundPrompt, "描述需要替换的新背景、光线、景别与环境氛围")}</div></div>;
 
@@ -548,18 +647,18 @@ export default function AiVideoView({
       ? { min: 3, max: 12, value: durations.first_last, set: (value: number) => setDurations((current) => ({ ...current, first_last: value })) }
       : { min: 3, max: 12, value: durations.outfit, set: (value: number) => setDurations((current) => ({ ...current, outfit: value })) };
 
-  if (uploadTask) {
+  if (uploadSelection) {
     return (
       <div className="relative flex h-full min-h-0 flex-1 flex-col">
         {toast && <OverlayPortal layer="toast" className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-md bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xl">{toast}</OverlayPortal>}
         <UploadFinishedVideoModal
-          key={uploadTask.id}
+          key={`${uploadSelection.task.id}-${uploadSelection.outputs.map((output) => output.id).join("-")}`}
           isOpen
           isPage
-          initialFiles={[{ name: `${uploadTask.name}.mp4`, type: "video/mp4" }]}
-          onClose={() => setUploadTask(null)}
+          initialFiles={uploadSelection.outputs.map((output) => ({ name: output.name, type: "video/mp4" }))}
+          onClose={() => setUploadSelection(null)}
           onPublishSuccess={(message) => {
-            onUploadVideos([{ name: `${uploadTask.name}.mp4`, cover: uploadTask.aiVideoOutput?.coverUrl || "/assets/prototype/luxury-skincare-set.jpg" }]);
+            onUploadVideos(uploadSelection.outputs.map((output) => ({ name: output.name, cover: output.coverUrl })));
             setToast(message);
           }}
         />
@@ -693,26 +792,64 @@ export default function AiVideoView({
         <div className="min-h-0 flex-1 overflow-y-auto p-4">{renderControlBody()}</div>
         {(mode !== "outfit" || outfitPreview) && <div className="shrink-0 border-t border-slate-200 bg-white p-4"><button disabled={!canGenerate || (mode === "outfit" && outfitPreviewProgress < 100)} onClick={submitGeneration} className="flex w-full items-center justify-center gap-2 rounded-md bg-violet-600 py-3 text-sm font-bold text-white shadow-sm hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"><Sparkles className="h-4 w-4" />立即生成 <span className="text-violet-200">· {currentCost} 积分</span></button></div>}
       </aside>
-      <main className="flex min-h-0 flex-col rounded-lg border border-slate-200 bg-white shadow-sm max-lg:mt-3 max-lg:min-h-[700px]"><div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-950 text-white"><Sparkles className="h-5 w-5 text-violet-300" /></span><div><h2 className="text-sm font-bold text-slate-900">{mode === "background" || mode === "outfit" ? "AI视频编辑工作台" : `${MODE_LABELS[mode]}工作台`}</h2><p className="mt-1 text-[11px] text-slate-400">当前类别共 {modeRecords.length} 条生成记录</p></div></div><button onClick={onOpenTaskQueue} className="flex items-center gap-2 rounded-md bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-violet-50 hover:text-violet-700"><ListTodo className="h-4 w-4" />任务队列</button></div><div className="min-h-0 flex-1 overflow-y-auto px-5 pb-8">{modeRecords.length === 0 ? <div className="flex h-full min-h-[420px] flex-col items-center justify-center text-center"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400"><Video className="h-6 w-6" /></span><p className="mt-4 text-sm font-bold text-slate-700">还没有生成记录</p><p className="mt-1 text-xs text-slate-400">配置左侧内容后即可创建第一条视频原料</p></div> : <div className="divide-y divide-slate-100">{modeRecords.map((task) => <GenerationRecordCard key={task.id} task={task} selected={activeTaskId === task.id} onSelect={() => onActiveTaskChange(task.id)} onCancel={() => cancelRecord(task)} onPreview={() => setPreviewTask(task)} onDownload={() => downloadTask(task)} onUpload={() => setUploadTask(task)} onReEdit={() => reEditTask(task)} />)}</div>}</div></main>
+      <main className="flex min-h-0 flex-col rounded-lg border border-slate-200 bg-white shadow-sm max-lg:mt-3 max-lg:min-h-[700px]"><div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-950 text-white"><Sparkles className="h-5 w-5 text-violet-300" /></span><div><h2 className="text-sm font-bold text-slate-900">{mode === "background" || mode === "outfit" ? "AI视频编辑工作台" : `${MODE_LABELS[mode]}工作台`}</h2><p className="mt-1 text-[11px] text-slate-400">当前类别共 {modeRecords.length} 条生成记录</p></div></div><button onClick={onOpenTaskQueue} className="flex items-center gap-2 rounded-md bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-violet-50 hover:text-violet-700"><ListTodo className="h-4 w-4" />任务队列</button></div><div className="min-h-0 flex-1 overflow-y-auto px-5 pb-8">{modeRecords.length === 0 ? <div className="flex h-full min-h-[420px] flex-col items-center justify-center text-center"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400"><Video className="h-6 w-6" /></span><p className="mt-4 text-sm font-bold text-slate-700">还没有生成记录</p><p className="mt-1 text-xs text-slate-400">配置左侧内容后即可创建第一条视频原料</p></div> : <div className="divide-y divide-slate-100">{modeRecords.map((task) => <GenerationRecordCard key={task.id} task={task} selected={activeTaskId === task.id} onSelect={() => onActiveTaskChange(task.id)} onCancel={() => cancelRecord(task)} onPreview={(output) => setPreviewSelection({ task, output })} onDownload={downloadOutput} onUpload={(outputs) => setUploadSelection({ task, outputs })} onReEdit={() => reEditTask(task)} />)}</div>}</div></main>
     </div>
     {modelMediaTypePickerOpen && <MediaTypeChoiceModal onClose={() => setModelMediaTypePickerOpen(false)} onSelect={(allowed) => { setModelMediaTypePickerOpen(false); openPicker("modelMedia", allowed, 1); }} />}
     {picker && <MediaPickerModal allowed={picker.allowed} maxSelections={picker.max} initialSelected={pickerSelection()} items={libraryItems} onClose={() => setPicker(null)} onConfirm={applyPickerSelection} />}
-    {voicePickerOpen && <VoicePickerModal selected={voice} onClose={() => setVoicePickerOpen(false)} onConfirm={(item) => { setVoice(item); setVoicePickerOpen(false); }} />}
-    {previewTask && <VideoPreviewModal task={previewTask} onClose={() => setPreviewTask(null)} />}
+    {voicePickerOpen && <VoicePickerModal selected={voice} resourceVoices={resourceVoices} onClose={() => setVoicePickerOpen(false)} onConfirm={(item) => { setVoice(item); setVoicePickerOpen(false); }} />}
+    {previewSelection && <VideoPreviewModal task={previewSelection.task} output={previewSelection.output} onClose={() => setPreviewSelection(null)} />}
     {confirmOutfitReturn && <ConfirmDialog title="确认返回？" description="返回后当前搭配预览将无法找回，预览积分无法退还；已提交的视频任务仍会在后台继续。" onCancel={() => setConfirmOutfitReturn(false)} onConfirm={() => { setConfirmOutfitReturn(false); setOutfitPreview(false); setOutfitCandidates([]); setSelectedLook(null); }} />}
     {toast && <OverlayPortal layer="toast" className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-md bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xl">{toast}</OverlayPortal>}
   </section>;
 }
 
-function GenerationRecordCard({ task, selected, onSelect, onCancel, onPreview, onDownload, onUpload, onReEdit }: { task: Task; selected: boolean; onSelect: () => void; onCancel: () => void; onPreview: () => void; onDownload: () => void; onUpload: () => void; onReEdit: () => void }) {
-  const output = task.aiVideoOutput || (task.status === "completed" ? { videoUrl: task.outputFiles?.[0] || RESULT_VIDEO_URL, coverUrl: task.aiVideoSnapshot?.references?.[0]?.url || "/assets/prototype/luxury-skincare-set.jpg", duration: task.aiVideoSnapshot?.duration || 8 } : null);
-  const statusHeading = task.status === "queue" ? "正在排队，预计很快开始生成" : task.status === "generating" ? "正在生成视频，预计 5 秒内完成" : task.status === "completed" ? "已为你生成 1 个视频" : task.status === "failed" ? "生成遇到问题，请重新编辑后再试" : "排队已取消";
-  return <article id={`ai-video-record-${task.id}`} onClick={onSelect} className={`my-5 rounded-lg border p-4 transition-all ${selected ? "border-violet-500 bg-violet-50/30 ring-2 ring-violet-100" : "border-slate-200 bg-white hover:border-slate-300"}`}><div className="flex items-start justify-between gap-4"><div className="flex min-w-0 items-start gap-3"><span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${task.status === "failed" ? "bg-rose-50 text-rose-600" : task.status === "cancelled" ? "bg-amber-50 text-amber-600" : "bg-slate-950 text-violet-300"}`}>{task.status === "failed" ? <AlertCircle className="h-4 w-4" /> : task.status === "cancelled" ? <Ban className="h-4 w-4" /> : task.status === "generating" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}</span><div className="min-w-0"><h3 className="text-sm font-bold text-slate-800">{statusHeading}</h3><p className="mt-1 truncate text-[10px] text-slate-400">任务名称：{task.name}　·　{task.createdAt}　·　ID：{task.id.replace(/\D/g, "").slice(-11) || task.id.slice(-11)}</p></div></div>{task.status === "completed" ? <div className="flex shrink-0 items-center justify-end gap-2"><button onClick={(event) => { event.stopPropagation(); onPreview(); }} className="flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"><Play className="h-3.5 w-3.5" />预览</button><button onClick={(event) => { event.stopPropagation(); onDownload(); }} className="flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"><Download className="h-3.5 w-3.5" />下载</button><button onClick={(event) => { event.stopPropagation(); onUpload(); }} className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-violet-700"><CloudUpload className="h-3.5 w-3.5" />上传资源库</button><button onClick={(event) => { event.stopPropagation(); onReEdit(); }} className="flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:border-violet-300 hover:text-violet-700"><Edit3 className="h-3.5 w-3.5" />重新编辑</button></div> : <span className={`shrink-0 rounded px-2 py-1 text-[10px] font-semibold ${task.status === "failed" ? "bg-rose-50 text-rose-700" : task.status === "cancelled" ? "bg-amber-50 text-amber-700" : task.status === "generating" ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600"}`}>{task.status === "queue" ? "排队中" : task.status === "generating" ? "生成中" : task.status === "failed" ? "生成失败" : "已取消"}</span>}</div>
+function GenerationRecordCard({ task, selected, onSelect, onCancel, onPreview, onDownload, onUpload, onReEdit }: { task: Task; selected: boolean; onSelect: () => void; onCancel: () => void; onPreview: (output: DisplayAiVideoOutput) => void; onDownload: (output: DisplayAiVideoOutput) => void; onUpload: (outputs: DisplayAiVideoOutput[]) => void; onReEdit: () => void }) {
+  const outputs = getAiVideoTaskOutputs(task);
+  const [selectedOutputIds, setSelectedOutputIds] = useState<string[]>([]);
+  const selectedOutputs = outputs.filter((output) => selectedOutputIds.includes(output.id));
+  const toggleOutput = (outputId: string) => {
+    setSelectedOutputIds((current) => current.includes(outputId)
+      ? current.filter((id) => id !== outputId)
+      : [...current, outputId]);
+  };
+  const statusHeading = task.status === "queue" ? "正在排队，预计很快开始生成" : task.status === "generating" ? "正在生成视频，预计 5 秒内完成" : task.status === "completed" ? `已为你生成 ${outputs.length} 个视频` : task.status === "failed" ? "生成遇到问题，请重新编辑后再试" : "排队已取消";
+  return <article id={`ai-video-record-${task.id}`} onClick={onSelect} className={`my-5 rounded-lg border p-4 transition-all ${selected ? "border-violet-500 bg-violet-50/30 ring-2 ring-violet-100" : "border-slate-200 bg-white hover:border-slate-300"}`}>
+    <div className="flex items-start justify-between gap-4">
+      <div className="flex min-w-0 items-start gap-3">
+        <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${task.status === "failed" ? "bg-rose-50 text-rose-600" : task.status === "cancelled" ? "bg-amber-50 text-amber-600" : "bg-slate-950 text-violet-300"}`}>{task.status === "failed" ? <AlertCircle className="h-4 w-4" /> : task.status === "cancelled" ? <Ban className="h-4 w-4" /> : task.status === "generating" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}</span>
+        <div className="min-w-0"><h3 className="text-sm font-bold text-slate-800">{statusHeading}</h3><p className="mt-1 truncate text-[10px] text-slate-400">任务名称：{task.name}　·　{task.createdAt}　·　ID：{task.id.replace(/\D/g, "").slice(-11) || task.id.slice(-11)}</p></div>
+      </div>
+      {task.status === "completed" ? <div className="flex shrink-0 items-center justify-end gap-2">
+        <button disabled={selectedOutputs.length === 0} onClick={(event) => { event.stopPropagation(); if (selectedOutputs.length) onUpload(selectedOutputs); }} className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"><CloudUpload className="h-3.5 w-3.5" />上传资源库{selectedOutputs.length > 0 && ` (${selectedOutputs.length})`}</button>
+        <button onClick={(event) => { event.stopPropagation(); onReEdit(); }} className="flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:border-violet-300 hover:text-violet-700"><Edit3 className="h-3.5 w-3.5" />重新编辑</button>
+      </div> : <span className={`shrink-0 rounded px-2 py-1 text-[10px] font-semibold ${task.status === "failed" ? "bg-rose-50 text-rose-700" : task.status === "cancelled" ? "bg-amber-50 text-amber-700" : task.status === "generating" ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600"}`}>{task.status === "queue" ? "排队中" : task.status === "generating" ? "生成中" : task.status === "failed" ? "生成失败" : "已取消"}</span>}
+    </div>
     {task.status === "queue" && <div className="mt-4 flex h-48 flex-col items-center justify-center rounded-md bg-slate-100 text-slate-500"><Clock3 className="h-7 w-7" /><p className="mt-2 text-xs font-bold">排队中</p><p className="mt-1 text-[10px] text-slate-400">正在等待可用计算资源</p><button onClick={(event) => { event.stopPropagation(); onCancel(); }} className="mt-4 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:border-rose-300 hover:text-rose-600">取消排队</button></div>}
     {task.status === "generating" && <div className="mt-4 flex h-48 flex-col items-center justify-center rounded-md bg-slate-100"><span className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-950 text-violet-300"><Sparkles className="h-6 w-6" /></span><div className="mt-5 flex w-72 items-center gap-3"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-violet-600 transition-all" style={{ width: `${task.progress}%` }} /></div><span className="w-8 text-right text-[10px] font-bold text-slate-600">{task.progress}%</span></div><p className="mt-2 text-[10px] text-slate-400">正在渲染合成视频...</p></div>}
     {task.status === "failed" && <div className="mt-4 flex h-44 flex-col items-center justify-center rounded-md bg-rose-50/60 px-8 text-center"><AlertCircle className="h-8 w-8 text-rose-500" /><p className="mt-3 text-xs font-bold text-rose-700">任务生成失败</p><p className="mt-1 text-[11px] leading-5 text-rose-500">{task.failureReason || "生成服务发生异常，请检查素材后重试。"}</p>{task.refundedCredits === task.creditsCost && <p className="mt-2 text-[10px] font-semibold text-emerald-600">本次消耗的 {task.creditsCost} 积分已退还</p>}</div>}
     {task.status === "cancelled" && <div className="mt-4 flex h-40 flex-col items-center justify-center rounded-md bg-amber-50/60 text-center"><Ban className="h-7 w-7 text-amber-500" /><p className="mt-2 text-xs font-bold text-amber-700">已取消排队</p><p className="mt-1 text-[10px] text-amber-600">积分已退还，点击重新编辑可再次提交</p></div>}
-    {task.status === "completed" && output && <div className="mt-4"><button onClick={(event) => { event.stopPropagation(); onPreview(); }} className="group relative block w-36 overflow-hidden rounded-md border border-slate-200 bg-slate-950 text-left"><img src={output.coverUrl} alt="" className="aspect-[9/16] w-full object-cover" referrerPolicy="no-referrer" /><span className="absolute inset-0 flex items-center justify-center bg-black/15 opacity-0 transition-opacity group-hover:opacity-100"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-violet-700"><Play className="ml-0.5 h-4 w-4 fill-current" /></span></span><span className="absolute bottom-2 left-2 rounded bg-black/65 px-1.5 py-0.5 text-[9px] text-white">00:{String(output.duration).padStart(2, "0")}</span><span className="absolute bottom-2 right-2 rounded bg-black/65 px-1.5 py-0.5 text-[9px] text-white">AI生成</span></button><p className="mt-2 flex items-center gap-1.5 text-[10px] text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" />已通过素材初审，具体请以最终投放平台规则为准</p></div>}
+    {task.status === "completed" && outputs.length > 0 && <div className="mt-4">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(144px,176px))] gap-3">
+        {outputs.map((output) => {
+          const checked = selectedOutputIds.includes(output.id);
+          return <article key={output.id} className={`min-w-0 overflow-hidden rounded-md border bg-white transition-colors ${checked ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200"}`}>
+            <div className="relative aspect-[9/16] overflow-hidden bg-slate-950">
+              <button type="button" onClick={(event) => { event.stopPropagation(); onPreview(output); }} title={`预览 ${output.name}`} className="group block h-full w-full text-left">
+                <img src={output.coverUrl} alt={output.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                <span className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity group-hover:opacity-100"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-violet-700"><Play className="ml-0.5 h-4 w-4 fill-current" /></span></span>
+              </button>
+              <button type="button" onClick={(event) => { event.stopPropagation(); toggleOutput(output.id); }} title={checked ? "取消选择" : "选择视频"} aria-pressed={checked} className={`absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded border shadow-sm ${checked ? "border-violet-600 bg-violet-600 text-white" : "border-white bg-white/90 text-transparent hover:text-slate-300"}`}><Check className="h-3.5 w-3.5" /></button>
+              <button type="button" onClick={(event) => { event.stopPropagation(); onDownload(output); }} title="下载视频" className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded bg-black/65 text-white shadow-sm hover:bg-black/80"><Download className="h-3.5 w-3.5" /></button>
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/65 to-transparent px-2 pb-2 pt-10 text-white">
+                <div className="flex items-center justify-between gap-2 text-[10px]"><span>{formatAiVideoDuration(output.duration)}</span><span>{output.size}</span></div>
+                <p title={output.name} className="mt-1 truncate text-[10px] font-semibold">{output.name}</p>
+              </div>
+            </div>
+          </article>;
+        })}
+      </div>
+      <p className="mt-2 flex items-center gap-1.5 text-[10px] text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" />已通过素材初审，具体请以最终投放平台规则为准</p>
+    </div>}
     {(task.status === "failed" || task.status === "cancelled") && <div className="mt-3 flex justify-end"><button onClick={(event) => { event.stopPropagation(); onReEdit(); }} className="flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:border-violet-300 hover:text-violet-700"><Edit3 className="h-3.5 w-3.5" />重新编辑</button></div>}
   </article>;
 }
@@ -980,28 +1117,138 @@ function MixedMediaPickerModal({ allowed, maxSelections, initialSelected, items,
     <div className="flex shrink-0 items-center gap-3 border-t border-slate-200 bg-white px-5 py-4"><p className="mr-auto text-xs text-slate-500">已选择 <b className="text-violet-700">{selected.length}</b> / {maxSelections}</p>{notice && <p className="text-[11px] text-amber-600">{notice}</p>}<button onClick={onClose} className="rounded-md border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">取消</button><button disabled={!selected.length} onClick={() => onConfirm(selected)} className="rounded-md bg-violet-600 px-5 py-2 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-40">确认选择</button></div></div></OverlayPortal>;
 }
 
-function VoicePickerModal({ selected, onClose, onConfirm }: { selected: VoiceOption | null; onClose: () => void; onConfirm: (voice: VoiceOption) => void }) {
-  const [tab, setTab] = useState<"system" | "clone">("system");
+function VoicePickerModal({ selected, resourceVoices, onClose, onConfirm }: { selected: VoiceOption | null; resourceVoices: VoiceOption[]; onClose: () => void; onConfirm: (voice: VoiceOption) => void }) {
+  const [tab, setTab] = useState<"system" | "asset">(selected?.source === "asset" ? "asset" : "system");
   const [draft, setDraft] = useState<VoiceOption | null>(selected);
   const [search, setSearch] = useState("");
   const [playingId, setPlayingId] = useState<string | null>(null);
-  const visible = VOICES.filter((voice) => voice.source === tab && `${voice.name}${voice.scene}${voice.tone}`.includes(search));
-  const playVoice = (voice: VoiceOption) => {
-    if (playingId === voice.id) { window.speechSynthesis?.cancel(); setPlayingId(null); return; }
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const normalizedSearch = search.trim().toLocaleLowerCase();
+  const systemVoices = VOICES.filter((voice) => `${voice.name}${voice.scene}${voice.tone}`.toLocaleLowerCase().includes(normalizedSearch));
+  const assetVoices = resourceVoices.filter((voice) => `${voice.name}${voice.creator || ""}`.toLocaleLowerCase().includes(normalizedSearch));
+
+  const stopPlayback = () => {
     window.speechSynthesis?.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+    }
+    setPlayingId(null);
+  };
+
+  useEffect(() => {
+    window.speechSynthesis?.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+    }
+    setPlayingId(null);
+  }, [tab]);
+
+  useEffect(() => () => {
+    window.speechSynthesis?.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+    }
+  }, []);
+
+  const playVoice = (voice: VoiceOption) => {
+    if (playingId === voice.id) {
+      stopPlayback();
+      return;
+    }
+    stopPlayback();
+    setPlayingId(voice.id);
+
+    if (voice.source === "asset" && voice.audioUrl) {
+      const audio = new Audio(voice.audioUrl);
+      audioRef.current = audio;
+      audio.onended = () => setPlayingId(null);
+      audio.onerror = () => setPlayingId(null);
+      void audio.play().catch(() => setPlayingId(null));
+      return;
+    }
+
     const utterance = new SpeechSynthesisUtterance(`你好，我是${voice.name}，欢迎体验这款精选商品。`);
     utterance.lang = "zh-CN";
     utterance.rate = voice.id.includes("male") ? 0.9 : 1;
     utterance.onend = () => setPlayingId(null);
-    setPlayingId(voice.id);
     window.speechSynthesis?.speak(utterance);
   };
-  return <OverlayPortal layer="modal" className="fixed inset-0 flex items-center justify-center bg-slate-900/45 p-5 backdrop-blur-sm"><div className="flex h-[min(650px,86vh)] w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl"><div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4"><h3 className="text-sm font-bold text-slate-800">选择音色</h3><button onClick={onClose} title="关闭" className="rounded p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></div><div className="flex shrink-0 items-center gap-3 border-b border-slate-100 px-5 py-3"><div className="flex rounded-md bg-slate-100 p-1"><button onClick={() => setTab("system")} className={`rounded px-4 py-1.5 text-xs font-semibold ${tab === "system" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500"}`}>系统推荐</button><button onClick={() => setTab("clone")} className={`rounded px-4 py-1.5 text-xs font-semibold ${tab === "clone" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500"}`}>我的音色</button></div><div className="relative ml-auto w-64"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索音色" className="h-9 w-full rounded-md border border-slate-200 pl-9 pr-3 text-xs outline-none focus:border-violet-400" /></div></div><div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/50 p-5"><div className="grid grid-cols-3 gap-3">{visible.map((voice) => <button key={voice.id} onClick={() => setDraft(voice)} className={`group relative rounded-md border bg-white p-4 text-left ${draft?.id === voice.id ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200 hover:border-slate-300"}`}><div className="flex items-center gap-3"><div className="relative"><img src={voice.avatar} alt="" className="h-11 w-11 rounded-full object-cover" referrerPolicy="no-referrer" /><span onClick={(event) => { event.stopPropagation(); playVoice(voice); }} className="absolute inset-0 flex items-center justify-center rounded-full bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100">{playingId === voice.id ? <Pause className="h-4 w-4 fill-current" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}</span></div><div className="min-w-0"><p className="truncate text-xs font-bold text-slate-700">{voice.name}</p><p className="mt-1 text-[10px] text-slate-400">{voice.scene}</p></div>{draft?.id === voice.id && <Check className="ml-auto h-4 w-4 text-violet-600" />}</div><p className="mt-3 text-[10px] text-slate-500">音色特点：{voice.tone}</p></button>)}</div></div><div className="flex shrink-0 justify-end gap-2 border-t border-slate-200 px-5 py-4"><button onClick={onClose} className="rounded-md border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!draft} onClick={() => draft && onConfirm(draft)} className="rounded-md bg-violet-600 px-5 py-2 text-xs font-semibold text-white disabled:opacity-40">确认</button></div></div></OverlayPortal>;
+
+  return (
+    <OverlayPortal layer="modal" className="fixed inset-0 flex items-center justify-center bg-slate-900/45 p-5 backdrop-blur-sm">
+      <div className="flex h-[min(650px,86vh)] w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4">
+          <h3 className="text-sm font-bold text-slate-800">选择音色</h3>
+          <button onClick={onClose} title="关闭" className="rounded p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="flex shrink-0 items-center gap-3 border-b border-slate-100 px-5 py-3">
+          <div className="flex rounded-md bg-slate-100 p-1">
+            <button onClick={() => setTab("system")} className={`rounded px-4 py-1.5 text-xs font-semibold ${tab === "system" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500"}`}>系统推荐</button>
+            <button onClick={() => setTab("asset")} className={`rounded px-4 py-1.5 text-xs font-semibold ${tab === "asset" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500"}`}>我的音色</button>
+          </div>
+          <div className="relative ml-auto w-64">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tab === "system" ? "搜索音色" : "搜索音频名称或上传人"} className="h-9 w-full rounded-md border border-slate-200 pl-9 pr-3 text-xs outline-none focus:border-violet-400" />
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/50 p-5">
+          {tab === "system" ? (
+            systemVoices.length ? <div className="grid grid-cols-3 gap-3">{systemVoices.map((voice) => (
+              <button key={voice.id} onClick={() => setDraft(voice)} className={`group relative rounded-md border bg-white p-4 text-left ${draft?.id === voice.id ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200 hover:border-slate-300"}`}>
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <img src={voice.avatar} alt="" className="h-11 w-11 rounded-full object-cover" referrerPolicy="no-referrer" />
+                    <span onClick={(event) => { event.stopPropagation(); playVoice(voice); }} className="absolute inset-0 flex items-center justify-center rounded-full bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100">{playingId === voice.id ? <Pause className="h-4 w-4 fill-current" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}</span>
+                  </div>
+                  <div className="min-w-0"><p className="truncate text-xs font-bold text-slate-700">{voice.name}</p><p className="mt-1 text-[10px] text-slate-400">{voice.scene}</p></div>
+                  {draft?.id === voice.id && <Check className="ml-auto h-4 w-4 text-violet-600" />}
+                </div>
+                <p className="mt-3 text-[10px] text-slate-500">音色特点：{voice.tone}</p>
+              </button>
+            ))}</div> : <VoiceEmptyState message="没有找到匹配音色" />
+          ) : assetVoices.length ? (
+            <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-left text-xs">
+                  <thead className="bg-slate-50 text-[11px] font-semibold text-slate-400"><tr>{["音频名称", "时长", "文件大小", "上传人", "上传时间", "试听"].map((item) => <th key={item} className="px-4 py-3">{item}</th>)}</tr></thead>
+                  <tbody className="divide-y divide-slate-100">{assetVoices.map((voice) => {
+                    const checked = draft?.id === voice.id;
+                    return (
+                      <tr key={voice.id} role="button" tabIndex={0} onClick={() => setDraft(voice)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setDraft(voice); } }} className={`cursor-pointer outline-none transition-colors ${checked ? "bg-violet-50" : "hover:bg-slate-50 focus:bg-slate-50"}`}>
+                        <td className="px-4 py-3.5"><span className="flex min-w-0 items-center gap-3"><span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${checked ? "border-violet-600" : "border-slate-300"}`}>{checked && <span className="h-2 w-2 rounded-full bg-violet-600" />}</span><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-violet-50 text-violet-600"><Volume2 className="h-4 w-4" /></span><b className="max-w-[250px] truncate text-slate-700">{voice.name}</b></span></td>
+                        <td className="whitespace-nowrap px-4 py-3.5 text-slate-500">{voice.duration}</td>
+                        <td className="whitespace-nowrap px-4 py-3.5 text-slate-500">{voice.size}</td>
+                        <td className="whitespace-nowrap px-4 py-3.5 text-slate-500">{voice.creator}</td>
+                        <td className="whitespace-nowrap px-4 py-3.5 text-slate-500">{voice.createdAt}</td>
+                        <td className="px-4 py-3.5"><button type="button" onClick={(event) => { event.stopPropagation(); playVoice(voice); }} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 px-3 text-[11px] font-semibold text-slate-600 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700">{playingId === voice.id ? <Pause className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current" />}{playingId === voice.id ? "暂停" : "试听"}</button></td>
+                      </tr>
+                    );
+                  })}</tbody>
+                </table>
+              </div>
+            </div>
+          ) : <VoiceEmptyState message="资源库中暂无音频文件" />}
+        </div>
+        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-200 px-5 py-4">
+          <p className="text-[11px] text-slate-400">{tab === "asset" ? "从资源库音频中单选一个，确认后直接用于本次配音" : "选择一个系统推荐音色"}</p>
+          <div className="flex gap-2"><button onClick={onClose} className="rounded-md border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button disabled={!draft} onClick={() => draft && onConfirm(draft)} className="rounded-md bg-violet-600 px-5 py-2 text-xs font-semibold text-white disabled:opacity-40">确认</button></div>
+        </div>
+      </div>
+    </OverlayPortal>
+  );
 }
 
-function VideoPreviewModal({ task, onClose }: { task: Task; onClose: () => void }) {
-  const output = task.aiVideoOutput || { videoUrl: task.outputFiles?.[0] || RESULT_VIDEO_URL, coverUrl: "/assets/prototype/luxury-skincare-set.jpg", duration: task.aiVideoSnapshot?.duration || 8 };
-  return <OverlayPortal layer="modal" className="fixed inset-0 flex items-center justify-center bg-slate-950/70 p-5 backdrop-blur-sm"><div className="w-full max-w-4xl overflow-hidden rounded-lg bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><div><h3 className="text-sm font-bold text-slate-800">视频预览</h3><p className="mt-1 text-[10px] text-slate-400">{task.name}</p></div><button onClick={onClose} className="rounded p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></div><div className="flex h-[min(620px,76vh)] items-center justify-center bg-slate-950 p-5"><video src={output.videoUrl} poster={output.coverUrl} controls autoPlay className="h-full max-w-full object-contain" /></div></div></OverlayPortal>;
+function VoiceEmptyState({ message }: { message: string }) {
+  return <div className="flex h-full min-h-64 flex-col items-center justify-center text-slate-400"><Volume2 className="h-8 w-8" /><p className="mt-3 text-xs">{message}</p></div>;
+}
+
+function VideoPreviewModal({ task, output, onClose }: { task: Task; output: DisplayAiVideoOutput; onClose: () => void }) {
+  return <OverlayPortal layer="modal" className="fixed inset-0 flex items-center justify-center bg-slate-950/70 p-5 backdrop-blur-sm"><div className="w-full max-w-4xl overflow-hidden rounded-lg bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><div><h3 className="text-sm font-bold text-slate-800">{output.name}</h3><p className="mt-1 text-[10px] text-slate-400">{task.name} · {formatAiVideoDuration(output.duration)} · {output.size}</p></div><button onClick={onClose} title="关闭" className="rounded p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></div><div className="flex h-[min(620px,76vh)] items-center justify-center bg-slate-950 p-5"><video src={output.videoUrl} poster={output.coverUrl} controls autoPlay className="h-full max-w-full object-contain" /></div></div></OverlayPortal>;
 }
 
 function ConfirmDialog({ title, description, onCancel, onConfirm }: { title: string; description: string; onCancel: () => void; onConfirm: () => void }) {

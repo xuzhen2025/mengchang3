@@ -20,19 +20,17 @@ import {
   Send,
   ShoppingBag,
   Trash2,
-  Users,
   Video,
   X,
   XCircle,
 } from "lucide-react";
 import AssetPagination from "./AssetPagination";
 
-export type AdPushTaskKind = "push_video" | "create_plan";
 export type AdPushStatus = "排队中" | "推送中" | "推送成功" | "推送失败";
 
 export interface AdPushRecord {
   id: string;
-  kind: AdPushTaskKind;
+  kind: "push_video";
   videoTitle: string;
   platform: string;
   account: string;
@@ -44,9 +42,6 @@ export interface AdPushRecord {
   createdAt: string;
   updatedAt: string;
   taskId: string;
-  planTemplate?: string;
-  targeting?: string;
-  marketingGoal?: string;
   startedAt?: number;
   finishAt?: number;
 }
@@ -68,7 +63,7 @@ interface PushRecordsModalProps {
   onClose: () => void;
 }
 
-type PushMethod = "push" | "full_domain" | "single_plan" | "multi_plan";
+type PushMethod = "push" | "full_domain";
 type AccountScope = "favorite" | "personal" | "group" | "category" | "all" | "company";
 
 interface SelectableAccount {
@@ -132,8 +127,6 @@ const PLATFORMS: PlatformConfig[] = PLATFORM_SEEDS.map(([id, name, code]) => ({
 const PUSH_METHODS: Array<{ id: PushMethod; title: string; description: string }> = [
   { id: "push", title: "仅推送", description: "将视频推送至所选平台素材库" },
   { id: "full_domain", title: "全域推广", description: "投放新视频至现有全域推广计划" },
-  { id: "single_plan", title: "推送并搭建计划（单创意）", description: "每个计划使用一个视频创意" },
-  { id: "multi_plan", title: "推送并搭建计划（多创意）", description: "每个计划使用多个视频创意" },
 ];
 
 const ACCOUNT_TABS: Array<{ id: AccountScope; label: string }> = [
@@ -149,12 +142,6 @@ const PLANS = [
   { id: "plan-01", name: "美妆新品直播全域放量计划", account: "梦畅美妆旗舰店", target: "直播全域", budget: "¥3,000/日" },
   { id: "plan-02", name: "珠宝爆款商品全域稳投计划", account: "悦己珠宝直播间", target: "商品全域", budget: "¥5,000/日" },
   { id: "plan-03", name: "服饰直播乘方拉新计划", account: "轻氧服饰直营", target: "直播乘方", budget: "¥2,000/日" },
-];
-
-const TEMPLATES = [
-  { id: "template-01", name: "直播间高转化放量模板", type: "个人模板", targeting: "行业人群 + 商品行为" },
-  { id: "template-02", name: "新品冷启动测试模板", type: "公司模板", targeting: "智能定向" },
-  { id: "template-03", name: "商城承接复投模板", type: "收藏模板", targeting: "成交相似人群" },
 ];
 
 export const createDefaultAdPushRecords = (): AdPushRecord[] => [
@@ -177,30 +164,6 @@ export const createDefaultAdPushRecords = (): AdPushRecord[] => [
     id: "push-demo-4", kind: "push_video", videoTitle: "家居收纳柜场景种草视频.mp4", platform: "百度营销",
     account: "新锐家居增长账户-百度营销", media: "百度营销", assetId: "BDY-51029384", status: "推送失败", failureReason: "账户授权已过期",
     operator: "王强", createdAt: "2026-09-07 17:20:11", updatedAt: "2026-09-07 17:20:16", taskId: "PUSH-260907-018",
-  },
-  {
-    id: "plan-demo-1", kind: "create_plan", videoTitle: "复古耳环直播间强转化版本.mp4", platform: "巨量千川",
-    account: "梦畅美妆旗舰店-千川主账户", media: "巨量千川", assetId: "QC-90182736", status: "推送成功", failureReason: "—",
-    operator: "徐振", createdAt: "2026-09-08 08:38:02", updatedAt: "2026-09-08 08:38:08", taskId: "PLAN-260908-011",
-    planTemplate: "直播间高转化放量模板", targeting: "行业人群 + 商品行为", marketingGoal: "直播全域",
-  },
-  {
-    id: "plan-demo-2", kind: "create_plan", videoTitle: "轻氧服饰换季促销视频.mp4", platform: "巨量广告",
-    account: "轻氧服饰直营-巨量广告", media: "巨量广告", assetId: "JL-72018453", status: "推送中", failureReason: "—",
-    operator: "李云", createdAt: "2026-09-08 10:04:18", updatedAt: "2026-09-08 10:04:20", taskId: "PLAN-260908-012",
-    planTemplate: "新品冷启动测试模板", targeting: "智能定向", marketingGoal: "商品全域",
-  },
-  {
-    id: "plan-demo-3", kind: "create_plan", videoTitle: "珠宝礼盒开箱多创意视频.mp4", platform: "磁力金牛",
-    account: "悦己珠宝直播间-磁力金牛", media: "磁力金牛", assetId: "JN-66201928", status: "排队中", failureReason: "—",
-    operator: "蔡卓良", createdAt: "2026-09-08 10:15:42", updatedAt: "2026-09-08 10:15:42", taskId: "PLAN-260908-013",
-    planTemplate: "商城承接复投模板", targeting: "成交相似人群", marketingGoal: "商品乘方",
-  },
-  {
-    id: "plan-demo-4", kind: "create_plan", videoTitle: "家居焕新节直播切片.mp4", platform: "腾讯ADQ",
-    account: "新锐家居增长账户-腾讯ADQ", media: "腾讯ADQ", assetId: "TX-51290837", status: "推送失败", failureReason: "计划日预算低于平台最低要求",
-    operator: "王强", createdAt: "2026-09-07 16:48:25", updatedAt: "2026-09-07 16:48:31", taskId: "PLAN-260907-029",
-    planTemplate: "直播间高转化放量模板", targeting: "行业人群 + 商品行为", marketingGoal: "直播乘方",
   },
 ];
 
@@ -273,7 +236,6 @@ export function AdAccountPushWorkspace({ video, onClose, onCreate }: AdAccountPu
   const [marketingGoal, setMarketingGoal] = useState("直播全域");
   const [planMode, setPlanMode] = useState<"existing" | "batch">("existing");
   const [selectedPlanId, setSelectedPlanId] = useState("");
-  const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [distributionRule, setDistributionRule] = useState<"all" | "average">("all");
   const [removalPolicy, setRemovalPolicy] = useState<"none" | "material" | "low" | "review">("none");
   const [removeMaterialIds, setRemoveMaterialIds] = useState("");
@@ -298,13 +260,11 @@ export function AdAccountPushWorkspace({ video, onClose, onCreate }: AdAccountPu
   }), [scope, search, sourceItems]);
   const selectedItems = sourceItems.filter((item) => selectedIds.includes(item.id));
   const selectedPlan = PLANS.find((item) => item.id === selectedPlanId);
-  const selectedTemplate = TEMPLATES.find((item) => item.id === selectedTemplateId);
 
   const selectPlatform = (id: string) => {
     setPlatformId(id);
     setSelectedIds([]);
     setSelectedPlanId("");
-    setSelectedTemplateId("");
     setSearch("");
     setError("");
   };
@@ -326,8 +286,6 @@ export function AdAccountPushWorkspace({ video, onClose, onCreate }: AdAccountPu
     let validationMessage = "";
     if (method === "push" && selectedIds.length === 0) validationMessage = `请至少选择一个${destination === "account" ? "广告账户" : "工作台"}`;
     if (method === "full_domain" && !selectedPlanId) validationMessage = "请选择一个已有推广计划";
-    if ((method === "single_plan" || method === "multi_plan") && !selectedTemplateId) validationMessage = "请选择一个计划模板";
-    if ((method === "single_plan" || method === "multi_plan") && selectedIds.length === 0) validationMessage = "请至少选择一个广告账户";
     if (createTime === "scheduled" && !scheduledAt) validationMessage = "请选择定时创建时间";
     if (!namingRule.trim()) validationMessage = "请填写视频推送至素材库的名称格式";
     if (removalPolicy === "material" && !removeMaterialIds.trim()) validationMessage = "请输入需要移除的视频素材 ID";
@@ -343,11 +301,9 @@ export function AdAccountPushWorkspace({ video, onClose, onCreate }: AdAccountPu
       const targetName = method === "full_domain"
         ? selectedPlan?.account ?? "计划绑定账户"
         : selectedItems.map((item) => item.name).join("、");
-      const isPlanTask = method !== "push";
-      const taskPrefix = isPlanTask ? "PLAN" : "PUSH";
       onCreate({
         id: `ad-push-${now}`,
-        kind: isPlanTask ? "create_plan" : "push_video",
+        kind: "push_video",
         videoTitle: video.title,
         platform: platform.name,
         account: targetName,
@@ -358,10 +314,7 @@ export function AdAccountPushWorkspace({ video, onClose, onCreate }: AdAccountPu
         operator: "徐振",
         createdAt: formatDateTime(new Date(now)),
         updatedAt: formatDateTime(new Date(now)),
-        taskId: `${taskPrefix}-${now.toString().slice(-10)}`,
-        planTemplate: selectedTemplate?.name ?? selectedPlan?.name,
-        targeting: selectedTemplate?.targeting ?? "智能定向",
-        marketingGoal,
+        taskId: `PUSH-${now.toString().slice(-10)}`,
         startedAt: now,
         finishAt: now + 3000,
       });
@@ -466,7 +419,7 @@ export function AdAccountPushWorkspace({ video, onClose, onCreate }: AdAccountPu
           <main className="min-w-0 overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
             <section className="space-y-4 p-5">
               <SectionTitle>推送方式</SectionTitle>
-              <div className="grid gap-3 xl:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2">
                 {PUSH_METHODS.map((item) => (
                   <button key={item.id} type="button" onClick={() => { setMethod(item.id); setDestination("account"); setSelectedIds([]); setScope("favorite"); setError(""); }} className={`relative min-h-24 overflow-hidden rounded-md border p-4 text-left transition ${method === item.id ? "border-violet-500 bg-violet-50/40" : "border-slate-100 bg-slate-50 hover:border-violet-200"}`}>
                     <span className={`block text-sm font-bold ${method === item.id ? "text-violet-700" : "text-slate-700"}`}>{item.title}</span>
@@ -548,30 +501,6 @@ export function AdAccountPushWorkspace({ video, onClose, onCreate }: AdAccountPu
               </>
             )}
 
-            {(method === "single_plan" || method === "multi_plan") && (
-              <section className="space-y-4 border-t-[6px] border-[#eef7f5] p-5">
-                <SectionTitle>计划模板与广告账户</SectionTitle>
-                <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-                  <div className={`overflow-hidden rounded-md border bg-white ${error.includes("模板") ? "border-rose-400 ring-2 ring-rose-100" : "border-slate-200"}`}>
-                    <div className="flex h-11 items-center justify-between border-b border-slate-200 bg-slate-50 px-4 text-xs font-bold"><span>收藏模板　个人模板　公司模板</span><span className="text-violet-600">新建模板</span></div>
-                    <div className="p-3">
-                      {TEMPLATES.map((template) => (
-                        <button key={template.id} type="button" onClick={() => { setSelectedTemplateId(template.id); setError(""); }} className={`relative mb-2 w-full overflow-hidden rounded-md border p-3 text-left ${selectedTemplateId === template.id ? "border-violet-500 bg-violet-50" : "border-slate-100 hover:border-violet-200"}`}>
-                          <p className="text-xs font-black text-slate-800">{template.name}</p>
-                          <p className="mt-1 text-[11px] text-slate-400">{template.type} · {template.targeting}</p>
-                          {selectedTemplateId === template.id && <SelectionMark />}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="mb-3 flex items-center gap-2 text-xs text-slate-500"><Users className="h-4 w-4 text-violet-600" /><span>选择用于创建计划的广告账户</span></div>
-                    {accountSelector}
-                  </div>
-                </div>
-              </section>
-            )}
-
             <section className="space-y-5 border-t-[6px] border-[#eef7f5] p-5">
               <SectionTitle>推送视频设置</SectionTitle>
               <div className="mx-auto max-w-4xl space-y-4 text-xs">
@@ -626,10 +555,9 @@ export function AdAccountPushWorkspace({ video, onClose, onCreate }: AdAccountPu
 }
 
 export function PushRecordsModal({ records, onClose }: PushRecordsModalProps) {
-  const [activeTab, setActiveTab] = useState<AdPushTaskKind>("push_video");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const filtered = records.filter((record) => record.kind === activeTab);
+  const filtered = records.filter((record) => record.kind === "push_video");
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const rows = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -644,31 +572,19 @@ export function PushRecordsModal({ records, onClose }: PushRecordsModalProps) {
           </header>
           <div className="flex shrink-0 items-center px-7 py-4">
             <div className="inline-flex overflow-hidden rounded-md border border-slate-200">
-              <button type="button" onClick={() => { setActiveTab("push_video"); setPage(1); }} className={`h-10 px-5 text-sm font-bold ${activeTab === "push_video" ? "bg-violet-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}>推送视频</button>
-              <button type="button" onClick={() => { setActiveTab("create_plan"); setPage(1); }} className={`h-10 border-l border-slate-200 px-5 text-sm font-bold ${activeTab === "create_plan" ? "bg-violet-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}>创建计划</button>
+              <span className="flex h-10 items-center bg-violet-600 px-5 text-sm font-bold text-white">推送视频</span>
             </div>
           </div>
           <div className="min-h-0 flex-1 overflow-auto px-7">
             <table className="w-full min-w-[1180px] table-fixed text-left text-xs">
               <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500">
-                {activeTab === "push_video" ? (
-                  <tr>{["推送视频", "广告账户", "媒体", "素材ID", "推送状态", "失败原因", "操作人", "创建推送时间", "更新时间", "任务ID"].map((head, index) => <th key={head} className={`px-4 py-3.5 font-bold ${index === 0 ? "w-60" : index === 1 ? "w-52" : ""}`}>{head}</th>)}</tr>
-                ) : (
-                  <tr>{["计划模板", "定向", "广告账户", "营销目标", "推送状态", "失败原因", "操作人", "操作时间", "更新时间", "任务ID"].map((head, index) => <th key={head} className={`px-4 py-3.5 font-bold ${index === 0 ? "w-56" : index === 2 ? "w-52" : ""}`}>{head}</th>)}</tr>
-                )}
+                <tr>{["推送视频", "广告账户", "媒体", "素材ID", "推送状态", "失败原因", "操作人", "创建推送时间", "更新时间", "任务ID"].map((head, index) => <th key={head} className={`px-4 py-3.5 font-bold ${index === 0 ? "w-60" : index === 1 ? "w-52" : ""}`}>{head}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {rows.map((record) => activeTab === "push_video" ? (
+                {rows.map((record) => (
                   <tr key={record.id} className="hover:bg-slate-50/70">
                     <td className="px-4 py-4"><div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-violet-50 text-violet-600"><Video className="h-5 w-5" /></span><span className="line-clamp-2 font-bold text-slate-800">{record.videoTitle}</span></div></td>
                     <td className="px-4 py-4 text-slate-600">{record.account}</td><td className="px-4 py-4 text-slate-600">{record.media}</td><td className="px-4 py-4 font-mono text-slate-500">{record.assetId}</td>
-                    <td className="px-4 py-4"><StatusBadge status={record.status} /></td><td className={`px-4 py-4 ${record.status === "推送失败" ? "font-bold text-rose-600" : "text-slate-400"}`}>{record.failureReason}</td>
-                    <td className="px-4 py-4 text-slate-600">{record.operator}</td><td className="px-4 py-4 font-mono text-slate-500">{record.createdAt}</td><td className="px-4 py-4 font-mono text-slate-500">{record.updatedAt}</td><td className="px-4 py-4 font-mono text-slate-500">{record.taskId}</td>
-                  </tr>
-                ) : (
-                  <tr key={record.id} className="hover:bg-slate-50/70">
-                    <td className="px-4 py-4"><p className="font-bold text-slate-800">{record.planTemplate}</p><p className="mt-1 truncate text-[11px] text-slate-400">{record.videoTitle}</p></td>
-                    <td className="px-4 py-4 text-slate-600">{record.targeting}</td><td className="px-4 py-4 text-slate-600">{record.account}</td><td className="px-4 py-4 text-slate-600">{record.marketingGoal}</td>
                     <td className="px-4 py-4"><StatusBadge status={record.status} /></td><td className={`px-4 py-4 ${record.status === "推送失败" ? "font-bold text-rose-600" : "text-slate-400"}`}>{record.failureReason}</td>
                     <td className="px-4 py-4 text-slate-600">{record.operator}</td><td className="px-4 py-4 font-mono text-slate-500">{record.createdAt}</td><td className="px-4 py-4 font-mono text-slate-500">{record.updatedAt}</td><td className="px-4 py-4 font-mono text-slate-500">{record.taskId}</td>
                   </tr>

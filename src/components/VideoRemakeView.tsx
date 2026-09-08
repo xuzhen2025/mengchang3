@@ -19,7 +19,6 @@ import {
   FolderOpen,
   Image as ImageIcon,
   Languages,
-  ListTodo,
   Loader2,
   Mic2,
   Package,
@@ -167,8 +166,6 @@ interface VideoRemakeViewProps {
   activeSessionId: string | null;
   activeTask?: Task;
   onSessionChange: (sessionId: string) => void;
-  onCreateSession: () => void;
-  onOpenTaskQueue: () => void;
   onSyncTask: (task: Task, creditsCharge?: number) => void;
   onUploadVideos: (videos: Array<{ name: string; cover: string }>) => void;
 }
@@ -516,8 +513,6 @@ export default function VideoRemakeView({
   activeSessionId,
   activeTask,
   onSessionChange,
-  onCreateSession,
-  onOpenTaskQueue,
   onSyncTask,
   onUploadVideos,
 }: VideoRemakeViewProps) {
@@ -1027,10 +1022,7 @@ export default function VideoRemakeView({
             {index < steps.length - 1 && <ChevronRight className="h-3 w-3 text-slate-300" />}
           </React.Fragment>)}
         </nav>
-        <div className="flex items-center gap-2">
-          <button onClick={onCreateSession} disabled={!!operation} className="flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"><Plus className="h-4 w-4" />新建任务</button>
-          <button onClick={onOpenTaskQueue} className="flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"><ListTodo className="h-4 w-4" />任务队列</button>
-        </div>
+        <div aria-hidden="true" className="w-[200px] shrink-0" />
       </header>}
 
       {operation && <div className="shrink-0 border-b border-blue-100 bg-blue-50 px-5 py-2.5">

@@ -121,9 +121,13 @@ export interface AiVideoTaskSnapshot {
 }
 
 export interface AiVideoTaskOutput {
+  id?: string;
+  name?: string;
   videoUrl: string;
   coverUrl: string;
   duration: number;
+  size?: string;
+  sourceVideoId?: string;
 }
 
 export interface Task {
@@ -149,6 +153,7 @@ export interface Task {
   restartable?: boolean;
   aiVideoSnapshot?: AiVideoTaskSnapshot;
   aiVideoOutput?: AiVideoTaskOutput;
+  aiVideoOutputs?: AiVideoTaskOutput[];
   simulationStartedAt?: number;
 }
 

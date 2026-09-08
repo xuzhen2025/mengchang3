@@ -4,7 +4,6 @@ import {
   AlertTriangle,
   ArrowLeft,
   BarChart3,
-  BellRing,
   Bot,
   CalendarDays,
   Check,
@@ -21,8 +20,8 @@ import {
   History,
   Home,
   Link2,
-  Megaphone,
   MessageSquare,
+  MonitorPlay,
   Package,
   Pencil,
   PlayCircle,
@@ -60,7 +59,6 @@ import {
   type EmployeeAssignment,
   type LiveAccount,
   type LiveEmployee,
-  type LiveProduct,
   type LiveRole,
   type LiveSession,
   type LiveShift,
@@ -103,8 +101,6 @@ type DialogId =
   | "store"
   | "unbind-store"
   | "tool"
-  | "product"
-  | "stock-warning"
   | null;
 
 interface EmployeeFormState {
@@ -233,7 +229,7 @@ export default function LiveManagementWorkspaceV3() {
   const [employees, setEmployees] = useState(INITIAL_EMPLOYEES);
   const [shifts, setShifts] = useState(INITIAL_SHIFTS);
   const [stores, setStores] = useState(INITIAL_STORES);
-  const [products, setProducts] = useState(INITIAL_PRODUCTS);
+  const [products] = useState(INITIAL_PRODUCTS);
   const [reductions, setReductions] = useState(INITIAL_REDUCTION_RECORDS);
   const [rolePermissions, setRolePermissions] = useState(DEFAULT_ROLE_PERMISSIONS);
   const [toast, setToast] = useState("");
@@ -266,7 +262,6 @@ export default function LiveManagementWorkspaceV3() {
   const [teamPage, setTeamPage] = useState(1);
   const [teamPageSize, setTeamPageSize] = useState(10);
   const [storeAccountFilter, setStoreAccountFilter] = useState<AccountFilter>("all");
-  const [toolAccountFilter, setToolAccountFilter] = useState<AccountFilter>("all");
   const [accountDetailTab, setAccountDetailTab] = useState<"经营概览" | "直播记录" | "商品数据" | "部门成员">("经营概览");
 
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
@@ -274,20 +269,13 @@ export default function LiveManagementWorkspaceV3() {
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<LiveRole>("主播");
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-  const [toolName, setToolName] = useState("");
-  const [consoleProductId, setConsoleProductId] = useState<string | null>("prod-1");
-  const [consoleMessage, setConsoleMessage] = useState("");
-  const [consoleMessages, setConsoleMessages] = useState(["欢迎来到梦畅直播间，今天新品福利已经上架。", "精华液适合混合肌吗？", "已关注，坐等主播讲面膜套装。"]);
+  const [consoleMessages] = useState(["欢迎来到梦畅直播间，今天新品福利已经上架。", "精华液适合混合肌吗？", "已关注，坐等主播讲面膜套装。"]);
 
   const [accountForm, setAccountForm] = useState({ name: "", handle: "", manager: "" });
   const [employeeForm, setEmployeeForm] = useState<EmployeeFormState>({ name: "", login: "", phone: "", employment: "全职", joinDate: "2026-09-08", status: "在职", assignments: [{ accountId: "acc-1", role: "主播" }] });
   const [shiftForm, setShiftForm] = useState<ShiftFormState>({ accountId: "acc-1", roomId: "room-1", date: "2026-09-09", start: 9, end: 13, title: "", participantIds: [], status: "待确认" });
   const [reductionForm, setReductionForm] = useState({ reducedAt: "2026-09-08", lastWorkDate: "2026-09-10", reason: "主动离职", note: "" });
   const [storeForm, setStoreForm] = useState({ accountId: "acc-1", name: "", platform: "抖店" as LiveStore["platform"] });
-  const [productForm, setProductForm] = useState({ name: "", category: "", price: 0, stock: 0 });
-  const [stockWarning, setStockWarning] = useState(100);
-  const [reminders, setReminders] = useState({ beforeLive: true, conflict: true, authExpiry: true, stock: true, anomaly: false, minutes: "30" });
   const [liveCompare, setLiveCompare] = useState<"vs 上一场" | "vs 近7场均值" | "vs 行业均值">("vs 上一场");
 
   const notify = (message: string) => {
@@ -554,29 +542,6 @@ export default function LiveManagementWorkspaceV3() {
     setStores((current) => current.filter((item) => item.id !== store.id));
     closeDialog();
     notify(`${store.name}已解除授权`);
-  };
-
-  const openProductEditor = (product: LiveProduct) => {
-    setSelectedProductId(product.id);
-    setProductForm({ name: product.name, category: product.category, price: product.price, stock: product.stock });
-    setDialog("product");
-  };
-
-  const saveProduct = () => {
-    if (!selectedProductId || !productForm.name.trim() || !productForm.category.trim() || productForm.price <= 0 || productForm.stock < 0) {
-      setFormError("请填写有效的商品名称、分类、价格与库存");
-      return;
-    }
-    setProducts((current) => current.map((product) => product.id === selectedProductId ? { ...product, ...productForm, name: productForm.name.trim(), category: productForm.category.trim(), status: productForm.stock === 0 ? "已售罄" : "在售" } : product));
-    closeDialog();
-    notify("商品信息已更新，并同步到运营控制台");
-  };
-
-  const saveStockWarning = () => {
-    if (!selectedProductId || stockWarning < 0) return;
-    setProducts((current) => current.map((product) => product.id === selectedProductId ? { ...product, warningStock: stockWarning } : product));
-    closeDialog();
-    notify("库存预警阈值已保存");
   };
 
   const productImage = (productId: string) => {
@@ -860,19 +825,25 @@ export default function LiveManagementWorkspaceV3() {
     const visibleStores = stores.filter((store) => storeAccountFilter === "all" || store.accountId === storeAccountFilter);
     const visibleProducts = products.filter((product) => storeAccountFilter === "all" || product.accountId === storeAccountFilter);
     return <div className="space-y-5">
-      <PageHeader title="店铺管理" description="管理直播号店铺授权、商品库存与销售表现"><AccountSelect value={storeAccountFilter} onChange={setStoreAccountFilter} /><button type="button" onClick={() => openStoreEditor()} className={primaryButton}><Link2 className="h-4 w-4" />绑定店铺</button></PageHeader>
+      <PageHeader title="店铺管理" description="查看店铺授权、商品数据与销售表现"><AccountSelect value={storeAccountFilter} onChange={setStoreAccountFilter} /><button type="button" onClick={() => openStoreEditor()} className={primaryButton}><Link2 className="h-4 w-4" />绑定店铺</button></PageHeader>
       <section className="grid gap-4 lg:grid-cols-3">{visibleStores.map((store) => <article key={store.id} className="rounded-lg border border-slate-200 bg-white p-5"><div className="flex items-start gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-md bg-amber-50 text-amber-600"><Store className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="flex items-center gap-2"><b className="truncate text-sm text-slate-900">{store.name}</b><Badge tone={store.status === "已授权" ? "green" : store.status === "即将到期" ? "amber" : "red"}>{store.status}</Badge></span><small className="mt-1 block text-slate-400">{store.platform} · {accountName(store.accountId)}</small></span></div><div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 text-[11px]"><span className="text-slate-400">授权时间<b className="mt-1 block text-slate-700">{store.authorizedAt}</b></span><span className="text-slate-400">到期时间<b className="mt-1 block text-slate-700">{store.expiresAt}</b></span></div><div className="mt-4 flex gap-2"><button type="button" onClick={() => openStoreEditor(store)} className={`${secondaryButton} flex-1`}>{store.status === "已授权" ? "重新授权" : "立即续期"}</button><button type="button" title="解除授权" onClick={() => { setSelectedStoreId(store.id); setDialog("unbind-store"); }} className={`${iconButton} hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600`}><Trash2 className="h-4 w-4" /></button></div></article>)}</section>
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white"><div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div><h2 className="text-sm font-black text-slate-900">直播商品</h2><p className="mt-1 text-[11px] text-slate-400">商品销售数据与库存状态由已授权店铺同步</p></div><button type="button" onClick={() => notify("商品数据已同步")} className={secondaryButton}><RefreshCw className="h-4 w-4" />同步商品</button></div><div className="overflow-x-auto"><table className="w-full min-w-[1050px] text-left text-xs"><thead className="bg-slate-50 text-slate-400"><tr>{["商品", "直播号", "分类", "售价", "库存", "预警值", "成交件数", "成交金额", "退货率", "状态", "操作"].map((head) => <th key={head} className="px-4 py-3">{head}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{visibleProducts.map((product) => <tr key={product.id} className="hover:bg-slate-50"><td className="px-4 py-3"><button type="button" onClick={() => setDetailRoute({ type: "product", productId: product.id })} className="flex items-center gap-3 text-left">{productImage(product.id) ? <img src={productImage(product.id)} alt="" className="h-10 w-10 rounded object-cover" /> : <span className="flex h-10 w-10 items-center justify-center rounded bg-slate-100 text-slate-400"><Package className="h-5 w-5" /></span>}<span><b className="block max-w-60 truncate text-slate-800">{product.name}</b><small className="text-slate-400">ID {product.id}</small></span></button></td><td className="px-4 py-3">{accountName(product.accountId)}</td><td className="px-4 py-3">{product.category}</td><td className="px-4 py-3 font-bold">{formatMoney(product.price)}</td><td className={`px-4 py-3 font-black ${product.stock <= product.warningStock ? "text-rose-600" : "text-slate-700"}`}>{formatNumber(product.stock)}</td><td className="px-4 py-3">{formatNumber(product.warningStock)}</td><td className="px-4 py-3">{formatNumber(product.sales)}</td><td className="px-4 py-3 font-black">{formatMoney(product.gmv)}</td><td className="px-4 py-3">{product.refundRate.toFixed(1)}%</td><td className="px-4 py-3"><Badge tone={product.status === "在售" ? (product.stock <= product.warningStock ? "amber" : "green") : product.status === "已售罄" ? "red" : "slate"}>{product.status}</Badge></td><td className="px-4 py-3"><div className="flex gap-1.5"><button type="button" title="查看商品详情" onClick={() => setDetailRoute({ type: "product", productId: product.id })} className={iconButton}><Eye className="h-4 w-4" /></button><button type="button" title="编辑商品" onClick={() => openProductEditor(product)} className={iconButton}><Pencil className="h-4 w-4" /></button><button type="button" title="库存预警" onClick={() => { setSelectedProductId(product.id); setStockWarning(product.warningStock); setDialog("stock-warning"); }} className={iconButton}><BellRing className="h-4 w-4" /></button></div></td></tr>)}</tbody></table></div><Pagination total={visibleProducts.length} page={1} pageSize={10} onPage={() => undefined} onPageSize={() => undefined} /></section>
+      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4"><div className="min-w-0 flex-1 basis-56"><h2 className="text-sm font-black text-slate-900">直播商品</h2><p className="mt-1 text-[11px] text-slate-400">商品销售数据与库存状态由已授权店铺同步</p></div><button type="button" onClick={() => notify("商品数据已同步")} className={`${secondaryButton} shrink-0`}><RefreshCw className="h-4 w-4" />同步商品</button></div><div className="overflow-x-auto"><table className="w-full min-w-[1050px] text-left text-xs"><thead className="bg-slate-50 text-slate-400"><tr>{["商品", "直播号", "分类", "售价", "库存", "预警值", "成交件数", "成交金额", "退货率", "状态", "操作"].map((head) => <th key={head} className="px-4 py-3">{head}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{visibleProducts.map((product) => <tr key={product.id} className="hover:bg-slate-50"><td className="px-4 py-3"><button type="button" onClick={() => setDetailRoute({ type: "product", productId: product.id })} className="flex items-center gap-3 text-left">{productImage(product.id) ? <img src={productImage(product.id)} alt="" className="h-10 w-10 rounded object-cover" /> : <span className="flex h-10 w-10 items-center justify-center rounded bg-slate-100 text-slate-400"><Package className="h-5 w-5" /></span>}<span><b className="block max-w-60 truncate text-slate-800">{product.name}</b><small className="text-slate-400">ID {product.id}</small></span></button></td><td className="px-4 py-3">{accountName(product.accountId)}</td><td className="px-4 py-3">{product.category}</td><td className="px-4 py-3 font-bold">{formatMoney(product.price)}</td><td className={`px-4 py-3 font-black ${product.stock <= product.warningStock ? "text-rose-600" : "text-slate-700"}`}>{formatNumber(product.stock)}</td><td className="px-4 py-3">{formatNumber(product.warningStock)}</td><td className="px-4 py-3">{formatNumber(product.sales)}</td><td className="px-4 py-3 font-black">{formatMoney(product.gmv)}</td><td className="px-4 py-3">{product.refundRate.toFixed(1)}%</td><td className="px-4 py-3"><Badge tone={product.status === "在售" ? (product.stock <= product.warningStock ? "amber" : "green") : product.status === "已售罄" ? "red" : "slate"}>{product.status}</Badge></td><td className="px-4 py-3"><button type="button" title="查看商品详情" onClick={() => setDetailRoute({ type: "product", productId: product.id })} className={iconButton}><Eye className="h-4 w-4" /></button></td></tr>)}</tbody></table></div><Pagination total={visibleProducts.length} page={1} pageSize={10} onPage={() => undefined} onPageSize={() => undefined} /></section>
     </div>;
   };
 
-  const renderTools = () => <div className="space-y-5"><PageHeader title="辅助工具" description="管理直播业务提醒；设置仅在当前访问期间保存"><AccountSelect value={toolAccountFilter} onChange={setToolAccountFilter} /><button type="button" onClick={() => notify(`${toolAccountFilter === "all" ? "全部直播号" : accountName(toolAccountFilter)}提醒设置已保存`)} className={primaryButton}><Check className="h-4 w-4" />保存设置</button></PageHeader><section className="mx-auto max-w-4xl overflow-hidden rounded-lg border border-slate-200 bg-white"><div className="border-b border-slate-100 px-5 py-4"><h2 className="text-sm font-black text-slate-900">提醒设置</h2><p className="mt-1 text-[11px] text-slate-400">当前范围：{toolAccountFilter === "all" ? "全部直播号" : accountName(toolAccountFilter)}；按业务事件向负责人和参与员工发送提醒</p></div><div className="divide-y divide-slate-100">{([
-    ["beforeLive", "开播前提醒", "按排班向本场直播全部参与员工发送提醒", BellRing],
-    ["conflict", "排班冲突提醒", "新增或调整排班发生直播间、员工冲突时提示", AlertTriangle],
-    ["authExpiry", "账号授权到期提醒", "直播号或店铺授权到期前 7 天提醒负责人", ShieldCheck],
-    ["stock", "商品库存预警", "库存低于商品设置的预警值时提醒运营", Package],
-    ["anomaly", "直播数据异常提醒", "数据同步失败或关键指标异常波动时提醒负责人", Activity],
-  ] as const).map(([key, title, description, Icon]) => { const enabled = reminders[key as keyof typeof reminders] === true; return <div key={String(key)} className="flex items-center gap-4 px-5 py-4"><span className="flex h-9 w-9 items-center justify-center rounded-md bg-violet-50 text-violet-600"><Icon className="h-4 w-4" /></span><span className="min-w-0 flex-1"><b className="block text-xs text-slate-800">{title}</b><small className="mt-1 block text-slate-400">{description}</small></span>{key === "beforeLive" && <select value={reminders.minutes} onChange={(event) => setReminders((current) => ({ ...current, minutes: event.target.value }))} className={fieldClass} style={{ width: "8rem" }}><option value="15">提前15分钟</option><option value="30">提前30分钟</option><option value="60">提前1小时</option></select>}<button type="button" aria-label={`${enabled ? "关闭" : "开启"}${title}`} onClick={() => setReminders((current) => ({ ...current, [String(key)]: !enabled }))} className={`relative h-6 w-11 rounded-full transition ${enabled ? "bg-violet-600" : "bg-slate-200"}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${enabled ? "left-[22px]" : "left-0.5"}`} /></button></div>; })}</div></section></div>;
+  const renderTools = () => (
+    <div className="min-h-full">
+      <button type="button" onClick={() => setDialog("tool")} className="group w-full max-w-[300px] overflow-hidden rounded-lg border border-slate-200 bg-white text-left transition hover:border-violet-200 hover:shadow-md">
+        <span className="flex h-40 items-center justify-center bg-blue-50">
+          <span className="flex h-20 w-20 items-center justify-center rounded-lg bg-white text-blue-500 shadow-lg shadow-blue-100/80 transition-transform group-hover:scale-105"><MonitorPlay className="h-9 w-9" /></span>
+        </span>
+        <span className="block px-5 py-5">
+          <b className="block text-sm font-black text-slate-900">云管家智播助手</b>
+          <small className="mt-2 block text-xs leading-5 text-slate-500">直播间中控插件，支持自动点击商品讲解、自动发送评论。</small>
+        </span>
+      </button>
+    </div>
+  );
 
   const renderAccountDetail = (accountId: string) => {
     const account = accounts.find((item) => item.id === accountId);
@@ -929,16 +900,11 @@ export default function LiveManagementWorkspaceV3() {
     const session = sessions.find((item) => item.id === sessionId);
     if (!session) return <EmptyState title="无法进入控制台" description="对应直播场次不存在" />;
     const sessionProducts = products.filter((product) => session.productIds.includes(product.id));
-    const featuredProduct = sessionProducts.find((product) => product.id === consoleProductId) ?? sessionProducts[0];
-    const sendMessage = () => {
-      if (!consoleMessage.trim()) return;
-      setConsoleMessages((current) => [...current, consoleMessage.trim()]);
-      setConsoleMessage("");
-    };
+    const featuredProduct = sessionProducts[0];
     return <div className="space-y-4"><PageHeader title="直播运营控制台" description={`${accountName(session.accountId)} · ${session.title}`} onBack={() => setDetailRoute({ type: "session", sessionId })}><Badge tone="green"><span className="mr-1.5 h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />直播中</Badge><button type="button" onClick={() => notify("控制台数据已刷新")} className={secondaryButton}><RefreshCw className="h-4 w-4" />刷新</button></PageHeader><section className="grid min-h-[650px] gap-4 xl:grid-cols-[260px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(420px,1fr)_300px]">
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white"><div className="relative mx-auto aspect-[9/16] max-h-[505px] w-full max-w-[284px] overflow-hidden bg-slate-950"><div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,#6d28d9_0,#18181b_42%,#09090b_100%)]" /><div className="absolute inset-x-0 top-0 flex items-center justify-between bg-black/30 px-3 py-2 text-[10px] text-white"><span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-500" />LIVE</span><span>{formatNumber(session.avgOnline)} 人在线</span></div><div className="absolute inset-x-4 top-[28%] text-center text-white"><Radio className="mx-auto h-10 w-10 opacity-80" /><p className="mt-3 text-sm font-black">梦畅直播画面</p><p className="mt-1 text-[10px] text-white/60">实时预览 · 延迟约 3 秒</p></div>{featuredProduct && <div className="absolute inset-x-3 bottom-3 flex items-center gap-2 rounded-md bg-white/95 p-2 shadow-lg">{productImage(featuredProduct.id) ? <img src={productImage(featuredProduct.id)} alt="" className="h-10 w-10 rounded object-cover" /> : <span className="flex h-10 w-10 items-center justify-center rounded bg-violet-50 text-violet-600"><Package className="h-5 w-5" /></span>}<span className="min-w-0 flex-1"><b className="block truncate text-[10px] text-slate-900">{featuredProduct.name}</b><strong className="text-xs text-rose-600">{formatMoney(featuredProduct.price)}</strong></span><span className="rounded bg-rose-600 px-2 py-1 text-[9px] font-bold text-white">讲解中</span></div>}</div><div className="grid grid-cols-3 divide-x divide-slate-100 border-t border-slate-100">{[["观看", formatNumber(session.viewers)], ["点赞", formatNumber(session.likes)], ["新增粉丝", formatNumber(session.newFollowers)]].map(([label, value]) => <div key={label} className="px-2 py-3 text-center"><b className="block text-xs text-slate-800">{value}</b><small className="text-[9px] text-slate-400">{label}</small></div>)}</div></div>
-      <div className="space-y-4"><MetricStrip items={[{ label: "当前GMV", value: formatCompactMoney(session.revenue), icon: CircleDollarSign, tone: "green" }, { label: "成交订单", value: formatNumber(session.orders), icon: ShoppingCart, tone: "blue" }, { label: "实时ROI", value: session.roi.toFixed(2), icon: TrendingUp, tone: "purple" }, { label: "当前在线", value: formatNumber(session.avgOnline), icon: Eye, tone: "red" }, { label: "投放消耗", value: formatCompactMoney(session.spend), icon: WalletCards, tone: "amber" }]} /><section className="rounded-lg border border-slate-200 bg-white p-4"><div className="flex items-center justify-between"><h2 className="text-xs font-black text-slate-900">实时在线趋势</h2><span className="text-[10px] text-slate-400">每分钟刷新</span></div><TrendChart values={[3120, 3860, 4280, 5120, 4860, 5680, session.avgOnline, 6120, 5740]} labels={["-40m", "-35m", "-30m", "-25m", "-20m", "-15m", "-10m", "-5m", "当前"]} /></section><section className="overflow-hidden rounded-lg border border-slate-200 bg-white"><div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><h2 className="text-xs font-black text-slate-900">直播商品控制</h2><button type="button" onClick={() => notify("商品顺序已保存")} className="text-[11px] font-bold text-violet-600">保存排序</button></div><div className="divide-y divide-slate-100">{sessionProducts.map((product, index) => <button key={product.id} type="button" onClick={() => setConsoleProductId(product.id)} className={`flex w-full items-center gap-3 px-4 py-3 text-left ${featuredProduct?.id === product.id ? "bg-violet-50" : "hover:bg-slate-50"}`}><span className="w-5 text-center text-[10px] font-black text-slate-400">{index + 1}</span>{productImage(product.id) ? <img src={productImage(product.id)} alt="" className="h-9 w-9 rounded object-cover" /> : <span className="flex h-9 w-9 items-center justify-center rounded bg-slate-100 text-slate-400"><Package className="h-4 w-4" /></span>}<span className="min-w-0 flex-1"><b className="block truncate text-xs text-slate-800">{product.name}</b><small className="text-slate-400">库存 {product.stock} · 已售 {Math.round(product.sales * .28)}</small></span><span className="text-xs font-black text-rose-600">{formatMoney(product.price)}</span>{featuredProduct?.id === product.id && <Badge tone="purple">讲解中</Badge>}</button>)}</div></section></div>
-      <aside className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white xl:col-span-2 2xl:col-span-1"><div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><h2 className="text-xs font-black text-slate-900">实时互动</h2><Badge tone="slate">{consoleMessages.length} 条</Badge></div><div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">{consoleMessages.map((message, index) => <div key={`${message}-${index}`} className={`rounded-md p-3 text-xs leading-5 ${index % 3 === 0 ? "bg-violet-50 text-violet-800" : "bg-slate-50 text-slate-600"}`}><span className="mb-1 block text-[10px] font-bold text-slate-400">{index % 3 === 0 ? "运营公告" : `用户${String(index + 1).padStart(3, "0")}`}</span>{message}</div>)}</div><div className="border-t border-slate-100 p-3"><div className="flex gap-2"><input value={consoleMessage} onChange={(event) => setConsoleMessage(event.target.value)} onKeyDown={(event) => event.key === "Enter" && sendMessage()} placeholder="发送直播间消息" className={fieldClass} /><button type="button" onClick={sendMessage} title="发送" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-violet-600 text-white hover:bg-violet-700"><Send className="h-4 w-4" /></button></div><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => notify("优惠券已推送")} className={secondaryButton}><Megaphone className="h-4 w-4" />推优惠券</button><button type="button" onClick={() => notify("福袋活动已创建")} className={secondaryButton}><Package className="h-4 w-4" />发福袋</button></div></div></aside>
+      <div className="space-y-4"><MetricStrip items={[{ label: "当前GMV", value: formatCompactMoney(session.revenue), icon: CircleDollarSign, tone: "green" }, { label: "成交订单", value: formatNumber(session.orders), icon: ShoppingCart, tone: "blue" }, { label: "实时ROI", value: session.roi.toFixed(2), icon: TrendingUp, tone: "purple" }, { label: "当前在线", value: formatNumber(session.avgOnline), icon: Eye, tone: "red" }, { label: "投放消耗", value: formatCompactMoney(session.spend), icon: WalletCards, tone: "amber" }]} /><section className="rounded-lg border border-slate-200 bg-white p-4"><div className="flex items-center justify-between"><h2 className="text-xs font-black text-slate-900">实时在线趋势</h2><span className="text-[10px] text-slate-400">每分钟刷新</span></div><TrendChart values={[3120, 3860, 4280, 5120, 4860, 5680, session.avgOnline, 6120, 5740]} labels={["-40m", "-35m", "-30m", "-25m", "-20m", "-15m", "-10m", "-5m", "当前"]} /></section><section className="overflow-hidden rounded-lg border border-slate-200 bg-white"><div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><h2 className="text-xs font-black text-slate-900">直播商品数据</h2></div><div className="divide-y divide-slate-100">{sessionProducts.map((product, index) => <button key={product.id} type="button" onClick={() => setDetailRoute({ type: "product", productId: product.id })} title="查看商品详情" className={`flex w-full items-center gap-3 px-4 py-3 text-left ${featuredProduct?.id === product.id ? "bg-violet-50" : "hover:bg-slate-50"}`}><span className="w-5 text-center text-[10px] font-black text-slate-400">{index + 1}</span>{productImage(product.id) ? <img src={productImage(product.id)} alt="" className="h-9 w-9 rounded object-cover" /> : <span className="flex h-9 w-9 items-center justify-center rounded bg-slate-100 text-slate-400"><Package className="h-4 w-4" /></span>}<span className="min-w-0 flex-1"><b className="block truncate text-xs text-slate-800">{product.name}</b><small className="text-slate-400">库存 {product.stock} · 已售 {Math.round(product.sales * .28)}</small></span><span className="text-xs font-black text-rose-600">{formatMoney(product.price)}</span>{featuredProduct?.id === product.id && <Badge tone="purple">讲解中</Badge>}</button>)}</div></section></div>
+      <aside className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white xl:col-span-2 2xl:col-span-1"><div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><h2 className="text-xs font-black text-slate-900">实时互动</h2><Badge tone="slate">{consoleMessages.length} 条</Badge></div><div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">{consoleMessages.map((message, index) => <div key={`${message}-${index}`} className={`rounded-md p-3 text-xs leading-5 ${index % 3 === 0 ? "bg-violet-50 text-violet-800" : "bg-slate-50 text-slate-600"}`}><span className="mb-1 block text-[10px] font-bold text-slate-400">{index % 3 === 0 ? "运营公告" : `用户${String(index + 1).padStart(3, "0")}`}</span>{message}</div>)}</div></aside>
     </section></div>;
   };
 
@@ -955,7 +921,7 @@ export default function LiveManagementWorkspaceV3() {
     const product = products.find((item) => item.id === productId);
     if (!product) return <EmptyState title="商品不存在" description="商品可能已经下架" />;
     const productSessions = sessions.filter((session) => session.productIds.includes(product.id));
-    return <div className="space-y-5"><PageHeader title="商品详情分析" description={`${accountName(product.accountId)} · 商品ID ${product.id}`} onBack={() => setDetailRoute(null)}><button type="button" onClick={() => openProductEditor(product)} className={secondaryButton}><Pencil className="h-4 w-4" />编辑商品</button><button type="button" onClick={() => { setSelectedProductId(product.id); setStockWarning(product.warningStock); setDialog("stock-warning"); }} className={secondaryButton}><BellRing className="h-4 w-4" />库存预警</button><button type="button" onClick={() => notify("商品报表已导出")} className={primaryButton}><Download className="h-4 w-4" />导出报表</button></PageHeader><section className="flex flex-wrap items-center gap-5 rounded-lg border border-slate-200 bg-white p-5">{productImage(product.id) ? <img src={productImage(product.id)} alt={product.name} className="h-24 w-24 rounded-md object-cover" /> : <span className="flex h-24 w-24 items-center justify-center rounded-md bg-violet-50 text-violet-600"><Package className="h-10 w-10" /></span>}<span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><b className="text-base text-slate-900">{product.name}</b><Badge tone={product.status === "在售" ? "green" : "red"}>{product.status}</Badge><Badge tone="slate">{product.category}</Badge></span><span className="mt-3 flex flex-wrap gap-6 text-xs text-slate-500"><span>售价 <b className="ml-1 text-base text-rose-600">{formatMoney(product.price)}</b></span><span>库存 <b className={product.stock <= product.warningStock ? "text-rose-600" : "text-slate-800"}>{product.stock}</b></span><span>预警值 <b className="text-slate-800">{product.warningStock}</b></span><span>累计讲解 <b className="text-slate-800">{productSessions.length} 场</b></span></span></span></section><section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">{[["曝光人数", formatNumber(sumBy(productSessions, (item) => Math.round(item.exposure / Math.max(item.productIds.length, 1))))], ["商品点击", formatNumber(sumBy(productSessions, (item) => Math.round(item.productClicks / Math.max(item.productIds.length, 1))))], ["成交件数", formatNumber(product.sales)], ["成交金额", formatMoney(product.gmv)], ["退款率", `${product.refundRate.toFixed(1)}%`], ["库存周转", `${Math.max(1, Math.round(product.stock / Math.max(product.sales / 30, 1)))} 天`]].map(([label, value]) => <div key={label} className="rounded-lg border border-slate-200 bg-white p-4"><small className="text-slate-400">{label}</small><b className="mt-1 block text-lg text-slate-900">{value}</b></div>)}</section><div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,.6fr)]"><section className="rounded-lg border border-slate-200 bg-white p-5"><h2 className="text-sm font-black text-slate-900">近30日销售趋势</h2><TrendChart color="#10b981" values={[product.gmv * .42, product.gmv * .55, product.gmv * .49, product.gmv * .68, product.gmv * .76, product.gmv * .88, product.gmv]} labels={["09-02", "09-03", "09-04", "09-05", "09-06", "09-07", "09-08"]} /></section><section className="rounded-lg border border-slate-200 bg-white p-5"><h2 className="text-sm font-black text-slate-900">转化漏斗</h2><div className="mt-4 space-y-3">{[["商品曝光", 100], ["商品点击", 34], ["创建订单", 12], ["成交支付", 8]].map(([label, value]) => <div key={String(label)} className="rounded-md bg-violet-50 px-3 py-2 text-center" style={{ width: `${55 + Number(value) * .45}%`, marginInline: "auto" }}><span className="text-[10px] text-violet-600">{label}</span><b className="ml-2 text-xs text-violet-900">{value}%</b></div>)}</div></section></div><section className="overflow-hidden rounded-lg border border-slate-200 bg-white"><div className="border-b border-slate-100 px-5 py-4"><h2 className="text-sm font-black text-slate-900">关联直播场次</h2></div><SessionTable items={productSessions} showAccount /></section></div>;
+    return <div className="space-y-5"><PageHeader title="商品详情分析" description={`${accountName(product.accountId)} · 商品ID ${product.id}`} onBack={() => setDetailRoute(null)}><button type="button" onClick={() => notify("商品报表已导出")} className={primaryButton}><Download className="h-4 w-4" />导出报表</button></PageHeader><section className="flex flex-wrap items-center gap-5 rounded-lg border border-slate-200 bg-white p-5">{productImage(product.id) ? <img src={productImage(product.id)} alt={product.name} className="h-24 w-24 rounded-md object-cover" /> : <span className="flex h-24 w-24 items-center justify-center rounded-md bg-violet-50 text-violet-600"><Package className="h-10 w-10" /></span>}<span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><b className="text-base text-slate-900">{product.name}</b><Badge tone={product.status === "在售" ? "green" : "red"}>{product.status}</Badge><Badge tone="slate">{product.category}</Badge></span><span className="mt-3 flex flex-wrap gap-6 text-xs text-slate-500"><span>售价 <b className="ml-1 text-base text-rose-600">{formatMoney(product.price)}</b></span><span>库存 <b className={product.stock <= product.warningStock ? "text-rose-600" : "text-slate-800"}>{product.stock}</b></span><span>预警值 <b className="text-slate-800">{product.warningStock}</b></span><span>累计讲解 <b className="text-slate-800">{productSessions.length} 场</b></span></span></span></section><section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">{[["曝光人数", formatNumber(sumBy(productSessions, (item) => Math.round(item.exposure / Math.max(item.productIds.length, 1))))], ["商品点击", formatNumber(sumBy(productSessions, (item) => Math.round(item.productClicks / Math.max(item.productIds.length, 1))))], ["成交件数", formatNumber(product.sales)], ["成交金额", formatMoney(product.gmv)], ["退款率", `${product.refundRate.toFixed(1)}%`], ["库存周转", `${Math.max(1, Math.round(product.stock / Math.max(product.sales / 30, 1)))} 天`]].map(([label, value]) => <div key={label} className="rounded-lg border border-slate-200 bg-white p-4"><small className="text-slate-400">{label}</small><b className="mt-1 block text-lg text-slate-900">{value}</b></div>)}</section><div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,.6fr)]"><section className="rounded-lg border border-slate-200 bg-white p-5"><h2 className="text-sm font-black text-slate-900">近30日销售趋势</h2><TrendChart color="#10b981" values={[product.gmv * .42, product.gmv * .55, product.gmv * .49, product.gmv * .68, product.gmv * .76, product.gmv * .88, product.gmv]} labels={["09-02", "09-03", "09-04", "09-05", "09-06", "09-07", "09-08"]} /></section><section className="rounded-lg border border-slate-200 bg-white p-5"><h2 className="text-sm font-black text-slate-900">转化漏斗</h2><div className="mt-4 space-y-3">{[["商品曝光", 100], ["商品点击", 34], ["创建订单", 12], ["成交支付", 8]].map(([label, value]) => <div key={String(label)} className="rounded-md bg-violet-50 px-3 py-2 text-center" style={{ width: `${55 + Number(value) * .45}%`, marginInline: "auto" }}><span className="text-[10px] text-violet-600">{label}</span><b className="ml-2 text-xs text-violet-900">{value}%</b></div>)}</div></section></div><section className="overflow-hidden rounded-lg border border-slate-200 bg-white"><div className="border-b border-slate-100 px-5 py-4"><h2 className="text-sm font-black text-slate-900">关联直播场次</h2></div><SessionTable items={productSessions} showAccount /></section></div>;
   };
 
   const renderDialog = () => {
@@ -1010,7 +976,7 @@ export default function LiveManagementWorkspaceV3() {
     }
 
     if (dialog === "role-permission") {
-      const permissionOptions = ["查看我的直播号", "查看运营控制台", "查看直播记录", "查看主播数据", "查看直播排班", "管理直播商品", "查看投放数据", "部门配置", "店铺授权", "排班管理", "直播管理全部功能"];
+      const permissionOptions = ["查看我的直播号", "查看运营控制台", "查看直播记录", "查看主播数据", "查看直播排班", "查看直播商品", "查看投放数据", "部门配置", "店铺授权", "排班管理", "直播管理全部功能"];
       return <Dialog title={`${selectedRole} · 权限设置`} onClose={closeDialog} footer={<><button type="button" onClick={closeDialog} className={secondaryButton}>取消</button><button type="button" onClick={() => { closeDialog(); notify(`${selectedRole}权限已保存`); }} className={primaryButton}>保存权限</button></>}><div className="grid gap-2 sm:grid-cols-2">{permissionOptions.map((permission) => { const checked = rolePermissions[selectedRole].includes(permission); return <label key={permission} className={`flex cursor-pointer items-center gap-3 rounded-md border p-3 text-xs ${checked ? "border-violet-200 bg-violet-50 text-violet-800" : "border-slate-200 text-slate-600"}`}><input type="checkbox" checked={checked} onChange={() => setRolePermissions((current) => ({ ...current, [selectedRole]: checked ? current[selectedRole].filter((item) => item !== permission) : [...current[selectedRole], permission] }))} className="accent-violet-600" />{permission}</label>; })}</div></Dialog>;
     }
 
@@ -1033,14 +999,34 @@ export default function LiveManagementWorkspaceV3() {
       return <Dialog title="解除店铺授权" onClose={closeDialog} width="max-w-lg" footer={<><button type="button" onClick={closeDialog} className={secondaryButton}>取消</button><button type="button" onClick={confirmUnbindStore} className={dangerButton}>确认解除</button></>}><div className="flex gap-3 rounded-md bg-rose-50 p-4"><AlertTriangle className="h-5 w-5 shrink-0 text-rose-600" /><p className="text-xs leading-6 text-rose-700">解除“{store?.name}”授权后将停止同步商品、订单及退款数据，已同步历史数据仍保留。</p></div></Dialog>;
     }
 
-    if (dialog === "product") return <Dialog title="编辑商品信息" onClose={closeDialog} footer={<><button type="button" onClick={closeDialog} className={secondaryButton}>取消</button><button type="button" onClick={saveProduct} className={primaryButton}>保存修改</button></>}><div className="space-y-4"><label className="block space-y-2 text-xs font-bold text-slate-600">商品名称<input value={productForm.name} onChange={(event) => setProductForm({ ...productForm, name: event.target.value })} className={fieldClass} /></label><div className="grid gap-4 sm:grid-cols-3"><label className="space-y-2 text-xs font-bold text-slate-600">商品分类<input value={productForm.category} onChange={(event) => setProductForm({ ...productForm, category: event.target.value })} className={fieldClass} /></label><label className="space-y-2 text-xs font-bold text-slate-600">售价<input type="number" min="0" value={productForm.price} onChange={(event) => setProductForm({ ...productForm, price: Number(event.target.value) })} className={fieldClass} /></label><label className="space-y-2 text-xs font-bold text-slate-600">库存<input type="number" min="0" value={productForm.stock} onChange={(event) => setProductForm({ ...productForm, stock: Number(event.target.value) })} className={fieldClass} /></label></div>{error}</div></Dialog>;
 
-    if (dialog === "stock-warning") {
-      const product = products.find((item) => item.id === selectedProductId);
-      return <Dialog title="设置库存预警" onClose={closeDialog} width="max-w-md" footer={<><button type="button" onClick={closeDialog} className={secondaryButton}>取消</button><button type="button" onClick={saveStockWarning} className={primaryButton}>保存设置</button></>}><div className="space-y-4"><p className="text-xs text-slate-500">{product?.name}</p><label className="block space-y-2 text-xs font-bold text-slate-600">库存预警值<input type="number" min="0" value={stockWarning} onChange={(event) => setStockWarning(Number(event.target.value))} className={fieldClass} /></label><p className="rounded-md bg-amber-50 p-3 text-[11px] leading-5 text-amber-700">当前库存低于该数值时，将按辅助工具中的提醒设置通知对应直播号负责人。</p></div></Dialog>;
-    }
-
-    if (dialog === "tool") return <Dialog title={toolName || "辅助工具"} onClose={closeDialog} footer={<button type="button" onClick={closeDialog} className={primaryButton}>关闭</button>}><p className="text-xs text-slate-500">该工具配置已保存。</p></Dialog>;
+    if (dialog === "tool") return (
+      <Dialog title="工具详情" onClose={closeDialog} width="max-w-4xl">
+        <div className="space-y-7">
+          <section className="flex items-start gap-5">
+            <span className="flex h-24 w-24 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-500"><MonitorPlay className="h-11 w-11" /></span>
+            <div className="min-w-0 flex-1 pt-1">
+              <h3 className="text-lg font-black text-slate-900">云管家智播助手</h3>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">直播间中控插件，支持自动点击商品讲解、自动发送评论。提升直播间运营效率，减少人工操作成本。</p>
+              <span className="mt-4 inline-flex h-9 items-center rounded-md bg-violet-600 px-4 text-xs font-bold text-white">点击获取</span>
+            </div>
+          </section>
+          <section>
+            <h3 className="text-sm font-black text-slate-900">使用说明</h3>
+            <p className="mt-3 break-all text-sm text-violet-600">https://sucaiwang.zhishangsoft.com/#/article/87</p>
+          </section>
+          <section>
+            <h3 className="text-sm font-black text-slate-900">功能特性</h3>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">{([
+              ["自动商品讲解", "按设定间隔自动点击商品讲解按钮", PlayCircle],
+              ["自动发送评论", "自定义评论内容，定时自动发送", Send],
+              ["智能话术库", "内置多种直播场景话术模板", MessageSquare],
+              ["数据统计", "实时统计互动数据和转化效果", BarChart3],
+            ] as const).map(([title, description, Icon]) => <div key={title} className="flex items-start gap-3 rounded-lg bg-slate-50 p-4"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white text-violet-600"><Icon className="h-4 w-4" /></span><span><b className="block text-xs text-slate-800">{title}</b><small className="mt-1 block text-[11px] leading-5 text-slate-500">{description}</small></span></div>)}</div>
+          </section>
+        </div>
+      </Dialog>
+    );
     return null;
   };
 

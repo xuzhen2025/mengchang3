@@ -446,21 +446,37 @@ export default function App() {
             || snapshot?.sourceVideos?.[0]
             || snapshot?.modelMedia
             || snapshot?.clothingImages?.[0];
-          const coverUrl = previewMedia?.coverUrl
-            || (previewMedia?.type === "image" ? previewMedia.url : "")
-            || "/assets/prototype/luxury-skincare-set.jpg";
           const videoUrl = "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4";
+          const outputSources = snapshot?.mode === "background" && snapshot.sourceVideos?.length
+            ? snapshot.sourceVideos
+            : [previewMedia];
+          const aiVideoOutputs = outputSources.map((media, index) => {
+            const duration = snapshot?.mode === "background"
+              ? Math.min(media?.durationSeconds || snapshot.duration || 8, 8)
+              : snapshot?.duration || 8;
+            const sourceName = media?.name?.replace(/\.[^.]+$/, "");
+            return {
+              id: `${task.id}-output-${index + 1}`,
+              name: snapshot?.mode === "background" && sourceName
+                ? `${sourceName}_换背景.mp4`
+                : `${task.name}.mp4`,
+              videoUrl,
+              coverUrl: media?.coverUrl
+                || (media?.type === "image" ? media.url : "")
+                || "/assets/prototype/luxury-skincare-set.jpg",
+              duration,
+              size: `${(duration * 1.02 + 0.8 + index * 0.33).toFixed(2)}MB`,
+              sourceVideoId: snapshot?.mode === "background" ? media?.id : undefined
+            };
+          });
           changed = true;
           return {
             ...task,
             status: "completed" as const,
             progress: 100,
-            outputFiles: [videoUrl],
-            aiVideoOutput: {
-              videoUrl,
-              coverUrl,
-              duration: snapshot?.duration || 8
-            }
+            outputFiles: aiVideoOutputs.map((output) => output.videoUrl),
+            aiVideoOutput: aiVideoOutputs[0],
+            aiVideoOutputs
           };
         });
         return changed ? next : current;
@@ -837,7 +853,9 @@ export default function App() {
       cancelledAt: undefined,
       refundedCredits: undefined,
       failureReason: undefined,
-      outputFiles: undefined
+      outputFiles: undefined,
+      aiVideoOutput: undefined,
+      aiVideoOutputs: undefined
     } : task));
     setTransactions((current) => [{
       id: `tx_restart_${Date.now()}`,
@@ -934,6 +952,7 @@ export default function App() {
       case "ai_video":
         return (
           <AiVideoView
+            assets={assets}
             galleryItems={galleryItems}
             tasks={tasks}
             activeTaskId={activeAiVideoTaskId}
@@ -1076,8 +1095,6 @@ export default function App() {
             activeSessionId={activeRemakeSessionId}
             activeTask={activeRemakeSessionId ? tasks.find((task) => task.remakeSessionId === activeRemakeSessionId || task.id === activeRemakeSessionId) : undefined}
             onSessionChange={setActiveRemakeSessionId}
-            onCreateSession={() => setActiveRemakeSessionId(`remake-${Date.now()}`)}
-            onOpenTaskQueue={() => setIsQueueOpen(true)}
             onSyncTask={handleSyncAgentTask}
             onUploadVideos={handleUploadAgentVideos}
           />

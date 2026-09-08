@@ -157,6 +157,9 @@ export default function Sidebar({
         <nav className="p-2 space-y-1">
           {currentMenuItems.map((item) => {
             const Icon = item.icon;
+            const tooltipText = item.id === "canvas"
+              ? "画布功能以现有独立开发版本为准"
+              : item.label;
             const isActive = appMode === "admin"
               ? adminActiveScreen === item.id
               : (
@@ -196,10 +199,16 @@ export default function Sidebar({
                   </span>
                 )}
 
+                {!collapsed && item.id === "canvas" && (
+                  <div role="tooltip" className="pointer-events-none absolute left-[calc(100%+8px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-100 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+                    {tooltipText}
+                  </div>
+                )}
+
                 {/* Tooltip for collapsed mode */}
                 {collapsed && (
-                  <div className="absolute left-16 top-1/2 -translate-y-1/2 bg-slate-900 text-slate-100 text-xs px-2.5 py-1.5 rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 border border-slate-800 shadow-xl">
-                    {item.label}
+                  <div role="tooltip" className="absolute left-16 top-1/2 -translate-y-1/2 bg-slate-900 text-slate-100 text-xs px-2.5 py-1.5 rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 border border-slate-800 shadow-xl">
+                    {tooltipText}
                   </div>
                 )}
               </button>
