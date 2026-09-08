@@ -1193,7 +1193,7 @@ export default function UploadFinishedVideoModal({
                         onChange={() => setPermissionType("team")}
                         className="accent-purple-600 w-3.5 h-3.5 cursor-pointer"
                       />
-                      <span>团队成员</span>
+                      <span>部门成员</span>
                     </label>
 
                     <label className="flex items-center gap-1.5 cursor-pointer font-medium text-slate-700">
@@ -1204,7 +1204,7 @@ export default function UploadFinishedVideoModal({
                         onChange={() => setPermissionType("group")}
                         className="accent-purple-600 w-3.5 h-3.5 cursor-pointer"
                       />
-                      <span>小组成员</span>
+                      <span>分组成员</span>
                     </label>
 
                     {/* 公用资源 with Tooltip */}
@@ -1251,7 +1251,7 @@ export default function UploadFinishedVideoModal({
                   {permissionType === "specified" && (
                     <div className="flex items-center gap-4 pt-1 flex-wrap">
                       <div className="flex items-center gap-2">
-                        <span className="text-slate-600 font-medium">指定团队</span>
+                        <span className="text-slate-600 font-medium">指定部门</span>
                         <select
                           value={specifiedTeam}
                           onChange={(e) => setSpecifiedTeam(e.target.value)}
@@ -1264,7 +1264,7 @@ export default function UploadFinishedVideoModal({
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <span className="text-slate-600 font-medium">指定小组</span>
+                        <span className="text-slate-600 font-medium">指定分组</span>
                         <select
                           value={specifiedGroup}
                           onChange={(e) => setSpecifiedGroup(e.target.value)}

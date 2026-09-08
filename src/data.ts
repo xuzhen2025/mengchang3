@@ -250,7 +250,7 @@ export const INITIAL_MESSAGES: AppMessage[] = [
     title: "8 月 21 日凌晨进行系统维护", detail: "平台将在 02:00-03:00 进行存储升级，期间上传与AI生成任务将暂停提交。",
     status: "read", time: "2026-08-18 10:00:00", eventCode: "SYSTEM_MAINTENANCE_NOTICE", template: "security", severity: "warning",
     actorName: "平台运营", recipientNames: ["全体用户"], sourceType: "系统公告", sourceId: "NOTICE-20260818-001", businessStatus: "待执行",
-    details: [{ label: "维护时间", value: "2026-08-21 02:00-03:00" }, { label: "影响功能", value: "资源上传、AI视频、AI图片、批量裂变" }, { label: "不受影响", value: "资源浏览、任务查看、直播数据查看" }]
+    details: [{ label: "维护时间", value: "2026-08-21 02:00-03:00" }, { label: "影响功能", value: "资源上传、AI视频、爆款复刻" }, { label: "不受影响", value: "资源浏览、任务查看、直播数据查看" }]
   }
 ];
 
@@ -677,19 +677,6 @@ export const INITIAL_TASKS: Task[] = [
     category: "fission"
   },
   {
-    id: "t_demo_ai_image",
-    name: "夏季防晒产品 AI 图片素材",
-    type: "image_gen",
-    status: "completed",
-    progress: 100,
-    inputFiles: ["防晒产品图.png"],
-    outputFiles: ["https://images.unsplash.com/photo-1556228720-195a672e8a03?w=480&auto=format&fit=crop&q=80"],
-    createdAt: "2026-08-20 09:30",
-    creditsCost: 6,
-    source: "tool",
-    category: "ai_image"
-  },
-  {
     id: "t_demo_agent_cancelled",
     name: "秋季新品整合营销视频",
     type: "video_gen",
@@ -702,24 +689,6 @@ export const INITIAL_TASKS: Task[] = [
     cancelledAt: "2026-08-19 18:05",
     source: "agent",
     category: "agent"
-  },
-  {
-    id: "t_old_1",
-    name: "兰蔻小黑瓶商详套图 (4张)",
-    type: "detail_set",
-    status: "completed",
-    progress: 100,
-    inputFiles: ["雅诗兰黛精华空瓶_主图主体.png"],
-    outputFiles: [
-      "./assets/prototype/skincare-product.jpg",
-      "https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=400&q=80",
-      "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400&q=80",
-      "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400&q=80"
-    ],
-    createdAt: "2026-07-08 18:00",
-    creditsCost: 4.0,
-    source: "tool",
-    category: "quick_creation"
   },
   {
     id: "t_old_2",
@@ -771,14 +740,6 @@ export const INITIAL_TRANSACTIONS: CreditTransaction[] = [
     amount: 100.00,
     time: "2026-07-07 00:00:00",
     remark: "新人注册赠送体验积分"
-  },
-  {
-    id: "tx2",
-    type: "consume",
-    tool: "商详套图",
-    amount: -4.00,
-    time: "2026-07-08 18:00:00",
-    remark: "生成兰蔻小黑瓶套图(4张)"
   },
   {
     id: "tx3",

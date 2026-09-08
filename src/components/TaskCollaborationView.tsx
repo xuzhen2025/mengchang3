@@ -606,7 +606,7 @@ const HIERARCHY_DATA: HierarchyTeam[] = [
   },
   {
     id: "team_xiaozhen",
-    name: "小真测试团队",
+    name: "小真测试部门",
     groups: [
       {
         id: "grp_edit_1",
@@ -653,7 +653,7 @@ const HIERARCHY_DATA: HierarchyTeam[] = [
   },
   {
     id: "team_rooooongz",
-    name: "RooooongZ团队",
+    name: "RooooongZ部门",
     groups: [
       {
         id: "grp_rooo_1",
@@ -777,8 +777,8 @@ export default function TaskCollaborationView({
   const [dateRange, setDateRange] = useState("2026-06-01 至 2026-06-30");
   const [outputDateRange, setOutputDateRange] = useState("");
 
-  // Second Row Multi-Dimension Cascading Filter (团队 / 分组 / 发布人)
-  const [publisherDimension, setPublisherDimension] = useState<"团队" | "分组" | "发布人">("发布人");
+  // Second Row Multi-Dimension Cascading Filter (部门 / 分组 / 发布人)
+  const [publisherDimension, setPublisherDimension] = useState<"部门" | "分组" | "发布人">("发布人");
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [selectedPublishers, setSelectedPublishers] = useState<string[]>([]);
@@ -795,8 +795,8 @@ export default function TaskCollaborationView({
   const [scriptIdSearch, setScriptIdSearch] = useState("");
   const [remarkSearch, setRemarkSearch] = useState("");
 
-  // Second Row Multi-Dimension Cascading Filter for Assignee (团队 / 分组 / 出片人)
-  const [assigneeDimension, setAssigneeDimension] = useState<"团队" | "分组" | "出片人">("出片人");
+  // Second Row Multi-Dimension Cascading Filter for Assignee (部门 / 分组 / 出片人)
+  const [assigneeDimension, setAssigneeDimension] = useState<"部门" | "分组" | "出片人">("出片人");
   const [selectedAssigneeTeams, setSelectedAssigneeTeams] = useState<string[]>([]);
   const [selectedAssigneeGroups, setSelectedAssigneeGroups] = useState<string[]>([]);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
@@ -1882,8 +1882,8 @@ export default function TaskCollaborationView({
     if (statusSubFilter === "review" && task.status !== "review") return false;
     if (statusSubFilter === "completed" && task.status !== "completed") return false;
 
-    // Second Row Filters (团队 / 分组 / 发布人)
-    if (publisherDimension === "团队") {
+    // Second Row Filters (部门 / 分组 / 发布人)
+    if (publisherDimension === "部门") {
       if (selectedTeams.length > 0) {
         const matched = selectedTeams.some(t =>
           (task.specifiedTeam && task.specifiedTeam.includes(t)) ||
@@ -1926,8 +1926,8 @@ export default function TaskCollaborationView({
         if (!matched) return false;
       }
     }
-    // Second Row Filters: 指派给谁 (团队 / 分组 / 指派人)
-    if (assigneeDimension === "团队") {
+    // Second Row Filters: 指派给谁 (部门 / 分组 / 指派人)
+    if (assigneeDimension === "部门") {
       if (selectedAssigneeTeams.length > 0) {
         const matched = selectedAssigneeTeams.some(t =>
           (task.specifiedTeam && task.specifiedTeam.includes(t)) ||
@@ -2259,7 +2259,7 @@ export default function TaskCollaborationView({
       {/* SECOND ROW: 8 FILTER INPUTS */}
       <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs p-3.5">
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 text-xs">
-          {/* 1 & 2. 维度搜索 (团队 / 分组 / 发布人) 联合一体可多选下拉框 */}
+          {/* 1 & 2. 维度搜索 (部门 / 分组 / 发布人) 联合一体可多选下拉框 */}
           <div className="col-span-2 space-y-1 relative">
             <div className={`flex bg-slate-50 border rounded-lg overflow-hidden transition-all ${
               isPublisherPopoverOpen ? "border-purple-500 ring-1 ring-purple-500/20" : "border-slate-200"
@@ -2272,7 +2272,7 @@ export default function TaskCollaborationView({
                 }}
                 className="bg-slate-100 text-slate-700 font-bold px-2.5 py-1.5 border-r border-slate-200 text-xs focus:outline-none cursor-pointer shrink-0"
               >
-                <option value="团队">团队</option>
+                <option value="部门">部门</option>
                 <option value="分组">分组</option>
                 <option value="发布人">发布人</option>
               </select>
@@ -2284,7 +2284,7 @@ export default function TaskCollaborationView({
                 <input
                   type="text"
                   placeholder={
-                    publisherDimension === "团队" && selectedTeams.length > 0
+                    publisherDimension === "部门" && selectedTeams.length > 0
                       ? `已选择 ${selectedTeams.length} 项 (${selectedTeams.join(", ")})`
                       : publisherDimension === "分组" && selectedGroups.length > 0
                       ? `已选择 ${selectedGroups.length} 项 (${selectedGroups.join(", ")})`
@@ -2304,7 +2304,7 @@ export default function TaskCollaborationView({
                   className="w-full bg-transparent px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none font-medium truncate"
                 />
                 {(publisherSearchText ||
-                  (publisherDimension === "团队" && selectedTeams.length > 0) ||
+                  (publisherDimension === "部门" && selectedTeams.length > 0) ||
                   (publisherDimension === "分组" && selectedGroups.length > 0) ||
                   (publisherDimension === "发布人" && selectedPublishers.length > 0)) ? (
                   <button
@@ -2339,8 +2339,8 @@ export default function TaskCollaborationView({
                   {/* Triangle Arrow */}
                   <div className="absolute -top-1.5 left-12 w-3 h-3 bg-white border-t border-l border-slate-200/90 rotate-45" />
 
-                  {/* MODE 1: 团队 (1 Column) */}
-                  {publisherDimension === "团队" && (
+                  {/* MODE 1: 部门 (1 Column) */}
+                  {publisherDimension === "部门" && (
                     <div className="max-h-60 overflow-y-auto space-y-0.5 p-1 w-56">
                       {HIERARCHY_DATA.filter(t => !publisherSearchText || t.name.includes(publisherSearchText)).map((team) => {
                         const isChecked = selectedTeams.includes(team.name);
@@ -2551,8 +2551,8 @@ export default function TaskCollaborationView({
                   {/* Footer Bar */}
                   <div className="pt-2 mt-1 border-t border-slate-100 flex items-center justify-between px-2 text-[11px] text-slate-400">
                     <span>
-                      {publisherDimension === "团队"
-                        ? `已选择 ${selectedTeams.length} 个团队`
+                      {publisherDimension === "部门"
+                        ? `已选择 ${selectedTeams.length} 个部门`
                         : publisherDimension === "分组"
                         ? `已选择 ${selectedGroups.length} 个分组`
                         : `已选择 ${selectedPublishers.length} 位发布人`}
@@ -2569,7 +2569,7 @@ export default function TaskCollaborationView({
             )}
           </div>
 
-          {/* 3 & 4. 出片人 / 分组 / 团队 联合一体可多选下拉框 */}
+          {/* 3 & 4. 出片人 / 分组 / 部门 联合一体可多选下拉框 */}
           <div className="col-span-2 space-y-1 relative">
             <div className={`flex bg-slate-50 border rounded-lg overflow-hidden transition-all ${
               isAssigneePopoverOpen ? "border-purple-500 ring-1 ring-purple-500/20" : "border-slate-200"
@@ -2584,7 +2584,7 @@ export default function TaskCollaborationView({
               >
                 <option value="出片人">出片人</option>
                 <option value="分组">分组</option>
-                <option value="团队">团队</option>
+                <option value="部门">部门</option>
               </select>
 
               <div
@@ -2594,7 +2594,7 @@ export default function TaskCollaborationView({
                 <input
                   type="text"
                   placeholder={
-                    assigneeDimension === "团队" && selectedAssigneeTeams.length > 0
+                    assigneeDimension === "部门" && selectedAssigneeTeams.length > 0
                       ? `已选择 ${selectedAssigneeTeams.length} 项 (${selectedAssigneeTeams.join(", ")})`
                       : assigneeDimension === "分组" && selectedAssigneeGroups.length > 0
                       ? `已选择 ${selectedAssigneeGroups.length} 项 (${selectedAssigneeGroups.join(", ")})`
@@ -2614,7 +2614,7 @@ export default function TaskCollaborationView({
                   className="w-full bg-transparent px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none font-medium truncate"
                 />
                 {(assigneeSearchText ||
-                  (assigneeDimension === "团队" && selectedAssigneeTeams.length > 0) ||
+                  (assigneeDimension === "部门" && selectedAssigneeTeams.length > 0) ||
                   (assigneeDimension === "分组" && selectedAssigneeGroups.length > 0) ||
                   (assigneeDimension === "出片人" && selectedAssignees.length > 0)) ? (
                   <button
@@ -2649,8 +2649,8 @@ export default function TaskCollaborationView({
                   {/* Triangle Arrow */}
                   <div className="absolute -top-1.5 left-12 w-3 h-3 bg-white border-t border-l border-slate-200/90 rotate-45" />
 
-                  {/* MODE 1: 团队 (1 Column) */}
-                  {assigneeDimension === "团队" && (
+                  {/* MODE 1: 部门 (1 Column) */}
+                  {assigneeDimension === "部门" && (
                     <div className="max-h-60 overflow-y-auto space-y-0.5 p-1 w-56">
                       {HIERARCHY_DATA.filter(t => !assigneeSearchText || t.name.includes(assigneeSearchText)).map((team) => {
                         const isChecked = selectedAssigneeTeams.includes(team.name);
@@ -2861,8 +2861,8 @@ export default function TaskCollaborationView({
                   {/* Footer Bar */}
                   <div className="pt-2 mt-1 border-t border-slate-100 flex items-center justify-between px-2 text-[11px] text-slate-400">
                     <span>
-                      {assigneeDimension === "团队"
-                        ? `已选择 ${selectedAssigneeTeams.length} 个团队`
+                      {assigneeDimension === "部门"
+                        ? `已选择 ${selectedAssigneeTeams.length} 个部门`
                         : assigneeDimension === "分组"
                         ? `已选择 ${selectedAssigneeGroups.length} 个分组`
                         : `已选择 ${selectedAssignees.length} 位出片人`}
@@ -3786,7 +3786,7 @@ export default function TaskCollaborationView({
                           </div>
 
                           <div className="flex items-center gap-2">
-                            <span className="w-16 text-right text-xs text-slate-500 shrink-0">指定小组</span>
+                            <span className="w-16 text-right text-xs text-slate-500 shrink-0">指定分组</span>
                             <select
                               value={formState.specifiedGroup}
                               onChange={(e) => setFormState({ ...formState, specifiedGroup: e.target.value })}

@@ -5,11 +5,9 @@ import MaterialSelector from "./components/MaterialSelector";
 import CreditsDashboard from "./components/CreditsDashboard";
 import HomeView from "./components/HomeView";
 import QuickCreationView from "./components/QuickCreationView";
-import DetailSetsView from "./components/DetailSetsView";
 import QualityEnhanceView from "./components/QualityEnhanceView";
 import WatermarkSubtitleView from "./components/WatermarkSubtitleView";
 import AiVideoView from "./components/AiVideoView";
-import AiImageView from "./components/AiImageView";
 import AssetsView from "./components/AssetsView";
 import InfiniteCanvasView from "./components/InfiniteCanvasView";
 import LiveManagementView from "./components/LiveManagementView";
@@ -20,8 +18,6 @@ import AdDeliveryView from "./components/AdDeliveryView";
 import SameStyleVideoView from "./components/SameStyleVideoView";
 import AgentCreationView from "./components/AgentCreationView";
 import VideoRemakeView from "./components/VideoRemakeView";
-import FissionView from "./components/FissionView";
-import AccountManagementView from "./components/AccountManagementView";
 import TaskCollaborationView, { TaskItem } from "./components/TaskCollaborationView";
 import MessageCenterWorkspace from "./components/MessageCenterWorkspace";
 import AdminView from "./components/AdminView";
@@ -478,52 +474,7 @@ export default function App() {
     // Generate beautiful assets dynamically upon completion
     const timestamp = new Date().toISOString().replace("T", " ").slice(0, 16);
     
-    if (task.type === "detail_set") {
-      const outputUrls = [
-        "https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=600&auto=format&fit=crop&q=80",
-        "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&auto=format&fit=crop&q=80",
-        "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&auto=format&fit=crop&q=80",
-        "https://images.unsplash.com/photo-1612817288484-6f916006741a?w=600&auto=format&fit=crop&q=80"
-      ];
-      
-      const newAssets: Asset[] = outputUrls.map((url, i) => ({
-        id: `gen_asset_${Date.now()}_${i}`,
-        name: `商详分析输出_${task.name.slice(0,6)}_${i+1}.png`,
-        type: "image",
-        url,
-        size: "1.8 MB",
-        createdAt: timestamp,
-        category: "AI商品套图",
-        resourceCategory: "图片",
-        source: "ai_generation",
-        creator: "徐振",
-        publicTags: ["AI生成", "商品套图"]
-      }));
-
-      const newGalleryItem: GalleryItem = {
-        id: `gen_g_${Date.now()}`,
-        title: `AI生成: ${task.name}`,
-        author: "MC电商至尊",
-        authorAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&h=80&fit=crop",
-        type: "image",
-        url: outputUrls[0],
-        likes: 12,
-        views: 45,
-        category: "图片",
-        prompt: "Completed AIGC E-commerce commercial pack render"
-      };
-
-      setAssets((prev) => [...newAssets, ...prev]);
-      setGalleryItems((prev) => [newGalleryItem, ...prev]);
-      
-      // Update task itself with output links
-      setTimeout(() => {
-        setTasks((current) => 
-          current.map((ct) => ct.id === task.id ? { ...ct, outputFiles: outputUrls } : ct)
-        );
-      }, 100);
-
-    } else if (task.type === "video_gen") {
+    if (task.type === "video_gen") {
       const videoUrl = "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4";
       const coverUrl = "https://images.unsplash.com/photo-1485462537746-965f33f7f6a7?w=600&auto=format&fit=crop&q=80";
       
@@ -639,7 +590,7 @@ export default function App() {
         type === "model_change" ? "model_change" :
         type === "fission" ? "fission" :
         type === "video_gen" ? "ai_video" :
-        type === "image_gen" ? "ai_image" : "quick_creation"
+        "quick_creation"
       )
     };
 
@@ -647,15 +598,14 @@ export default function App() {
 
     // Add logging ledger record
     const toolLabel = 
-      type === "detail_set" ? "商详套图" : 
-      type === "watermark" ? "水印擦除" :
+        type === "watermark" ? "水印擦除" :
       type === "subtitle" ? "字幕擦除" :
       type === "enhance" ? "画质增强" :
       type === "digital_human" ? "数字人分身" :
       type === "model_change" ? "模特换衣" :
       type === "fission" ? "爆款复刻" :
       type === "video_gen" ? (source === "agent" ? "Agent创作" : "AI视频原料") :
-      type === "image_gen" ? (source === "agent" ? "Agent创作" : "AI图片素材") : "快速创作";
+      source === "agent" ? "Agent创作" : "快速创作";
 
     const newTx: CreditTransaction = {
       id: "tx_" + Date.now(),
@@ -945,21 +895,14 @@ export default function App() {
               if (item) {
                 setSelectedSameStyleItem(item);
                 handleNavigate("same_style_video");
-              } else {
+              } else if (type === "video") {
                 setPresetPrompt(prompt);
                 setPresetReferences(refUrl ? [refUrl] : []);
-                handleNavigate(type === "video" ? "ai_video" : "ai_image");
+                handleNavigate("ai_video");
+              } else {
+                handleNavigate("quick_creation");
               }
             }}
-          />
-        );
-      case "detail_set":
-        return (
-          <DetailSetsView
-            onBack={handleBack}
-            onAddTask={handleAddTask}
-            onAddCredits={handleAddCredits}
-            onOpenMaterialSelector={handleOpenMaterialSelector}
           />
         );
       case "enhance":
@@ -1000,25 +943,6 @@ export default function App() {
             onCancelTask={handleCancelGenerationTask}
             onOpenTaskQueue={() => setIsQueueOpen(true)}
             onUploadVideos={handleUploadAgentVideos}
-            presetPrompt={presetPrompt}
-            presetReferences={presetReferences}
-            onClearPreset={() => {
-              setPresetPrompt("");
-              setPresetReferences([]);
-            }}
-          />
-        );
-      case "ai_image":
-        return (
-          <AiImageView
-            onBack={() => {
-              setPresetPrompt("");
-              setPresetReferences([]);
-              handleBack();
-            }}
-            onAddTask={handleAddTask}
-            onOpenMaterialSelector={handleOpenMaterialSelector}
-            galleryItems={galleryItems}
             presetPrompt={presetPrompt}
             presetReferences={presetReferences}
             onClearPreset={() => {
@@ -1113,11 +1037,6 @@ export default function App() {
           <AdDeliveryView />
         );
 
-      case "account_management":
-        return (
-          <AccountManagementView />
-        );
-
       case "same_style_video":
         return (
           <SameStyleVideoView
@@ -1147,16 +1066,6 @@ export default function App() {
           />
         );
       
-      case "fission":
-        return (
-          <FissionView
-            onBack={handleBack}
-            onAddTask={handleAddTask}
-            onOpenMaterialSelector={handleOpenMaterialSelector}
-            credits={availableCredits}
-          />
-        );
-
       case "video_remake":
         return (
           <VideoRemakeView

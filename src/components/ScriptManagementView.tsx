@@ -318,7 +318,7 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
     {
       id: "S-10294",
       title: "脚本 4 - 4K光感亮肤精华高能开箱",
-      author: "美妆团队A",
+      author: "美妆内容部",
       categoryTag: "爆款复刻",
       content: "1: 皮肤暗沉黄气重？看这条视频就够了！28天实测对比，透亮感直接拉满，质地丝滑清爽，上脸一抹即化...",
       status: "驳回-待修改",
@@ -826,7 +826,7 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
           <select className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-500 bg-white focus:outline-none focus:border-purple-400 cursor-pointer">
             <option value="">作者</option>
             <option value="致上编导">致上编导</option>
-            <option value="美妆团队A">美妆团队A</option>
+            <option value="美妆内容部">美妆内容部</option>
           </select>
 
           <input
@@ -1513,7 +1513,7 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
                           </div>
 
                           <div className="flex items-center gap-2">
-                            <span className="w-16 text-right text-xs text-slate-500 shrink-0">指定小组</span>
+                            <span className="w-16 text-right text-xs text-slate-500 shrink-0">指定分组</span>
                             <select
                               value={taskFormState.specifiedGroup}
                               onChange={(e) => setTaskFormState({ ...taskFormState, specifiedGroup: e.target.value })}

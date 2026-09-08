@@ -231,7 +231,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     category: "塑身裤",
     typeLabel: "切片重构",
     subtitle: "真实防粘不粘底",
-    tags: ["直播", "8018-沈阳团队"],
+    tags: ["直播", "8018-沈阳分组"],
     status: "审核驳回",
     version: "v1.0 测试版",
     secondaryCount: 0,
@@ -592,7 +592,7 @@ const TIME_TYPE_OPTIONS = [
 
 const PUBLIC_TAGS = [
   "姓名", "投放平台（素材必选标签）", "腾讯广告", "快手投手", "达人姓名", "素材类型", "草本剪辑", "8015-摄影/编导（基础）",
-  "草本8015摄影师", "达人标签", "8018-沈阳团队"
+  "草本8015摄影师", "达人标签", "8018-沈阳分组"
 ];
 
 interface MaterialsViewProps {

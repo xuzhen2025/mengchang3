@@ -203,7 +203,7 @@ export default function AudioDetailView({
                       }}
                       className="w-full text-left px-3.5 py-2 hover:bg-purple-50 text-slate-700 cursor-pointer"
                     >
-                      推送至团队剪辑
+                      推送给部门剪辑人员
                     </button>
                     <button
                       onClick={() => {

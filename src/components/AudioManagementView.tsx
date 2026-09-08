@@ -57,7 +57,7 @@ const PUBLIC_TAG_GROUPS: Record<string, string[]> = {
 const PERSONAL_TAG_GROUPS: Record<string, string[]> = {
   "Zs测试一": ["Zs测试一", "个人测试标签2", "重点剪辑音频"],
   "我的常用": ["高质量播音", "短视频配音", "爆款BGM"],
-  "团队协作": ["需重新剪辑", "待试听核对", "已审核通过"]
+  "部门协作": ["需重新剪辑", "待试听核对", "已审核通过"]
 };
 
 export interface AudioItem {
@@ -864,7 +864,7 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
                   <button
                     onClick={() => {
                       setShowMoreActionsMenu(false);
-                      showToast("已向团队群发消息提醒");
+                      showToast("已向部门成员群发消息提醒");
                     }}
                     className="w-full text-left px-4 py-2 hover:bg-purple-50 text-slate-700 font-medium flex items-center gap-2"
                   >

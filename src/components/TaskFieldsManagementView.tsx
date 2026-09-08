@@ -274,7 +274,7 @@ export default function TaskFieldsManagementView() {
                   className="w-4 h-4 text-[#7C3AED] focus:ring-purple-200 border-slate-300 cursor-pointer accent-[#7C3AED]"
                 />
                 <span className={assignTarget === "team" ? "text-[#7C3AED] font-bold" : ""}>
-                  团队成员
+                  部门成员
                 </span>
               </label>
 
@@ -287,7 +287,7 @@ export default function TaskFieldsManagementView() {
                   className="w-4 h-4 text-[#7C3AED] focus:ring-purple-200 border-slate-300 cursor-pointer accent-[#7C3AED]"
                 />
                 <span className={assignTarget === "group" ? "text-[#7C3AED] font-bold" : ""}>
-                  小组成员
+                  分组成员
                 </span>
               </label>
             </div>

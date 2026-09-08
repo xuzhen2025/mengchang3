@@ -548,6 +548,25 @@ export default function AiVideoView({
       ? { min: 3, max: 12, value: durations.first_last, set: (value: number) => setDurations((current) => ({ ...current, first_last: value })) }
       : { min: 3, max: 12, value: durations.outfit, set: (value: number) => setDurations((current) => ({ ...current, outfit: value })) };
 
+  if (uploadTask) {
+    return (
+      <div className="relative flex h-full min-h-0 flex-1 flex-col">
+        {toast && <OverlayPortal layer="toast" className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-md bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xl">{toast}</OverlayPortal>}
+        <UploadFinishedVideoModal
+          key={uploadTask.id}
+          isOpen
+          isPage
+          initialFiles={[{ name: `${uploadTask.name}.mp4`, type: "video/mp4" }]}
+          onClose={() => setUploadTask(null)}
+          onPublishSuccess={(message) => {
+            onUploadVideos([{ name: `${uploadTask.name}.mp4`, cover: uploadTask.aiVideoOutput?.coverUrl || "/assets/prototype/luxury-skincare-set.jpg" }]);
+            setToast(message);
+          }}
+        />
+      </div>
+    );
+  }
+
   return <section className="flex h-full min-h-[720px] flex-col overflow-hidden bg-slate-50 text-slate-800">
     <div className="grid min-h-0 flex-1 grid-cols-[390px_minmax(0,1fr)] gap-3 p-4 max-xl:grid-cols-[350px_minmax(0,1fr)] max-lg:block max-lg:overflow-y-auto">
       <aside className="flex min-h-0 flex-col rounded-lg border border-slate-200 bg-white shadow-sm max-lg:min-h-[680px]">
@@ -680,7 +699,6 @@ export default function AiVideoView({
     {picker && <MediaPickerModal allowed={picker.allowed} maxSelections={picker.max} initialSelected={pickerSelection()} items={libraryItems} onClose={() => setPicker(null)} onConfirm={applyPickerSelection} />}
     {voicePickerOpen && <VoicePickerModal selected={voice} onClose={() => setVoicePickerOpen(false)} onConfirm={(item) => { setVoice(item); setVoicePickerOpen(false); }} />}
     {previewTask && <VideoPreviewModal task={previewTask} onClose={() => setPreviewTask(null)} />}
-    {uploadTask && <UploadFinishedVideoModal isOpen onClose={() => setUploadTask(null)} initialFiles={[{ name: `${uploadTask.name}.mp4`, type: "video/mp4" }]} onPublishSuccess={(message) => { onUploadVideos([{ name: `${uploadTask.name}.mp4`, cover: uploadTask.aiVideoOutput?.coverUrl || "/assets/prototype/luxury-skincare-set.jpg" }]); setToast(message); }} />}
     {confirmOutfitReturn && <ConfirmDialog title="确认返回？" description="返回后当前搭配预览将无法找回，预览积分无法退还；已提交的视频任务仍会在后台继续。" onCancel={() => setConfirmOutfitReturn(false)} onConfirm={() => { setConfirmOutfitReturn(false); setOutfitPreview(false); setOutfitCandidates([]); setSelectedLook(null); }} />}
     {toast && <OverlayPortal layer="toast" className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-md bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xl">{toast}</OverlayPortal>}
   </section>;

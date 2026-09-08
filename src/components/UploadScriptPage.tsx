@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import CategoryCascader from "./CategoryCascader";
+import DynamicScriptTemplateForm, { DynamicScriptTemplateFormHandle } from "./DynamicScriptTemplateForm";
 import {
   ArrowLeft,
   FileText,
@@ -8,9 +9,6 @@ import {
   RefreshCw,
   Calendar,
   ChevronDown,
-  Plus,
-  Minus,
-  Upload,
   Folder,
   Search
 } from "lucide-react";
@@ -27,23 +25,6 @@ const TAG_GROUPS_DATA: Record<string, string[]> = {
   "人群画像": ["年轻职场", "宝妈群体", "学生党", "大码人群", "精致高净值"]
 };
 
-const SCRIPT_CATEGORY_OPTIONS: Record<string, string[]> = {
-  "基础：对标翻拍": ["8835内衣", "6017内衣", "8020内衣", "0969内裤"],
-  "进阶：二创衍生": ["8022超薄", "保暖系列", "无痕吊带", "功能内衣"],
-  "原创": ["MF品牌", "爆款短视频", "直播切片"],
-  "品牌宣传": ["品牌TVC", "形象宣传", "文化故事"],
-  "电商带货": ["硬广直投", "口播种草", "痛点对比"]
-};
-
-interface ScriptRow {
-  id: number;
-  timepoint: string;
-  dialogue: string;
-  shotDescription: string;
-  shotImage: string | null;
-  notes: string;
-}
-
 export default function UploadScriptPage({
   onClose,
   onPublishSuccess
@@ -52,7 +33,6 @@ export default function UploadScriptPage({
   const [presetTemplate, setPresetTemplate] = useState("");
 
   // Section 1: Classification & Basic Info
-  const [scriptCategory, setScriptCategory] = useState("基础：对标翻拍");
   const [primaryCategory, setPrimaryCategory] = useState("基础：对标翻拍");
   const [secondaryCategory, setSecondaryCategory] = useState("8835内衣");
   const [scriptTitle, setScriptTitle] = useState("粉色的发顺丰");
@@ -73,68 +53,19 @@ export default function UploadScriptPage({
   const [selectedPersonalGroupKey, setSelectedPersonalGroupKey] = useState("电商痛点");
   const [addedPersonalTags, setAddedPersonalTags] = useState<string[]>([]);
 
-  // Section 2: 填写脚本
-  const [scriptTemplate, setScriptTemplate] = useState("对标翻拍");
-  
-  // Timeline Table Rows
-  const [scriptRows, setScriptRows] = useState<ScriptRow[]>([
-    {
-      id: 1,
-      timepoint: "",
-      dialogue: "",
-      shotDescription: "",
-      shotImage: null,
-      notes: ""
-    }
-  ]);
-
-  // Extra Video Parameters
-  const [videoFormat, setVideoFormat] = useState("");
-  const [videoSize, setVideoSize] = useState("");
-  const [subtitleType, setSubtitleType] = useState("");
-  const [videoQuality, setVideoQuality] = useState("");
-  const [bgm, setBgm] = useState("");
+  const scriptTemplateFormRef = useRef<DynamicScriptTemplateFormHandle | null>(null);
 
   // Section 3: 更多设置
   const [presetPermissionConfig, setPresetPermissionConfig] = useState("");
-  const [viewPermission, setViewPermission] = useState<"公开" | "团队成员" | "小组成员" | "公用资源" | "指定范围">("公开");
+  const [viewPermission, setViewPermission] = useState<"公开" | "部门成员" | "分组成员" | "公用资源" | "指定范围">("公开");
   const [effectiveDate, setEffectiveDate] = useState("");
   const [reminderUser, setReminderUser] = useState("");
   const [reminderMessage, setReminderMessage] = useState("");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Row Add / Remove
-  const handleAddRow = (index?: number) => {
-    const newRow: ScriptRow = {
-      id: Date.now(),
-      timepoint: "",
-      dialogue: "",
-      shotDescription: "",
-      shotImage: null,
-      notes: ""
-    };
-    if (typeof index === "number") {
-      const updated = [...scriptRows];
-      updated.splice(index + 1, 0, newRow);
-      setScriptRows(updated);
-    } else {
-      setScriptRows([...scriptRows, newRow]);
-    }
-  };
-
-  const handleRemoveRow = (index: number) => {
-    if (scriptRows.length <= 1) return;
-    setScriptRows(scriptRows.filter((_, i) => i !== index));
-  };
-
-  const handleUpdateRow = (index: number, field: keyof ScriptRow, value: any) => {
-    const updated = [...scriptRows];
-    updated[index] = { ...updated[index], [field]: value };
-    setScriptRows(updated);
-  };
-
   const handlePublish = (keepConfig = false) => {
+    if (!scriptTemplateFormRef.current?.validate()) return;
     setIsSubmitting(true);
     setTimeout(() => {
       setIsSubmitting(false);
@@ -577,220 +508,7 @@ export default function UploadScriptPage({
         </div>
 
         {/* SECTION 2: 填写脚本 */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-2xs space-y-5">
-          {/* Section Header */}
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h3 className="font-extrabold text-slate-900 text-sm">填写脚本</h3>
-            <div className="flex items-center gap-1 text-slate-400 text-xs">
-              <span>AI仿写免费次数200000/200000</span>
-              <HelpCircle className="w-3.5 h-3.5" />
-            </div>
-          </div>
-
-          {/* 脚本模板 */}
-          <div className="flex items-center gap-4">
-            <label className="w-24 font-bold text-slate-700 text-right shrink-0">
-              <span className="text-rose-500 mr-0.5">*</span>脚本模板
-            </label>
-            <div className="flex-1 relative">
-              <select
-                value={scriptTemplate}
-                onChange={(e) => setScriptTemplate(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2 text-xs text-slate-700 focus:outline-none focus:border-purple-500 shadow-2xs appearance-none cursor-pointer"
-              >
-                <option value="对标翻拍">对标翻拍</option>
-                <option value="口播种草">口播种草</option>
-                <option value="剧情反转">剧情反转</option>
-              </select>
-              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-          </div>
-
-          {/* Script Timeline Table (画面时间轴) */}
-          <div className="border border-purple-200 rounded-xl overflow-hidden bg-white shadow-2xs">
-            <div className="flex min-w-[760px]">
-              {/* Vertical Header Bar */}
-              <div className="w-10 bg-purple-100/90 border-r border-purple-200 flex items-center justify-center py-6 shrink-0 select-none">
-                <span className="text-purple-900 font-extrabold text-xs tracking-widest [writing-mode:vertical-lr] text-center">
-                  画面时间轴
-                </span>
-              </div>
-
-              {/* Table Container */}
-              <div className="flex-1 overflow-x-auto">
-                {/* Table Header */}
-                <div className="grid grid-cols-12 bg-purple-50/80 border-b border-purple-200 text-slate-700 font-bold text-xs text-center py-2.5">
-                  <div className="col-span-1 border-r border-purple-200 flex items-center justify-center">序号</div>
-                  <div className="col-span-2 border-r border-purple-200 flex items-center justify-center gap-1">
-                    <span>画面时间点 (秒)</span>
-                  </div>
-                  <div className="col-span-3 border-r border-purple-200 flex items-center justify-center gap-1">
-                    <span>台词/对白</span>
-                  </div>
-                  <div className="col-span-3 border-r border-purple-200 flex items-center justify-center">画面镜头</div>
-                  <div className="col-span-2 border-r border-purple-200 flex items-center justify-center gap-1">
-                    <span>画面注意事项</span>
-                  </div>
-                  <div className="col-span-1 flex items-center justify-center">操作</div>
-                </div>
-
-                {/* Table Body Rows */}
-                {scriptRows.map((row, idx) => (
-                  <div
-                    key={row.id}
-                    className="grid grid-cols-12 border-b border-slate-200/80 min-h-[140px] text-xs"
-                  >
-                    {/* 1. 序号 */}
-                    <div className="col-span-1 border-r border-slate-200/80 flex items-center justify-center font-bold text-slate-800">
-                      {idx + 1}
-                    </div>
-
-                    {/* 2. 画面时间点 (秒) */}
-                    <div className="col-span-2 border-r border-slate-200/80 p-2">
-                      <textarea
-                        value={row.timepoint}
-                        onChange={(e) => handleUpdateRow(idx, "timepoint", e.target.value)}
-                        placeholder="例如: 0-3s"
-                        className="w-full h-full min-h-[120px] bg-white border border-transparent hover:border-slate-200 focus:border-purple-500 rounded p-2 text-xs focus:outline-none resize-none"
-                      />
-                    </div>
-
-                    {/* 3. 台词/对白 */}
-                    <div className="col-span-3 border-r border-slate-200/80 p-2">
-                      <textarea
-                        value={row.dialogue}
-                        onChange={(e) => handleUpdateRow(idx, "dialogue", e.target.value)}
-                        placeholder="请输入台词或口播文本"
-                        className="w-full h-full min-h-[120px] bg-white border border-transparent hover:border-slate-200 focus:border-purple-500 rounded p-2 text-xs focus:outline-none resize-none"
-                      />
-                    </div>
-
-                    {/* 4. 画面镜头 (Shot + File Drop Area) */}
-                    <div className="col-span-3 border-r border-slate-200/80 p-2 flex flex-col gap-2">
-                      <textarea
-                        value={row.shotDescription}
-                        onChange={(e) => handleUpdateRow(idx, "shotDescription", e.target.value)}
-                        placeholder="描述画面特写/分镜镜头"
-                        className="w-full bg-white border border-transparent hover:border-slate-200 focus:border-purple-500 rounded p-1.5 text-xs focus:outline-none resize-none h-12"
-                      />
-
-                      {/* Dropzone Box */}
-                      <div className="flex-1 bg-slate-100/80 border border-slate-200 rounded-lg p-2 flex flex-col items-center justify-center text-center relative group">
-                        <p className="text-[11px] text-slate-500 font-medium mb-1.5">粘贴或拖拽至这里上传</p>
-                        <label className="border border-dashed border-slate-300 hover:border-purple-500 bg-white hover:bg-purple-50 text-slate-700 font-bold px-3 py-1 rounded text-[11px] flex items-center gap-1 cursor-pointer transition-colors">
-                          <Plus className="w-3.5 h-3.5 text-purple-600" />
-                          <span>添加本地文件</span>
-                          <input
-                            type="file"
-                            className="hidden"
-                            onChange={(e) => {
-                              if (e.target.files && e.target.files[0]) {
-                                handleUpdateRow(idx, "shotImage", e.target.files[0].name);
-                              }
-                            }}
-                          />
-                        </label>
-                        {row.shotImage && (
-                          <span className="text-[10px] text-purple-600 mt-1 font-medium truncate max-w-[140px]">
-                            已选: {row.shotImage}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* 5. 画面注意事项 */}
-                    <div className="col-span-2 border-r border-slate-200/80 p-2">
-                      <textarea
-                        value={row.notes}
-                        onChange={(e) => handleUpdateRow(idx, "notes", e.target.value)}
-                        placeholder="灯光、道具或动作注意项"
-                        className="w-full h-full min-h-[120px] bg-white border border-transparent hover:border-slate-200 focus:border-purple-500 rounded p-2 text-xs focus:outline-none resize-none"
-                      />
-                    </div>
-
-                    {/* 6. 操作 (+ / -) */}
-                    <div className="col-span-1 flex flex-col items-center justify-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleAddRow(idx)}
-                        className="w-6 h-6 rounded-full border border-purple-300 hover:border-purple-600 text-purple-600 flex items-center justify-center hover:bg-purple-50 cursor-pointer transition-colors"
-                        title="插入一行"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                      {scriptRows.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveRow(idx)}
-                          className="w-6 h-6 rounded-full border border-rose-300 hover:border-rose-600 text-rose-500 flex items-center justify-center hover:bg-rose-50 cursor-pointer transition-colors"
-                          title="删除此行"
-                        >
-                          <Minus className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-
-                {/* Full Width Bottom Bar: + 新增一行 */}
-                <button
-                  type="button"
-                  onClick={() => handleAddRow()}
-                  className="w-full py-2 bg-slate-50 hover:bg-slate-100/90 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors border-t border-slate-200"
-                >
-                  <Plus className="w-4 h-4 text-purple-600" />
-                  <span>新增一行</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Extra Video Parameters (Stacked Left Purple Headers) */}
-          <div className="space-y-2 pt-2">
-            {[
-              { label: "视频格式", isInput: false, state: videoFormat, setter: setVideoFormat, options: ["MP4", "MOV", "AVI"] },
-              { label: "视频尺寸", isInput: false, state: videoSize, setter: setVideoSize, options: ["9:16", "16:9", "1:1"] },
-              { label: "字幕类型", isInput: true, state: subtitleType, setter: setSubtitleType, placeholder: "请输入字幕类型，如：内嵌字幕 / 挂载字幕 / 无字幕" },
-              { label: "视频画质", isInput: false, state: videoQuality, setter: setVideoQuality, options: ["1080P", "4K", "720P"] },
-              { label: "BGM", isInput: true, state: bgm, setter: setBgm, placeholder: "请输入BGM信息 / 背景音乐名称" }
-            ].map((param) => (
-              <div key={param.label} className="flex items-stretch border border-slate-200 rounded-lg overflow-hidden bg-white">
-                <div className="w-36 bg-purple-100/60 border-r border-slate-200 text-slate-800 font-bold p-2.5 text-xs flex items-center shrink-0">
-                  {param.label}
-                </div>
-                <div className="flex-1 relative flex items-center">
-                  {param.isInput ? (
-                    <input
-                      type="text"
-                      value={param.state}
-                      onChange={(e) => param.setter(e.target.value)}
-                      placeholder={param.placeholder}
-                      className="w-full h-full bg-white px-3 py-2 text-xs text-slate-700 focus:outline-none"
-                    />
-                  ) : (
-                    <>
-                      <select
-                        value={param.state}
-                        onChange={(e) => param.setter(e.target.value)}
-                        className="w-full h-full bg-white px-3 py-2 text-xs text-slate-700 focus:outline-none appearance-none cursor-pointer"
-                      >
-                        <option value="">请选择</option>
-                        {param.options?.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-        </div>
-
+        <DynamicScriptTemplateForm ref={scriptTemplateFormRef} />
         {/* SECTION 3: 更多设置 */}
         <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-2xs space-y-5">
           {/* Section Header */}
@@ -806,7 +524,7 @@ export default function UploadScriptPage({
                 >
                   <option value="">选择预设配置</option>
                   <option value="p1">公开访问配置</option>
-                  <option value="p2">仅团队访问配置</option>
+                  <option value="p2">仅部门访问配置</option>
                 </select>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
@@ -827,7 +545,7 @@ export default function UploadScriptPage({
               <span className="text-rose-500 mr-0.5">*</span>谁可以看
             </label>
             <div className="flex items-center gap-5 text-xs font-bold text-slate-700">
-              {(["公开", "团队成员", "小组成员", "公用资源", "指定范围"] as const).map((opt) => (
+              {(["公开", "部门成员", "分组成员", "公用资源", "指定范围"] as const).map((opt) => (
                 <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
                   <input
                     type="radio"

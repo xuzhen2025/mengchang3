@@ -240,19 +240,25 @@ export default function QuickCreationView({
       return;
     }
 
-    const detectedScreen: ActiveScreen = outputTarget === "video" ? "ai_video" : "ai_image";
-    const targetText = outputTarget === "video" ? "AI视频生成" : "AI图片生成";
+    const targetText = outputTarget === "video" ? "AI视频原料" : "快速创作任务队列";
 
     const confirmRoute = window.confirm(
       `✨ AI智能识别为您产出素材中...\n` +
       `已上传素材: ${selectedMaterials.length > 0 ? `${selectedMaterials.length} 个多媒体文件` : "暂未上传文件 (AI将自动解析提示词)"}\n` +
       `输出目标: [${outputTarget === "video" ? "视频素材" : "图片素材"}]\n` +
       `提示词: "${queryText || "由AI智能识别上传素材产出"}"\n\n` +
-      `将自动为您跳转至 [${targetText}] 工具进行快速生成，是否跳转？`
+      `${outputTarget === "video" ? "将跳转至" : "将在"} [${targetText}] ${outputTarget === "video" ? "继续配置" : "创建图片生成任务"}，是否继续？`
     );
 
     if (confirmRoute) {
-      setActiveScreen(detectedScreen);
+      if (outputTarget === "video") {
+        setActiveScreen("ai_video");
+        return;
+      }
+
+      const taskName = `快速创作图片: ${queryText.trim() || "智能解析素材"}`;
+      onAddTask("image_gen", taskName, selectedMaterials, imageCount * 2);
+      alert("图片生成任务已加入任务队列，生成结果将保存至资源库。");
     }
   };
 
@@ -1445,7 +1451,7 @@ export default function QuickCreationView({
                   <button
                     onClick={() => {
                       copyToClipboard(selectedGalleryItem.prompt);
-                      alert("已复制同款创意 Prompt 链接及提示词！快去和团队成员分享吧。");
+                      alert("已复制同款创意 Prompt 链接及提示词！快去和部门成员分享吧。");
                     }}
                     className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all cursor-pointer flex items-center justify-center"
                     title="分享创意"

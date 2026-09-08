@@ -49,7 +49,7 @@ export default function DeliveryReportView({ showToast }: DeliveryReportViewProp
   // 1. Top Platform Sub-Tabs (巨量广告 | 巨量千川 | 磁力智投 | 磁力金牛 | 百度营销 | 小红书)
   const [platformTab, setPlatformTab] = useState<string>("巨量广告");
 
-  // 2. Dimension Tabs (团队 | 分组 | 个人 | 明细 | 分日 | 分月)
+  // 2. Dimension Tabs (部门 | 分组 | 个人 | 明细 | 分日 | 分月)
   const [dimensionTab, setDimensionTab] = useState<"team" | "group" | "individual" | "detail" | "daily" | "monthly">("team");
 
   // 3. Creator/Operator Role Toggle (视频作者 | 下单运营)
@@ -213,7 +213,7 @@ export default function DeliveryReportView({ showToast }: DeliveryReportViewProp
           ))}
         </div>
 
-        {/* ================= 2. Secondary Dimension Navigation Bar (Screenshot 1: 团队 | 分组 | 个人 | 明细 | 分日 | 分月) ================= */}
+        {/* ================= 2. Secondary Dimension Navigation Bar (Screenshot 1: 部门 | 分组 | 个人 | 明细 | 分日 | 分月) ================= */}
         <div className="px-6 py-3 border-b border-slate-100 bg-white flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-6">
             {[

@@ -27,7 +27,7 @@ interface SameStyleVideoViewProps {
   selectedItem: GalleryItem;
   onBack: () => void;
   onAddTask: (
-    type: "detail_set" | "watermark" | "subtitle" | "enhance" | "video_gen" | "image_gen" | "fission",
+    type: "watermark" | "subtitle" | "enhance" | "video_gen" | "image_gen" | "fission",
     name: string,
     inputFiles: string[],
     creditsCost: number

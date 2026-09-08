@@ -30,7 +30,7 @@ import {
   Layers,
   ArrowUpRight
 } from "lucide-react";
-import { DeptNode, AccountMember, INITIAL_DEPTS, INITIAL_MEMBERS } from "./AccountManagementView";
+import { DeptNode, AccountMember, INITIAL_DEPTS, INITIAL_MEMBERS } from "../data/adminAccounts";
 
 interface CustomCreditConfig {
   id: string;
@@ -211,7 +211,7 @@ export default function AdminCreditsManagementView() {
     { id: "tx_101", user: "汤小真", dept: "算法推荐部", type: "AI视频生成", amount: -20, balance: 2615, time: "2026-08-11 14:30:12", note: "高清分镜视频批量渲染" },
     { id: "tx_102", user: "梁靖淇", dept: "电商1组", type: "爆款复刻", amount: -15, balance: 2635, time: "2026-08-11 11:12:00", note: "服装视频一键复刻" },
     { id: "tx_103", user: "张小花", dept: "品牌2组", type: "充值到账", amount: 1000, balance: 2650, time: "2026-08-10 16:20:00", note: "管理员手动充值配额" },
-    { id: "tx_104", user: "李强", dept: "技术研发部", type: "AI图片生成", amount: -5, balance: 1650, time: "2026-08-10 09:45:10", note: "高清商用海报渲染" },
+    { id: "tx_104", user: "李强", dept: "技术研发部", type: "Agent创作", amount: -5, balance: 1650, time: "2026-08-10 09:45:10", note: "高清商用海报渲染" },
     { id: "tx_105", user: "赵天", dept: "家电业务部", type: "配额划拨", amount: 500, balance: 1655, time: "2026-08-09 18:00:00", note: "部门月度充值划拨" }
   ]);
 

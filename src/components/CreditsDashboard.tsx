@@ -106,7 +106,7 @@ export default function CreditsDashboard({
     return typeMatch && toolMatch;
   });
 
-  const toolsList = ["商详套图", "AI视频", "AI图片", "水印擦除", "字幕擦除", "画质增强", "爆款裂变", "系统赠送"];
+  const toolsList = ["Agent创作", "AI视频原料", "水印擦除", "字幕擦除", "画质增强", "爆款复刻", "系统赠送"];
 
   return (
     <div className="flex-1 bg-slate-50 p-6 overflow-y-auto font-sans relative">

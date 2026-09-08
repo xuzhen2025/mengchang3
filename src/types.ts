@@ -85,8 +85,7 @@ export type GenerationTaskCategory =
   | "digital_human"
   | "model_change"
   | "fission"
-  | "ai_video"
-  | "ai_image";
+  | "ai_video";
 
 export type AiVideoMode = "reference" | "first_last" | "dubbing" | "background" | "outfit";
 
@@ -130,7 +129,7 @@ export interface AiVideoTaskOutput {
 export interface Task {
   id: string;
   name: string;
-  type: "detail_set" | "video" | "watermark" | "subtitle" | "enhance" | "digital_human" | "model_change" | "video_gen" | "image_gen" | "fission";
+  type: "video" | "watermark" | "subtitle" | "enhance" | "digital_human" | "model_change" | "video_gen" | "image_gen" | "fission";
   status: "queue" | "generating" | "completed" | "failed" | "cancelled";
   progress: number;
   inputFiles: string[];
@@ -181,7 +180,7 @@ export interface GalleryItem {
   tags?: string[];
 }
 
-export type ActiveScreen = "home" | "quick_creation" | "agent_creation" | "video_remake" | "ai_video" | "ai_image" | "canvas" | "live_management" | "assets" | "detail_set" | "enhance" | "watermark" | "subtitle" | "fission" | "credits" | "resources" | "materials" | "finished_videos" | "scripts" | "images" | "audio" | "ad_delivery" | "same_style_video" | "account_management" | "task_collaboration" | "message_center";
+export type ActiveScreen = "home" | "quick_creation" | "agent_creation" | "video_remake" | "ai_video" | "canvas" | "live_management" | "assets" | "enhance" | "watermark" | "subtitle" | "credits" | "resources" | "materials" | "finished_videos" | "scripts" | "images" | "audio" | "ad_delivery" | "same_style_video" | "task_collaboration" | "message_center";
 
 export type ResourceSearchType = "成片" | "素材" | "脚本" | "图片" | "音频";
 

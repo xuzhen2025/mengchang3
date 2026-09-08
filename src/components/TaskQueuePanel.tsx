@@ -37,8 +37,7 @@ const CATEGORY_META: Record<GenerationTaskCategory, { label: string; shortLabel:
   digital_human: { label: "数字人分身", shortLabel: "数字人分身" },
   model_change: { label: "模特换衣", shortLabel: "模特换衣" },
   fission: { label: "爆款复刻", shortLabel: "爆款复刻" },
-  ai_video: { label: "AI视频原料", shortLabel: "AI视频原料" },
-  ai_image: { label: "AI图片素材", shortLabel: "AI图片素材" }
+  ai_video: { label: "AI视频原料", shortLabel: "AI视频原料" }
 };
 
 const ALL_CATEGORIES: GenerationTaskCategory[] = [
@@ -50,8 +49,7 @@ const ALL_CATEGORIES: GenerationTaskCategory[] = [
   "digital_human",
   "model_change",
   "fission",
-  "ai_video",
-  "ai_image"
+  "ai_video"
 ];
 
 const STATUS_META: Record<Task["status"], { label: string; className: string }> = {
@@ -72,7 +70,6 @@ const getTaskCategory = (task: Task): GenerationTaskCategory => {
   if (task.type === "model_change") return "model_change";
   if (task.type === "fission") return "fission";
   if (task.type === "video_gen") return "ai_video";
-  if (task.type === "image_gen") return "ai_image";
   return "quick_creation";
 };
 
@@ -214,7 +211,7 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
                 const canRestart = task.restartable !== false && (task.status === "failed" || task.status === "cancelled");
                 const preview = task.aiVideoOutput?.coverUrl || task.outputFiles?.[0] || task.inputFiles.find((file) => /^https?:\/\//.test(file));
                 const estimatedMinutes = Math.max(1, Math.ceil((100 - task.progress) / 12));
-                const PreviewIcon = category === "agent" ? Bot : category === "ai_image" ? ImageIcon : category === "ai_video" ? Video : WandSparkles;
+                const PreviewIcon = category === "agent" ? Bot : task.type === "image_gen" ? ImageIcon : category === "ai_video" ? Video : WandSparkles;
                 return (
                   <article
                     key={task.id}

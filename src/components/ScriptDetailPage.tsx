@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import AssetPagination from "./AssetPagination";
 import {
   ArrowLeft,
   User,
@@ -40,6 +39,7 @@ import {
 } from "lucide-react";
 import { TaskDetailPage } from "./TaskDetailPage";
 import { TaskItem, AssociatedWorkItem } from "./TaskCollaborationView";
+import VideoResourcePickerModal, { VideoResourcePickerItem } from "./VideoResourcePickerModal";
 
 export interface ScriptItem {
   id: string;
@@ -131,13 +131,44 @@ const SCRIPT_TYPES = [
   "痛点直击"
 ];
 
-// Mock finished videos library for linking
-const MOCK_FINISHED_VIDEOS_LIBRARY = [
-  { id: "v-101", title: "0623-MF-鲁月园-刘弯-大盘有量分解-3.mp4", type: "video" as const, author: "鲁月园", duration: "00:45", category: "种草短视频 / 爆款口播" },
-  { id: "v-102", title: "0624-鸡蛋裤舒适冰丝透气展示-1.mp4", type: "video" as const, author: "张三", duration: "00:30", category: "对标翻拍 / MF" },
-  { id: "v-103", title: "0625-夏季高弹无痕内衣测评-2.mp4", type: "video" as const, author: "李四", duration: "01:10", category: "痛点解说 / 种草" },
-  { id: "v-104", title: "0626-美妆卸妆油实测无死角清洁.mp4", type: "video" as const, author: "王五", duration: "00:55", category: "演示分类 / 卸妆油" }
+const LINKABLE_WORK_LIBRARY: VideoResourcePickerItem[] = [
+  { id: "w-11033274", name: "0730-8835-复古耳环珠宝展示视频.mp4", cover: "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=800&auto=format&fit=crop&q=80", status: "待审核", section: "成片", primaryCategory: "时尚配饰", secondaryCategory: "珠宝首饰", tags: ["商品展示", "质感特写"], author: "张三", duration: "00:30", size: "42.6 MB" },
+  { id: "w-11033275", name: "0801-美妆洗护自然透亮模特成片.mp4", cover: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&auto=format&fit=crop&q=80", status: "审核通过", section: "成片", primaryCategory: "美妆护肤", secondaryCategory: "面部护理", tags: ["模特出镜", "效果展示"], author: "李四", duration: "00:42", size: "58.2 MB" },
+  { id: "w-11033276", name: "0802-高腰提臀修身牛仔裤翻拍.mp4", cover: "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=800&auto=format&fit=crop&q=80", status: "已上机", section: "成片", primaryCategory: "服饰内衣", secondaryCategory: "女士下装", tags: ["对标翻拍", "穿搭展示"], author: "王五", duration: "00:36", size: "49.8 MB" },
+  { id: "w-11033277", name: "0803-居家生活厨房剪辑特写.mp4", cover: "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=800&auto=format&fit=crop&q=80", status: "审核驳回", section: "成片", primaryCategory: "日用百货", secondaryCategory: "厨房用品", tags: ["场景展示", "使用过程"], author: "赵六", duration: "00:28", size: "35.4 MB" },
+  { id: "w-11033278", name: "0804-运动健身连体服街拍视频.mp4", cover: "https://images.unsplash.com/photo-1518310383802-640c2de311b2?w=800&auto=format&fit=crop&q=80", status: "已搭", section: "成片", primaryCategory: "服饰内衣", secondaryCategory: "运动服饰", tags: ["街拍", "真人展示"], author: "钱七", duration: "00:31", size: "44.1 MB" },
+  { id: "w-11033279", name: "0805-墨镜时尚穿搭展示成片.mp4", cover: "https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=800&auto=format&fit=crop&q=80", status: "审核通过", section: "成片", primaryCategory: "时尚配饰", secondaryCategory: "眼镜", tags: ["穿搭展示", "户外场景"], author: "孙八", duration: "00:25", size: "31.7 MB" },
+  { id: "v-101", name: "0623-MF-鲁月园-刘弯-大盘有量分解-3.mp4", cover: "./assets/prototype/beauty-promo-detail.jpg", status: "审核通过", section: "成片", primaryCategory: "服饰内衣", secondaryCategory: "女士内衣", tags: ["种草口播", "爆款复刻"], author: "鲁月园", duration: "00:45", size: "61.3 MB" },
+  { id: "v-102", name: "0624-鸡蛋裤舒适冰丝透气展示-1.mp4", cover: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=800&auto=format&fit=crop&q=80", status: "待审核", section: "成片", primaryCategory: "服饰内衣", secondaryCategory: "女士下装", tags: ["对标翻拍", "面料展示"], author: "徐振", duration: "00:30", size: "39.5 MB" },
+  { id: "v-103", name: "0625-夏季高弹无痕内衣测评-2.mp4", cover: "https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?w=800&auto=format&fit=crop&q=80", status: "审核通过", section: "成片", primaryCategory: "服饰内衣", secondaryCategory: "女士内衣", tags: ["痛点解说", "效果对比"], author: "李四", duration: "01:10", size: "86.7 MB" },
+  { id: "v-104", name: "0626-美妆卸妆油实测无死角清洁.mp4", cover: "./assets/prototype/skincare-product.jpg", status: "审核通过", section: "成片", primaryCategory: "美妆护肤", secondaryCategory: "清洁卸妆", tags: ["实测", "使用过程"], author: "王五", duration: "00:55", size: "72.4 MB" },
+  { id: "w-2204101", name: "鸡蛋裤冰丝透气拉扯特写.mp4", cover: "https://images.unsplash.com/photo-1506152983158-b4a74a01c721?w=800&auto=format&fit=crop&q=80", status: "审核通过", section: "素材", primaryCategory: "服饰内衣", secondaryCategory: "面料展示", tags: ["材质特写", "拉扯测试"], author: "摄制组", duration: "00:12", size: "18.4 MB" },
+  { id: "w-2204102", name: "模特展示平缝腰头特写镜头.mp4", cover: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&auto=format&fit=crop&q=80", status: "已上机", section: "素材", primaryCategory: "服饰内衣", secondaryCategory: "模特展示", tags: ["真人展示", "腰头特写"], author: "摄制组", duration: "00:08", size: "12.9 MB" },
+  { id: "m-103", name: "卸妆油乳化过程近景素材.mp4", cover: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=800&auto=format&fit=crop&q=80", status: "审核通过", section: "素材", primaryCategory: "美妆护肤", secondaryCategory: "清洁卸妆", tags: ["产品实拍", "过程特写"], author: "徐振", duration: "00:15", size: "20.6 MB" },
+  { id: "m-104", name: "护肤产品瓶身旋转展示素材.mp4", cover: "./assets/prototype/luxury-skincare-set.jpg", status: "待审核", section: "素材", primaryCategory: "美妆护肤", secondaryCategory: "商品主图", tags: ["产品实拍", "瓶身展示"], author: "汤小真", duration: "00:10", size: "16.8 MB" },
+  { id: "m-105", name: "厨房台面清洁前后对比素材.mp4", cover: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=800&auto=format&fit=crop&q=80", status: "审核通过", section: "素材", primaryCategory: "日用百货", secondaryCategory: "清洁用品", tags: ["前后对比", "场景实拍"], author: "梁浩然", duration: "00:18", size: "24.3 MB" },
+  { id: "m-106", name: "户外通勤全身穿搭跟拍素材.mp4", cover: "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=800&auto=format&fit=crop&q=80", status: "未审核", section: "素材", primaryCategory: "服饰内衣", secondaryCategory: "模特展示", tags: ["街拍", "全身展示"], author: "刘弯", duration: "00:22", size: "29.1 MB" },
 ];
+
+const isVideoWork = (work: AssociatedWorkItem) => work.type === "成片" || work.type === "素材" || work.type === "video";
+
+const associatedWorkToPickerItem = (work: AssociatedWorkItem): VideoResourcePickerItem => {
+  const section = work.type === "素材" ? "素材" : "成片";
+  const [primaryCategory = section === "成片" ? "成片视频" : "视频素材", secondaryCategory = "未分类"] = (work.category || "").split("/").map((item) => item.trim()).filter(Boolean);
+  return {
+    id: work.id,
+    name: work.name,
+    cover: work.coverUrl || "./assets/prototype/beauty-promo-detail.jpg",
+    status: work.status || "审核通过",
+    section,
+    primaryCategory,
+    secondaryCategory,
+    tags: work.publicTags || [],
+    author: work.author || "当前用户",
+    duration: work.duration || "00:30",
+    size: work.size || "24.0 MB",
+  };
+};
 
 // Tag Groups definitions matching FinishedVideoDetailModal
 const CATEGORY_TREE = [
@@ -408,15 +439,6 @@ export default function ScriptDetailPage({
 
   // Link Works Modal (Bottom Action 2)
   const [showLinkWorkModal, setShowLinkWorkModal] = useState(false);
-  const [workSearchText, setWorkSearchText] = useState("");
-  const [selectedWorkIds, setSelectedWorkIds] = useState<string[]>(
-    currentScript.associatedWorks?.map(w => w.id) || []
-  );
-  const [workPage, setWorkPage] = useState(1);
-  const [workPageSize, setWorkPageSize] = useState(20);
-  const filteredWorkOptions = MOCK_FINISHED_VIDEOS_LIBRARY.filter(v => !workSearchText.trim() || v.title.includes(workSearchText.trim()));
-  const currentWorkPage = Math.min(workPage, Math.max(1, Math.ceil(filteredWorkOptions.length / workPageSize)));
-  const pagedWorkOptions = filteredWorkOptions.slice((currentWorkPage - 1) * workPageSize, currentWorkPage * workPageSize);
 
   // Other Modals
   const [showTasksModal, setShowTasksModal] = useState(false);
@@ -520,6 +542,34 @@ export default function ScriptDetailPage({
     updateCurrentScript({ associatedWorks: updatedWorks });
     setShowUploadVideoModal(false);
     showToast(`✅ 视频《${newWork.name}》上传成功，并已关联至当前脚本！`);
+  };
+
+  const libraryWorkIds = new Set(LINKABLE_WORK_LIBRARY.map((item) => item.id));
+  const linkableWorkOptions = [
+    ...LINKABLE_WORK_LIBRARY,
+    ...(currentScript.associatedWorks || [])
+      .filter((work) => isVideoWork(work) && !libraryWorkIds.has(work.id))
+      .map(associatedWorkToPickerItem),
+  ];
+
+  const confirmLinkedWorks = (selectedItems: VideoResourcePickerItem[]) => {
+    const associatedWorks: AssociatedWorkItem[] = selectedItems.map((item) => ({
+      id: item.id,
+      numericId: item.id.replace(/\D/g, "") || item.id,
+      name: item.name,
+      type: item.section,
+      coverUrl: item.cover,
+      status: item.status,
+      author: item.author,
+      createdAt: "2026-09-07",
+      category: `${item.primaryCategory} / ${item.secondaryCategory}`,
+      publicTags: item.tags,
+      duration: item.duration,
+      size: item.size,
+    }));
+    updateCurrentScript({ associatedWorks });
+    setShowLinkWorkModal(false);
+    showToast(associatedWorks.length ? `已关联 ${associatedWorks.length} 个视频` : "已清空关联作品");
   };
 
   // Render TaskDetailPage if selected
@@ -1291,7 +1341,7 @@ export default function ScriptDetailPage({
                   "8015-摄影/编导 (基础)",
                   "草本8015摄影师",
                   "达人标签",
-                  "8018-沈阳团队"
+                  "8018-沈阳分组"
                 ].map((item) => (
                   <button
                     key={item}
@@ -2504,7 +2554,7 @@ export default function ScriptDetailPage({
                           </div>
 
                           <div className="flex items-center gap-2">
-                            <span className="w-16 text-right text-xs text-slate-500 shrink-0">指定小组</span>
+                            <span className="w-16 text-right text-xs text-slate-500 shrink-0">指定分组</span>
                             <select
                               value={taskFormState.specifiedGroup}
                               onChange={(e) => setTaskFormState({ ...taskFormState, specifiedGroup: e.target.value })}
@@ -2723,97 +2773,15 @@ export default function ScriptDetailPage({
         </div>
       )}
 
-      {/* MODAL 8: Link Works Modal (关联作品 Modal - Standard Resource Picker) */}
+      {/* MODAL 8: Link Works Modal */}
       {showLinkWorkModal && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-xs animate-fade-in p-4 font-sans">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden text-slate-800 flex flex-col max-h-[85vh]">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-4 bg-[#7C3AED] rounded-full" />
-                <h3 className="text-sm font-extrabold text-slate-900">选择关联作品/成品视频</h3>
-              </div>
-              <button
-                onClick={() => setShowLinkWorkModal(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4 overflow-y-auto text-xs flex-1">
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="搜索作品名称或关键词..."
-                  value={workSearchText}
-                  onChange={(e) => { setWorkSearchText(e.target.value); setWorkPage(1); }}
-                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-purple-500 font-medium"
-                />
-              </div>
-
-              <div className="space-y-2">
-                {pagedWorkOptions.map((v) => {
-                  const isSelected = selectedWorkIds.includes(v.id);
-                  return (
-                    <div
-                      key={v.id}
-                      onClick={() => {
-                        if (isSelected) {
-                          setSelectedWorkIds(selectedWorkIds.filter(id => id !== v.id));
-                        } else {
-                          setSelectedWorkIds([...selectedWorkIds, v.id]);
-                        }
-                      }}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                        isSelected
-                          ? "bg-purple-50/80 border-purple-500 shadow-2xs"
-                          : "bg-white border-slate-200 hover:bg-slate-50"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${
-                          isSelected ? "bg-purple-600 border-purple-600 text-white" : "border-slate-300"
-                        }`}>
-                          {isSelected && <Check className="w-3.5 h-3.5" />}
-                        </div>
-                        <div>
-                          <div className="font-bold text-slate-900">{v.title}</div>
-                          <div className="text-[11px] text-slate-400 mt-0.5">作者: {v.author} • 时长: {v.duration}</div>
-                        </div>
-                      </div>
-                      <span className="px-2 py-0.5 bg-slate-100 text-slate-600 font-medium rounded text-[10px]">
-                        {v.category}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-              <AssetPagination total={filteredWorkOptions.length} page={currentWorkPage} pageSize={workPageSize} onPageChange={setWorkPage} onPageSizeChange={(value) => { setWorkPageSize(value); setWorkPage(1); }} />
-            </div>
-
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
-              <button onClick={() => setShowLinkWorkModal(false)} className="px-4 py-2 border border-slate-300 text-slate-600 font-bold rounded-xl text-xs hover:bg-slate-100">
-                取消
-              </button>
-              <button
-                onClick={() => {
-                  const newAssociated = MOCK_FINISHED_VIDEOS_LIBRARY.filter(v => selectedWorkIds.includes(v.id)).map(v => ({
-                    id: v.id,
-                    name: v.title,
-                    type: "video" as const
-                  }));
-                  updateCurrentScript({ associatedWorks: newAssociated });
-                  setShowLinkWorkModal(false);
-                  showToast("关联作品成功！");
-                }}
-                className="px-5 py-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold rounded-xl text-xs shadow-2xs cursor-pointer"
-              >
-                确定关联 ({selectedWorkIds.length})
-              </button>
-            </div>
-          </div>
-        </div>
+        <VideoResourcePickerModal
+          items={linkableWorkOptions}
+          initialSelectedIds={(currentScript.associatedWorks || []).filter(isVideoWork).map((work) => work.id)}
+          initialSection={activeWorkType === "素材" ? "素材" : "成片"}
+          onClose={() => setShowLinkWorkModal(false)}
+          onConfirm={confirmLinkedWorks}
+        />
       )}
 
       {/* MODAL 9: Associated Tasks Modal */}

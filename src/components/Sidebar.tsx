@@ -2,7 +2,6 @@ import React, { useRef, useState } from "react";
 import { 
   Home, 
   Video, 
-  Image as ImageIcon, 
   Layers, 
   FolderHeart, 
   CreditCard, 
@@ -67,7 +66,6 @@ export default function Sidebar({
     { id: "agent_creation", label: "Agent 创作", icon: Sparkles },
     { id: "video_remake", label: "爆款复刻", icon: RefreshCw },
     { id: "ai_video", label: "AI视频原料", icon: Video },
-    { id: "ai_image", label: "AI图片", icon: ImageIcon },
     { id: "canvas", label: "画布", icon: Layers },
     { id: "live_management", label: "直播管理", icon: Radio },
     { id: "task_collaboration", label: "任务协作", icon: ListTodo, badge: "协作" },
@@ -165,7 +163,7 @@ export default function Sidebar({
                   activeScreen === item.id || 
                   (item.id === "resources" && ["resources", "materials", "finished_videos"].includes(activeScreen)) ||
                   (item.id === "quick_creation" && [
-                    "detail_set", "enhance", "watermark", "subtitle", "fission"
+                    "enhance", "watermark", "subtitle"
                   ].includes(activeScreen))
                 );
 

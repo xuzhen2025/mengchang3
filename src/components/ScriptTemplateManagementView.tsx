@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Plus,
   X,
@@ -14,24 +14,15 @@ import {
   Clock,
   ChevronDown
 } from "lucide-react";
-
-// 字段定义
-export interface TemplateFieldItem {
-  id: string;
-  title: string;
-  type: string; // "文本" | "单选" | "多选" | "图片" | "附件" | "链接" | "数字" | "时间"
-  displayMode: "column" | "row"; // "列向展示" | "横向展示"
-  placeholder?: string; // 提示语
-  options?: string[]; // 单选/多选的选项列表
-}
-
-// 模板定义
-export interface ScriptTemplateItem {
-  id: string;
-  title: string;
-  enabled: boolean;
-  fields: TemplateFieldItem[];
-}
+import {
+  loadScriptTemplates,
+  saveScriptTemplates,
+  ScriptTemplate as ScriptTemplateItem,
+  ScriptTemplateField as TemplateFieldItem,
+  ScriptTemplateFieldType,
+  subscribeToScriptTemplates,
+} from "../data/scriptTemplates";
+import OverlayPortal from "./overlays/OverlayPortal";
 
 export default function ScriptTemplateManagementView() {
   // Toast 提示框
@@ -43,112 +34,35 @@ export default function ScriptTemplateManagementView() {
     }, 2500);
   };
 
-  // 模拟模板初始数据
-  const [templates, setTemplates] = useState<ScriptTemplateItem[]>([
-    {
-      id: "tpl-1",
-      title: "默认模板",
-      enabled: true,
-      fields: [
-        {
-          id: "f-1",
-          title: "画面时间轴",
-          type: "时间",
-          displayMode: "column",
-          placeholder: "请录入视频分镜秒数",
-        },
-        {
-          id: "f-2",
-          title: "台词/对白",
-          type: "文本",
-          displayMode: "column",
-          placeholder: "请输入口播台词或旁白解说",
-        },
-        {
-          id: "f-3",
-          title: "画面镜头",
-          type: "图片",
-          displayMode: "column",
-          placeholder: "请上传分镜景别或画面缩略图",
-        },
-        {
-          id: "f-4",
-          title: "画面注意点",
-          type: "文本",
-          displayMode: "column",
-          placeholder: "请填写拍摄或剪辑要点",
-        },
-        {
-          id: "f-5",
-          title: "参考视频",
-          type: "链接",
-          displayMode: "row",
-          placeholder: "粘贴对标视频链接",
-        },
-        {
-          id: "f-6",
-          title: "备注",
-          type: "多选",
-          displayMode: "row",
-          placeholder: "请勾选相关标记",
-          options: ["重点推荐", "需AI配音", "需要花字特效"],
-        },
-      ],
-    },
-    {
-      id: "tpl-2",
-      title: "ces",
-      enabled: true,
-      fields: [
-        {
-          id: "f-21",
-          title: "黄金3秒",
-          type: "文本",
-          displayMode: "column",
-          placeholder: "输入吸引眼球的开头文案",
-        },
-        {
-          id: "f-22",
-          title: "产品展示",
-          type: "图片",
-          displayMode: "column",
-          placeholder: "产品细节图",
-        },
-      ],
-    },
-    {
-      id: "tpl-3",
-      title: "20231125脚本模板12",
-      enabled: true,
-      fields: [
-        {
-          id: "f-31",
-          title: "场景痛点",
-          type: "文本",
-          displayMode: "column",
-          placeholder: "描述用户痛点场景",
-        },
-      ],
-    },
-    {
-      id: "tpl-4",
-      title: "编辑模板",
-      enabled: true,
-      fields: [
-        {
-          id: "f-41",
-          title: "解说文案",
-          type: "文本",
-          displayMode: "column",
-          placeholder: "解说文本",
-        },
-      ],
-    },
-  ]);
+  const [templates, setTemplates] = useState<ScriptTemplateItem[]>(loadScriptTemplates);
+  const templatesRef = useRef(templates);
 
   // 当前选中模板 ID
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("tpl-1");
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(() => loadScriptTemplates()[0]?.id || "");
   const currentTemplate = templates.find((t) => t.id === selectedTemplateId) || templates[0];
+
+  useEffect(() => {
+    templatesRef.current = templates;
+  }, [templates]);
+
+  useEffect(() => subscribeToScriptTemplates(() => {
+    const next = loadScriptTemplates();
+    templatesRef.current = next;
+    setTemplates(next);
+  }), []);
+
+  useEffect(() => {
+    if (!templates.some((template) => template.id === selectedTemplateId)) {
+      setSelectedTemplateId(templates[0]?.id || "");
+    }
+  }, [selectedTemplateId, templates]);
+
+  const commitTemplates = (updater: (current: ScriptTemplateItem[]) => ScriptTemplateItem[]) => {
+    const next = updater(templatesRef.current);
+    templatesRef.current = next;
+    setTemplates(next);
+    saveScriptTemplates(next);
+  };
 
   // -------------------------- 模板 Modal 状态 --------------------------
   // 新增模板 Modal
@@ -159,16 +73,21 @@ export default function ScriptTemplateManagementView() {
   const [editingTemplate, setEditingTemplate] = useState<ScriptTemplateItem | null>(null);
   const [formEditTemplateTitle, setFormEditTemplateTitle] = useState("");
 
+  // 编辑列向区域名称 Modal
+  const [editingColumnGroupTemplate, setEditingColumnGroupTemplate] = useState<ScriptTemplateItem | null>(null);
+  const [formColumnGroupTitle, setFormColumnGroupTitle] = useState("");
+  const [columnGroupTitleError, setColumnGroupTitleError] = useState("");
+
   // 删除模板 Modal
   const [deletingTemplate, setDeletingTemplate] = useState<ScriptTemplateItem | null>(null);
 
   // -------------------------- 字段 Modal & Popover 状态 --------------------------
   // Popover 菜单 (在左侧插入一列/在右侧插入一列，或在上方插入一行/在下方插入一行)
   const [activeMenuFieldId, setActiveMenuFieldId] = useState<string | null>(null);
-  const [menuDirectionMode, setMenuDirectionMode] = useState<"column" | "row">("column");
 
   // 新增字段 Modal
   const [isAddFieldModalOpen, setIsAddFieldModalOpen] = useState(false);
+  const [editingField, setEditingField] = useState<TemplateFieldItem | null>(null);
   const [insertConfig, setInsertConfig] = useState<{
     targetFieldId?: string;
     position?: "left" | "right" | "top" | "bottom";
@@ -177,7 +96,7 @@ export default function ScriptTemplateManagementView() {
 
   // 字段表单状态 (完全对齐截图 6)
   const [formFieldTitle, setFormFieldTitle] = useState("");
-  const [formFieldType, setFormFieldType] = useState("单选");
+  const [formFieldType, setFormFieldType] = useState<ScriptTemplateFieldType>("单选");
   const [formFieldPlaceholder, setFormFieldPlaceholder] = useState("");
   const [formFieldOptions, setFormFieldOptions] = useState<string[]>(["选项1"]);
   const [formFieldErrors, setFormFieldErrors] = useState<{ title?: string; options?: string }>({});
@@ -193,243 +112,213 @@ export default function ScriptTemplateManagementView() {
   // 提交新增模板
   const handleAddTemplateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formTemplateTitle.trim()) {
+    const title = formTemplateTitle.trim();
+    if (!title) {
       showToast("请输入模板标题");
+      return;
+    }
+    if (templatesRef.current.some((template) => template.title === title)) {
+      showToast("模板标题不能重复");
       return;
     }
 
     const newTemplate: ScriptTemplateItem = {
       id: `tpl-${Date.now()}`,
-      title: formTemplateTitle.trim(),
+      title,
+      columnGroupTitle: title,
       enabled: true,
-      fields: [
-        {
-          id: `f-${Date.now()}-1`,
-          title: "画面镜头",
-          type: "图片",
-          displayMode: "column",
-          placeholder: "请上传镜头画面",
-        },
-        {
-          id: `f-${Date.now()}-2`,
-          title: "台词/对白",
-          type: "文本",
-          displayMode: "column",
-          placeholder: "请录入对白内容",
-        },
-      ],
+      fields: [],
     };
 
-    setTemplates((prev) => [...prev, newTemplate]);
+    commitTemplates((current) => [...current, newTemplate]);
     setSelectedTemplateId(newTemplate.id);
     setIsAddTemplateModalOpen(false);
     showToast(`新增脚本模板 [${newTemplate.title}] 成功！`);
   };
 
-  // 打开编辑模板 Modal
   const handleOpenEditTemplateModal = (tpl: ScriptTemplateItem, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
+    e?.stopPropagation();
     setEditingTemplate(tpl);
     setFormEditTemplateTitle(tpl.title);
   };
 
-  // 提交编辑模板
   const handleEditTemplateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTemplate) return;
-    if (!formEditTemplateTitle.trim()) {
+    const title = formEditTemplateTitle.trim();
+    if (!title) {
       showToast("模板标题不能为空");
       return;
     }
+    if (templatesRef.current.some((template) => template.id !== editingTemplate.id && template.title === title)) {
+      showToast("模板标题不能重复");
+      return;
+    }
 
-    setTemplates((prev) =>
-      prev.map((t) =>
-        t.id === editingTemplate.id ? { ...t, title: formEditTemplateTitle.trim() } : t
-      )
-    );
-
-    showToast(`修改脚本模板 [${formEditTemplateTitle.trim()}] 成功！`);
+    commitTemplates((current) => current.map((template) => template.id === editingTemplate.id ? { ...template, title } : template));
+    showToast(`修改脚本模板 [${title}] 成功！`);
     setEditingTemplate(null);
   };
 
-  // 切换模板开关（开启/关闭）
-  const handleToggleTemplateEnabled = (tplId: string, e: React.MouseEvent) => {
+  const handleOpenEditColumnGroupTitle = (template: ScriptTemplateItem, e: React.MouseEvent) => {
     e.stopPropagation();
-    setTemplates((prev) =>
-      prev.map((t) => {
-        if (t.id === tplId) {
-          const nextState = !t.enabled;
-          showToast(nextState ? `已启用脚本模板 [${t.title}]` : `已停用脚本模板 [${t.title}]`);
-          return { ...t, enabled: nextState };
-        }
-        return t;
-      })
-    );
+    setEditingColumnGroupTemplate(template);
+    setFormColumnGroupTitle(template.columnGroupTitle);
+    setColumnGroupTitleError("");
   };
 
-  // 打开删除模板 Modal
+  const handleEditColumnGroupTitleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingColumnGroupTemplate) return;
+    const columnGroupTitle = formColumnGroupTitle.trim();
+    if (!columnGroupTitle) {
+      setColumnGroupTitleError("列向区域名称不能为空");
+      return;
+    }
+
+    commitTemplates((current) => current.map((template) => template.id === editingColumnGroupTemplate.id
+      ? { ...template, columnGroupTitle }
+      : template));
+    setEditingColumnGroupTemplate(null);
+    setColumnGroupTitleError("");
+    showToast(`列向区域名称已修改为 [${columnGroupTitle}]`);
+  };
+
+  const handleToggleTemplateEnabled = (tplId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const target = templatesRef.current.find((template) => template.id === tplId);
+    if (!target) return;
+    commitTemplates((current) => current.map((template) => template.id === tplId ? { ...template, enabled: !template.enabled } : template));
+    showToast(target.enabled ? `已停用脚本模板 [${target.title}]` : `已启用脚本模板 [${target.title}]`);
+  };
+
   const handleOpenDeleteTemplateModal = (tpl: ScriptTemplateItem, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (templatesRef.current.length <= 1) {
+      showToast("至少保留一个脚本模板");
+      return;
+    }
     setDeletingTemplate(tpl);
   };
 
-  // 确认删除模板
   const handleConfirmDeleteTemplate = () => {
     if (!deletingTemplate) return;
     const targetTitle = deletingTemplate.title;
-    const filtered = templates.filter((t) => t.id !== deletingTemplate.id);
-    setTemplates(filtered);
-    if (selectedTemplateId === deletingTemplate.id && filtered.length > 0) {
-      setSelectedTemplateId(filtered[0].id);
-    }
+    const filtered = templatesRef.current.filter((template) => template.id !== deletingTemplate.id);
+    commitTemplates(() => filtered);
+    if (selectedTemplateId === deletingTemplate.id) setSelectedTemplateId(filtered[0]?.id || "");
     setDeletingTemplate(null);
     showToast(`已删除脚本模板 [${targetTitle}]`);
   };
 
-  // -------------------------- 字段管理 handler --------------------------
-
-  // 点击字段上的 + 按钮打开浮层菜单
-  const handleOpenInsertMenu = (
-    fieldId: string,
-    displayMode: "column" | "row",
-    e: React.MouseEvent
-  ) => {
-    e.stopPropagation();
-    if (activeMenuFieldId === fieldId) {
-      setActiveMenuFieldId(null);
-    } else {
-      setActiveMenuFieldId(fieldId);
-      setMenuDirectionMode(displayMode);
-    }
+  const resetFieldForm = (field?: TemplateFieldItem) => {
+    setFormFieldTitle(field?.title || "");
+    setFormFieldType(field?.type || "单选");
+    setFormFieldPlaceholder(field?.placeholder || "");
+    setFormFieldOptions(field?.options?.length ? [...field.options] : [""]);
+    setFormFieldErrors({});
   };
 
-  // 从浮层菜单选择：在左侧/右侧插入一列，或在上方/下方插入一行
+  const handleOpenInsertMenu = (fieldId: string, _displayMode: "column" | "row", e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActiveMenuFieldId((current) => current === fieldId ? null : fieldId);
+  };
+
   const handleSelectInsertDirection = (position: "left" | "right" | "top" | "bottom") => {
-    const isCol = position === "left" || position === "right";
+    const isColumn = position === "left" || position === "right";
     setInsertConfig({
       targetFieldId: activeMenuFieldId || undefined,
       position,
-      displayMode: isCol ? "column" : "row",
+      displayMode: isColumn ? "column" : "row",
     });
-
-    // 重置字段表单
-    setFormFieldTitle("");
-    setFormFieldType("单选");
-    setFormFieldPlaceholder("");
-    setFormFieldOptions([""]);
-    setFormFieldErrors({});
-
+    setEditingField(null);
+    resetFieldForm();
     setActiveMenuFieldId(null);
     setIsAddFieldModalOpen(true);
   };
 
-  // 直接点击全局 + 按钮新增字段
   const handleOpenDirectAddField = (displayMode: "column" | "row") => {
     setInsertConfig({
       position: displayMode === "column" ? "right" : "bottom",
       displayMode,
     });
-    setFormFieldTitle("");
-    setFormFieldType("单选");
-    setFormFieldPlaceholder("");
-    setFormFieldOptions([""]);
-    setFormFieldErrors({});
+    setEditingField(null);
+    resetFieldForm();
     setIsAddFieldModalOpen(true);
   };
 
-  // 添加选项
-  const handleAddOption = () => {
-    setFormFieldOptions((prev) => [...prev, ""]);
+  const handleOpenEditField = (field: TemplateFieldItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingField(field);
+    setInsertConfig({ displayMode: field.displayMode });
+    resetFieldForm(field);
+    setIsAddFieldModalOpen(true);
   };
 
-  const handleUpdateOption = (index: number, val: string) => {
-    setFormFieldOptions((prev) => {
-      const next = [...prev];
-      next[index] = val;
-      return next;
-    });
-  };
+  const handleAddOption = () => setFormFieldOptions((current) => [...current, ""]);
+  const handleUpdateOption = (index: number, value: string) => setFormFieldOptions((current) => current.map((option, optionIndex) => optionIndex === index ? value : option));
+  const handleRemoveOption = (index: number) => setFormFieldOptions((current) => current.length === 1 ? current : current.filter((_, optionIndex) => optionIndex !== index));
 
-  // 删除单项字段
   const handleDeleteField = (fieldId: string, fieldTitle: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setTemplates((prev) =>
-      prev.map((t) => {
-        if (t.id === currentTemplate.id) {
-          return {
-            ...t,
-            fields: t.fields.filter((f) => f.id !== fieldId),
-          };
-        }
-        return t;
-      })
-    );
+    if (!currentTemplate) return;
+    commitTemplates((current) => current.map((template) => template.id === currentTemplate.id ? { ...template, fields: template.fields.filter((field) => field.id !== fieldId) } : template));
     showToast(`已删除字段 [${fieldTitle}]`);
   };
 
-  // 提交新增字段
   const handleAddFieldSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentTemplate) return;
     const errors: { title?: string; options?: string } = {};
+    const title = formFieldTitle.trim();
+    const options = formFieldOptions.map((option) => option.trim()).filter(Boolean);
 
-    if (!formFieldTitle.trim()) {
-      errors.title = "请输入名称";
+    if (!title) errors.title = "请输入名称";
+    if ((formFieldType === "单选" || formFieldType === "多选") && (!options.length || formFieldOptions.some((option) => !option.trim()))) {
+      errors.options = "选项名称不能为空";
     }
-
-    if (
-      (formFieldType === "单选" || formFieldType === "多选") &&
-      formFieldOptions.some((o) => !o.trim())
-    ) {
-      errors.options = "名称不能为空";
-    }
-
-    if (Object.keys(errors).length > 0) {
+    if (Object.keys(errors).length) {
       setFormFieldErrors(errors);
       return;
     }
 
-    const newField: TemplateFieldItem = {
-      id: `f-${Date.now()}`,
-      title: formFieldTitle.trim(),
+    const field: TemplateFieldItem = {
+      id: editingField?.id || `f-${Date.now()}`,
+      title,
       type: formFieldType,
-      displayMode: insertConfig.displayMode,
+      displayMode: editingField?.displayMode || insertConfig.displayMode,
       placeholder: formFieldPlaceholder.trim() || undefined,
-      options:
-        formFieldType === "单选" || formFieldType === "多选"
-          ? formFieldOptions.filter((o) => o.trim().length > 0)
-          : undefined,
+      options: formFieldType === "单选" || formFieldType === "多选" ? options : undefined,
     };
 
-    // 插入逻辑：放到当前模板的 fields 数组对应位置
-    setTemplates((prev) =>
-      prev.map((t) => {
-        if (t.id === currentTemplate.id) {
-          const currentFields = [...t.fields];
-          if (insertConfig.targetFieldId && insertConfig.position) {
-            const idx = currentFields.findIndex((f) => f.id === insertConfig.targetFieldId);
-            if (idx !== -1) {
-              const insertIdx =
-                insertConfig.position === "left" || insertConfig.position === "top"
-                  ? idx
-                  : idx + 1;
-              currentFields.splice(insertIdx, 0, newField);
-              return { ...t, fields: currentFields };
-            }
-          }
-          // 默认 append 到同类型尾部
-          return { ...t, fields: [...currentFields, newField] };
+    commitTemplates((current) => current.map((template) => {
+      if (template.id !== currentTemplate.id) return template;
+      if (editingField) return { ...template, fields: template.fields.map((item) => item.id === editingField.id ? field : item) };
+
+      const fields = [...template.fields];
+      if (insertConfig.targetFieldId && insertConfig.position) {
+        const targetIndex = fields.findIndex((item) => item.id === insertConfig.targetFieldId);
+        if (targetIndex >= 0) {
+          const insertIndex = insertConfig.position === "left" || insertConfig.position === "top" ? targetIndex : targetIndex + 1;
+          fields.splice(insertIndex, 0, field);
+          return { ...template, fields };
         }
-        return t;
-      })
-    );
+      }
+
+      const sameModeIndexes = fields.map((item, index) => item.displayMode === field.displayMode ? index : -1).filter((index) => index >= 0);
+      const insertIndex = sameModeIndexes.length ? sameModeIndexes[sameModeIndexes.length - 1] + 1 : fields.length;
+      fields.splice(insertIndex, 0, field);
+      return { ...template, fields };
+    }));
 
     setIsAddFieldModalOpen(false);
-    showToast(`新字段 [${newField.title}] 创建成功！`);
+    setEditingField(null);
+    showToast(editingField ? `字段 [${field.title}] 修改成功！` : `新字段 [${field.title}] 创建成功！`);
   };
 
   // 按 displayMode 分类字段
-  const columnFields = currentTemplate.fields.filter((f) => f.displayMode === "column");
-  const rowFields = currentTemplate.fields.filter((f) => f.displayMode === "row");
+  const columnFields = currentTemplate?.fields.filter((f) => f.displayMode === "column") || [];
+  const rowFields = currentTemplate?.fields.filter((f) => f.displayMode === "row") || [];
 
   return (
     <div
@@ -567,19 +456,36 @@ export default function ScriptTemplateManagementView() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3.5">
-              {columnFields.map((field) => (
-                <div
-                  key={field.id}
-                  className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs group/card relative flex flex-col"
+            <div className="flex items-stretch gap-3.5">
+              <div className="flex w-12 shrink-0 flex-col items-center justify-center rounded-lg border border-violet-200 bg-violet-100/70 px-2 py-3 text-slate-800">
+                <span className="flex flex-1 items-center justify-center text-xs font-bold [writing-mode:vertical-rl]">
+                  {currentTemplate.columnGroupTitle}
+                </span>
+                <button
+                  type="button"
+                  onClick={(event) => handleOpenEditColumnGroupTitle(currentTemplate, event)}
+                  title="编辑列向区域名称"
+                  className="mt-2 rounded p-1 text-[#7C3AED] hover:bg-violet-200/70"
                 >
+                  <Edit3 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <div className="grid min-w-0 flex-1 grid-cols-1 gap-3.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+                {columnFields.map((field) => (
+                  <div
+                    key={field.id}
+                    className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs group/card relative flex flex-col"
+                  >
                   {/* 列字段 Header */}
                   <div className="px-3 py-2 bg-purple-50/50 border-b border-slate-100 flex items-center justify-between">
                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
                       <span className="text-xs font-bold text-slate-800 truncate">
                         {field.title}
                       </span>
-                      <Edit3 className="w-3 h-3 text-[#7C3AED] opacity-70 cursor-pointer shrink-0" />
+                      <button type="button" onClick={(event) => handleOpenEditField(field, event)} title="编辑字段" className="shrink-0 rounded p-0.5 text-[#7C3AED] opacity-70 hover:bg-violet-100 hover:opacity-100">
+                        <Edit3 className="w-3 h-3" />
+                      </button>
                     </div>
 
                     {/* 右侧：删除 + (+) 插入按钮 (对齐截图 4) */}
@@ -634,18 +540,19 @@ export default function ScriptTemplateManagementView() {
                       </span>
                     )}
                   </div>
-                </div>
-              ))}
+                  </div>
+                ))}
 
-              {/* 尾部 (+) 按钮卡片 (完全对齐截图 6 右上方单独 + 按钮) */}
-              <div
-                onClick={() => handleOpenDirectAddField("column")}
-                className="border-2 border-dashed border-slate-200 hover:border-purple-300 rounded-xl p-4 flex flex-col items-center justify-center min-h-[120px] text-slate-400 hover:text-[#7C3AED] cursor-pointer transition-all bg-slate-50/30 hover:bg-purple-50/20"
-              >
-                <div className="w-7 h-7 rounded-full border border-current flex items-center justify-center font-bold text-sm">
-                  +
+                {/* 尾部 (+) 按钮卡片 (完全对齐截图 6 右上方单独 + 按钮) */}
+                <div
+                  onClick={() => handleOpenDirectAddField("column")}
+                  className="border-2 border-dashed border-slate-200 hover:border-purple-300 rounded-xl p-4 flex flex-col items-center justify-center min-h-[120px] text-slate-400 hover:text-[#7C3AED] cursor-pointer transition-all bg-slate-50/30 hover:bg-purple-50/20"
+                >
+                  <div className="w-7 h-7 rounded-full border border-current flex items-center justify-center font-bold text-sm">
+                    +
+                  </div>
+                  <span className="text-xs font-bold mt-1.5">新增列</span>
                 </div>
-                <span className="text-xs font-bold mt-1.5">新增列</span>
               </div>
             </div>
           </div>
@@ -674,7 +581,9 @@ export default function ScriptTemplateManagementView() {
                   <div className="px-4 py-2.5 bg-purple-50/50 border-b border-slate-100 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-slate-800">{field.title}</span>
-                      <Edit3 className="w-3.5 h-3.5 text-[#7C3AED] opacity-70 cursor-pointer" />
+                      <button type="button" onClick={(event) => handleOpenEditField(field, event)} title="编辑字段" className="rounded p-0.5 text-[#7C3AED] opacity-70 hover:bg-violet-100 hover:opacity-100">
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
 
                     {/* 右侧：删除 + (+) 插入按钮 (对齐截图 5) */}
@@ -861,6 +770,68 @@ export default function ScriptTemplateManagementView() {
         </div>
       )}
 
+      {editingColumnGroupTemplate && (
+        <OverlayPortal layer="dialog" className="fixed inset-0 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <div className="flex items-center gap-2">
+                <span className="h-4 w-1 rounded-full bg-[#7C3AED]" />
+                <h3 className="text-sm font-bold text-slate-800">编辑列向区域名称</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingColumnGroupTemplate(null);
+                  setColumnGroupTitleError("");
+                }}
+                title="关闭"
+                className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditColumnGroupTitleSubmit} className="space-y-6 p-6">
+              <div className="flex items-start gap-4">
+                <label className="w-24 shrink-0 pt-2 text-right text-xs font-bold text-slate-700">
+                  <span className="mr-1 text-rose-500">*</span>区域名称
+                </label>
+                <div className="min-w-0 flex-1 space-y-1">
+                  <input
+                    type="text"
+                    value={formColumnGroupTitle}
+                    onChange={(event) => {
+                      setFormColumnGroupTitle(event.target.value);
+                      if (event.target.value.trim()) setColumnGroupTitleError("");
+                    }}
+                    placeholder="请输入列向区域名称"
+                    className={`w-full rounded-lg border bg-white px-3.5 py-2 text-xs font-medium text-slate-800 outline-hidden focus:ring-1 ${columnGroupTitleError ? "border-rose-500 focus:border-rose-500 focus:ring-rose-100" : "border-purple-300 focus:border-[#7C3AED] focus:ring-purple-200"}`}
+                    autoFocus
+                  />
+                  {columnGroupTitleError && <p className="text-[11px] font-medium text-rose-500">{columnGroupTitleError}</p>}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingColumnGroupTemplate(null);
+                    setColumnGroupTitleError("");
+                  }}
+                  className="rounded-lg border border-slate-200 px-6 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  取消
+                </button>
+                <button type="submit" className="rounded-lg bg-[#7C3AED] px-6 py-1.5 text-xs font-bold text-white shadow-2xs transition-colors hover:bg-purple-700">
+                  确定
+                </button>
+              </div>
+            </form>
+          </div>
+        </OverlayPortal>
+      )}
+
       {/* ========================================================================= */}
       {/* 模态框 3：删除模板确认                                                     */}
       {/* ========================================================================= */}
@@ -964,7 +935,7 @@ export default function ScriptTemplateManagementView() {
                 </label>
                 <select
                   value={formFieldType}
-                  onChange={(e) => setFormFieldType(e.target.value)}
+                  onChange={(e) => setFormFieldType(e.target.value as ScriptTemplateFieldType)}
                   className="flex-1 px-3.5 py-2 bg-white border border-slate-200 focus:border-[#7C3AED] focus:ring-1 focus:ring-purple-200 rounded-lg text-xs outline-hidden font-medium text-slate-800 cursor-pointer"
                 >
                   <option value="单选">单选</option>

@@ -243,7 +243,7 @@ export default function PlatformTagsView({ showToast }: PlatformTagsViewProps) {
   // Top level platforms: 巨量千川 | 巨量广告
   const [platform, setPlatform] = useState<"qianchuan" | "oceanengine">("qianchuan");
 
-  // Dimension level: 汇总 | 团队 | 分组 | 个人 | 广告账户
+  // Dimension level: 汇总 | 部门 | 分组 | 个人 | 广告账户
   const [dimension, setDimension] = useState<"summary" | "team" | "group" | "user" | "account">("summary");
 
   // Filters

@@ -63,7 +63,7 @@ export const PUBLIC_TAG_GROUPS: Record<string, string[]> = {
 
 export const PERSONAL_TAG_GROUPS: Record<string, string[]> = {
   "常用精选": ["精选爆款", "首图必选", "高点击率"],
-  "团队必用": ["A/B测试", "主推图", "大促备用"]
+  "部门必用": ["A/B测试", "主推图", "大促备用"]
 };
 
 export interface OperationLogItem {
@@ -110,7 +110,7 @@ export default function ImageDetailView({
   const [publicPresetTab, setPublicPresetTab] = useState<"我的预设" | "分享给我">("我的预设");
 
   // Personal Tags Modal States
-  const [personalTags, setPersonalTags] = useState<string[]>(["常用精选", "团队必用"]);
+  const [personalTags, setPersonalTags] = useState<string[]>(["常用精选", "部门必用"]);
   const [showPersonalTagModal, setShowPersonalTagModal] = useState(false);
   const [personalGroupSearch, setPersonalGroupSearch] = useState("");
   const [personalSubSearch, setPersonalSubSearch] = useState("");
@@ -272,7 +272,7 @@ export default function ImageDetailView({
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 text-xs sm:text-sm">
-                    {item.author || "致上运营"} / 默认分组 / 默认团队
+                    {item.author || "致上运营"} / 默认部门 / 默认分组
                   </h3>
                   <p className="text-[11px] text-slate-400 mt-0.5">发布时间：2025-05-26 12:25:11</p>
                 </div>
@@ -481,18 +481,18 @@ export default function ImageDetailView({
               <div className="flex items-start justify-between pt-1 border-t border-slate-200/60">
                 <span className="text-slate-400 shrink-0 pt-0.5">可查看时间:</span>
                 <div className="text-right space-y-1 text-slate-600 font-medium">
-                  <div>小组成员 / 不限</div>
-                  <div>团队成员 / 不限</div>
-                  <div>其他团队 / 2025-06-25 12:25:11</div>
+                  <div>分组成员 / 不限</div>
+                  <div>部门成员 / 不限</div>
+                  <div>其他部门 / 2025-06-25 12:25:11</div>
                 </div>
               </div>
 
               <div className="flex items-start justify-between pt-1 border-t border-slate-200/60">
                 <span className="text-slate-400 shrink-0 pt-0.5">可下载时间:</span>
                 <div className="text-right space-y-1 text-slate-600 font-medium">
-                  <div>小组成员 / 不限</div>
-                  <div>团队成员 / 不限</div>
-                  <div>其他团队 / 2025-06-02 12:25:11</div>
+                  <div>分组成员 / 不限</div>
+                  <div>部门成员 / 不限</div>
+                  <div>其他部门 / 2025-06-02 12:25:11</div>
                 </div>
               </div>
 

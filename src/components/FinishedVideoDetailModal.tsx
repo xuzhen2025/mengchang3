@@ -2,6 +2,14 @@ import React, { useState, useRef, useEffect } from "react";
 import LinkScriptModal from "./LinkScriptModal";
 import ReferencedVideosProduced from "./ReferencedVideosProduced";
 import AssetPagination from "./AssetPagination";
+import VideoResourcePickerModal, { VideoResourcePickerItem } from "./VideoResourcePickerModal";
+import {
+  AdAccountPushWorkspace,
+  PushRecordsModal,
+  advanceAdPushRecords,
+  createDefaultAdPushRecords,
+  type AdPushRecord,
+} from "./AdAccountPush";
 import {
   X,
   Play,
@@ -45,10 +53,8 @@ import {
   Smartphone,
   Monitor,
   ShoppingCart,
-  ShieldCheck,
   Box,
   ChevronDown,
-  ChevronUp,
   Check,
   Info,
   Folder,
@@ -195,108 +201,6 @@ function MengchangWingedLogo({ className = "w-9 h-6" }: { className?: string }) 
   );
 }
 
-// Employee Permission Info Interface & Mock Data
-export interface EmployeePermissionInfo {
-  id: string;
-  name: string;
-  company?: string;
-  department: string;
-  group: string;
-  account: string;
-  phone: string;
-  isAdmin: boolean;
-  role: string;
-  observedGroups: string;
-  permissions: {
-    role: { view: boolean; download: boolean; copyToCapCut: boolean; push: boolean };
-    category: { view: boolean; download: boolean; copyToCapCut: boolean; push: boolean };
-    video: { view: boolean; download: boolean; copyToCapCut: boolean; push: boolean };
-  };
-}
-
-export const SAMPLE_EMPLOYEES: EmployeePermissionInfo[] = [
-  {
-    id: "1",
-    name: "邓彦晨",
-    company: "梦畅AIGC",
-    department: "信息流投放部",
-    group: "视频号投流组",
-    account: "xmsmdyc01",
-    phone: "17199928737",
-    isAdmin: true,
-    role: "部门主管",
-    observedGroups: "视频号投流组 + 摄影特组 + 剪辑一组",
-    permissions: {
-      role: { view: true, download: true, copyToCapCut: true, push: true },
-      category: { view: true, download: true, copyToCapCut: true, push: true },
-      video: { view: true, download: true, copyToCapCut: true, push: true },
-    }
-  },
-  {
-    id: "2",
-    name: "蔡卓良",
-    company: "梦畅AIGC",
-    department: "信息流投放部",
-    group: "快手投流组",
-    account: "xmsmczl02",
-    phone: "13800138000",
-    isAdmin: false,
-    role: "高级投手",
-    observedGroups: "快手投流组 + 商务组",
-    permissions: {
-      role: { view: true, download: true, copyToCapCut: true, push: true },
-      category: { view: true, download: true, copyToCapCut: true, push: true },
-      video: { view: true, download: true, copyToCapCut: true, push: true },
-    }
-  },
-  {
-    id: "3",
-    name: "李云",
-    company: "梦畅AIGC",
-    department: "电商运营部",
-    group: "天猫/拼多多组",
-    account: "xmsmly03",
-    phone: "13911223344",
-    isAdmin: false,
-    role: "编导",
-    observedGroups: "天猫/拼多多组 + 剪辑二组",
-    permissions: {
-      role: { view: true, download: true, copyToCapCut: true, push: false },
-      category: { view: true, download: true, copyToCapCut: true, push: false },
-      video: { view: true, download: true, copyToCapCut: true, push: false },
-    }
-  },
-  {
-    id: "4",
-    name: "王强",
-    company: "梦畅AIGC",
-    department: "商务与直播部",
-    group: "商务组",
-    account: "xmsmwq04",
-    phone: "15866778899",
-    isAdmin: false,
-    role: "商务主管",
-    observedGroups: "商务组 + 直播运营组",
-    permissions: {
-      role: { view: true, download: false, copyToCapCut: false, push: true },
-      category: { view: true, download: false, copyToCapCut: false, push: true },
-      video: { view: true, download: false, copyToCapCut: false, push: true },
-    }
-  }
-];
-
-const MANUAL_MATERIAL_OPTIONS = [
-  { id: "17894239801", name: "纯朴洁面油10.6爆款框架高转化卡点V1.mp4" },
-  { id: "17894239802", name: "法式高奢珠宝质感展示分镜02.mp4" }
-];
-
-const MONITOR_ACCOUNT_OPTIONS = [
-  { id: "1815150855223564", name: "ell化妆品旗舰店-UDs-1" },
-  { id: "1788423177165833", name: "厦门十梦俪_ELL卸妆油1_童欣园" },
-  { id: "1892014812398112", name: "纯朴品牌美妆小店" },
-  { id: "1902847192837192", name: "巨量千川爆款极速投放A组" }
-];
-
 export const CATEGORY_TREE = [
   { name: "彩妆香水", subs: ["唇膏口红", "香水底妆", "眼影彩盘", "卸妆洁面"] },
   { name: "宠物食品", subs: ["猫粮", "狗粮", "零食罐头", "宠物保健品"] },
@@ -349,6 +253,20 @@ interface FinishedVideoDetailModalProps {
   initialTagModal?: "public" | "personal";
   isAdminMode?: boolean;
 }
+
+const AD_PUSH_RECORDS_STORAGE_KEY = "mengchang-ad-push-records-v1";
+
+const loadAdPushRecords = (): AdPushRecord[] => {
+  if (typeof window === "undefined") return createDefaultAdPushRecords();
+  try {
+    const stored = window.sessionStorage.getItem(AD_PUSH_RECORDS_STORAGE_KEY);
+    if (!stored) return createDefaultAdPushRecords();
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed) ? parsed : createDefaultAdPushRecords();
+  } catch {
+    return createDefaultAdPushRecords();
+  }
+};
 
 // Mock campaign plans data
 interface CampaignPlan {
@@ -553,24 +471,6 @@ export const INITIAL_PROJECT_FILES: ProjectFileItem[] = [
   }
 ];
 
-export interface LinkedAdMaterialItem {
-  id: string;
-  accountName: string;
-  accountId: string;
-  media: string;
-  assetId: string;
-  ctr: string;
-  likes: number;
-  comments: number;
-  shares: number;
-  linkType: "系统自动关联" | "手动关联" | "抖音号匹配";
-  linkTime: string;
-  updateTime: string;
-  spend: number;
-  roi: number;
-  conversions: number;
-}
-
 export const SPEND_TREND_CHART_DATA = [
   { date: "2025-07-26", 消耗: 45.2, ROI: 5.8, 成交金额: 262.16, 智能优惠券: 12.0, 转化数: 15, 转化率: 12.5, 转化成本: 3.01, 展示数: 12000, 平均千次展现费用: 3.76, 点击数: 950, 点击率: 7.91, 播放量: 10500, 完播率: 18.2, 净成交金额: 240.0, 净成交ROI: 5.3 },
   { date: "2025-07-27", 消耗: 28.6, ROI: 0.8, 成交金额: 22.88, 智能优惠券: 5.0, 转化数: 8, 转化率: 8.2, 转化成本: 3.57, 展示数: 8500, 平均千次展现费用: 3.36, 点击数: 620, 点击率: 7.29, 播放量: 7200, 完播率: 15.0, 净成交金额: 20.0, 净成交ROI: 0.7 },
@@ -587,77 +487,6 @@ export const SPEND_TREND_CHART_DATA = [
   { date: "2025-08-12", 消耗: 8.0, ROI: 0.1, 成交金额: 0.8, 智能优惠券: 0.0, 转化数: 1, 转化率: 1.0, 转化成本: 8.00, 展示数: 1500, 平均千次展现费用: 5.33, 点击数: 90, 点击率: 6.00, 播放量: 1200, 完播率: 5.0, 净成交金额: 0.0, 净成交ROI: 0.0 },
   { date: "2025-08-16", 消耗: 5.0, ROI: 0.0, 成交金额: 0.0, 智能优惠券: 0.0, 转化数: 0, 转化率: 0.0, 转化成本: 0.00, 展示数: 800, 平均千次展现费用: 6.25, 点击数: 40, 点击率: 5.00, 播放量: 600, 完播率: 3.0, 净成交金额: 0.0, 净成交ROI: 0.0 },
   { date: "2025-08-20", 消耗: 2.0, ROI: 0.0, 成交金额: 0.0, 智能优惠券: 0.0, 转化数: 0, 转化率: 0.0, 转化成本: 0.00, 展示数: 300, 平均千次展现费用: 6.66, 点击数: 15, 点击率: 5.00, 播放量: 200, 完播率: 1.0, 净成交金额: 0.0, 净成交ROI: 0.0 }
-];
-
-export const INITIAL_LINKED_AD_MATERIALS: LinkedAdMaterialItem[] = [
-  {
-    id: "lam_1",
-    accountName: "ell化妆品旗舰店-UDs-1",
-    accountId: "1815150855223564",
-    media: "巨量千川",
-    assetId: "原视频-转码_89213401",
-    ctr: "2.85%",
-    likes: 3420,
-    comments: 480,
-    shares: 210,
-    linkType: "系统自动关联",
-    linkTime: "2025-04-29 11:02:07",
-    updateTime: "2025-05-09 17:08:51",
-    spend: 245211.5,
-    roi: 1.85,
-    conversions: 4890
-  },
-  {
-    id: "lam_2",
-    accountName: "厦门十梦俪_ELL卸妆油1_童欣园",
-    accountId: "1788423177165833",
-    media: "腾讯ADQ",
-    assetId: "原视频-转码_77491208",
-    ctr: "3.12%",
-    likes: 5120,
-    comments: 690,
-    shares: 340,
-    linkType: "系统自动关联",
-    linkTime: "2025-05-09 17:08:51",
-    updateTime: "2025-05-11 09:15:22",
-    spend: 182100.0,
-    roi: 1.62,
-    conversions: 3210
-  },
-  {
-    id: "lam_3",
-    accountName: "纯朴美妆自营旗舰账户",
-    accountId: "1892014812398112",
-    media: "巨量广告",
-    assetId: "原视频-转码_90182412",
-    ctr: "2.40%",
-    likes: 1890,
-    comments: 210,
-    shares: 95,
-    linkType: "手动关联",
-    linkTime: "2025-05-01 14:22:10",
-    updateTime: "2025-05-12 18:30:00",
-    spend: 98600.0,
-    roi: 1.45,
-    conversions: 1820
-  },
-  {
-    id: "lam_4",
-    accountName: "磁力快手推广爆款组02",
-    accountId: "1902847192837192",
-    media: "磁力智投",
-    assetId: "素材ID_66201928",
-    ctr: "2.10%",
-    likes: 1240,
-    comments: 150,
-    shares: 60,
-    linkType: "抖音号匹配",
-    linkTime: "2025-05-03 09:10:00",
-    updateTime: "2025-05-13 10:00:00",
-    spend: 41070.43,
-    roi: 1.28,
-    conversions: 851
-  }
 ];
 
 export const INTERACTION_TREND_DATA = [
@@ -835,7 +664,6 @@ export default function FinishedVideoDetailModal({
   const [duration, setDuration] = useState(15);
   const [isMuted, setIsMuted] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
-  const [selectedHighlightFrame, setSelectedHighlightFrame] = useState<number | null>(null);
 
   // Platform UI Safe-Zone Overlay Style (douyin | douyin_showcase | channels | hidden)
   const [overlayStyle, setOverlayStyle] = useState<"douyin" | "douyin_showcase" | "channels" | "hidden">("douyin");
@@ -1030,30 +858,6 @@ export default function FinishedVideoDetailModal({
     return true;
   });
 
-  // Permission Modal State
-  const [showPermissionModal, setShowPermissionModal] = useState(false);
-  const [showEmployeePicker, setShowEmployeePicker] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<EmployeePermissionInfo>(SAMPLE_EMPLOYEES[0]);
-  const [employeeSearchText, setEmployeeSearchText] = useState("");
-  const [selectedPickerGroup, setSelectedPickerGroup] = useState("视频号投流组");
-  const [selectedPickerSub, setSelectedPickerSub] = useState("视频号");
-  const [employeePage, setEmployeePage] = useState(1);
-  const [employeePageSize, setEmployeePageSize] = useState(20);
-  const filteredEmployees = SAMPLE_EMPLOYEES.filter((employee) =>
-    !employeeSearchText.trim() ||
-    employee.name.includes(employeeSearchText.trim()) ||
-    employee.group.includes(employeeSearchText.trim()) ||
-    employee.department.includes(employeeSearchText.trim())
-  );
-  const currentEmployeePage = Math.min(
-    employeePage,
-    Math.max(1, Math.ceil(filteredEmployees.length / employeePageSize))
-  );
-  const pagedEmployees = filteredEmployees.slice(
-    (currentEmployeePage - 1) * employeePageSize,
-    currentEmployeePage * employeePageSize
-  );
-
   // Associated Scripts State
   const [showRelatedScriptsModal, setShowRelatedScriptsModal] = useState(false);
   const [associatedScripts, setAssociatedScripts] = useState<AssociatedScript[]>([
@@ -1125,6 +929,29 @@ export default function FinishedVideoDetailModal({
       afterValue: "成片渲染合成完成（分辨率1080P/60fps，时长 00:28）",
     }
   ]);
+
+  // Ad account push workflow
+  const [showAdPushWorkspace, setShowAdPushWorkspace] = useState(false);
+  const [showPushRecordsModal, setShowPushRecordsModal] = useState(false);
+  const [adPushRecords, setAdPushRecords] = useState<AdPushRecord[]>(loadAdPushRecords);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.setItem(AD_PUSH_RECORDS_STORAGE_KEY, JSON.stringify(adPushRecords));
+  }, [adPushRecords]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setAdPushRecords((current) => advanceAdPushRecords(current));
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const handleCreateAdPushTask = (record: AdPushRecord) => {
+    setAdPushRecords((current) => [record, ...current]);
+    setShowAdPushWorkspace(false);
+    setShowPushRecordsModal(true);
+  };
 
   const addOperationLog = (actionType: OperationLogItem['actionType'], beforeValue: string, afterValue: string) => {
     if (beforeValue === afterValue) return;
@@ -1251,131 +1078,21 @@ export default function FinishedVideoDetailModal({
   const [assetPlatformTab, setAssetPlatformTab] = useState<string>("汇总数据");
   const [assetStartDate, setAssetStartDate] = useState<string>("2025-04-10");
   const [assetEndDate, setAssetEndDate] = useState<string>("2025-05-13");
-  const [linkedAdMaterials, setLinkedAdMaterials] = useState<LinkedAdMaterialItem[]>(INITIAL_LINKED_AD_MATERIALS);
   
   // 消耗曲线 Modal State
   const [showSpendTrendModal, setShowSpendTrendModal] = useState(false);
   const [trendMetric1, setTrendMetric1] = useState<string>("消耗");
   const [trendMetric2, setTrendMetric2] = useState<string>("ROI");
   
-  // 素材数据 Modals
-  const [showManualLinkModal, setShowManualLinkModal] = useState(false);
-  const [showMatchMonitorModal, setShowMatchMonitorModal] = useState(false);
-  const [showLinkedAdMaterialsModal, setShowLinkedAdMaterialsModal] = useState(false);
-  const [showSyncHowToModal, setShowSyncHowToModal] = useState(false);
-
-  // Modal 1: 手动关联素材 Sub-state
-  const [manualLinkPlatform, setManualLinkPlatform] = useState<string>("巨量千川");
-  const [manualLinkMode, setManualLinkMode] = useState<"从视频库关联" | "从抖音号关联">("从视频库关联");
-  const [manualAccountTab, setManualAccountTab] = useState<string>("收藏账户");
-  const [manualAccountSearch, setManualAccountSearch] = useState("");
-  const [manualAssetSearch, setManualAssetSearch] = useState("");
-  const [manualSelectedAccountIds, setManualSelectedAccountIds] = useState<string[]>(["1815150855223564"]);
-  const [manualSelectedMaterialIds, setManualSelectedMaterialIds] = useState<string[]>([]);
-  const [manualMaterialPage, setManualMaterialPage] = useState(1);
-  const [manualMaterialPageSize, setManualMaterialPageSize] = useState(20);
-  const filteredManualMaterials = MANUAL_MATERIAL_OPTIONS.filter((material) =>
-    !manualAssetSearch.trim() ||
-    material.id.includes(manualAssetSearch.trim()) ||
-    material.name.toLowerCase().includes(manualAssetSearch.trim().toLowerCase())
-  );
-  const currentManualMaterialPage = Math.min(
-    manualMaterialPage,
-    Math.max(1, Math.ceil(filteredManualMaterials.length / manualMaterialPageSize))
-  );
-  const pagedManualMaterials = filteredManualMaterials.slice(
-    (currentManualMaterialPage - 1) * manualMaterialPageSize,
-    currentManualMaterialPage * manualMaterialPageSize
-  );
-
-  // Modal 2: 素材配对监控 Sub-state
-  const [monitorPlatform, setMonitorPlatform] = useState<string>("巨量千川");
-  const [monitorGroupTab, setMonitorGroupTab] = useState<string>("收藏账户");
-  const [monitorSearchInput, setMonitorSearchInput] = useState("");
-  const [monitorAccountPage, setMonitorAccountPage] = useState(1);
-  const [monitorAccountPageSize, setMonitorAccountPageSize] = useState(20);
-  const filteredMonitorAccounts = MONITOR_ACCOUNT_OPTIONS.filter((account) =>
-    !monitorSearchInput.trim() ||
-    account.id.includes(monitorSearchInput.trim()) ||
-    account.name.toLowerCase().includes(monitorSearchInput.trim().toLowerCase())
-  );
-  const currentMonitorAccountPage = Math.min(
-    monitorAccountPage,
-    Math.max(1, Math.ceil(filteredMonitorAccounts.length / monitorAccountPageSize))
-  );
-  const pagedMonitorAccounts = filteredMonitorAccounts.slice(
-    (currentMonitorAccountPage - 1) * monitorAccountPageSize,
-    currentMonitorAccountPage * monitorAccountPageSize
-  );
-  const [monitoredAccountIds, setMonitoredAccountIds] = useState<string[]>([
-    "1815150855223564",
-    "1788423177165833"
-  ]);
-  const [showMonitorInfoModal, setShowMonitorInfoModal] = useState(false);
-
-  // Modal 3: 已关联广告视频素材 Sub-state
-  const [linkedMaterialSubTab, setLinkedMaterialSubTab] = useState<"素材明细数据" | "素材汇总数据" | "账户汇总数据">("素材明细数据");
-  const [linkedMaterialPlatform, setLinkedMaterialPlatform] = useState<string>("全部平台");
-  const [linkedMaterialAccountSearch, setLinkedMaterialAccountSearch] = useState("");
-  const [linkedMaterialAssetSearch, setLinkedMaterialAssetSearch] = useState("");
-
   // 镜头/分镜溯源与关联 (Shot Traceability & AIGC Video Associations) State
-  const [shotTraceTab, setShotTraceTab] = useState<"引用视频镜头" | "被引用后出片" | "衍生视频">("引用视频镜头");
+  const [shotTraceTab, setShotTraceTab] = useState<"引用视频镜头" | "被引用后出片">("引用视频镜头");
   const [isEditingLink, setIsEditingLink] = useState(false);
-  const [shotTraceAuthorType, setShotTraceAuthorType] = useState<"引用视频" | "引用视频作者">("引用视频");
-  const [shotTracePlatform, setShotTracePlatform] = useState("全部平台");
-  const [showShotTraceHelpModal, setShowShotTraceHelpModal] = useState(false);
   const [showAddAigcLinkModal, setShowAddAigcLinkModal] = useState(false);
-  const [aigcLinkCategory, setAigcLinkCategory] = useState<"成片" | "素材" | "第三方">("成片");
-  const [aigcLinkSearch, setAigcLinkSearch] = useState("");
-  const [selectedAigcVideoId, setSelectedAigcVideoId] = useState<string | null>(null);
-  const [aigcVideoPage, setAigcVideoPage] = useState(1);
-  const [aigcVideoPageSize, setAigcVideoPageSize] = useState(20);
-  const aigcVideoOptions = [
-    {
-      id: "v_aigc_1",
-      title: `【${aigcLinkCategory}】高奢美妆精油近景特写剪辑片段01.mp4`,
-      code: "39810234",
-      author: "梦畅AI智能剪辑",
-      duration: "12.5s",
-      cover: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200&auto=format&fit=crop&q=80"
-    },
-    {
-      id: "v_aigc_2",
-      title: `【${aigcLinkCategory}】模特夏日素颜上脸质感切片.mp4`,
-      code: "39810235",
-      author: "创意生成组",
-      duration: "8.2s",
-      cover: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&auto=format&fit=crop&q=80"
-    },
-    {
-      id: "v_aigc_3",
-      title: `【${aigcLinkCategory}】清爽控油产品功能演示与镜头回放.mp4`,
-      code: "39810236",
-      author: "达人授权素材",
-      duration: "15.0s",
-      cover: "https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=200&auto=format&fit=crop&q=80"
-    }
-  ];
-  const filteredAigcVideos = aigcVideoOptions.filter((item) =>
-    !aigcLinkSearch.trim() ||
-    item.title.toLowerCase().includes(aigcLinkSearch.trim().toLowerCase()) ||
-    item.code.includes(aigcLinkSearch.trim())
-  );
-  const currentAigcVideoPage = Math.min(
-    aigcVideoPage,
-    Math.max(1, Math.ceil(filteredAigcVideos.length / aigcVideoPageSize))
-  );
-  const pagedAigcVideos = filteredAigcVideos.slice(
-    (currentAigcVideoPage - 1) * aigcVideoPageSize,
-    currentAigcVideoPage * aigcVideoPageSize
-  );
   const [shotTraceMaterials, setShotTraceMaterials] = useState([
     {
       id: "shot_1",
       type: "素材",
       code: "38945245",
-      isAuto: true,
       duration: "16.7秒",
       durationNum: 16.7,
       title: "张玲静 | 口播（实拍素材）",
@@ -1392,7 +1109,6 @@ export default function FinishedVideoDetailModal({
       id: "shot_2",
       type: "素材",
       code: "37333498",
-      isAuto: true,
       duration: "14.3秒",
       durationNum: 14.3,
       title: "叶闯红 | 上脸-磨皮版（纯净",
@@ -1409,7 +1125,6 @@ export default function FinishedVideoDetailModal({
       id: "shot_3",
       type: "素材",
       code: "38951233",
-      isAuto: true,
       duration: "6.3秒",
       durationNum: 6.3,
       title: "姐妹种草团 | 全网可用 | E",
@@ -1426,7 +1141,6 @@ export default function FinishedVideoDetailModal({
       id: "shot_4",
       type: "素材",
       code: "39363858",
-      isAuto: true,
       duration: "4.3秒",
       durationNum: 4.3,
       title: "非模特岗 | 纯净版 | 上脸-",
@@ -1440,6 +1154,104 @@ export default function FinishedVideoDetailModal({
       color: "#06b6d4"
     }
   ]);
+
+  const availableAigcVideos: VideoResourcePickerItem[] = [
+    ...shotTraceMaterials.map((item) => ({
+      id: item.id,
+      name: item.title,
+      cover: item.cover,
+      status: "已关联",
+      section: item.type === "成片" ? "成片" as const : "素材" as const,
+      primaryCategory: "AIGC视频",
+      secondaryCategory: "已关联视频",
+      tags: ["已关联"],
+      author: item.author,
+      duration: item.duration,
+      size: "--",
+    })),
+    ...([
+      {
+        id: "aigc-finished-39810234",
+        name: "高奢美妆精油近景特写成片.mp4",
+        cover: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&auto=format&fit=crop&q=80",
+        status: "生成成功",
+        section: "成片" as const,
+        primaryCategory: "商品展示",
+        secondaryCategory: "美妆护肤",
+        tags: ["美妆", "近景"],
+        author: "梦畅AI智能剪辑",
+        duration: "12.5秒",
+        size: "18.6 MB",
+      },
+      {
+        id: "aigc-finished-39810235",
+        name: "夏日素颜上脸效果展示成片.mp4",
+        cover: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&auto=format&fit=crop&q=80",
+        status: "生成成功",
+        section: "成片" as const,
+        primaryCategory: "达人口播",
+        secondaryCategory: "效果展示",
+        tags: ["模特", "上脸"],
+        author: "创意生成组",
+        duration: "18.2秒",
+        size: "24.3 MB",
+      },
+      {
+        id: "aigc-finished-39810236",
+        name: "清爽控油产品功能演示成片.mp4",
+        cover: "https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=400&auto=format&fit=crop&q=80",
+        status: "生成成功",
+        section: "成片" as const,
+        primaryCategory: "商品展示",
+        secondaryCategory: "功能演示",
+        tags: ["控油", "演示"],
+        author: "徐振",
+        duration: "15.0秒",
+        size: "20.8 MB",
+      },
+      {
+        id: "aigc-material-39810237",
+        name: "精油瓶身旋转特写素材.mp4",
+        cover: "https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=400&auto=format&fit=crop&q=80",
+        status: "可用",
+        section: "素材" as const,
+        primaryCategory: "产品素材",
+        secondaryCategory: "产品特写",
+        tags: ["精油", "静物"],
+        author: "商品素材组",
+        duration: "6.8秒",
+        size: "9.4 MB",
+      },
+      {
+        id: "aigc-material-39810238",
+        name: "模特涂抹精华近景素材.mp4",
+        cover: "https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?w=400&auto=format&fit=crop&q=80",
+        status: "可用",
+        section: "素材" as const,
+        primaryCategory: "人物素材",
+        secondaryCategory: "上脸实拍",
+        tags: ["模特", "护肤"],
+        author: "达人授权素材",
+        duration: "9.6秒",
+        size: "13.1 MB",
+      },
+      {
+        id: "aigc-material-39810239",
+        name: "控油效果前后对比素材.mp4",
+        cover: "https://images.unsplash.com/photo-1612817288484-6f916006741a?w=400&auto=format&fit=crop&q=80",
+        status: "可用",
+        section: "素材" as const,
+        primaryCategory: "效果素材",
+        secondaryCategory: "对比展示",
+        tags: ["控油", "对比"],
+        author: "徐振",
+        duration: "8.4秒",
+        size: "11.7 MB",
+      },
+    ] satisfies VideoResourcePickerItem[]).filter(
+      (option) => !shotTraceMaterials.some((item) => item.id === option.id),
+    ),
+  ];
 
   // Review Comments State
   const [reviews, setReviews] = useState<ReviewComment[]>(INITIAL_REVIEWS);
@@ -1480,10 +1292,7 @@ export default function FinishedVideoDetailModal({
     }
   };
 
-  const seekToSecond = (sec: number, fromHighlight = false) => {
-    if (!fromHighlight) {
-      setSelectedHighlightFrame(null);
-    }
+  const seekToSecond = (sec: number) => {
     if (videoRef.current) {
       videoRef.current.currentTime = sec;
       setCurrentTime(sec);
@@ -1584,7 +1393,7 @@ export default function FinishedVideoDetailModal({
             
             {/* LEFT COLUMN: Video Player & Second-by-Second Frame Strip (lg:col-span-5) */}
             <div className="lg:col-span-5 space-y-4">
-              
+
               {/* Top Controls Header Bar for Video Audit (Only visible when activeRightTab === "review") */}
               {activeRightTab === "review" && (
                 <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between gap-2 text-xs font-medium text-slate-700 animate-in fade-in duration-150">
@@ -2665,57 +2474,6 @@ export default function FinishedVideoDetailModal({
               </div>
             )}
 
-              {/* 秒级高光分镜拆解 (Frame Highlight Strip) */}
-              {!isMaterialMode && !isAdminMode && (
-                <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs space-y-2.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-purple-600" />
-                      <span>秒级高光镜头拆解 (点击跳帧)</span>
-                    </span>
-                    <span className="text-[11px] text-slate-400">黄金15秒爆款结构</span>
-                  </div>
-
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {[
-                      { sec: 1, label: "0-3s 黄金Hook", desc: "复古古法金耳环特写", color: "bg-purple-100 text-purple-800 border-purple-300" },
-                      { sec: 4, label: "3-6s 痛点场景", desc: "夏日佩戴出汗对比", color: "bg-indigo-100 text-indigo-800 border-indigo-300" },
-                      { sec: 7, label: "6-9s 核心亮点", desc: "微距工艺与高显白", color: "bg-blue-100 text-blue-800 border-blue-300" },
-                      { sec: 10, label: "9-12s 弹窗优惠", desc: "直播间买一赠一", color: "bg-rose-100 text-rose-800 border-rose-300 font-extrabold" },
-                      { sec: 13, label: "12-15s 强促单", desc: "点击下方小黄车", color: "bg-emerald-100 text-emerald-800 border-emerald-300" }
-                    ].map((frame, i) => {
-                      const isSelected = selectedHighlightFrame === i;
-                      return (
-                        <button
-                          key={i}
-                          onClick={() => {
-                            setSelectedHighlightFrame(i);
-                            seekToSecond(frame.sec, true);
-                          }}
-                          className={`p-2 rounded-xl text-left border transition-all cursor-pointer relative group ${
-                            isSelected 
-                              ? "bg-purple-600 text-white border-purple-600 shadow-md ring-2 ring-purple-300" 
-                              : `${frame.color} hover:shadow-xs`
-                          }`}
-                        >
-                          <div className={`text-[10px] font-bold truncate ${isSelected ? "text-white" : ""}`}>
-                            {frame.label}
-                          </div>
-                          <div className={`text-[9px] mt-0.5 line-clamp-1 ${isSelected ? "text-purple-100" : "opacity-80"}`}>
-                            {frame.desc}
-                          </div>
-                          {isSelected && (
-                            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full animate-ping" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-
-
             </div>
 
             {/* RIGHT COLUMN: Video Information / Review / Interaction / Project Tabs (lg:col-span-7) */}
@@ -2724,7 +2482,7 @@ export default function FinishedVideoDetailModal({
               {/* MAIN CONTAINER CARD: Header + Nav Tabs + Tab Content */}
               <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-xs space-y-4">
                 
-                {/* 1. Header Row (Brand Path + Timestamps + Top Right Buttons) */}
+                {/* 1. Header Row (Brand Path + Timestamps) */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
                   {/* Left: Brand Path & Timestamps */}
                   <div className="space-y-1">
@@ -2742,16 +2500,6 @@ export default function FinishedVideoDetailModal({
                     </div>
                   </div>
 
-                  {/* Right: Action Buttons (权限检测) */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => setShowPermissionModal(true)}
-                      className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>权限检测</span>
-                    </button>
-                  </div>
                 </div>
 
                 {/* 2. Top Navigation Tabs Bar */}
@@ -3088,6 +2836,33 @@ export default function FinishedVideoDetailModal({
                             </div>
                           </div>
                         </div>
+
+                        {!isMaterialMode && !isAdminMode && (
+                          <div className="inline-flex items-stretch rounded-xl border border-purple-300 bg-white text-purple-700 shadow-2xs">
+                            <button
+                              type="button"
+                              onClick={() => setShowAdPushWorkspace(true)}
+                              className="flex items-center gap-1.5 rounded-l-[11px] px-3 py-2 text-xs font-bold transition-colors hover:bg-purple-50"
+                            >
+                              <Send className="h-3.5 w-3.5" />
+                              <span>推送广告账户</span>
+                            </button>
+                            <div className="group relative border-l border-purple-200">
+                              <button
+                                type="button"
+                                onClick={() => setShowPushRecordsModal(true)}
+                                className="flex h-full min-w-10 items-center justify-center rounded-r-[11px] px-2.5 transition-colors hover:bg-purple-50"
+                                aria-label="查看推送记录"
+                              >
+                                <Clock className="h-4 w-4" />
+                              </button>
+                              <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-lg group-hover:block">
+                                推送记录
+                                <span className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                              </span>
+                            </div>
+                          </div>
+                        )}
 
                         {/* 操作记录 */}
                         <button
@@ -4018,36 +3793,6 @@ export default function FinishedVideoDetailModal({
                       <span>素材数据</span>
                     </h3>
 
-                    <div className="flex items-center gap-3 text-xs font-bold text-purple-600 flex-wrap">
-                      <button
-                        onClick={() => setShowManualLinkModal(true)}
-                        className="hover:underline cursor-pointer flex items-center gap-1"
-                      >
-                        <span>手动关联素材</span>
-                      </button>
-
-                      <button
-                        onClick={() => setShowMatchMonitorModal(true)}
-                        className="hover:underline cursor-pointer flex items-center gap-1"
-                      >
-                        <span>素材配对监控</span>
-                      </button>
-
-                      <button
-                        onClick={() => setShowLinkedAdMaterialsModal(true)}
-                        className="hover:underline cursor-pointer flex items-center gap-1"
-                      >
-                        <span>已关联广告视频素材({linkedAdMaterials.length})</span>
-                      </button>
-
-                      <button
-                        onClick={() => setShowSyncHowToModal(true)}
-                        className="text-slate-500 hover:text-purple-600 font-medium cursor-pointer flex items-center gap-1 group"
-                      >
-                        <span>如何同步: 历史已投放视频/抖音号视频数据</span>
-                        <HelpCircle className="w-3.5 h-3.5 text-slate-400 group-hover:text-purple-600" />
-                      </button>
-                    </div>
                   </div>
 
                   {/* Right side controls */}
@@ -4231,8 +3976,7 @@ export default function FinishedVideoDetailModal({
                     <div className="flex items-center gap-6 text-sm font-extrabold">
                       {[
                         { id: "引用视频镜头", label: "引用视频镜头" },
-                        { id: "被引用后出片", label: "被引用后出片" },
-                        { id: "衍生视频", label: "衍生视频", hasHelp: true }
+                        { id: "被引用后出片", label: "被引用后出片" }
                       ].map((tab) => (
                         <div key={tab.id} className="relative flex items-center gap-1">
                           <button
@@ -4245,15 +3989,6 @@ export default function FinishedVideoDetailModal({
                           >
                             <span>{tab.label}</span>
                           </button>
-                          {tab.hasHelp && (
-                            <button
-                              onClick={() => setShowShotTraceHelpModal(true)}
-                              className="p-0.5 text-slate-400 hover:text-purple-600 transition-colors cursor-pointer"
-                              title="了解分镜溯源功能"
-                            >
-                              <HelpCircle className="w-3.5 h-3.5" />
-                            </button>
-                          )}
                         </div>
                       ))}
                     </div>
@@ -4296,36 +4031,6 @@ export default function FinishedVideoDetailModal({
                 
                 {/* Left Column: Donut Breakdown Chart & Filters */}
                 <div className="w-full lg:w-[320px] shrink-0 bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs flex flex-col justify-between space-y-3">
-                  {/* Top Filter Buttons */}
-                  <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
-                    <div className="flex items-center gap-1 bg-slate-100/80 p-0.5 rounded-lg">
-                      {(["引用视频", "引用视频作者"] as const).map((type) => (
-                        <button
-                          key={type}
-                          onClick={() => setShotTraceAuthorType(type)}
-                          className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
-                            shotTraceAuthorType === type
-                              ? "bg-purple-600 text-white shadow-2xs"
-                              : "text-slate-600 hover:text-slate-900"
-                          }`}
-                        >
-                          {type}
-                        </button>
-                      ))}
-                    </div>
-
-                    <select
-                      value={shotTracePlatform}
-                      onChange={(e) => setShotTracePlatform(e.target.value)}
-                      className="bg-slate-50 border border-slate-200 text-slate-700 text-[11px] font-bold rounded-lg px-1.5 py-0.5 focus:outline-none cursor-pointer"
-                    >
-                      <option value="全部平台">全部平台</option>
-                      <option value="巨量千川">巨量千川</option>
-                      <option value="巨量广告">巨量广告</option>
-                      <option value="微信视频号">微信视频号</option>
-                    </select>
-                  </div>
-
                   {/* Donut Chart & Legend Display - Vertically Centered */}
                   <div className="flex-1 flex items-center justify-center gap-3 py-1 my-auto">
                     {/* SVG Donut Chart */}
@@ -4427,7 +4132,7 @@ export default function FinishedVideoDetailModal({
                         关联梦畅AIGC视频
                       </span>
                       <span className="text-[9px] text-purple-500/80 mt-1 text-center">
-                        支持成片、素材与第三方
+                        支持成片与素材
                       </span>
                     </button>
                   )}
@@ -4459,9 +4164,9 @@ export default function FinishedVideoDetailModal({
                             <span className="scale-90 origin-left">{item.code}</span>
                           </div>
 
-                          {/* Top Right Badge / Unlink Action */}
-                          <div className="pointer-events-auto shrink-0 flex items-center">
-                            {isEditingLink ? (
+                          {/* Top Right Unlink Action */}
+                          {isEditingLink && (
+                            <div className="pointer-events-auto shrink-0 flex items-center">
                               <button
                                 onClick={() => {
                                   setShotTraceMaterials(prev => prev.filter(m => m.id !== item.id));
@@ -4471,12 +4176,8 @@ export default function FinishedVideoDetailModal({
                               >
                                 <span>取消关联</span>
                               </button>
-                            ) : (
-                              <span className="bg-purple-600/90 backdrop-blur-xs text-white text-[9px] font-extrabold px-1.5 h-4.5 rounded-md shadow-xs flex items-center leading-none">
-                                {item.isAuto ? "自动" : "手动"}
-                              </span>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
 
                         {/* Bottom Overlay Info: 引用次数 + 下载次数 with Monochrome Icons */}
@@ -4526,347 +4227,6 @@ export default function FinishedVideoDetailModal({
         </div>
 
       </div>
-
-      {/* 视频权限检测 Modal */}
-      {showPermissionModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-4 bg-purple-600 rounded-full"></span>
-                <h3 className="text-base font-extrabold text-slate-900 tracking-tight">视频权限检测</h3>
-              </div>
-              <button
-                onClick={() => {
-                  setShowPermissionModal(false);
-                  setShowEmployeePicker(false);
-                }}
-                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-5">
-              {/* Top User Card Area */}
-              <div className="relative bg-purple-50/40 rounded-2xl p-4 border border-purple-100/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-start sm:items-center gap-3.5">
-                  {/* User Avatar */}
-                  <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center text-white shrink-0 shadow-xs">
-                    <User className="w-6 h-6" />
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                      <span className="font-extrabold text-slate-900 text-sm">
-                        {selectedEmployee.name}
-                      </span>
-                      <span className="text-xs bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded-md">
-                        {selectedEmployee.company || "梦畅AIGC"} / {selectedEmployee.department} / {selectedEmployee.group}
-                      </span>
-
-                      {/* Select Employee Dropdown Trigger Button */}
-                      <div className="relative">
-                        <button
-                          onClick={() => setShowEmployeePicker(!showEmployeePicker)}
-                          className="px-3 py-1 bg-white hover:bg-purple-50 border border-purple-300 rounded-full text-xs font-bold text-purple-700 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-                        >
-                          <span>选择人员</span>
-                        </button>
-
-                        {/* Cascading Employee Picker Popover */}
-                        {showEmployeePicker && (
-                          <div className="absolute top-full left-0 mt-2 z-50 bg-white rounded-2xl shadow-2xl border border-slate-200/90 p-2 w-[480px] sm:w-[540px] text-xs animate-in fade-in duration-100">
-                            {/* Search Bar */}
-                            <div className="p-2 border-b border-slate-100">
-                              <div className="relative">
-                                <input
-                                  type="text"
-                                  placeholder="输入姓名/分组/部门搜索人员..."
-                                  value={employeeSearchText}
-                                  onChange={(e) => {
-                                    setEmployeeSearchText(e.target.value);
-                                    setEmployeePage(1);
-                                  }}
-                                  className="w-full pl-3 pr-8 py-1.5 bg-slate-50 border border-purple-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-400"
-                                />
-                                <ChevronUp className="w-4 h-4 text-purple-600 absolute right-2.5 top-2 cursor-pointer" onClick={() => setShowEmployeePicker(false)} />
-                              </div>
-                            </div>
-
-                            {/* 3 Column Cascading Menu */}
-                            <div className="grid grid-cols-3 h-56 divide-x divide-slate-100 font-medium">
-                              {/* Column 1: 部门 (2级) */}
-                              <div className="p-1 space-y-0.5 overflow-y-auto">
-                                <div className="text-[10px] font-black text-slate-400 px-2 py-1 uppercase tracking-wider bg-slate-50 rounded">
-                                  2级部门
-                                </div>
-                                {["信息流投放部", "电商运营部", "AIGC爆款拆解部", "商务与直播部"].map((dept) => (
-                                  <button
-                                    key={dept}
-                                    onClick={() => setSelectedPickerGroup(dept)}
-                                    className={`w-full text-left px-2 py-1.5 rounded-lg flex items-center justify-between cursor-pointer transition-colors text-xs ${
-                                      selectedPickerGroup === dept
-                                        ? "bg-purple-50 text-purple-700 font-bold"
-                                        : "hover:bg-slate-50 text-slate-700"
-                                    }`}
-                                  >
-                                    <span className="truncate">{dept}</span>
-                                    <ChevronRight className="w-3.5 h-3.5 opacity-60 text-purple-500 shrink-0" />
-                                  </button>
-                                ))}
-                              </div>
-
-                              {/* Column 2: 分组 (3级) */}
-                              <div className="p-1 space-y-0.5 overflow-y-auto">
-                                <div className="text-[10px] font-black text-slate-400 px-2 py-1 uppercase tracking-wider bg-slate-50 rounded">
-                                  3级分组
-                                </div>
-                                {["视频号投流组", "快手投流组", "天猫/拼多多组", "千川剧本拆解组", "商务组"].map((grp) => (
-                                  <button
-                                    key={grp}
-                                    onClick={() => setSelectedPickerSub(grp)}
-                                    className={`w-full text-left px-2 py-1.5 rounded-lg flex items-center justify-between cursor-pointer transition-colors text-xs ${
-                                      selectedPickerSub === grp
-                                        ? "bg-purple-50 text-purple-700 font-bold"
-                                        : "hover:bg-slate-50 text-slate-700"
-                                    }`}
-                                  >
-                                    <span className="truncate">{grp}</span>
-                                    <ChevronRight className="w-3.5 h-3.5 opacity-60 text-purple-500 shrink-0" />
-                                  </button>
-                                ))}
-                              </div>
-
-                              {/* Column 3: 人员 (4级) */}
-                              <div className="p-1 space-y-0.5 overflow-y-auto">
-                                <div className="text-[10px] font-black text-slate-400 px-2 py-1 uppercase tracking-wider bg-slate-50 rounded">
-                                  4级人员
-                                </div>
-                                {pagedEmployees.map((emp) => (
-                                  <button
-                                    key={emp.id}
-                                    onClick={() => {
-                                      setSelectedEmployee(emp);
-                                      setShowEmployeePicker(false);
-                                      showToast(`👤 已切换检测用户: ${emp.name}`);
-                                    }}
-                                    className={`w-full text-left px-2 py-1.5 rounded-lg cursor-pointer transition-colors text-xs ${
-                                      selectedEmployee.id === emp.id
-                                        ? "bg-purple-600 text-white font-bold"
-                                        : "hover:bg-purple-50 hover:text-purple-700 text-slate-800"
-                                    }`}
-                                  >
-                                    <div className="truncate font-bold">{emp.name}</div>
-                                    <div className={`text-[10px] truncate ${selectedEmployee.id === emp.id ? "text-purple-200" : "text-slate-400"}`}>
-                                      {emp.group}
-                                    </div>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                            <div className="border-t border-slate-100 px-2">
-                              <AssetPagination
-                                total={filteredEmployees.length}
-                                page={currentEmployeePage}
-                                pageSize={employeePageSize}
-                                onPageChange={setEmployeePage}
-                                onPageSizeChange={(value) => {
-                                  setEmployeePageSize(value);
-                                  setEmployeePage(1);
-                                }}
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="text-xs text-slate-400 font-mono">
-                      {selectedEmployee.account} / {selectedEmployee.phone}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Admin / Role Badge */}
-                {selectedEmployee.isAdmin && (
-                  <span className="px-3 py-1 bg-purple-100/80 text-purple-700 text-xs font-bold rounded-lg self-start sm:self-center shrink-0">
-                    超级管理员
-                  </span>
-                )}
-              </div>
-
-              {/* Organization Hierarchy & Roles Info */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs bg-slate-50 p-3 rounded-xl border border-slate-200/80">
-                <div className="space-y-0.5">
-                  <span className="text-slate-400 font-bold block text-[10px]">架构归属 (公司/部门/分组)</span>
-                  <span className="font-extrabold text-slate-800">
-                    梦畅AIGC &gt; {selectedEmployee.department} &gt; {selectedEmployee.group}
-                  </span>
-                </div>
-
-                <div className="space-y-0.5">
-                  <span className="text-slate-400 font-bold block text-[10px]">岗位角色</span>
-                  <span className="font-extrabold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200 inline-block">
-                    {selectedEmployee.role}
-                  </span>
-                </div>
-
-                <div className="space-y-0.5">
-                  <span className="text-slate-400 font-bold block text-[10px]">可查观察分组</span>
-                  <span className="font-bold text-slate-700 truncate block" title={selectedEmployee.observedGroups}>
-                    {selectedEmployee.observedGroups}
-                  </span>
-                </div>
-              </div>
-
-              {/* Permissions Table Matrix */}
-              <div className="overflow-hidden rounded-2xl border border-slate-200/90 text-xs">
-                <table className="w-full text-center border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-200">
-                      <th className="py-3 px-4 bg-purple-50/60 text-purple-900 font-extrabold text-left w-1/4">
-                        权限检测
-                      </th>
-                      <th className="py-3 px-4 bg-emerald-50/40 text-slate-800 font-bold">
-                        <div className="inline-flex items-center gap-1 text-slate-800">
-                          <span>查看</span>
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500 fill-emerald-100" />
-                        </div>
-                      </th>
-                      <th className="py-3 px-4 bg-emerald-50/40 text-slate-800 font-bold">
-                        <div className="inline-flex items-center gap-1 text-slate-800">
-                          <span>下载</span>
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500 fill-emerald-100" />
-                        </div>
-                      </th>
-                      <th className="hidden py-3 px-4 bg-emerald-50/40 text-slate-800 font-bold">
-                        <div className="inline-flex items-center gap-1 text-slate-800">
-                          <span>复制到剪映</span>
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500 fill-emerald-100" />
-                        </div>
-                      </th>
-                      <th className="hidden py-3 px-4 bg-emerald-50/40 text-slate-800 font-bold">
-                        <div className="inline-flex items-center gap-1 text-slate-800">
-                          <span>推送</span>
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500 fill-emerald-100" />
-                        </div>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {/* Row 1: 角色权限 */}
-                    <tr className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-3.5 px-4 bg-purple-50/30 text-left">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-800">角色权限</span>
-                          <button
-                            onClick={() => showToast(`🔍 角色权限明细: [${selectedEmployee.name}] 拥有${selectedEmployee.role}所有对应操作功能`)}
-                            className="px-2 py-0.5 border border-purple-300 text-purple-600 hover:bg-purple-50 rounded-full text-[10px] font-bold cursor-pointer transition-colors"
-                          >
-                            明细
-                          </button>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4 bg-emerald-50/20">
-                        {selectedEmployee.permissions.role.view ? (
-                          <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
-                        ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}
-                      </td>
-                      <td className="py-3.5 px-4 bg-emerald-50/20">
-                        {selectedEmployee.permissions.role.download ? (
-                          <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
-                        ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}
-                      </td>
-                      <td className="hidden py-3.5 px-4 bg-emerald-50/20">
-                        {selectedEmployee.permissions.role.copyToCapCut ? (
-                          <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
-                        ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}
-                      </td>
-                      <td className="hidden py-3.5 px-4 bg-emerald-50/20">
-                        {selectedEmployee.permissions.role.push ? (
-                          <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
-                        ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}
-                      </td>
-                    </tr>
-
-                    {/* Row 2: 分类权限 */}
-                    <tr className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-3.5 px-4 bg-purple-50/30 text-left">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-800">分类权限</span>
-                          <button
-                            onClick={() => showToast(`🔍 分类权限明细: 适用于 ${video.category || "个护/美妆"} 分类所有归档素材`)}
-                            className="px-2 py-0.5 border border-purple-300 text-purple-600 hover:bg-purple-50 rounded-full text-[10px] font-bold cursor-pointer transition-colors"
-                          >
-                            明细
-                          </button>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4 bg-emerald-50/20">
-                        {selectedEmployee.permissions.category.view ? (
-                          <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
-                        ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}
-                      </td>
-                      <td className="py-3.5 px-4 bg-emerald-50/20">
-                        {selectedEmployee.permissions.category.download ? (
-                          <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
-                        ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}
-                      </td>
-                      <td className="hidden py-3.5 px-4 bg-emerald-50/20">
-                        {selectedEmployee.permissions.category.copyToCapCut ? (
-                          <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
-                        ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}
-                      </td>
-                      <td className="hidden py-3.5 px-4 bg-emerald-50/20">
-                        {selectedEmployee.permissions.category.push ? (
-                          <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
-                        ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}
-                      </td>
-                    </tr>
-
-                    {/* Row 3: 视频权限 */}
-                    <tr className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-3.5 px-4 bg-purple-50/30 text-left">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-800">视频权限</span>
-                          <button
-                            onClick={() => showToast(`🔍 视频权限明细: 对单条成片《${video.title}》的特定操作权限`)}
-                            className="px-2 py-0.5 border border-purple-300 text-purple-600 hover:bg-purple-50 rounded-full text-[10px] font-bold cursor-pointer transition-colors"
-                          >
-                            明细
-                          </button>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4 bg-emerald-50/20">
-                        {selectedEmployee.permissions.video.view ? (
-                          <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
-                        ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}
-                      </td>
-                      <td className="py-3.5 px-4 bg-emerald-50/20">
-                        {selectedEmployee.permissions.video.download ? (
-                          <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
-                        ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}
-                      </td>
-                      <td className="hidden py-3.5 px-4 bg-emerald-50/20">
-                        {selectedEmployee.permissions.video.copyToCapCut ? (
-                          <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
-                        ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}
-                      </td>
-                      <td className="hidden py-3.5 px-4 bg-emerald-50/20">
-                        {selectedEmployee.permissions.video.push ? (
-                          <Check className="w-6 h-6 text-emerald-500 stroke-[3] mx-auto" />
-                        ) : <X className="w-5 h-5 text-slate-300 mx-auto" />}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 修改分类 Modal */}
       {showModifyCategoryModal && (
@@ -6057,7 +5417,7 @@ export default function FinishedVideoDetailModal({
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-bold focus:outline-none cursor-pointer"
                   >
                     <option value="公开">公开 (全公司员工可下载)</option>
-                    <option value="仅团队">仅本部门 (指定分组共享)</option>
+                    <option value="仅本部门">仅本部门 (指定分组共享)</option>
                     <option value="私密">私密 (仅作者与管理员)</option>
                   </select>
                 </div>
@@ -6179,666 +5539,12 @@ export default function FinishedVideoDetailModal({
                 </ul>
               </div>
 
-              {/* Question 3 */}
-              <div className="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
-                <h4 className="font-extrabold text-slate-900 text-xs flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-purple-600 shrink-0" />
-                  3、上传工程文件后系统没有自动关联素材片段
-                </h4>
-                <ul className="text-slate-600 text-[11px] leading-relaxed pl-3.5 space-y-1 list-disc list-inside">
-                  <li>工程内使用的素材并不是云管家复制而是本地文件</li>
-                  <li>工程内使用的素材是云管家复制，但是使用了预设或复合片段，这种情况剪映会判断该片段是本地文件</li>
-                  <li>逆向操作，将已经是预设/复合片段的素材解除恢复单个复制的情况，同上会被判断是本地文件</li>
-                  <li>不是通过剪映导入而是直接打开插件虚拟盘拖入剪映的素材，同上被判断为本地</li>
-                </ul>
-              </div>
             </div>
 
             {/* Footer */}
             <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end">
               <button
                 onClick={() => setShowProjectFaqModal(false)}
-                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
-              >
-                我知道了
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal 1: 手动关联素材 (Screenshot 2) */}
-      {showManualLinkModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[130] flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-5xl overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-4 bg-purple-600 rounded-full" />
-                <h3 className="text-base font-extrabold text-slate-900">手动关联素材</h3>
-              </div>
-              <button
-                onClick={() => setShowManualLinkModal(false)}
-                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Yellow Banner */}
-            <div className="px-6 py-3 bg-amber-50/90 border-b border-amber-200/80 text-[11px] text-amber-900 space-y-1 font-medium leading-relaxed shrink-0">
-              <p className="font-bold">
-                手动关联：关联后，平台将自动同步后续产生的广告数据，并会追溯过去30天的广告数据（如果是抖音首页视频/达人抖音主页视频，支持选择【巨量千川-从抖音号关联】选择抖音首页视频进行关联）
-              </p>
-              <p className="text-amber-700 font-medium">
-                请注意：关联后，数据同步可能需要时间，请隔天再查看数据。
-              </p>
-            </div>
-
-            {/* Platform Tabs */}
-            <div className="px-6 pt-3 bg-slate-50/50 border-b border-slate-100 flex items-center gap-2 overflow-x-auto scrollbar-none shrink-0">
-              {[
-                "巨量广告", "巨量千川", "磁力智投", "磁力金牛", "腾讯ADQ", "TikTok", "TikTok首页", "百度营销", "小红书", "Bilibili三连推广"
-              ].map((plat) => (
-                <button
-                  key={plat}
-                  onClick={() => {
-                    setManualLinkPlatform(plat);
-                    setManualMaterialPage(1);
-                  }}
-                  className={`px-3 py-2 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-                    manualLinkPlatform === plat
-                      ? "border-purple-600 text-purple-600 bg-white rounded-t-lg"
-                      : "border-transparent text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  {plat}
-                </button>
-              ))}
-            </div>
-
-            {/* Two Pane Content */}
-            <div className="p-6 grid grid-cols-1 md:grid-cols-12 gap-6 overflow-y-auto flex-1 text-xs">
-              {/* Left Pane: Accounts */}
-              <div className="md:col-span-5 border border-slate-200 rounded-2xl p-4 space-y-3 bg-slate-50/40 flex flex-col">
-                <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto scrollbar-none">
-                  {["收藏账户", "小组账户", "分类账户", "全部账户", "去授权"].map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setManualAccountTab(tab)}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer whitespace-nowrap ${
-                        manualAccountTab === tab
-                          ? "bg-purple-100 text-purple-700"
-                          : "text-slate-500 hover:text-slate-800"
-                      }`}
-                    >
-                      {tab}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    placeholder="账户名称/id"
-                    value={manualAccountSearch}
-                    onChange={(e) => setManualAccountSearch(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500/20 font-medium"
-                  />
-                </div>
-
-                <div className="flex-1 overflow-y-auto max-h-60 space-y-1.5 pr-1">
-                  {[
-                    { id: "1815150855223564", name: "ell化妆品旗舰店-UDs-1" },
-                    { id: "1788423177165833", name: "厦门十梦俪_ELL卸妆油1_童欣园" },
-                    { id: "1892014812398112", name: "纯朴美妆自营旗舰账户" }
-                  ].map((acc) => {
-                    const checked = manualSelectedAccountIds.includes(acc.id);
-                    return (
-                      <label
-                        key={acc.id}
-                        className={`p-2.5 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all ${
-                          checked ? "bg-purple-50/80 border-purple-300 text-purple-900 font-bold" : "bg-white border-slate-200 text-slate-700"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => {
-                            setManualSelectedAccountIds(prev =>
-                              prev.includes(acc.id) ? prev.filter(i => i !== acc.id) : [...prev, acc.id]
-                            );
-                          }}
-                          className="accent-purple-600 cursor-pointer"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs">{acc.name}</p>
-                          <p className="text-[10px] text-slate-400 font-mono">{acc.id}</p>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Right Pane: 素材关联 */}
-              <div className="md:col-span-7 border border-slate-200 rounded-2xl p-4 space-y-3 bg-white flex flex-col">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => {
-                        setManualLinkMode("从视频库关联");
-                        setManualMaterialPage(1);
-                      }}
-                      className={`text-xs font-bold cursor-pointer transition-colors ${
-                        manualLinkMode === "从视频库关联" ? "text-purple-600 underline underline-offset-4 font-extrabold" : "text-slate-500"
-                      }`}
-                    >
-                      从视频库关联
-                    </button>
-                    <button
-                      onClick={() => {
-                        setManualLinkMode("从抖音号关联");
-                        setManualMaterialPage(1);
-                      }}
-                      className={`text-xs font-bold cursor-pointer transition-colors ${
-                        manualLinkMode === "从抖音号关联" ? "text-purple-600 underline underline-offset-4 font-extrabold" : "text-slate-500"
-                      }`}
-                    >
-                      从抖音号关联
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={() => setShowSyncHowToModal(true)}
-                    className="text-[11px] text-slate-400 hover:text-purple-600 flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>如何同步: 历史已投放视频/抖音号视频数据</span>
-                    <HelpCircle className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    placeholder="素材ID"
-                    value={manualAssetSearch}
-                    onChange={(e) => {
-                      setManualAssetSearch(e.target.value);
-                      setManualMaterialPage(1);
-                    }}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500/20 font-medium"
-                  />
-                </div>
-
-                {/* Table list of assets */}
-                <div className="flex-1 border border-slate-200 rounded-xl overflow-hidden bg-slate-50/30 min-h-48 flex flex-col justify-between">
-                  <table className="w-full text-left text-[11px]">
-                    <thead className="bg-slate-100/80 text-slate-600 font-bold border-b border-slate-200">
-                      <tr>
-                        <th className="p-2 w-10 text-center">
-                          <input type="checkbox" className="accent-purple-600" />
-                        </th>
-                        <th className="p-2">素材名称</th>
-                        <th className="p-2">素材ID</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200/60 text-slate-700">
-                      {pagedManualMaterials.map((item) => {
-                        const selected = manualSelectedMaterialIds.includes(item.id);
-                        return (
-                          <tr key={item.id} className="hover:bg-purple-50/50">
-                            <td className="p-2 text-center">
-                              <input
-                                type="checkbox"
-                                checked={selected}
-                                onChange={() => {
-                                  setManualSelectedMaterialIds(prev =>
-                                    prev.includes(item.id) ? prev.filter(i => i !== item.id) : [...prev, item.id]
-                                  );
-                                }}
-                                className="accent-purple-600 cursor-pointer"
-                              />
-                            </td>
-                            <td className="p-2 font-bold text-slate-800">{item.name}</td>
-                            <td className="p-2 font-mono text-slate-500">{item.id}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-
-                  <div className="p-2 bg-slate-100/60 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                    <span>共 {manualSelectedMaterialIds.length} 条已勾选</span>
-                  </div>
-                </div>
-                <AssetPagination
-                  total={filteredManualMaterials.length}
-                  page={currentManualMaterialPage}
-                  pageSize={manualMaterialPageSize}
-                  onPageChange={setManualMaterialPage}
-                  onPageSizeChange={(value) => {
-                    setManualMaterialPageSize(value);
-                    setManualMaterialPage(1);
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between shrink-0">
-              <span className="text-xs font-bold text-slate-600">已选: {manualSelectedMaterialIds.length}</span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowManualLinkModal(false)}
-                  className="px-4 py-2 border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl font-bold cursor-pointer transition-colors text-xs"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={() => {
-                    showToast("✅ 已成功保存关联素材！");
-                  }}
-                  className="px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-xl font-bold cursor-pointer transition-colors text-xs"
-                >
-                  保存
-                </button>
-                <button
-                  onClick={() => {
-                    showToast("🎉 已成功保存并关闭弹窗！");
-                    setShowManualLinkModal(false);
-                  }}
-                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold cursor-pointer transition-colors text-xs shadow-xs"
-                >
-                  保存并关闭弹窗
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal 2: 素材配对监控 (Screenshot 3) */}
-      {showMatchMonitorModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[130] flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-4 bg-purple-600 rounded-full" />
-                <h3 className="text-base font-extrabold text-slate-900">素材配对监控</h3>
-              </div>
-              <button
-                onClick={() => setShowMatchMonitorModal(false)}
-                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Help bar */}
-            <div className="px-6 py-2.5 bg-purple-50/50 border-b border-purple-100 text-xs flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2 text-slate-700 font-bold">
-                <span>选择要监控的广告账号：</span>
-                <button
-                  onClick={() => setShowMonitorInfoModal(true)}
-                  className="text-purple-600 hover:underline cursor-pointer flex items-center gap-1 font-bold"
-                >
-                  <span>查看功能说明</span>
-                  <HelpCircle className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Main Two Column Selector */}
-            <div className="p-6 grid grid-cols-1 md:grid-cols-12 gap-6 overflow-y-auto flex-1 text-xs">
-              {/* Left Column: Accounts Directory */}
-              <div className="md:col-span-7 border border-slate-200 rounded-2xl p-4 space-y-3 bg-white flex flex-col">
-                {/* Category Tabs */}
-                <div className="flex items-center gap-1.5 border-b border-slate-100 pb-2 overflow-x-auto scrollbar-none">
-                  {["收藏账户", "个人账户", "小组账户", "分类账户", "全部账户", "公司分组", "去授权"].map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => {
-                        setMonitorGroupTab(tab);
-                        setMonitorAccountPage(1);
-                      }}
-                      className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer whitespace-nowrap ${
-                        monitorGroupTab === tab
-                          ? "bg-purple-100 text-purple-700"
-                          : "text-slate-500 hover:text-slate-800"
-                      }`}
-                    >
-                      {tab}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Search Box */}
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    placeholder="请输入账户名称/id"
-                    value={monitorSearchInput}
-                    onChange={(e) => {
-                      setMonitorSearchInput(e.target.value);
-                      setMonitorAccountPage(1);
-                    }}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500/20 font-medium"
-                  />
-                </div>
-
-                {/* Accounts Checklist */}
-                <div className="flex-1 overflow-y-auto max-h-64 space-y-2 pr-1">
-                  {pagedMonitorAccounts.map((acc) => {
-                    const checked = monitoredAccountIds.includes(acc.id);
-                    return (
-                      <div
-                        key={acc.id}
-                        className={`p-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                          checked ? "bg-purple-50/70 border-purple-300" : "bg-slate-50 border-slate-200"
-                        }`}
-                        onClick={() => {
-                          setMonitoredAccountIds(prev =>
-                            prev.includes(acc.id) ? prev.filter(i => i !== acc.id) : [...prev, acc.id]
-                          );
-                        }}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => {}}
-                            className="accent-purple-600 cursor-pointer"
-                          />
-                          <div className="min-w-0">
-                            <p className="font-bold text-slate-900 truncate">{acc.name}</p>
-                            <p className="text-[10px] text-slate-400 font-mono">{acc.id}</p>
-                          </div>
-                        </div>
-                        <Star className="w-4 h-4 text-purple-500 fill-purple-500 shrink-0" />
-                      </div>
-                    );
-                  })}
-                </div>
-                <AssetPagination
-                  total={filteredMonitorAccounts.length}
-                  page={currentMonitorAccountPage}
-                  pageSize={monitorAccountPageSize}
-                  onPageChange={setMonitorAccountPage}
-                  onPageSizeChange={(value) => {
-                    setMonitorAccountPageSize(value);
-                    setMonitorAccountPage(1);
-                  }}
-                />
-              </div>
-
-              {/* Right Column: Selected Accounts */}
-              <div className="md:col-span-5 border border-slate-200 rounded-2xl p-4 space-y-3 bg-slate-50/50 flex flex-col">
-                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                  <span className="font-extrabold text-slate-800">已选账号 ({monitoredAccountIds.length})</span>
-                  {monitoredAccountIds.length > 0 && (
-                    <button
-                      onClick={() => setMonitoredAccountIds([])}
-                      className="text-[11px] text-purple-600 hover:underline cursor-pointer font-bold"
-                    >
-                      清空全部
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex-1 overflow-y-auto max-h-64 space-y-2 pr-1">
-                  {monitoredAccountIds.map((id) => (
-                    <div key={id} className="p-2.5 bg-white border border-slate-200 rounded-xl flex items-center justify-between">
-                      <div className="min-w-0 pr-2">
-                        <p className="font-bold text-slate-800 truncate text-[11px]">{id === "1815150855223564" ? "ell化妆品旗舰店-UDs-1" : id === "1788423177165833" ? "厦门十梦俪_ELL卸妆油1_童欣园" : `广告账户_${id}`}</p>
-                        <p className="text-[10px] text-slate-400 font-mono">{id}</p>
-                      </div>
-                      <button
-                        onClick={() => setMonitoredAccountIds(prev => prev.filter(i => i !== id))}
-                        className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
-              <button
-                onClick={() => setShowMatchMonitorModal(false)}
-                className="px-4 py-2 border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl font-bold cursor-pointer transition-colors text-xs"
-              >
-                取消
-              </button>
-              <button
-                onClick={() => {
-                  showToast("🔍 已成功保存素材配对监控设置！");
-                  setShowMatchMonitorModal(false);
-                }}
-                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold cursor-pointer transition-colors text-xs shadow-xs"
-              >
-                保存监控设置
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal 3: 已关联广告视频素材 (Screenshot 4) */}
-      {showLinkedAdMaterialsModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[130] flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-6xl overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-4 bg-purple-600 rounded-full" />
-                <h3 className="text-base font-extrabold text-slate-900">已关联素材</h3>
-              </div>
-              <button
-                onClick={() => setShowLinkedAdMaterialsModal(false)}
-                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Header Tabs */}
-            <div className="px-6 pt-3 bg-slate-50/50 border-b border-slate-100 flex items-center gap-6 text-xs font-bold shrink-0">
-              {(["素材明细数据", "素材汇总数据", "账户汇总数据"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setLinkedMaterialSubTab(tab)}
-                  className={`pb-2.5 border-b-2 transition-all cursor-pointer ${
-                    linkedMaterialSubTab === tab
-                      ? "border-purple-600 text-purple-600 font-extrabold"
-                      : "border-transparent text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-
-            {/* Search & Actions Bar */}
-            <div className="p-4 bg-white border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <select
-                  value={linkedMaterialPlatform}
-                  onChange={(e) => setLinkedMaterialPlatform(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 font-bold text-slate-700 focus:outline-none cursor-pointer"
-                >
-                  <option value="全部平台">全部平台</option>
-                  <option value="巨量千川">巨量千川</option>
-                  <option value="巨量广告">巨量广告</option>
-                  <option value="腾讯ADQ">腾讯ADQ</option>
-                  <option value="磁力智投">磁力智投</option>
-                </select>
-
-                <input
-                  type="text"
-                  placeholder="请输入账户名称/id"
-                  value={linkedMaterialAccountSearch}
-                  onChange={(e) => setLinkedMaterialAccountSearch(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none w-44 font-medium"
-                />
-
-                <input
-                  type="text"
-                  placeholder="请输入素材ID"
-                  value={linkedMaterialAssetSearch}
-                  onChange={(e) => setLinkedMaterialAssetSearch(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none w-44 font-medium"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    setShowLinkedAdMaterialsModal(false);
-                    setShowMatchMonitorModal(true);
-                  }}
-                  className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold cursor-pointer transition-colors shadow-2xs"
-                >
-                  素材配对监控
-                </button>
-                <button
-                  onClick={() => showToast("📥 已导出素材关联明细 Excel 表格")}
-                  className="px-3.5 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-xl font-bold cursor-pointer transition-colors shadow-2xs"
-                >
-                  导出
-                </button>
-              </div>
-            </div>
-
-            {/* Table Body */}
-            <div className="p-4 overflow-y-auto flex-1">
-              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
-                    <tr>
-                      <th className="p-3">广告账户</th>
-                      <th className="p-3">媒体</th>
-                      <th className="p-3">素材ID / 创意ID</th>
-                      <th className="p-3">点击率</th>
-                      <th className="p-3">点赞数</th>
-                      <th className="p-3">评论量</th>
-                      <th className="p-3">分享量</th>
-                      <th className="p-3">关联方式</th>
-                      <th className="p-3">关联时间</th>
-                      <th className="p-3">更新时间</th>
-                      <th className="p-3 text-right">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 text-slate-700 font-medium">
-                    {linkedAdMaterials.map((mat) => (
-                      <tr key={mat.id} className="hover:bg-purple-50/40 transition-colors">
-                        <td className="p-3">
-                          <p className="font-bold text-slate-900">{mat.accountName}</p>
-                          <p className="text-[10px] text-slate-400 font-mono">{mat.accountId}</p>
-                        </td>
-                        <td className="p-3">
-                          <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded-md text-[10px] font-bold">
-                            {mat.media}
-                          </span>
-                        </td>
-                        <td className="p-3 font-mono font-bold text-purple-900">{mat.assetId}</td>
-                        <td className="p-3 font-mono">{mat.ctr}</td>
-                        <td className="p-3 font-mono">{mat.likes.toLocaleString()}</td>
-                        <td className="p-3 font-mono">{mat.comments.toLocaleString()}</td>
-                        <td className="p-3 font-mono">{mat.shares.toLocaleString()}</td>
-                        <td className="p-3">
-                          <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[10px] font-bold">
-                            {mat.linkType}
-                          </span>
-                        </td>
-                        <td className="p-3 font-mono text-[11px] text-slate-500">{mat.linkTime}</td>
-                        <td className="p-3 font-mono text-[11px] text-slate-500">{mat.updateTime}</td>
-                        <td className="p-3 text-right">
-                          <button
-                            onClick={() => {
-                              setLinkedAdMaterials(prev => prev.filter(m => m.id !== mat.id));
-                              showToast(`🗑️ 已取消【${mat.assetId}】的素材关联`);
-                            }}
-                            className="text-purple-600 hover:text-purple-800 font-bold text-xs cursor-pointer hover:underline"
-                          >
-                            取消关联
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal 4: 如何同步 / 功能说明 Modal */}
-      {(showSyncHowToModal || showMonitorInfoModal) && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[140] flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden animate-in zoom-in-95 duration-150">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
-              <div className="flex items-center gap-2">
-                <HelpCircle className="w-4 h-4 text-purple-600" />
-                <h3 className="text-sm font-extrabold text-slate-900">如何同步: 历史已投放视频/抖音号视频数据说明</h3>
-              </div>
-              <button
-                onClick={() => {
-                  setShowSyncHowToModal(false);
-                  setShowMonitorInfoModal(false);
-                }}
-                className="p-1.5 hover:bg-slate-200/60 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4 text-xs">
-              <div className="p-3.5 bg-purple-50/80 rounded-2xl border border-purple-100 space-y-1.5">
-                <h4 className="font-extrabold text-purple-900 text-xs flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-                  1. 自动匹配与监控
-                </h4>
-                <p className="text-purple-800 text-[11px] leading-relaxed">
-                  系统会定期扫描已选广告账户/广告账户授权抖音号的视频，自动将视频与当前成片已关联的素材ID进行匹配，减少手动关联操作。（若成片未关联任何素材ID，系统无法进行自动匹配）
-                </p>
-              </div>
-
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
-                <h4 className="font-extrabold text-slate-900 text-xs flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                  2. 抖音首页视频跨账号关联
-                </h4>
-                <p className="text-slate-600 text-[11px] leading-relaxed">
-                  如果您将视频推送至广告账户A，再发布到抖音首页，随后用其他账户B、账户C、账户D选择抖音首页视频进行投放，开启对账户B、C、D的监控即可自动将投放数据归因关联回来。
-                </p>
-              </div>
-
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
-                <h4 className="font-extrabold text-slate-900 text-xs flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                  3. 历史30天数据同步与追溯
-                </h4>
-                <p className="text-slate-600 text-[11px] leading-relaxed">
-                  一旦匹配关联成功，系统会自动追溯这些视频素材的历史30天投放数据（包含消耗、ROI、播放量、完播率等），以及后续新产生的所有广告投放数据。
-                </p>
-              </div>
-            </div>
-
-            <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end">
-              <button
-                onClick={() => {
-                  setShowSyncHowToModal(false);
-                  setShowMonitorInfoModal(false);
-                }}
                 className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
               >
                 我知道了
@@ -6989,240 +5695,55 @@ export default function FinishedVideoDetailModal({
         </div>
       )}
 
-      {/* Modal 6: 分镜溯源与自动关联功能说明 */}
-      {showShotTraceHelpModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[150] flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-150">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-purple-50 to-white">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-purple-100 text-purple-600 rounded-xl">
-                  <HelpCircle className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-slate-900">分镜溯源与自动关联功能说明</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">全自动匹配素材片段，精准归因全库高价值镜头</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowShotTraceHelpModal(false)}
-                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {showAddAigcLinkModal && (
+        <VideoResourcePickerModal
+          items={availableAigcVideos}
+          initialSelectedIds={shotTraceMaterials.map((item) => item.id)}
+          initialSection="成片"
+          onClose={() => setShowAddAigcLinkModal(false)}
+          onConfirm={(selectedVideos) => {
+            setShotTraceMaterials(selectedVideos.map((video) => {
+              const currentItem = shotTraceMaterials.find((item) => item.id === video.id);
+              if (currentItem) return currentItem;
 
-            {/* Body */}
-            <div className="p-6 space-y-5 text-sm text-slate-700">
-              <div className="bg-purple-50/80 border border-purple-100 p-4 rounded-2xl space-y-1">
-                <p className="font-extrabold text-purple-900 text-sm">✨ 自动关联素材（分镜溯源）</p>
-                <p className="text-xs text-purple-800 leading-relaxed">
-                  全自动溯源，系统自动匹配素材片段，解放人力。自动预估素材使用时长/频次、消耗转化等数据，精准定位高价值素材。
-                </p>
-              </div>
-
-              <div className="space-y-3.5 pt-1">
-                <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-purple-600" />
-                  <span>使用三步曲流程：</span>
-                </h4>
-
-                <div className="space-y-3 pl-2">
-                  <div className="flex items-start gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <span className="px-2 py-0.5 bg-purple-600 text-white font-mono text-xs font-bold rounded-md shrink-0">步骤 1</span>
-                    <p className="text-xs text-slate-700 leading-relaxed font-medium">
-                      需由管理员统一在<strong className="text-purple-700">管理后台 - 系统管理 - 系统设置</strong>中，开启分镜溯源功能开关。
-                    </p>
-                  </div>
-
-                  <div className="flex items-start gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <span className="px-2 py-0.5 bg-purple-600 text-white font-mono text-xs font-bold rounded-md shrink-0">步骤 2</span>
-                    <div className="text-xs text-slate-700 space-y-1 font-medium">
-                      <p>
-                        开启功能后新上传素材，系统会在视频左下方自动添加<strong className="text-purple-700">「分镜溯源标识」</strong>，后续再使用带有标识的素材进行剪辑即可。
-                      </p>
-                      <p className="text-amber-600 font-bold text-[11px]">
-                        ⚠️ 注意：剪辑素材时请勿遮挡标识，否则会影响自动追溯关联。
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <span className="px-2 py-0.5 bg-purple-600 text-white font-mono text-xs font-bold rounded-md shrink-0">步骤 3</span>
-                    <p className="text-xs text-slate-700 leading-relaxed font-medium">
-                      后续上传成片即可，系统自动追溯关联素材镜头、并在视频详情内展示。
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-              <button
-                onClick={() => setShowShotTraceHelpModal(false)}
-                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-extrabold rounded-xl shadow-xs transition-all cursor-pointer"
-              >
-                知道了
-              </button>
-            </div>
-          </div>
-        </div>
+              const parsedDuration = Number.parseFloat(video.duration);
+              const durationNum = Number.isFinite(parsedDuration) ? parsedDuration : 10;
+              return {
+                id: video.id,
+                type: video.section,
+                code: video.id.replace(/\D/g, "").slice(-8) || String(Date.now()).slice(-8),
+                duration: `${durationNum.toFixed(1)}秒`,
+                durationNum,
+                title: video.name,
+                author: video.author,
+                avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
+                cover: video.cover,
+                date: "2025-05-18",
+                syncTime: "2025-05-18 14:20:00",
+                viewCount: 1,
+                useCount: 0,
+                color: video.section === "成片" ? "#8b5cf6" : "#06b6d4",
+              };
+            }));
+            setShowAddAigcLinkModal(false);
+            showToast(`已更新关联视频，共 ${selectedVideos.length} 项`);
+          }}
+        />
       )}
 
-      {/* Modal 7: 手动关联梦畅AIGC视频 */}
-      {showAddAigcLinkModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[150] flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
-              <div className="flex items-center gap-2">
-                <Link2 className="w-5 h-5 text-purple-600" />
-                <h3 className="text-base font-extrabold text-slate-900">关联梦畅AIGC视频</h3>
-              </div>
-              <button
-                onClick={() => {
-                  setShowAddAigcLinkModal(false);
-                  setSelectedAigcVideoId(null);
-                }}
-                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {showAdPushWorkspace && (
+        <AdAccountPushWorkspace
+          video={{ id: video.id, title: titleText, coverUrl: video.coverUrl }}
+          onClose={() => setShowAdPushWorkspace(false)}
+          onCreate={handleCreateAdPushTask}
+        />
+      )}
 
-            {/* Body */}
-            <div className="p-6 space-y-4 overflow-y-auto flex-1">
-              {/* Sub-tabs: 成片 | 素材 | 第三方 */}
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-                {(["成片", "素材", "第三方"] as const).map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => {
-                      setAigcLinkCategory(cat);
-                      setSelectedAigcVideoId(null);
-                      setAigcVideoPage(1);
-                    }}
-                    className={`px-4 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                      aigcLinkCategory === cat
-                        ? "bg-purple-600 text-white shadow-2xs"
-                        : "text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    关联{cat}
-                  </button>
-                ))}
-              </div>
-
-              {/* Search */}
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  placeholder={`搜索${aigcLinkCategory}名称或编号...`}
-                  value={aigcLinkSearch}
-                  onChange={(e) => {
-                    setAigcLinkSearch(e.target.value);
-                    setAigcVideoPage(1);
-                  }}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                />
-              </div>
-
-              {/* Video List Items */}
-              <div className="space-y-2">
-                {pagedAigcVideos.map((item) => (
-                  <div
-                    key={item.id}
-                    onClick={() => setSelectedAigcVideoId(item.id)}
-                    className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center gap-3 ${
-                      selectedAigcVideoId === item.id
-                        ? "bg-purple-50/80 border-purple-500 ring-2 ring-purple-500/20"
-                        : "bg-slate-50/60 border-slate-200/80 hover:bg-slate-50"
-                    }`}
-                  >
-                    <img src={item.cover} alt="" className="w-16 h-12 rounded-xl object-cover shrink-0" />
-                    <div className="flex-1 min-w-0 space-y-0.5">
-                      <h5 className="font-bold text-xs text-slate-800 truncate">{item.title}</h5>
-                      <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
-                        <span>ID: {item.code}</span>
-                        <span>•</span>
-                        <span>{item.author}</span>
-                        <span>•</span>
-                        <span>{item.duration}</span>
-                      </div>
-                    </div>
-                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
-                      selectedAigcVideoId === item.id ? "bg-purple-600 border-purple-600 text-white" : "border-slate-300"
-                    }`}>
-                      {selectedAigcVideoId === item.id && <Check className="w-3.5 h-3.5" />}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <AssetPagination
-                total={filteredAigcVideos.length}
-                page={currentAigcVideoPage}
-                pageSize={aigcVideoPageSize}
-                onPageChange={setAigcVideoPage}
-                onPageSizeChange={(value) => {
-                  setAigcVideoPageSize(value);
-                  setAigcVideoPage(1);
-                }}
-              />
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-xs text-slate-500">
-                已选择: <strong className="text-purple-600">{selectedAigcVideoId ? "1" : "0"}</strong> 项
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    setShowAddAigcLinkModal(false);
-                    setSelectedAigcVideoId(null);
-                  }}
-                  className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold rounded-xl transition-all cursor-pointer"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={() => {
-                    if (!selectedAigcVideoId) {
-                      showToast("⚠️ 请先选择要关联的视频!");
-                      return;
-                    }
-                    const newItem = {
-                      id: `shot_custom_${Date.now()}`,
-                      type: aigcLinkCategory,
-                      code: `3981${Math.floor(Math.random() * 8999 + 1000)}`,
-                      isAuto: false,
-                      duration: "10.0秒",
-                      durationNum: 10.0,
-                      title: `【${aigcLinkCategory}】手动关联视频素材片段_${aigcLinkCategory}`,
-                      author: "梦畅AIGC",
-                      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
-                      cover: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&auto=format&fit=crop&q=80",
-                      date: "2025-05-18",
-                      syncTime: "2025-05-18 14:20:00",
-                      viewCount: 1,
-                      useCount: 1,
-                      color: "#a855f7"
-                    };
-                    setShotTraceMaterials(prev => [newItem, ...prev]);
-                    setShowAddAigcLinkModal(false);
-                    setSelectedAigcVideoId(null);
-                    showToast(`🎉 已成功手动关联梦畅AIGC${aigcLinkCategory}视频素材!`);
-                  }}
-                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-extrabold rounded-xl shadow-xs transition-all cursor-pointer"
-                >
-                  确认关联
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {showPushRecordsModal && (
+        <PushRecordsModal
+          records={adPushRecords}
+          onClose={() => setShowPushRecordsModal(false)}
+        />
       )}
 
     </div>

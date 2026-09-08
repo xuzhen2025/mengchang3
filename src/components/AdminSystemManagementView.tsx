@@ -51,7 +51,7 @@ import {
   FolderPlus,
   Star
 } from "lucide-react";
-import { DeptNode, AccountMember, INITIAL_DEPTS, INITIAL_MEMBERS } from "./AccountManagementView";
+import { DeptNode, AccountMember, INITIAL_DEPTS, INITIAL_MEMBERS } from "../data/adminAccounts";
 import AssetPagination from "./AssetPagination";
 
 type SystemTabType =
@@ -111,7 +111,6 @@ export const USER_CLIENT_PERMISSION_TREE: PermissionNode[] = [
       { id: "uc_agent_run", label: "使用 Agent 创作" },
       { id: "uc_remake_run", label: "发起爆款复刻" },
       { id: "uc_ai_video_generate", label: "生成 AI 视频" },
-      { id: "uc_ai_image_generate", label: "生成 AI 图片" },
       { id: "uc_canvas_edit", label: "使用画布编辑" },
       { id: "uc_canvas_export", label: "导出画布结果" },
     ]
@@ -180,7 +179,7 @@ export const USER_CLIENT_PERMISSION_TREE: PermissionNode[] = [
     children: [
       { id: "uc_live_overview", label: "查看直播首页" },
       { id: "uc_live_account_manage", label: "绑定/解绑直播账号" },
-      { id: "uc_live_team_view", label: "查看直播团队" },
+      { id: "uc_live_team_view", label: "查看直播部门成员" },
       { id: "uc_live_team_manage", label: "新增/编辑/删除员工" },
       { id: "uc_live_room_data", label: "查看直播间与场次数据" },
       { id: "uc_live_data_export", label: "导出直播数据" },
@@ -299,7 +298,7 @@ const mergePermissionKeys = (...groups: string[][]): string[] => Array.from(new 
 
 const CONTENT_CREATOR_KEYS = [
   ...BASIC_USER_KEYS,
-  "uc_quick_create", "uc_agent_run", "uc_remake_run", "uc_ai_video_generate", "uc_ai_image_generate", "uc_canvas_edit",
+  "uc_quick_create", "uc_agent_run", "uc_remake_run", "uc_ai_video_generate", "uc_canvas_edit",
   "uc_finished_upload", "uc_finished_edit", "uc_finished_status", "uc_finished_download", "uc_finished_share",
   "uc_material_upload", "uc_material_edit", "uc_material_download", "uc_material_category",
   "uc_script_create", "uc_script_edit", "uc_media_manage", "uc_task_edit", "uc_task_complete"
@@ -516,7 +515,7 @@ const INITIAL_ROLES: RolePermission[] = [
     dataScope: "dept_tree",
     enabled: true,
     checkedKeys: [
-      ...BASIC_USER_KEYS, "uc_ai_image_generate", "uc_canvas_edit", "uc_finished_edit", "uc_script_create", "uc_script_edit", "uc_task_edit"
+      ...BASIC_USER_KEYS, "uc_canvas_edit", "uc_finished_edit", "uc_script_create", "uc_script_edit", "uc_task_edit"
     ],
     permissions: [],
     updatedAt: "2026-07-15 17:10"
@@ -627,7 +626,7 @@ const INITIAL_ROLES: RolePermission[] = [
     code: "DEPT_HEAD",
     type: "preset",
     category: "other",
-    description: "管理本部门及下级团队的任务、内容、数据与积分审批",
+    description: "管理本部门及下级分组的任务、内容、数据与积分审批",
     memberCount: 5,
     dataScope: "dept_tree",
     enabled: true,
@@ -784,7 +783,7 @@ export const INITIAL_NOTIFICATION_CATEGORIES: NotificationCategory[] = [
       {
         id: "ai_generation_completed",
         title: "AI生成完成",
-        description: "AI 图片、视频或批量裂变任务完成时发送，并展示成功数量和积分消耗",
+        description: "AI 视频或爆款复刻任务完成时发送，并展示成功数量和积分消耗",
         recipients: "AI 任务发起人",
         enabled: true,
         channels: { system: true }
@@ -2203,7 +2202,7 @@ export default function AdminSystemManagementView() {
       id: "AG-001",
       platform: "巨量广告",
       name: "广告分组",
-      viewTeam: "华东运营团队",
+      viewTeam: "华东运营部",
       viewGroup: "核心投手一组",
       viewUsers: ["一凡最帅", "罗福强", "童欣园"],
       accountIds: ["1779353789485063", "1785333912040523", "1785879574627594"],
@@ -2250,7 +2249,7 @@ export default function AdminSystemManagementView() {
   );
 
   // 下拉可选项
-  const availableTeamsList = ["华东运营团队", "电商事业部", "品牌营销部", "海外推广团队"];
+  const availableTeamsList = ["华东运营部", "电商事业部", "品牌营销部", "海外推广部"];
   const availableGroupsList = ["核心投手一组", "第二投放组", "第一投放组", "千川第一组"];
   const availableUsersList = ["一凡最帅", "罗福强", "童欣园", "张小梅", "李强", "陈斌"];
   const availableCategoriesList = ["卸妆油类目", "核心精选", "备选类目", "爆款连衣裙", "防晒系列"];
@@ -2364,8 +2363,8 @@ export default function AdminSystemManagementView() {
         id: `AG-${Date.now().toString().slice(-4)}`,
         platform: adPlatform,
         name: groupFormName,
-        viewTeam: groupFormTeam || "全部团队",
-        viewGroup: groupFormGroup || "全部小组",
+        viewTeam: groupFormTeam || "全部部门",
+        viewGroup: groupFormGroup || "全部分组",
         viewUsers: groupFormUsers,
         accountIds: groupFormAccountIds,
       };
@@ -2584,7 +2583,7 @@ export default function AdminSystemManagementView() {
     return (
       <div className="flex items-center gap-4 pl-18 pt-1">
         <div className="flex items-center gap-2">
-          <span className="text-slate-500 font-normal">团队:</span>
+          <span className="text-slate-500 font-normal">部门:</span>
           <select
             value={scope.team}
             onChange={(e) => updateScope("team", e.target.value)}
@@ -2597,7 +2596,7 @@ export default function AdminSystemManagementView() {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-slate-500 font-normal">小组:</span>
+          <span className="text-slate-500 font-normal">分组:</span>
           <select
             value={scope.group}
             onChange={(e) => updateScope("group", e.target.value)}
@@ -4103,7 +4102,7 @@ export default function AdminSystemManagementView() {
                       <span className="w-16 shrink-0 text-right">{row.label}</span>
                       
                       <div className="flex items-center gap-2 flex-1">
-                        <span className="text-slate-400 font-normal shrink-0">小组成员</span>
+                        <span className="text-slate-400 font-normal shrink-0">分组成员</span>
                         <input
                           type="number"
                           value={val.group}
@@ -4118,7 +4117,7 @@ export default function AdminSystemManagementView() {
                       </div>
 
                       <div className="flex items-center gap-2 flex-1">
-                        <span className="text-slate-400 font-normal shrink-0">团队成员</span>
+                        <span className="text-slate-400 font-normal shrink-0">部门成员</span>
                         <input
                           type="number"
                           value={val.team}
@@ -4185,7 +4184,7 @@ export default function AdminSystemManagementView() {
                       <span className="w-16 shrink-0 text-right">{row.label}</span>
                       
                       <div className="flex items-center gap-2 flex-1">
-                        <span className="text-slate-400 font-normal shrink-0">小组成员</span>
+                        <span className="text-slate-400 font-normal shrink-0">分组成员</span>
                         <input
                           type="number"
                           value={val.group}
@@ -4200,7 +4199,7 @@ export default function AdminSystemManagementView() {
                       </div>
 
                       <div className="flex items-center gap-2 flex-1">
-                        <span className="text-slate-400 font-normal shrink-0">团队成员</span>
+                        <span className="text-slate-400 font-normal shrink-0">部门成员</span>
                         <input
                           type="number"
                           value={val.team}
@@ -4253,7 +4252,7 @@ export default function AdminSystemManagementView() {
 
               <div className="pt-2 flex items-center gap-8 max-w-4xl text-xs font-bold text-slate-700">
                 <div className="flex items-center gap-2 flex-1">
-                  <span className="text-slate-400 font-normal shrink-0">小组成员</span>
+                  <span className="text-slate-400 font-normal shrink-0">分组成员</span>
                   <input
                     type="number"
                     value={pushDaysRules.group}
@@ -4263,7 +4262,7 @@ export default function AdminSystemManagementView() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-1">
-                  <span className="text-slate-400 font-normal shrink-0">团队成员</span>
+                  <span className="text-slate-400 font-normal shrink-0">部门成员</span>
                   <input
                     type="number"
                     value={pushDaysRules.team}
@@ -4342,7 +4341,7 @@ export default function AdminSystemManagementView() {
                   {extLoginMode === "scope" && (
                     <div className="flex items-center gap-4 pl-18 pt-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-slate-500 font-normal">团队:</span>
+                        <span className="text-slate-500 font-normal">部门:</span>
                         <select
                           value={extLoginTeam}
                           onChange={(e) => setExtLoginTeam(e.target.value)}
@@ -4355,7 +4354,7 @@ export default function AdminSystemManagementView() {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <span className="text-slate-500 font-normal">小组:</span>
+                        <span className="text-slate-500 font-normal">分组:</span>
                         <select
                           value={extLoginGroup}
                           onChange={(e) => setExtLoginGroup(e.target.value)}
@@ -4462,8 +4461,8 @@ export default function AdminSystemManagementView() {
                 <span className="text-rose-500 mr-1">* 允许项</span>
                 {[
                   { key: "public", label: "公开" },
-                  { key: "team", label: "团队范围可见" },
-                  { key: "group", label: "小组范围可见" },
+                  { key: "team", label: "部门范围可见" },
+                  { key: "group", label: "分组范围可见" },
                   { key: "publicResource", label: "公用资源", hasHelp: true },
                   { key: "specifiedScope", label: "指定范围" },
                   { key: "afterDateAll", label: "到设定日期后，所有人可查看" },
@@ -5384,8 +5383,8 @@ export default function AdminSystemManagementView() {
                               <td className="py-3.5 px-5">
                                 <div className="text-xs space-y-1 text-slate-600">
                                   <div>
-                                    <span className="text-slate-400">团队：</span>
-                                    {group.viewTeam || "所有团队"}
+                                    <span className="text-slate-400">部门：</span>
+                                    {group.viewTeam || "所有部门"}
                                   </div>
                                   <div>
                                     <span className="text-slate-400">用户：</span>
@@ -5653,7 +5652,7 @@ export default function AdminSystemManagementView() {
                       谁能查看
                     </label>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500 w-12 text-right">团队：</span>
+                      <span className="text-xs text-slate-500 w-12 text-right">部门：</span>
                       <select
                         value={groupFormTeam}
                         onChange={(e) => setGroupFormTeam(e.target.value)}

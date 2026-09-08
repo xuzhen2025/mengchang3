@@ -308,7 +308,7 @@ export default function TaskAnalyticsView({ showToast }: TaskAnalyticsViewProps)
         { name: "抖音投放", color: "#06B6D4" }
       ];
 
-  // Values matching Screenshot 1 Peak (B团队=2, 默认团队=1 on 2025-04-07)
+  // Values matching Screenshot 1 Peak (B部门=2, 默认部门=1 on 2025-04-07)
   const chartPoints = [
     { date: "2025-04-06", bTeam: 0, defaultTeam: 0, aTeam: 0, cTeam: 0, douyin: 0 },
     { date: "2025-04-07", bTeam: 2, defaultTeam: 1, aTeam: 0, cTeam: 0, douyin: 0 },
@@ -423,7 +423,7 @@ export default function TaskAnalyticsView({ showToast }: TaskAnalyticsViewProps)
             ))}
           </div>
 
-          {/* Entity Selector Dropdown (请选择团队 / 请选择分组 / 请选择账号) */}
+          {/* Entity Selector Dropdown (请选择部门 / 请选择分组 / 请选择账号) */}
           <div className="relative">
             <button
               onClick={() => setShowFilterDropdown(!showFilterDropdown)}
@@ -438,7 +438,7 @@ export default function TaskAnalyticsView({ showToast }: TaskAnalyticsViewProps)
             {/* Popover Content */}
             {showFilterDropdown && (
               <div className="absolute left-0 top-full mt-1.5 bg-white rounded-xl shadow-2xl border border-slate-200 p-2 z-40 animate-fade-in text-xs min-w-[220px]">
-                {/* 1. If 团队数据 -> Checklist of Teams (Matches Screenshot 2) */}
+                {/* 1. If 部门数据 -> Checklist of departments (Matches Screenshot 2) */}
                 {topTab === "team" && (
                   <div className="space-y-1 max-h-60 overflow-y-auto">
                     {MOCK_TREE.map((t) => (

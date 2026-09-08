@@ -185,7 +185,7 @@ export default function HomeView({
       details: [
         { label: "提示发起人", value: "张立 (致上运营)" },
         { label: "上传成片", value: "冬季风衣短视频_01.mp4" },
-        { label: "触发动作", value: "资源库上传成片并选择提示团队成员" },
+        { label: "触发动作", value: "资源库上传成片并选择提示部门成员" },
         { label: "网页链接", value: "http://ygj-zssoft.sucaicloud.com/#/video-detail/42021437", isLink: true }
       ]
     },
@@ -259,7 +259,7 @@ export default function HomeView({
       category: "预约", 
       subcategory: "轮到你的预约", 
       title: "轮到你预约计算",
-      detail: "GPU 专属云端渲染排队提醒：轮到您的 [4K 爆款裂变生成] 任务开始计算，预计耗时 3 分钟。", 
+      detail: "GPU 专属云端渲染排队提醒：轮到您的 [4K 爆款复刻生成] 任务开始计算，预计耗时 3 分钟。",
       status: "unread", 
       time: "2026-07-31 16:10",
       details: [
@@ -305,11 +305,11 @@ export default function HomeView({
       category: "任务", 
       subcategory: "任务关联新视频", 
       title: "任务关联新视频通知",
-      detail: "任务《美妆多场景商详套图》已自动关联最新渲染出来的 5 条素材视频。", 
+      detail: "任务《美妆多场景成片复刻》已关联 5 条最新渲染的素材视频。",
       status: "unread", 
       time: "2026-07-31 10:20",
       details: [
-        { label: "关联任务", value: "美妆多场景商详套图" },
+        { label: "关联任务", value: "美妆多场景成片复刻" },
         { label: "新增视频", value: "5 条 (4K渲染纯享)" },
         { label: "生成时间", value: "2026-07-31 10:20:00" }
       ]
@@ -506,7 +506,7 @@ export default function HomeView({
     {
       version: "v2.7.2",
       date: "2026-07-08",
-      title: "爆款裂变工作台全新重组算法",
+      title: "爆款复刻工作台全新重组算法",
       tag: "性能提升",
       description: "一键上传多条原片，平台自动完成分镜拆解、音画去重与视觉贴片，无缝对接主流电商投放平台。",
       contents: [

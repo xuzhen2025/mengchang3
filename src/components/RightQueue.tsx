@@ -93,7 +93,7 @@ export default function RightQueue({
             </div>
             <p className="text-slate-500 text-xs font-semibold">暂无进行中的创意任务</p>
             <p className="text-[10px] text-slate-400 mt-1 max-w-[200px] leading-relaxed">
-              使用商详套图、画质增强或AI图片视频工具，生成结果将在此实时呈现。
+              使用AI视频原料、快速创作、画质增强或爆款复刻工具，生成结果将在此实时呈现。
             </p>
           </div>
         ) : (

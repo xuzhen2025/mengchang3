@@ -139,7 +139,7 @@ export default function UploadImageModal({
   const [imageDescription, setImageDescription] = useState("");
 
   // Permission Settings States
-  const [permission, setPermission] = useState<"公开" | "团队成员" | "小组成员" | "公用资源" | "指定范围">("公开");
+  const [permission, setPermission] = useState<"公开" | "部门成员" | "分组成员" | "公用资源" | "指定范围">("公开");
   const [scheduledDate, setScheduledDate] = useState("");
   const [receiver, setReceiver] = useState("");
   const [messageContent, setMessageContent] = useState("");
@@ -1094,7 +1094,7 @@ export default function UploadImageModal({
                   <span className="text-rose-500 mr-1">*</span>图片查看权限
                 </label>
                 <div className="flex items-center gap-5 text-xs font-bold text-slate-700">
-                  {(["公开", "团队成员", "小组成员", "公用资源", "指定范围"] as const).map((opt) => (
+                  {(["公开", "部门成员", "分组成员", "公用资源", "指定范围"] as const).map((opt) => (
                     <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
                       <input
                         type="radio"

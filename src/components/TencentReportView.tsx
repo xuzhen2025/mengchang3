@@ -47,7 +47,7 @@ const DETAIL_ROWS = [
 ];
 
 export default function TencentReportView({ showToast }: TencentReportViewProps) {
-  // 1. Top Tabs: 团队数据 | 分组数据 | 个人数据 (Reference Screenshot 1)
+  // 1. Top Tabs: 部门数据 | 分组数据 | 个人数据 (Reference Screenshot 1)
   const [topTab, setTopTab] = useState<"team" | "group" | "individual">("team");
 
   // 2. View Mode Toggle: 汇总 | 明细 (Reference Screenshot 1)
@@ -208,7 +208,7 @@ export default function TencentReportView({ showToast }: TencentReportViewProps)
               </button>
             </div>
 
-            {/* Entity Selector (请选择团队 / 请选择分组 / 请选择个人) */}
+            {/* Entity Selector (请选择部门 / 请选择分组 / 请选择个人) */}
             <div className="relative">
               <select
                 value={selectedEntity}

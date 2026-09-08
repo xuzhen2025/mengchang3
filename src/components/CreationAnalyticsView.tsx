@@ -448,7 +448,7 @@ export default function CreationAnalyticsView({ showToast }: CreationAnalyticsVi
             {/* Popover Content */}
             {showFilterDropdown && (
               <div className="absolute left-0 top-full mt-1.5 bg-white rounded-xl shadow-2xl border border-slate-200 p-2 z-40 animate-fade-in text-xs min-w-[220px]">
-                {/* 1. If 团队数据 -> Checklist of Teams (Matches Screenshot 2) */}
+                {/* 1. If 部门数据 -> Checklist of departments (Matches Screenshot 2) */}
                 {topTab === "team" && (
                   <div className="space-y-1 max-h-60 overflow-y-auto">
                     {MOCK_TREE.map((t) => (
