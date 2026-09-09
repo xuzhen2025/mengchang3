@@ -53,6 +53,8 @@ import {
 } from "lucide-react";
 import { DeptNode, AccountMember, INITIAL_DEPTS, INITIAL_MEMBERS } from "../data/adminAccounts";
 import AssetPagination from "./AssetPagination";
+import { useViralVideoRule } from "../lib/useViralVideoRule";
+import { isValidViralVideoRule, saveViralVideoRule, type ViralVideoRule } from "../lib/viralVideoRule";
 
 type SystemTabType =
   | "depts"
@@ -1891,8 +1893,33 @@ export default function AdminSystemManagementView() {
   const [videoFormatMode, setVideoFormatMode] = useState<"transcoded" | "original">("transcoded");
 
   // 2. 爆款视频的规则
-  const [hotVideoType, setHotVideoType] = useState<"monthly" | "total">("monthly");
-  const [hotVideoThreshold, setHotVideoThreshold] = useState<number>(10);
+  const { rule: viralVideoRule } = useViralVideoRule();
+  const [hotVideoType, setHotVideoType] = useState<ViralVideoRule["period"]>(viralVideoRule.period);
+  const [hotVideoThreshold, setHotVideoThreshold] = useState(String(viralVideoRule.thresholdWan));
+  const [hotVideoError, setHotVideoError] = useState("");
+  const hotVideoThresholdRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    setHotVideoType(viralVideoRule.period);
+    setHotVideoThreshold(String(viralVideoRule.thresholdWan));
+    setHotVideoError("");
+  }, [viralVideoRule]);
+
+  const saveHotVideoSettings = () => {
+    const next = { period: hotVideoType, thresholdWan: Number(hotVideoThreshold) };
+    if (!isValidViralVideoRule(next)) {
+      setHotVideoError("请输入有效且大于0的消耗门槛。");
+      hotVideoThresholdRef.current?.focus();
+      return;
+    }
+    try {
+      saveViralVideoRule(next);
+      setHotVideoError("");
+      showToast("爆款视频设置已保存！");
+    } catch {
+      setHotVideoError("保存失败，原规则仍有效，请检查浏览器存储后重试。");
+    }
+  };
 
   // 3. 功能开关管理
   const [featureSwitches, setFeatureSwitches] = useState({
@@ -4813,7 +4840,7 @@ export default function AdminSystemManagementView() {
         {activeTab === "auto_tags" && (
           <div className="space-y-6 pb-12">
             {/* 1. 爆款视频 */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
+            <div data-testid="viral-video-settings" className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
               <div className="flex items-center gap-2 border-l-4 border-[#7C3AED] pl-2.5">
                 <h3 className="text-sm font-extrabold text-slate-900">爆款视频</h3>
               </div>
@@ -4822,8 +4849,9 @@ export default function AdminSystemManagementView() {
                 <div className="flex items-center gap-3 text-xs font-bold text-slate-700">
                   <span className="shrink-0 text-slate-600">成片</span>
                   <select
+                    aria-label="爆款判定指标"
                     value={hotVideoType}
-                    onChange={(e) => setHotVideoType(e.target.value as any)}
+                    onChange={(e) => { setHotVideoType(e.target.value as ViralVideoRule["period"]); setHotVideoError(""); }}
                     className="px-3 py-1.5 border border-slate-200 focus:border-[#7C3AED] rounded-xl text-xs font-bold text-slate-800 bg-white shadow-2xs outline-none cursor-pointer"
                   >
                     <option value="monthly">月消耗</option>
@@ -4831,22 +4859,29 @@ export default function AdminSystemManagementView() {
                   </select>
                   <span className="text-slate-600">达到</span>
                   <input
+                    ref={hotVideoThresholdRef}
+                    aria-label="爆款消耗门槛（万元）"
+                    aria-invalid={Boolean(hotVideoError)}
+                    aria-describedby={hotVideoError ? "viral-video-rule-error" : undefined}
                     type="number"
+                    min="0.000001"
+                    step="any"
                     value={hotVideoThreshold}
-                    onChange={(e) => setHotVideoThreshold(Number(e.target.value))}
-                    className="w-28 px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:border-[#7C3AED] outline-none text-center"
+                    onChange={(e) => { setHotVideoThreshold(e.target.value); setHotVideoError(""); }}
+                    className={`w-28 px-3 py-1.5 border rounded-xl text-xs font-bold text-slate-800 outline-none text-center ${hotVideoError ? "border-rose-500" : "border-slate-200 focus:border-[#7C3AED]"}`}
                   />
                   <span className="text-slate-600">万，自动设置为爆款视频</span>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => showToast("爆款视频设置已保存！")}
+                  onClick={saveHotVideoSettings}
                   className="px-5 py-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
                 >
                   保存设置
                 </button>
               </div>
+              {hotVideoError && <p id="viral-video-rule-error" role="alert" className="text-xs text-rose-600">{hotVideoError}</p>}
             </div>
 
             {/* 2. 保护标签 */}

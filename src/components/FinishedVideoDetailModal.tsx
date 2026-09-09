@@ -1,5 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
 import LinkScriptModal from "./LinkScriptModal";
+import ResourceTagModal from "./ResourceTagModal";
+import OverlayPortal from "./overlays/OverlayPortal";
+import { ResourceCategoryModal, VideoStatusSelect } from "./ResourceEditDialog";
+import { appendById, toRelatedVideo, VideoResourceMetadata } from "../lib/resourceBatch";
+import { DEFAULT_ASSOCIATED_SCRIPTS, DEFAULT_RELATED_VIDEOS, RELATED_VIDEO_OPTIONS, AssociatedScript } from "../data/videoResourceOptions";
+export { CATEGORY_TREE, PERSONAL_TAG_GROUPS, PUBLIC_TAG_GROUPS } from "../data/videoResourceOptions";
+export type { AssociatedScript } from "../data/videoResourceOptions";
 import ReferencedVideosProduced from "./ReferencedVideosProduced";
 import AssetPagination from "./AssetPagination";
 import VideoResourcePickerModal, { VideoResourcePickerItem } from "./VideoResourcePickerModal";
@@ -95,13 +102,13 @@ export interface UsedMaterial {
   category?: string;
 }
 
-export interface FinishedVideo {
+export interface FinishedVideo extends VideoResourceMetadata {
   id: string;
   title: string;
   videoUrl: string;
   coverUrl: string;
   duration: string;
-  resolution: "720p" | "1080p" | "2K";
+  resolution: string;
   size: string;
   creator: "ai" | "human";
   aiModel?: string;
@@ -201,40 +208,6 @@ function MengchangWingedLogo({ className = "w-9 h-6" }: { className?: string }) 
   );
 }
 
-export const CATEGORY_TREE = [
-  { name: "彩妆香水", subs: ["唇膏口红", "香水底妆", "眼影彩盘", "卸妆洁面"] },
-  { name: "宠物食品", subs: ["猫粮", "狗粮", "零食罐头", "宠物保健品"] },
-  { name: "宠物用品", subs: ["猫砂猫盆", "宠物玩具", "牵引驱虫", "清洁洗护"] },
-  { name: "婴童尿裤", subs: ["婴儿纸尿裤", "拉拉裤", "湿巾/纸巾"] },
-  { name: "奶粉辅食", subs: ["一段奶粉", "二段奶粉", "三段奶粉", "营养辅食"] },
-  { name: "婴童用品", subs: ["童车童床", "婴儿洗护", "喂养用品"] },
-  { name: "个护美妆", subs: ["美妆", "面部护肤", "身体护理", "洗护发"] },
-  { name: "服饰内衣", subs: ["女装", "男装", "内衣家居", "鞋靴箱包"] },
-];
-
-export const PERSONAL_TAG_GROUPS: Record<string, string[]> = {
-  "Zs测试一": ["Zs1", "Zs2", "Zs3"],
-  "Zs测试二": ["A1", "A2", "测试标签"]
-};
-
-export const PUBLIC_TAG_GROUPS: Record<string, string[]> = {
-  "模特": ["张三", "里斯", "溜溜", "王五", "娃娃", "事事", "琪琪", "久久", "苏逸飞", "沈知许"],
-  "场景": ["室内展厅", "户外公园", "直播间", "办公室", "家庭生活", "街拍"],
-  "合作达人": ["美妆小达人", "生活测评官", "种草狂魔", "时尚指南"],
-  "脚本类型": ["纯混剪", "痛点剧本", "口播测评", "拆箱体验"],
-  "创新点": ["视觉冲击", "强勾子", "对比反转", "开箱震撼"],
-  "编导姓名": ["张编", "王编", "李编", "刘编"]
-};
-
-export interface AssociatedScript {
-  id: string;
-  title: string;
-  template: string;
-  tag: string;
-  status: string;
-  publisher: string;
-  publishTime: string;
-}
 
 export interface OperationLogItem {
   id: string;
@@ -251,6 +224,7 @@ interface FinishedVideoDetailModalProps {
   onSyncToAd?: (video: FinishedVideo) => void;
   isMaterialMode?: boolean;
   initialTagModal?: "public" | "personal";
+  onUpdate?: (patch: VideoResourceMetadata) => boolean | void;
   isAdminMode?: boolean;
 }
 
@@ -656,6 +630,7 @@ export default function FinishedVideoDetailModal({
   onSyncToAd,
   isMaterialMode = false,
   initialTagModal,
+  onUpdate,
   isAdminMode = false
 }: FinishedVideoDetailModalProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -676,26 +651,14 @@ export default function FinishedVideoDetailModal({
   // Video Info Form Fields
   const [categoryText, setCategoryText] = useState(video.category || "个护 / 美妆");
   const [showModifyCategoryModal, setShowModifyCategoryModal] = useState(false);
-  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
-  const [selectedPrimaryCat, setSelectedPrimaryCat] = useState("宠物食品");
-  const [tempCategoryPath, setTempCategoryPath] = useState("");
   const [titleText, setTitleText] = useState(video.title || "视频标题1");
   const [showModifyTitleModal, setShowModifyTitleModal] = useState(false);
   const [tempTitleText, setTempTitleText] = useState("");
-  const [publicTags, setPublicTags] = useState(["纯混剪", "对比: 有对比", "白茶: 白茶产品3"]);
+  const [publicTags, setPublicTags] = useState<string[]>(video.tags || []);
   const [showPublicTagModal, setShowPublicTagModal] = useState(initialTagModal === "public");
-  const [publicGroupSearch, setPublicGroupSearch] = useState("");
-  const [publicSubSearch, setPublicSubSearch] = useState("");
-  const [selectedPublicGroupKey, setSelectedPublicGroupKey] = useState("模特");
-  const [tempAddedPublicTags, setTempAddedPublicTags] = useState<string[]>(["纯混剪"]);
-  const [publicPresetTab, setPublicPresetTab] = useState<"我的预设" | "分享给我">("我的预设");
 
-  const [personalTags, setPersonalTags] = useState<string[]>([]);
+  const [personalTags, setPersonalTags] = useState<string[]>(video.personalTags || []);
   const [showPersonalTagModal, setShowPersonalTagModal] = useState(initialTagModal === "personal");
-  const [personalGroupSearch, setPersonalGroupSearch] = useState("");
-  const [personalSubSearch, setPersonalSubSearch] = useState("");
-  const [selectedPersonalGroupKey, setSelectedPersonalGroupKey] = useState("Zs测试一");
-  const [tempAddedPersonalTags, setTempAddedPersonalTags] = useState<string[]>([]);
   const [videoStatus, setVideoStatus] = useState(video.status || "已上机");
   const [isChangingStatus, setIsChangingStatus] = useState(false);
   const [videoNotes, setVideoNotes] = useState("");
@@ -862,17 +825,7 @@ export default function FinishedVideoDetailModal({
 
   // Associated Scripts State
   const [showRelatedScriptsModal, setShowRelatedScriptsModal] = useState(false);
-  const [associatedScripts, setAssociatedScripts] = useState<AssociatedScript[]>([
-    {
-      id: "script_1",
-      title: "剪辑脚本_5",
-      template: "AI分镜拆解",
-      tag: "ces1...",
-      status: "1",
-      publisher: "zcl8",
-      publishTime: "2025-04-17 16:37:32"
-    }
-  ]);
+  const [associatedScripts, setAssociatedScripts] = useState<AssociatedScript[]>(video.associatedScripts || DEFAULT_ASSOCIATED_SCRIPTS);
   const [showScriptDetailModal, setShowScriptDetailModal] = useState(false);
   const [selectedScriptDetail, setSelectedScriptDetail] = useState<AssociatedScript | null>(null);
   const [showAddScriptModal, setShowAddScriptModal] = useState(false);
@@ -1090,72 +1043,13 @@ export default function FinishedVideoDetailModal({
   const [shotTraceTab, setShotTraceTab] = useState<"引用视频镜头" | "被引用后出片">("引用视频镜头");
   const [isEditingLink, setIsEditingLink] = useState(false);
   const [showAddAigcLinkModal, setShowAddAigcLinkModal] = useState(false);
-  const [shotTraceMaterials, setShotTraceMaterials] = useState([
-    {
-      id: "shot_1",
-      type: "素材",
-      code: "38945245",
-      duration: "16.7秒",
-      durationNum: 16.7,
-      title: "张玲静 | 口播（实拍素材）",
-      author: "张玲静",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
-      cover: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&auto=format&fit=crop&q=80",
-      date: "2025-05-05",
-      syncTime: "2025-05-18 03:30:12",
-      viewCount: 10,
-      useCount: 6,
-      color: "#a855f7"
-    },
-    {
-      id: "shot_2",
-      type: "素材",
-      code: "37333498",
-      duration: "14.3秒",
-      durationNum: 14.3,
-      title: "叶闯红 | 上脸-磨皮版（纯净",
-      author: "叶闯红",
-      avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80",
-      cover: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&auto=format&fit=crop&q=80",
-      date: "2025-04-19",
-      syncTime: "2025-05-18 03:30:12",
-      viewCount: 12,
-      useCount: 11,
-      color: "#3b82f6"
-    },
-    {
-      id: "shot_3",
-      type: "素材",
-      code: "38951233",
-      duration: "6.3秒",
-      durationNum: 6.3,
-      title: "姐妹种草团 | 全网可用 | E",
-      author: "姐妹种草团",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
-      cover: "https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=400&auto=format&fit=crop&q=80",
-      date: "2025-05-05",
-      syncTime: "2025-05-18 03:30:12",
-      viewCount: 15,
-      useCount: 12,
-      color: "#eab308"
-    },
-    {
-      id: "shot_4",
-      type: "素材",
-      code: "39363858",
-      duration: "4.3秒",
-      durationNum: 4.3,
-      title: "非模特岗 | 纯净版 | 上脸-",
-      author: "非模特岗",
-      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80",
-      cover: "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=400&auto=format&fit=crop&q=80",
-      date: "2025-05-08",
-      syncTime: "2025-05-18 03:30:12",
-      viewCount: 8,
-      useCount: 1,
-      color: "#06b6d4"
-    }
-  ]);
+  const [shotTraceMaterials, setShotTraceMaterials] = useState(video.relatedVideos || DEFAULT_RELATED_VIDEOS);
+  const relatedDuration = shotTraceMaterials.reduce((sum, item) => sum + item.durationNum, 0);
+  const relatedBreakdown = shotTraceMaterials.map((item, index) => ({
+    ...item,
+    percent: relatedDuration ? item.durationNum / relatedDuration * 100 : 0,
+    offset: relatedDuration ? shotTraceMaterials.slice(0, index).reduce((sum, video) => sum + video.durationNum, 0) / relatedDuration * 100 : 0,
+  }));
 
   const availableAigcVideos: VideoResourcePickerItem[] = [
     ...shotTraceMaterials.map((item) => ({
@@ -1171,86 +1065,7 @@ export default function FinishedVideoDetailModal({
       duration: item.duration,
       size: "--",
     })),
-    ...([
-      {
-        id: "aigc-finished-39810234",
-        name: "高奢美妆精油近景特写成片.mp4",
-        cover: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&auto=format&fit=crop&q=80",
-        status: "生成成功",
-        section: "成片" as const,
-        primaryCategory: "商品展示",
-        secondaryCategory: "美妆护肤",
-        tags: ["美妆", "近景"],
-        author: "梦畅AI智能剪辑",
-        duration: "12.5秒",
-        size: "18.6 MB",
-      },
-      {
-        id: "aigc-finished-39810235",
-        name: "夏日素颜上脸效果展示成片.mp4",
-        cover: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&auto=format&fit=crop&q=80",
-        status: "生成成功",
-        section: "成片" as const,
-        primaryCategory: "达人口播",
-        secondaryCategory: "效果展示",
-        tags: ["模特", "上脸"],
-        author: "创意生成组",
-        duration: "18.2秒",
-        size: "24.3 MB",
-      },
-      {
-        id: "aigc-finished-39810236",
-        name: "清爽控油产品功能演示成片.mp4",
-        cover: "https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=400&auto=format&fit=crop&q=80",
-        status: "生成成功",
-        section: "成片" as const,
-        primaryCategory: "商品展示",
-        secondaryCategory: "功能演示",
-        tags: ["控油", "演示"],
-        author: "徐振",
-        duration: "15.0秒",
-        size: "20.8 MB",
-      },
-      {
-        id: "aigc-material-39810237",
-        name: "精油瓶身旋转特写素材.mp4",
-        cover: "https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=400&auto=format&fit=crop&q=80",
-        status: "可用",
-        section: "素材" as const,
-        primaryCategory: "产品素材",
-        secondaryCategory: "产品特写",
-        tags: ["精油", "静物"],
-        author: "商品素材组",
-        duration: "6.8秒",
-        size: "9.4 MB",
-      },
-      {
-        id: "aigc-material-39810238",
-        name: "模特涂抹精华近景素材.mp4",
-        cover: "https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?w=400&auto=format&fit=crop&q=80",
-        status: "可用",
-        section: "素材" as const,
-        primaryCategory: "人物素材",
-        secondaryCategory: "上脸实拍",
-        tags: ["模特", "护肤"],
-        author: "达人授权素材",
-        duration: "9.6秒",
-        size: "13.1 MB",
-      },
-      {
-        id: "aigc-material-39810239",
-        name: "控油效果前后对比素材.mp4",
-        cover: "https://images.unsplash.com/photo-1612817288484-6f916006741a?w=400&auto=format&fit=crop&q=80",
-        status: "可用",
-        section: "素材" as const,
-        primaryCategory: "效果素材",
-        secondaryCategory: "对比展示",
-        tags: ["控油", "对比"],
-        author: "徐振",
-        duration: "8.4秒",
-        size: "11.7 MB",
-      },
-    ] satisfies VideoResourcePickerItem[]).filter(
+    ...RELATED_VIDEO_OPTIONS.filter(
       (option) => !shotTraceMaterials.some((item) => item.id === option.id),
     ),
   ];
@@ -1348,6 +1163,15 @@ export default function FinishedVideoDetailModal({
     }));
   };
 
+  const updateMetadata = (patch: VideoResourceMetadata) => {
+    if (onUpdate?.(patch) === false) {
+      setToastMsg("保存失败，请检查浏览器存储空间后重新操作");
+      window.setTimeout(() => setToastMsg(null), 4000);
+      return false;
+    }
+    return true;
+  };
+
   const showToast = (_msg: string) => {
     // Disabled toast prompts per user request
   };
@@ -1366,10 +1190,10 @@ export default function FinishedVideoDetailModal({
       
       {/* Toast floating banner */}
       {toastMsg && (
-        <div className="fixed top-6 right-6 bg-purple-900/95 text-white text-xs font-bold px-4 py-3 rounded-2xl shadow-2xl z-50 flex items-center gap-2 border border-purple-400/30 animate-bounce">
+        <OverlayPortal layer="toast" role="alert" className="fixed top-6 right-6 bg-purple-900/95 text-white text-xs font-bold px-4 py-3 rounded-2xl shadow-2xl z-50 flex items-center gap-2 border border-purple-400/30 animate-bounce">
           <Zap className="w-4 h-4 text-purple-300" />
           <span>{toastMsg}</span>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* Main Page Container */}
@@ -2567,9 +2391,6 @@ export default function FinishedVideoDetailModal({
                           <span>{categoryText}</span>
                           <button
                             onClick={() => {
-                              setTempCategoryPath(categoryText);
-                              setSelectedPrimaryCat("宠物食品");
-                              setIsCategoryDropdownOpen(true);
                               setShowModifyCategoryModal(true);
                             }}
                             className="text-slate-400 hover:text-purple-600 cursor-pointer transition-colors p-0.5 flex items-center gap-1 text-xs font-normal"
@@ -2614,7 +2435,6 @@ export default function FinishedVideoDetailModal({
 
                         <button
                           onClick={() => {
-                            setTempAddedPublicTags([...publicTags]);
                             setShowPublicTagModal(true);
                           }}
                           className="text-purple-600 hover:text-purple-700 font-bold text-xs flex items-center gap-1 cursor-pointer py-1 hover:underline"
@@ -2632,7 +2452,10 @@ export default function FinishedVideoDetailModal({
                           <span key={idx} className="bg-purple-50 text-purple-700 px-2.5 py-1 rounded-lg text-xs font-medium border border-purple-100 flex items-center gap-1">
                             <span>{tag}</span>
                             <button
-                              onClick={() => setPersonalTags(personalTags.filter((_, i) => i !== idx))}
+                              onClick={() => {
+                                const next = personalTags.filter((_, i) => i !== idx);
+                                if (updateMetadata({ personalTags: next })) setPersonalTags(next);
+                              }}
                               className="text-purple-400 hover:text-rose-500 ml-0.5 cursor-pointer text-xs"
                               title="删除标签"
                             >
@@ -2643,7 +2466,6 @@ export default function FinishedVideoDetailModal({
 
                         <button
                           onClick={() => {
-                            setTempAddedPersonalTags([...personalTags]);
                             setShowPersonalTagModal(true);
                           }}
                           className="text-purple-600 hover:text-purple-700 font-bold text-xs flex items-center gap-1 cursor-pointer py-1 hover:underline"
@@ -2671,28 +2493,13 @@ export default function FinishedVideoDetailModal({
                         <div className="flex items-center gap-2">
                           {isChangingStatus ? (
                             <div className="flex items-center gap-1.5">
-                              <select
-                                value={videoStatus}
-                                onChange={(e) => {
-                                  const newStatus = e.target.value;
-                                  if (newStatus !== videoStatus) {
-                                    addOperationLog("修改状态", videoStatus, newStatus);
-                                    setVideoStatus(newStatus);
-                                    showToast(`✅ 状态修改成功，现为: [${newStatus}]`);
-                                  }
-                                  setIsChangingStatus(false);
-                                }}
-                                className="px-2.5 py-1 bg-white border border-purple-300 rounded-lg text-xs font-bold text-purple-900 focus:outline-none cursor-pointer shadow-2xs"
-                              >
-                                <option value="待审核">待审核</option>
-                                <option value="审核通过">审核通过</option>
-                                <option value="审核驳回">审核驳回</option>
-                                <option value="已修改">已修改</option>
-                                <option value="二次修改">二次修改</option>
-                                <option value="已上机">已上机</option>
-                                <option value={isMaterialMode ? "画面利用" : "已搭"}>{isMaterialMode ? "画面利用" : "已搭"}</option>
-                                <option value="放弃">放弃</option>
-                              </select>
+                              <VideoStatusSelect value={videoStatus} isMaterialMode={isMaterialMode} onChange={newStatus => {
+                                if (!updateMetadata({ status: newStatus })) return;
+                                if (newStatus !== videoStatus) addOperationLog("修改状态", videoStatus, newStatus);
+                                setVideoStatus(newStatus);
+                                setIsChangingStatus(false);
+                                showToast(`状态修改成功，现为：${newStatus}`);
+                              }} />
                               <button
                                 onClick={() => setIsChangingStatus(false)}
                                 className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
@@ -4046,71 +3853,30 @@ export default function FinishedVideoDetailModal({
                           fill="none"
                           d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                         />
-                        {/* Segment 1: Purple 39.9% */}
-                        <path
-                          className="text-purple-500"
-                          strokeWidth="5"
-                          strokeDasharray="39.9, 100"
-                          strokeDashoffset="0"
-                          stroke="currentColor"
-                          fill="none"
-                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                        />
-                        {/* Segment 2: Blue 34.2% */}
-                        <path
-                          className="text-blue-500"
-                          strokeWidth="5"
-                          strokeDasharray="34.2, 100"
-                          strokeDashoffset="-39.9"
-                          stroke="currentColor"
-                          fill="none"
-                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                        />
-                        {/* Segment 3: Yellow 15.1% */}
-                        <path
-                          className="text-amber-400"
-                          strokeWidth="5"
-                          strokeDasharray="15.1, 100"
-                          strokeDashoffset="-74.1"
-                          stroke="currentColor"
-                          fill="none"
-                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                        />
-                        {/* Segment 4: Cyan 10.8% */}
-                        <path
-                          className="text-cyan-400"
-                          strokeWidth="5"
-                          strokeDasharray="10.8, 100"
-                          strokeDashoffset="-89.2"
-                          stroke="currentColor"
-                          fill="none"
-                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                        />
+                        {relatedBreakdown.map(item => <path key={item.id}
+                          strokeWidth="5" strokeDasharray={`${item.percent}, 100`}
+                          strokeDashoffset={-item.offset} stroke={item.color} fill="none"
+                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />)}
                       </svg>
                       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                         <span className="text-[9px] text-slate-400 font-bold">总时长</span>
-                        <span className="text-xs font-black text-slate-800 font-mono">41.6s</span>
+                        <span className="text-xs font-black text-slate-800 font-mono">{relatedDuration.toFixed(1)}s</span>
                       </div>
                     </div>
 
                     {/* Legend List */}
                     <div className="flex-1 space-y-1.5 min-w-0">
-                      {[
-                        { label: "公共资源...", val: "16.7", color: "bg-purple-500", barColor: "bg-purple-400", pct: "40%" },
-                        { label: "天翔组 闻...", val: "14.3", color: "bg-blue-500", barColor: "bg-blue-400", pct: "34%" },
-                        { label: "素颜霜...", val: "6.3", color: "bg-amber-400", barColor: "bg-amber-300", pct: "15%" },
-                        { label: "奔现上脸...", val: "4.3", color: "bg-cyan-400", barColor: "bg-cyan-300", pct: "11%" }
-                      ].map((item, i) => (
+                      {relatedBreakdown.map((item, i) => (
                         <div key={i} className="text-xs space-y-0.5">
                           <div className="flex items-center justify-between text-[10px]">
                             <div className="flex items-center gap-1 min-w-0">
-                              <span className={`w-2 h-2 rounded-xs shrink-0 ${item.color}`} />
-                              <span className="text-slate-600 font-medium truncate max-w-[75px]">{item.label}</span>
+                              <span className="w-2 h-2 rounded-xs shrink-0" style={{ backgroundColor: item.color }} />
+                              <span className="text-slate-600 font-medium truncate max-w-[75px]">{item.title}</span>
                             </div>
-                            <span className="font-mono font-bold text-purple-700 shrink-0 ml-1">{item.val}</span>
+                            <span className="font-mono font-bold text-purple-700 shrink-0 ml-1">{item.durationNum.toFixed(1)}</span>
                           </div>
                           <div className="w-full bg-slate-100 h-1 rounded-full overflow-hidden">
-                            <div className={`h-full ${item.barColor} rounded-full`} style={{ width: item.pct }} />
+                            <div className="h-full rounded-full" style={{ width: `${item.percent}%`, backgroundColor: item.color }} />
                           </div>
                         </div>
                       ))}
@@ -4171,7 +3937,9 @@ export default function FinishedVideoDetailModal({
                             <div className="pointer-events-auto shrink-0 flex items-center">
                               <button
                                 onClick={() => {
-                                  setShotTraceMaterials(prev => prev.filter(m => m.id !== item.id));
+                                  const next = shotTraceMaterials.filter(m => m.id !== item.id);
+                                  if (!updateMetadata({ relatedVideos: next })) return;
+                                  setShotTraceMaterials(next);
                                   showToast(`🗑️ 已取消关联该素材镜头 (${item.code})`);
                                 }}
                                 className="bg-purple-600 hover:bg-purple-700 text-white text-[9px] font-extrabold px-1.5 h-4.5 rounded-md shadow-md transition-all cursor-pointer flex items-center gap-0.5 leading-none"
@@ -4230,136 +3998,15 @@ export default function FinishedVideoDetailModal({
 
       </div>
 
-      {/* 修改分类 Modal */}
-      {showModifyCategoryModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[110] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-4 bg-purple-600 rounded-full"></span>
-                <h3 className="text-base font-extrabold text-slate-900 tracking-tight">修改分类</h3>
-              </div>
-              <button
-                onClick={() => {
-                  setShowModifyCategoryModal(false);
-                  setIsCategoryDropdownOpen(false);
-                }}
-                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-8 space-y-6 min-h-[320px] pb-32">
-              <div className="flex items-start gap-4 pt-2">
-                <label className="text-xs font-bold text-slate-700 shrink-0 pt-2.5 flex items-center">
-                  <span className="text-rose-500 font-bold mr-1">*</span>
-                  <span>分类</span>
-                </label>
-
-                <div className="relative flex-1">
-                  {/* Cascading Select Trigger Input */}
-                  <div
-                    onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
-                    className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-xs font-medium cursor-pointer flex items-center justify-between transition-all shadow-2xs ${
-                      isCategoryDropdownOpen
-                        ? "border-purple-500 ring-2 ring-purple-100 shadow-xs"
-                        : "border-purple-300 hover:border-purple-400"
-                    }`}
-                  >
-                    <span className={tempCategoryPath ? "text-slate-800 font-bold" : "text-slate-400"}>
-                      {tempCategoryPath || "请选择分类"}
-                    </span>
-                    <ChevronDown className={`w-4 h-4 text-purple-400 transition-transform duration-200 ${isCategoryDropdownOpen ? "rotate-180 text-purple-600" : ""}`} />
-                  </div>
-
-                  {/* Cascading Options Dropdown */}
-                  {isCategoryDropdownOpen && (
-                    <div className="absolute top-full left-0 mt-1 z-50 bg-white rounded-2xl shadow-2xl border border-slate-200/90 w-[360px] flex divide-x divide-slate-100 overflow-hidden text-xs animate-in fade-in duration-100">
-                      {/* Primary Categories Column */}
-                      <div className="w-1/2 py-1 max-h-64 overflow-y-auto space-y-0.5">
-                        {CATEGORY_TREE.map((cat) => (
-                          <div
-                            key={cat.name}
-                            onMouseEnter={() => setSelectedPrimaryCat(cat.name)}
-                            onClick={() => {
-                              setSelectedPrimaryCat(cat.name);
-                              if (!cat.subs || cat.subs.length === 0) {
-                                setTempCategoryPath(cat.name);
-                                setCategoryText(cat.name);
-                                setIsCategoryDropdownOpen(false);
-                                setShowModifyCategoryModal(false);
-                                showToast(`✅ 已分类修改为：${cat.name}`);
-                              }
-                            }}
-                            className={`px-3.5 py-2.5 flex items-center justify-between cursor-pointer transition-colors ${
-                              selectedPrimaryCat === cat.name
-                                ? "bg-purple-50 text-purple-700 font-bold"
-                                : "hover:bg-slate-50 text-slate-700 font-medium"
-                            }`}
-                          >
-                            <span>{cat.name}</span>
-                            <ChevronRight className={`w-3.5 h-3.5 ${selectedPrimaryCat === cat.name ? "text-purple-600" : "text-slate-300"}`} />
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Secondary Categories / Subcategories Column */}
-                      <div className="w-1/2 py-1 max-h-64 overflow-y-auto space-y-0.5 bg-white">
-                        {(CATEGORY_TREE.find(c => c.name === selectedPrimaryCat)?.subs || []).map((sub) => (
-                          <div
-                            key={sub}
-                            onClick={() => {
-                              const selectedVal = `${selectedPrimaryCat} / ${sub}`;
-                              setTempCategoryPath(selectedVal);
-                              setCategoryText(selectedVal);
-                              setIsCategoryDropdownOpen(false);
-                              setShowModifyCategoryModal(false);
-                              showToast(`✅ 已成功修改视频分类为：${selectedVal}`);
-                            }}
-                            className="px-3.5 py-2.5 hover:bg-purple-50 hover:text-purple-700 text-slate-700 cursor-pointer font-medium transition-colors"
-                          >
-                            {sub}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end gap-2">
-              <button
-                onClick={() => {
-                  setShowModifyCategoryModal(false);
-                  setIsCategoryDropdownOpen(false);
-                }}
-                className="px-4 py-1.5 bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-              >
-                取消
-              </button>
-              <button
-                onClick={() => {
-                  if (tempCategoryPath && tempCategoryPath !== categoryText) {
-                    addOperationLog("类目变更", categoryText, tempCategoryPath);
-                    setCategoryText(tempCategoryPath);
-                    showToast(`✅ 已成功保存分类为：${tempCategoryPath}`);
-                  }
-                  setShowModifyCategoryModal(false);
-                  setIsCategoryDropdownOpen(false);
-                }}
-                className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
-              >
-                确定
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showModifyCategoryModal && <ResourceCategoryModal initialCategory={categoryText}
+        onClose={() => setShowModifyCategoryModal(false)}
+        onConfirm={category => {
+          if (!updateMetadata({ category })) return;
+          if (category !== categoryText) addOperationLog("类目变更", categoryText, category);
+          setCategoryText(category);
+          setShowModifyCategoryModal(false);
+          showToast(`已成功保存分类为：${category}`);
+        }} />}
 
       {/* 编辑标题 Modal */}
       {showModifyTitleModal && (
@@ -4426,7 +4073,7 @@ export default function FinishedVideoDetailModal({
 
       {/* 关联脚本 Modal */}
       {showRelatedScriptsModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[110] flex items-center justify-center p-4">
+        <OverlayPortal role="dialog" aria-modal="true" aria-label="关联脚本" className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
@@ -4513,7 +4160,9 @@ export default function FinishedVideoDetailModal({
                               </button>
                               <button
                                 onClick={() => {
-                                  setAssociatedScripts(associatedScripts.filter(s => s.id !== scr.id));
+                                  const next = associatedScripts.filter(s => s.id !== scr.id);
+                                  if (!updateMetadata({ associatedScripts: next })) return;
+                                  setAssociatedScripts(next);
                                   showToast(`已取消关联脚本《${scr.title}》`);
                                 }}
                                 className="text-purple-600 hover:text-purple-800 font-medium cursor-pointer hover:underline"
@@ -4549,7 +4198,7 @@ export default function FinishedVideoDetailModal({
               </button>
             </div>
           </div>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* 选择关联新脚本 Modal */}
@@ -4559,18 +4208,13 @@ export default function FinishedVideoDetailModal({
         onConfirm={(selected) => {
           const chosen = Array.isArray(selected) ? selected[0] : selected;
           if (chosen) {
-            setAssociatedScripts((prev) => [
-              ...prev,
-              {
-                id: chosen.id,
-                title: chosen.title,
-                template: chosen.template || "通用模板",
-                tag: chosen.tags?.[0] || "痛点库",
-                status: chosen.status || "通过",
-                publisher: chosen.publisher || "管理员",
-                publishTime: chosen.publishTime || new Date().toLocaleString(),
-              }
-            ]);
+            const next = appendById(associatedScripts, [{
+              id: chosen.id, title: chosen.title, template: chosen.template || "通用模板",
+              tag: chosen.tags?.[0] || "", status: chosen.status || "待审核",
+              publisher: chosen.publisher || "", publishTime: chosen.publishTime || new Date().toLocaleString(),
+            }]);
+            if (!updateMetadata({ associatedScripts: next })) return false;
+            setAssociatedScripts(next);
             showToast(`✅ 已关联脚本《${chosen.title}》`);
           }
         }}
@@ -4641,344 +4285,22 @@ export default function FinishedVideoDetailModal({
         </div>
       )}
 
-      {/* 关联个人标签 Modal */}
-      {showPersonalTagModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[110] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-4 bg-purple-600 rounded-full"></span>
-                <h3 className="text-base font-extrabold text-slate-900 tracking-tight">关联个人标签</h3>
-              </div>
-              <button
-                onClick={() => setShowPersonalTagModal(false)}
-                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="p-6 space-y-4">
-              <div>
-                <button
-                  onClick={() => showToast("进入编辑个人标签模式")}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs"
-                >
-                  编辑个人标签
-                </button>
-              </div>
-
-              {/* 3 Columns */}
-              <div className="grid grid-cols-3 gap-3.5 h-[380px]">
-                {/* Col 1: 标签组 */}
-                <div className="border border-slate-200/80 rounded-xl overflow-hidden flex flex-col bg-white">
-                  <div className="bg-slate-100/90 text-slate-700 text-xs font-bold py-2.5 px-3.5 border-b border-slate-200/80">
-                    标签组
-                  </div>
-                  <div className="p-3 flex-1 flex flex-col overflow-hidden">
-                    <input
-                      type="text"
-                      placeholder="请输入标签组名称"
-                      value={personalGroupSearch}
-                      onChange={(e) => setPersonalGroupSearch(e.target.value)}
-                      className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-100 mb-2.5"
-                    />
-                    <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-                      {Object.keys(PERSONAL_TAG_GROUPS)
-                        .filter(g => g.includes(personalGroupSearch.trim()))
-                        .map((group) => (
-                          <div
-                            key={group}
-                            onClick={() => setSelectedPersonalGroupKey(group)}
-                            className={`px-3 py-2 rounded-lg cursor-pointer text-xs font-medium transition-colors ${
-                              selectedPersonalGroupKey === group
-                                ? "text-purple-600 font-bold bg-purple-50/80"
-                                : "text-slate-700 hover:bg-slate-50"
-                            }`}
-                          >
-                            {group}
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Col 2: 子标签 */}
-                <div className="border border-slate-200/80 rounded-xl overflow-hidden flex flex-col bg-white">
-                  <div className="bg-slate-100/90 text-slate-700 text-xs font-bold py-2.5 px-3.5 border-b border-slate-200/80">
-                    子标签
-                  </div>
-                  <div className="p-3 flex-1 flex flex-col overflow-hidden">
-                    <input
-                      type="text"
-                      placeholder="请输入标签名称"
-                      value={personalSubSearch}
-                      onChange={(e) => setPersonalSubSearch(e.target.value)}
-                      className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-100 mb-2.5"
-                    />
-                    <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
-                      {(PERSONAL_TAG_GROUPS[selectedPersonalGroupKey] || [])
-                        .filter(sub => sub.includes(personalSubSearch.trim()))
-                        .map((subTag) => {
-                          const isChecked = tempAddedPersonalTags.includes(subTag);
-                          return (
-                            <label
-                              key={subTag}
-                              className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer hover:text-purple-700 select-none"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => {
-                                  if (isChecked) {
-                                    setTempAddedPersonalTags(tempAddedPersonalTags.filter(t => t !== subTag));
-                                  } else {
-                                    setTempAddedPersonalTags([...tempAddedPersonalTags, subTag]);
-                                  }
-                                }}
-                                className="w-3.5 h-3.5 rounded text-purple-600 focus:ring-purple-500 border-slate-300"
-                              />
-                              <span>{subTag}</span>
-                            </label>
-                          );
-                        })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Col 3: 已添加标签 */}
-                <div className="border border-slate-200/80 rounded-xl overflow-hidden flex flex-col bg-white">
-                  <div className="bg-slate-100/90 text-slate-700 text-xs font-bold py-2.5 px-3.5 border-b border-slate-200/80">
-                    已添加标签
-                  </div>
-                  <div className="p-3 flex-1 overflow-y-auto">
-                    {tempAddedPersonalTags.length === 0 ? (
-                      <div className="text-slate-400 text-xs pt-4 text-left">
-                        暂未添加标签
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {tempAddedPersonalTags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="bg-purple-50 text-purple-700 border border-purple-100 text-xs px-2.5 py-1 rounded-lg flex items-center gap-1 font-medium"
-                          >
-                            <span>{tag}</span>
-                            <button
-                              onClick={() => setTempAddedPersonalTags(tempAddedPersonalTags.filter(t => t !== tag))}
-                              className="text-purple-400 hover:text-rose-500 ml-0.5 cursor-pointer"
-                            >
-                              ×
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-3.5 bg-slate-50/50 border-t border-slate-100 flex items-center justify-end gap-2.5">
-              <button
-                onClick={() => setShowPersonalTagModal(false)}
-                className="px-5 py-1.5 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-              >
-                取消
-              </button>
-              <button
-                onClick={() => {
-                  setPersonalTags([...tempAddedPersonalTags]);
-                  showToast("✅ 已同步个人标签设置");
-                  setShowPersonalTagModal(false);
-                }}
-                className="px-5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
-              >
-                确定
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 关联公共标签 Modal */}
-      {showPublicTagModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[110] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-4 bg-purple-600 rounded-full"></span>
-                <h3 className="text-base font-extrabold text-slate-900 tracking-tight">关联公共标签</h3>
-              </div>
-              <button
-                onClick={() => setShowPublicTagModal(false)}
-                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="p-6">
-              <div className="grid grid-cols-3 gap-3.5 h-[380px]">
-                {/* Col 1: 标签组 */}
-                <div className="border border-slate-200/80 rounded-xl overflow-hidden flex flex-col bg-white">
-                  <div className="bg-slate-100/90 text-slate-700 text-xs font-bold py-2.5 px-3.5 border-b border-slate-200/80 flex items-center justify-between">
-                    <span>标签组</span>
-                    <button
-                      onClick={() => showToast("已刷新标签组")}
-                      className="text-purple-600 hover:underline text-xs font-normal cursor-pointer"
-                    >
-                      刷新
-                    </button>
-                  </div>
-                  <div className="p-3 flex-1 flex flex-col overflow-hidden">
-                    <input
-                      type="text"
-                      placeholder="请输入标签组名称"
-                      value={publicGroupSearch}
-                      onChange={(e) => setPublicGroupSearch(e.target.value)}
-                      className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-100 mb-2.5"
-                    />
-                    <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-                      {Object.keys(PUBLIC_TAG_GROUPS)
-                        .filter(g => g.includes(publicGroupSearch.trim()))
-                        .map((group) => (
-                          <div
-                            key={group}
-                            onClick={() => setSelectedPublicGroupKey(group)}
-                            className={`px-3 py-2 rounded-lg cursor-pointer text-xs font-medium transition-colors ${
-                              selectedPublicGroupKey === group
-                                ? "text-purple-600 font-bold bg-purple-50/80"
-                                : "text-slate-700 hover:bg-slate-50"
-                            }`}
-                          >
-                            {group}
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Col 2: 子标签 */}
-                <div className="border border-slate-200/80 rounded-xl overflow-hidden flex flex-col bg-white">
-                  <div className="bg-slate-100/90 text-slate-700 text-xs font-bold py-2.5 px-3.5 border-b border-slate-200/80 flex items-center justify-between">
-                    <span>子标签</span>
-                    <button
-                      onClick={() => showToast("弹出添加子标签弹窗")}
-                      className="text-purple-600 hover:underline text-xs font-normal cursor-pointer"
-                    >
-                      + 添加子标签
-                    </button>
-                  </div>
-                  <div className="p-3 flex-1 flex flex-col overflow-hidden">
-                    <input
-                      type="text"
-                      placeholder="请输入标签名称"
-                      value={publicSubSearch}
-                      onChange={(e) => setPublicSubSearch(e.target.value)}
-                      className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-100 mb-2.5"
-                    />
-                    <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
-                      {(PUBLIC_TAG_GROUPS[selectedPublicGroupKey] || [])
-                        .filter(sub => sub.includes(publicSubSearch.trim()))
-                        .map((subTag) => {
-                          const isChecked = tempAddedPublicTags.includes(subTag);
-                          return (
-                            <label
-                              key={subTag}
-                              className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer hover:text-purple-700 select-none"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => {
-                                  if (isChecked) {
-                                    setTempAddedPublicTags(tempAddedPublicTags.filter(t => t !== subTag));
-                                  } else {
-                                    setTempAddedPublicTags([...tempAddedPublicTags, subTag]);
-                                  }
-                                }}
-                                className="w-3.5 h-3.5 rounded text-purple-600 focus:ring-purple-500 border-slate-300"
-                              />
-                              <span>{subTag}</span>
-                            </label>
-                          );
-                        })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Col 3: 已添加标签 */}
-                <div className="border border-slate-200/80 rounded-xl overflow-hidden flex flex-col bg-white">
-                  <div className="bg-slate-100/90 text-slate-700 text-xs font-bold py-2.5 px-3.5 border-b border-slate-200/80 flex items-center justify-between">
-                    <span>已添加标签</span>
-                    <button
-                      onClick={() => showToast("已保存当前选择为预设")}
-                      className="text-purple-600 hover:underline text-xs font-normal cursor-pointer"
-                    >
-                      保存为预设
-                    </button>
-                  </div>
-                  <div className="p-3 flex-1 overflow-y-auto">
-                    {tempAddedPublicTags.length === 0 ? (
-                      <div className="text-slate-400 text-xs pt-4 text-left">
-                        暂未添加标签
-                      </div>
-                    ) : (
-                      <div className="space-y-1.5">
-                        {tempAddedPublicTags.map((tag) => (
-                          <div
-                            key={tag}
-                            className="bg-slate-50 border border-slate-100 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg flex items-center justify-between font-medium hover:bg-slate-100/80 transition-colors"
-                          >
-                            <span>{tag}</span>
-                            <button
-                              onClick={() => setTempAddedPublicTags(tempAddedPublicTags.filter(t => t !== tag))}
-                              className="text-slate-400 hover:text-rose-500 cursor-pointer ml-2"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-3.5 bg-slate-50/50 border-t border-slate-100 flex items-center justify-end gap-2.5">
-              <button
-                onClick={() => setShowPublicTagModal(false)}
-                className="px-5 py-1.5 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-              >
-                取消
-              </button>
-              <button
-                onClick={() => {
-                  const oldTagsStr = publicTags.join(", ") || "无";
-                  const newTagsStr = tempAddedPublicTags.join(", ") || "无";
-                  if (oldTagsStr !== newTagsStr) {
-                    addOperationLog("修改公共标签", oldTagsStr, newTagsStr);
-                  }
-                  setPublicTags([...tempAddedPublicTags]);
-                  showToast("✅ 已同步公共标签设置");
-                  setShowPublicTagModal(false);
-                }}
-                className="px-5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
-              >
-                确定
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showPersonalTagModal && <ResourceTagModal kind="personal" initialTags={personalTags}
+        showToast={showToast} onClose={() => setShowPersonalTagModal(false)}
+        onConfirm={tags => {
+          if (!updateMetadata({ personalTags: tags })) return false;
+          addOperationLog("修改个人标签", personalTags.join(", ") || "无", tags.join(", ") || "无");
+          setPersonalTags(tags);
+          showToast("已同步个人标签设置");
+        }} />}
+      {showPublicTagModal && <ResourceTagModal kind="public" initialTags={publicTags}
+        showToast={showToast} onClose={() => setShowPublicTagModal(false)}
+        onConfirm={tags => {
+          if (!updateMetadata({ tags })) return false;
+          addOperationLog("修改公共标签", publicTags.join(", ") || "无", tags.join(", ") || "无");
+          setPublicTags(tags);
+          showToast("已同步公共标签设置");
+        }} />}
 
       {/* 操作记录 Modal */}
       {showOperationLogsModal && (
@@ -5703,32 +5025,12 @@ export default function FinishedVideoDetailModal({
           initialSelectedIds={shotTraceMaterials.map((item) => item.id)}
           initialSection="成片"
           onClose={() => setShowAddAigcLinkModal(false)}
-          onConfirm={(selectedVideos) => {
-            setShotTraceMaterials(selectedVideos.map((video) => {
-              const currentItem = shotTraceMaterials.find((item) => item.id === video.id);
-              if (currentItem) return currentItem;
-
-              const parsedDuration = Number.parseFloat(video.duration);
-              const durationNum = Number.isFinite(parsedDuration) ? parsedDuration : 10;
-              return {
-                id: video.id,
-                type: video.section,
-                code: video.id.replace(/\D/g, "").slice(-8) || String(Date.now()).slice(-8),
-                duration: `${durationNum.toFixed(1)}秒`,
-                durationNum,
-                title: video.name,
-                author: video.author,
-                avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
-                cover: video.cover,
-                date: "2025-05-18",
-                syncTime: "2025-05-18 14:20:00",
-                viewCount: 1,
-                useCount: 0,
-                color: video.section === "成片" ? "#8b5cf6" : "#06b6d4",
-              };
-            }));
+          onConfirm={selectedVideos => {
+            const next = selectedVideos.map(item => shotTraceMaterials.find(current => current.id === item.id) || toRelatedVideo(item));
+            if (!updateMetadata({ relatedVideos: next })) return;
+            setShotTraceMaterials(next);
             setShowAddAigcLinkModal(false);
-            showToast(`已更新关联视频，共 ${selectedVideos.length} 项`);
+            showToast(`已更新关联视频，共 ${next.length} 项`);
           }}
         />
       )}

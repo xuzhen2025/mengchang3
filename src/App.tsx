@@ -6,7 +6,9 @@ import CreditsDashboard from "./components/CreditsDashboard";
 import HomeView from "./components/HomeView";
 import QuickCreationView from "./components/QuickCreationView";
 import QualityEnhanceView from "./components/QualityEnhanceView";
-import WatermarkSubtitleView from "./components/WatermarkSubtitleView";
+import VideoWatermarkWorkspace from "./components/VideoWatermarkWorkspace";
+import VideoFaceSwapWorkspace from "./components/VideoFaceSwapWorkspace";
+import { useFaceSwapTasks } from "./lib/useFaceSwapTasks";
 import AiVideoView from "./components/AiVideoView";
 import AssetsView from "./components/AssetsView";
 import InfiniteCanvasView from "./components/InfiniteCanvasView";
@@ -31,7 +33,8 @@ import {
   INITIAL_TRANSACTIONS,
   INITIAL_MESSAGES
 } from "./data";
-import { Asset, Task, CreditTransaction, GalleryItem, ActiveScreen, AppMessage, ResourceSearchIntent, AiVideoTaskSnapshot } from "./types";
+import { Asset, Task, CreditTransaction, GalleryItem, ActiveScreen, AppMessage, ResourceSearchIntent, AiVideoTaskSnapshot, EnhanceTaskOutput, EnhanceTaskSnapshot, WatermarkTaskOutput, WatermarkTaskSnapshot } from "./types";
+import { buildEnhanceOutputName, getEnhanceOutputDimensions } from "./lib/videoEnhance";
 import { Sparkles, Layers, Sliders, ChevronRight, Play } from "lucide-react";
 
 const AUTH_STORAGE_KEY = "mengchang_prototype_session";
@@ -97,6 +100,10 @@ export default function App() {
   const [activeAgentSessionId, setActiveAgentSessionId] = useState<string | null>(null);
   const [activeRemakeSessionId, setActiveRemakeSessionId] = useState<string | null>(null);
   const [activeAiVideoTaskId, setActiveAiVideoTaskId] = useState<string | null>(null);
+  const [activeWatermarkTaskId, setActiveWatermarkTaskId] = useState<string | null>(null);
+  const [activeSubtitleTaskId, setActiveSubtitleTaskId] = useState<string | null>(null);
+  const [activeEnhanceTaskId, setActiveEnhanceTaskId] = useState<string | null>(null);
+  const [activeFaceSwapTaskId, setActiveFaceSwapTaskId] = useState<string | null>(null);
 
   const handleNavigate = (screen: ActiveScreen) => {
     setScreenHistory((prev) => {
@@ -131,6 +138,13 @@ export default function App() {
   };
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [narrowViewport, setNarrowViewport] = useState(() => window.innerWidth < 768);
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 767px)");
+    const update = () => setNarrowViewport(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
 
   // Mode switching state (用户端 vs 管理端)
@@ -191,6 +205,15 @@ export default function App() {
     }
     return true;
   };
+
+  const faceSwap = useFaceSwapTasks((amount, remark) => {
+    if (!deductAvailableCredits(amount)) return false;
+    setTransactions((current) => [{ id: `tx-face-${crypto.randomUUID()}`, type: "consume", tool: "视频换脸", amount: -amount, time: new Date().toISOString().replace("T", " ").slice(0, 19), remark }, ...current]);
+    return true;
+  }, (amount, remark) => {
+    setCredits((current) => current + amount);
+    setTransactions((current) => [{ id: `tx-face-refund-${crypto.randomUUID()}`, type: "refund", tool: "视频换脸", amount, time: new Date().toISOString().replace("T", " ").slice(0, 19), remark }, ...current]);
+  });
 
   // Credit Application Workflow (Closed-Loop)
   const handleRequestCredits = (amount: number, reason: string) => {
@@ -486,6 +509,119 @@ export default function App() {
     return () => window.clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const refundable = tasks.filter((task) => ["watermark", "subtitle", "enhance"].includes(task.category || "") && task.status === "failed" && (task.refundedCredits || 0) < task.creditsCost);
+    if (refundable.length === 0) return;
+
+    const timestamp = new Date().toISOString().replace("T", " ").slice(0, 19);
+    const totalRefund = refundable.reduce((sum, task) => sum + task.creditsCost - (task.refundedCredits || 0), 0);
+    setCredits((current) => current + totalRefund);
+    setTasks((current) => current.map((task) => refundable.some((item) => item.id === task.id) ? { ...task, refundedCredits: task.creditsCost } : task));
+    setTransactions((current) => [
+      ...refundable.map((task, index): CreditTransaction => ({
+        id: `tx_video_process_failure_refund_${Date.now()}_${index}`,
+        type: "refund",
+        tool: task.category === "subtitle" ? "字幕擦除" : task.category === "enhance" ? "画质增强" : "视频去水印",
+        amount: task.creditsCost - (task.refundedCredits || 0),
+        time: timestamp,
+        remark: `处理失败，退回全部积分：${task.name}`,
+      })),
+      ...current,
+    ]);
+  }, [tasks]);
+
+  // Watermark and subtitle erasing share a deterministic six-second prototype lifecycle.
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      const now = Date.now();
+      setTasks((current) => {
+        let changed = false;
+        const next = current.map((task) => {
+          if (!["watermark", "subtitle"].includes(task.category || "") || task.autoProgress !== false || !task.simulationStartedAt || !["queue", "generating"].includes(task.status)) {
+            return task;
+          }
+
+          const elapsed = now - task.simulationStartedAt;
+          if (elapsed < 1200) return task;
+          if (elapsed < 6000) {
+            const nextProgress = Math.min(96, Math.max(6, Math.round(((elapsed - 1200) / 4800) * 100)));
+            if (task.status !== "generating" || task.progress !== nextProgress) changed = true;
+            return { ...task, status: "generating" as const, progress: nextProgress };
+          }
+
+          const isSubtitle = task.category === "subtitle";
+          const sourceVideo = isSubtitle ? task.subtitleSnapshot?.sourceVideo : task.watermarkSnapshot?.sourceVideo;
+          if (!sourceVideo) return task;
+          const output: WatermarkTaskOutput = {
+            name: `${sourceVideo.name.replace(/\.[^.]+$/, "")}_${isSubtitle ? "字幕擦除" : "去水印"}.mp4`,
+            videoUrl: sourceVideo.url,
+            coverUrl: sourceVideo.coverUrl,
+            size: sourceVideo.size,
+            duration: sourceVideo.duration,
+            resolution: sourceVideo.resolution,
+          };
+          changed = true;
+          return {
+            ...task,
+            status: "completed" as const,
+            progress: 100,
+            outputFiles: [output.videoUrl],
+            ...(isSubtitle ? { subtitleOutput: output } : { watermarkOutput: output }),
+          };
+        });
+        return changed ? next : current;
+      });
+    }, 120);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
+  // Quality enhancement uses an eight-second prototype lifecycle.
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      const now = Date.now();
+      setTasks((current) => {
+        let changed = false;
+        const next = current.map((task) => {
+          if (task.category !== "enhance" || task.autoProgress !== false || !task.simulationStartedAt || !["queue", "generating"].includes(task.status)) {
+            return task;
+          }
+
+          const elapsed = now - task.simulationStartedAt;
+          if (elapsed < 1200) return task;
+          if (elapsed < 8000) {
+            const nextProgress = Math.min(96, Math.max(5, Math.round(((elapsed - 1200) / 6800) * 100)));
+            if (task.status !== "generating" || task.progress !== nextProgress) changed = true;
+            return { ...task, status: "generating" as const, progress: nextProgress };
+          }
+
+          const snapshot = task.enhanceSnapshot;
+          if (!snapshot) return task;
+          const output: EnhanceTaskOutput = {
+            name: buildEnhanceOutputName(snapshot.sourceVideo.name, snapshot.outputResolution, snapshot.outputFps),
+            videoUrl: snapshot.sourceVideo.url,
+            coverUrl: snapshot.sourceVideo.coverUrl,
+            size: snapshot.sourceVideo.size,
+            duration: snapshot.sourceVideo.duration,
+            resolution: getEnhanceOutputDimensions(snapshot.outputResolution),
+            fps: snapshot.outputFps,
+          };
+          changed = true;
+          return {
+            ...task,
+            status: "completed" as const,
+            progress: 100,
+            outputFiles: [output.videoUrl],
+            enhanceOutput: output,
+          };
+        });
+        return changed ? next : current;
+      });
+    }, 120);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
   const triggerTaskCompletedEffects = (task: Task) => {
     // Generate beautiful assets dynamically upon completion
     const timestamp = new Date().toISOString().replace("T", " ").slice(0, 16);
@@ -602,8 +738,7 @@ export default function App() {
         type === "watermark" ? "watermark" :
         type === "subtitle" ? "subtitle" :
         type === "enhance" ? "enhance" :
-        type === "digital_human" ? "digital_human" :
-        type === "model_change" ? "model_change" :
+        type === "face_swap" ? "face_swap" :
         type === "fission" ? "fission" :
         type === "video_gen" ? "ai_video" :
         "quick_creation"
@@ -617,8 +752,7 @@ export default function App() {
         type === "watermark" ? "水印擦除" :
       type === "subtitle" ? "字幕擦除" :
       type === "enhance" ? "画质增强" :
-      type === "digital_human" ? "数字人分身" :
-      type === "model_change" ? "模特换衣" :
+      type === "face_swap" ? "视频换脸" :
       type === "fission" ? "爆款复刻" :
       type === "video_gen" ? (source === "agent" ? "Agent创作" : "AI视频原料") :
       source === "agent" ? "Agent创作" : "快速创作";
@@ -689,6 +823,91 @@ export default function App() {
       amount: -creditsCost,
       time: timestamp,
       remark: `生成视频：${task.name}`
+    }, ...current]);
+    return id;
+  };
+
+  const handleCreateEraseTask = (type: "watermark" | "subtitle", snapshot: WatermarkTaskSnapshot) => {
+    const creditsCost = 40;
+    if (!deductAvailableCredits(creditsCost)) {
+      alert(`积分不足，无法开始${type === "subtitle" ? "字幕擦除" : "视频去水印"}。`);
+      return null;
+    }
+
+    const now = new Date();
+    const id = `${type}-${now.getTime()}`;
+    const timestamp = now.toISOString().replace("T", " ").slice(0, 19);
+    const baseName = snapshot.sourceVideo.name.replace(/\.[^.]+$/, "");
+    const suffix = type === "subtitle" ? "字幕擦除" : "去水印";
+    const task: Task = {
+      id,
+      name: `${baseName}_${suffix}`,
+      type,
+      status: "queue",
+      progress: 0,
+      inputFiles: [snapshot.sourceVideo.url],
+      createdAt: timestamp,
+      creditsCost,
+      source: "tool",
+      category: type,
+      autoProgress: false,
+      cancellable: true,
+      restartable: false,
+      ...(type === "subtitle" ? { subtitleSnapshot: snapshot } : { watermarkSnapshot: snapshot }),
+      simulationStartedAt: now.getTime(),
+    };
+
+    setTasks((current) => [task, ...current]);
+    setTransactions((current) => [{
+      id: `tx_${type}_${now.getTime()}`,
+      type: "consume",
+      tool: type === "subtitle" ? "字幕擦除" : "视频去水印",
+      amount: -creditsCost,
+      time: timestamp,
+      remark: `${type === "subtitle" ? "字幕擦除" : "视频去水印"}：${snapshot.sourceVideo.name}`,
+    }, ...current]);
+    return id;
+  };
+
+  const handleCreateWatermarkTask = (snapshot: WatermarkTaskSnapshot) => handleCreateEraseTask("watermark", snapshot);
+  const handleCreateSubtitleTask = (snapshot: WatermarkTaskSnapshot) => handleCreateEraseTask("subtitle", snapshot);
+
+  const handleCreateEnhanceTask = (snapshot: EnhanceTaskSnapshot, creditsCost: number) => {
+    if (!deductAvailableCredits(creditsCost)) {
+      alert("积分不足，无法开始视频画质增强。");
+      return null;
+    }
+
+    const now = new Date();
+    const id = `enhance-${now.getTime()}`;
+    const timestamp = now.toISOString().replace("T", " ").slice(0, 19);
+    const outputName = buildEnhanceOutputName(snapshot.sourceVideo.name, snapshot.outputResolution, snapshot.outputFps);
+    const task: Task = {
+      id,
+      name: outputName.replace(/\.mp4$/i, ""),
+      type: "enhance",
+      status: "queue",
+      progress: 0,
+      inputFiles: [snapshot.sourceVideo.url],
+      createdAt: timestamp,
+      creditsCost,
+      source: "tool",
+      category: "enhance",
+      autoProgress: false,
+      cancellable: true,
+      restartable: false,
+      enhanceSnapshot: snapshot,
+      simulationStartedAt: now.getTime(),
+    };
+
+    setTasks((current) => [task, ...current]);
+    setTransactions((current) => [{
+      id: `tx_enhance_${now.getTime()}`,
+      type: "consume",
+      tool: "画质增强",
+      amount: -creditsCost,
+      time: timestamp,
+      remark: `视频画质增强：${snapshot.sourceVideo.name}`,
     }, ...current]);
     return id;
   };
@@ -791,6 +1010,60 @@ export default function App() {
     setAssets((current) => [...uploadedAssets, ...current]);
   };
 
+  const handleUploadEraseResult = (type: "watermark" | "subtitle", output: WatermarkTaskOutput) => {
+    const timestamp = new Date().toISOString().replace("T", " ").slice(0, 16);
+    const label = type === "subtitle" ? "字幕擦除" : "视频去水印";
+    setAssets((current) => [{
+      id: `${type}_upload_${Date.now()}`,
+      name: output.name,
+      type: "video",
+      url: output.videoUrl,
+      coverUrl: output.coverUrl,
+      size: output.size,
+      createdAt: timestamp,
+      category: label,
+      resourceCategory: "成片",
+      source: "resource_library",
+      creator: "徐振",
+      publicTags: [label, "AI处理"],
+      status: "待审核",
+      fileInfo: {
+        size: output.size,
+        resolution: output.resolution,
+        duration: `${Math.floor(output.duration / 60).toString().padStart(2, "0")}:${Math.floor(output.duration % 60).toString().padStart(2, "0")}`,
+        format: "MP4",
+      },
+    }, ...current]);
+  };
+
+  const handleUploadWatermarkResult = (output: WatermarkTaskOutput) => handleUploadEraseResult("watermark", output);
+  const handleUploadSubtitleResult = (output: WatermarkTaskOutput) => handleUploadEraseResult("subtitle", output);
+
+  const handleUploadEnhanceResult = (output: EnhanceTaskOutput) => {
+    const timestamp = new Date().toISOString().replace("T", " ").slice(0, 16);
+    setAssets((current) => [{
+      id: `enhance_upload_${Date.now()}`,
+      name: output.name,
+      type: "video",
+      url: output.videoUrl,
+      coverUrl: output.coverUrl,
+      size: output.size,
+      createdAt: timestamp,
+      category: "画质增强",
+      resourceCategory: "成片",
+      source: "resource_library",
+      creator: "徐振",
+      publicTags: ["画质增强", "AI处理"],
+      status: "待审核",
+      fileInfo: {
+        size: output.size,
+        resolution: output.resolution,
+        duration: `${Math.floor(output.duration / 60).toString().padStart(2, "0")}:${Math.floor(output.duration % 60).toString().padStart(2, "0")}`,
+        format: "MP4",
+      },
+    }, ...current]);
+  };
+
   const handleRemoveAsset = (id: string) => {
     setAssets(assets.filter((a) => a.id !== id));
   };
@@ -810,9 +1083,11 @@ export default function App() {
   };
 
   const handleCancelGenerationTask = (taskId: string) => {
+    if (faceSwap.tasks.some((task) => task.id === taskId)) { faceSwap.cancel(taskId); return; }
     const target = tasks.find((task) => task.id === taskId);
     if (!target || !["queue", "generating"].includes(target.status)) return;
     if (target.category === "ai_video" && target.status !== "queue") return;
+    if (["watermark", "subtitle", "enhance"].includes(target.category || "") && target.status !== "queue") return;
 
     const cancelledAt = new Date().toISOString().replace("T", " ").slice(0, 19);
     const refund = target.status === "queue" ? target.creditsCost : 0;
@@ -828,7 +1103,7 @@ export default function App() {
       setTransactions((current) => [{
         id: `tx_cancel_refund_${Date.now()}`,
         type: "refund",
-        tool: "AI任务取消",
+        tool: target.category === "watermark" ? "视频去水印" : target.category === "subtitle" ? "字幕擦除" : target.category === "enhance" ? "画质增强" : "AI任务取消",
         amount: refund,
         time: cancelledAt,
         remark: `排队阶段取消，退回全部积分：${target.name}`
@@ -923,30 +1198,62 @@ export default function App() {
             }}
           />
         );
+      case "face_swap":
+        return <VideoFaceSwapWorkspace
+          assets={assets}
+          credits={availableCredits}
+          task={faceSwap.tasks.find((task) => task.id === activeFaceSwapTaskId) || null}
+          onBack={() => handleNavigate("quick_creation")}
+          onCreate={faceSwap.create}
+          onActiveTaskChange={setActiveFaceSwapTaskId}
+          onUpdate={faceSwap.update}
+          onSubmit={faceSwap.submit}
+          onCancel={faceSwap.cancel}
+          onPublish={(source, version, details) => {
+            setAssets((current) => [{ id: `face-published-${crypto.randomUUID()}`, name: details.names[0] || version.name, type: "video", url: version.videoUrl,
+              coverUrl: source.coverUrl, size: source.size, createdAt: new Date().toISOString().replace("T", " ").slice(0, 19),
+              category: details.primaryCategory, resourceCategory: details.partition, source: "resource_library", creator: "徐振", publicTags: ["视频换脸", `版本${version.number}`], status: "待审核",
+              fileInfo: { size: source.size, resolution: source.resolution, duration: `${Math.floor(source.duration / 60).toString().padStart(2, "0")}:${Math.floor(source.duration % 60).toString().padStart(2, "0")}`, format: source.name.split(".").at(-1)?.toUpperCase() || "MP4" },
+            }, ...current]);
+          }}
+        />;
       case "enhance":
         return (
           <QualityEnhanceView
+            assets={assets}
+            credits={availableCredits}
+            task={activeEnhanceTaskId ? tasks.find((task) => task.id === activeEnhanceTaskId) || null : null}
             onBack={handleBack}
-            onAddTask={handleAddTask}
-            onOpenMaterialSelector={handleOpenMaterialSelector}
+            onCreateTask={handleCreateEnhanceTask}
+            onActiveTaskChange={setActiveEnhanceTaskId}
+            onCancelTask={handleCancelGenerationTask}
+            onUploadResult={handleUploadEnhanceResult}
           />
         );
       case "watermark":
         return (
-          <WatermarkSubtitleView
+          <VideoWatermarkWorkspace
             type="watermark"
+            assets={assets}
+            task={activeWatermarkTaskId ? tasks.find((task) => task.id === activeWatermarkTaskId) || null : null}
             onBack={handleBack}
-            onAddTask={handleAddTask}
-            onOpenMaterialSelector={handleOpenMaterialSelector}
+            onCreateTask={handleCreateWatermarkTask}
+            onActiveTaskChange={setActiveWatermarkTaskId}
+            onCancelTask={handleCancelGenerationTask}
+            onUploadResult={handleUploadWatermarkResult}
           />
         );
       case "subtitle":
         return (
-          <WatermarkSubtitleView
+          <VideoWatermarkWorkspace
             type="subtitle"
+            assets={assets}
+            task={activeSubtitleTaskId ? tasks.find((task) => task.id === activeSubtitleTaskId) || null : null}
             onBack={handleBack}
-            onAddTask={handleAddTask}
-            onOpenMaterialSelector={handleOpenMaterialSelector}
+            onCreateTask={handleCreateSubtitleTask}
+            onActiveTaskChange={setActiveSubtitleTaskId}
+            onCancelTask={handleCancelGenerationTask}
+            onUploadResult={handleUploadSubtitleResult}
           />
         );
       case "ai_video":
@@ -960,7 +1267,6 @@ export default function App() {
             onCreateTask={handleCreateAiVideoTask}
             onConsumeCredits={handleConsumeAiVideoCredits}
             onCancelTask={handleCancelGenerationTask}
-            onOpenTaskQueue={() => setIsQueueOpen(true)}
             onUploadVideos={handleUploadAgentVideos}
             presetPrompt={presetPrompt}
             presetReferences={presetReferences}
@@ -1032,6 +1338,7 @@ export default function App() {
       case "scripts":
         return (
           <ResourcesView
+            uploadedVideos={assets.filter((asset) => asset.id.startsWith("face-published-"))}
             initialSearch={resourceSearchIntent}
             onClearInitialSearch={() => setResourceSearchIntent(null)}
             initialTab={
@@ -1116,7 +1423,7 @@ export default function App() {
       <Sidebar
         activeScreen={activeScreen}
         setActiveScreen={handleSidebarNavigate}
-        collapsed={sidebarCollapsed}
+        collapsed={sidebarCollapsed || (activeScreen === "face_swap" && narrowViewport)}
         setCollapsed={setSidebarCollapsed}
         credits={availableCredits}
         openCreditsModal={() => handleNavigate("credits")}
@@ -1136,12 +1443,20 @@ export default function App() {
       {/* 3. Right task queue drawer */}
       {appMode !== "admin" && (
         <RightQueue
-          tasks={tasks}
+          tasks={[...faceSwap.tasks, ...tasks]}
           isOpen={isQueueOpen}
           setIsOpen={setIsQueueOpen}
           cancelTask={handleCancelGenerationTask}
           restartTask={handleRestartGenerationTask}
+          uploadEraseResult={handleUploadEraseResult}
+          uploadEnhanceResult={handleUploadEnhanceResult}
           viewResult={(taskId) => {
+            if (faceSwap.tasks.some((task) => task.id === taskId)) {
+              setActiveFaceSwapTaskId(taskId);
+              setScreenHistory(["quick_creation", "face_swap"]);
+              setIsQueueOpen(false);
+              return;
+            }
             const task = tasks.find((item) => item.id === taskId);
             if (task?.source === "agent" || task?.category === "agent") {
               setActiveAgentSessionId(taskId);

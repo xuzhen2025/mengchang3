@@ -166,7 +166,7 @@ export default function Sidebar({
                   activeScreen === item.id || 
                   (item.id === "resources" && ["resources", "materials", "finished_videos"].includes(activeScreen)) ||
                   (item.id === "quick_creation" && [
-                    "enhance", "watermark", "subtitle"
+                    "enhance", "watermark", "subtitle", "face_swap"
                   ].includes(activeScreen))
                 );
 

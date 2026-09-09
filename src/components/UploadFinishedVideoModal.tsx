@@ -21,14 +21,22 @@ import {
   Folder
 } from "lucide-react";
 
+export interface VideoPublishDetails {
+  partition: "成片" | "素材";
+  primaryCategory: string;
+  secondaryCategory: string;
+  names: string[];
+}
+
 interface UploadFinishedVideoModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onPublishSuccess?: (msg: string) => void;
+  onPublishSuccess?: (msg: string, details?: VideoPublishDetails) => void;
   initialTaskCode?: string;
   isPage?: boolean;
   initialFiles?: Array<{ name: string; type?: string }>;
   stayOpenOnPublish?: boolean;
+  lockFiles?: boolean;
 }
 
 // Hierarchical Category Data (一级分类 -> 二级分类)
@@ -124,7 +132,8 @@ export default function UploadFinishedVideoModal({
   initialTaskCode = "",
   isPage = false,
   initialFiles = [],
-  stayOpenOnPublish = false
+  stayOpenOnPublish = false,
+  lockFiles = false
 }: UploadFinishedVideoModalProps) {
   if (!isOpen) return null;
 
@@ -257,6 +266,7 @@ export default function UploadFinishedVideoModal({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (lockFiles) return;
     if (e.target.files) {
       const filesArray = Array.from(e.target.files);
       setUploadedFiles((prev) => [...prev, ...filesArray]);
@@ -269,7 +279,10 @@ export default function UploadFinishedVideoModal({
       setIsSubmitting(false);
       if (!stayOpenOnPublish) onClose();
       if (onPublishSuccess) {
-        onPublishSuccess(`视频已成功${modeText}至资源库`);
+        onPublishSuccess(`视频已成功${modeText}至资源库`, {
+          partition, primaryCategory: selectedPrimaryCat, secondaryCategory: selectedSecondaryCat,
+          names: uploadedFiles.map((file) => nameType === "custom" ? customName : nameType === "prefix" ? `${prefixName}${file.name}` : file.name),
+        });
       }
     }, 800);
   };
@@ -301,9 +314,9 @@ export default function UploadFinishedVideoModal({
             <div>
               <div className="flex items-center gap-3">
                 <h2 className="text-base font-extrabold text-slate-900">视频上传页面</h2>
-                <span className="text-xs text-slate-400">
+                {!lockFiles && <span className="text-xs text-slate-400">
                   支持拖拽 200 个视频，上传的视频将显示在资源库列表中。
-                </span>
+                </span>}
               </div>
             </div>
           </div>
@@ -314,7 +327,7 @@ export default function UploadFinishedVideoModal({
           
           {/* SECTION 1: Drag & Drop Box */}
           <div className="bg-white rounded-xl p-5 border border-purple-100/80 shadow-2xs">
-            <div className="border-2 border-dashed border-purple-300 hover:border-purple-500 bg-purple-50/30 hover:bg-purple-50/50 rounded-2xl p-6 text-center transition-all relative group cursor-pointer">
+            {!lockFiles && <div className="border-2 border-dashed border-purple-300 hover:border-purple-500 bg-purple-50/30 hover:bg-purple-50/50 rounded-2xl p-6 text-center transition-all relative group cursor-pointer">
               <input
                 type="file"
                 multiple
@@ -348,7 +361,7 @@ export default function UploadFinishedVideoModal({
                   </div>
                 </div>
               </div>
-            </div>
+            </div>}
 
             {uploadedFiles.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">
@@ -359,13 +372,13 @@ export default function UploadFinishedVideoModal({
                   >
                     <Video className="w-3.5 h-3.5" />
                     {f.name}
-                    <button
+                    {!lockFiles && <button
                       type="button"
                       onClick={() => setUploadedFiles(prev => prev.filter((_, i) => i !== idx))}
                       className="hover:text-rose-600 ml-1 cursor-pointer"
                     >
                       ×
-                    </button>
+                    </button>}
                   </span>
                 ))}
               </div>

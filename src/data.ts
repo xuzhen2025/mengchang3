@@ -592,19 +592,6 @@ export const INITIAL_TASKS: Task[] = [
     }
   },
   {
-    id: "t_demo_queue_model",
-    name: "秋季风衣模特换装任务",
-    type: "model_change",
-    status: "queue",
-    progress: 0,
-    inputFiles: ["秋季风衣商品图.png"],
-    createdAt: "2026-08-20 16:42",
-    creditsCost: 8,
-    source: "tool",
-    category: "model_change",
-    autoProgress: false
-  },
-  {
     id: "t_demo_generating_quick",
     name: "七夕礼盒商品视频制作",
     type: "video",
@@ -623,13 +610,26 @@ export const INITIAL_TASKS: Task[] = [
     type: "subtitle",
     status: "failed",
     progress: 24,
-    inputFiles: ["直播切片_0820.mp4"],
+    inputFiles: ["https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4"],
     createdAt: "2026-08-20 15:48",
-    creditsCost: 3,
-    refundedCredits: 2.28,
-    failureReason: "字幕区域识别失败，未消耗积分已退回",
+    creditsCost: 40,
+    refundedCredits: 40,
+    failureReason: "视频处理异常，任务已停止，40 积分已全额退回。",
     source: "tool",
-    category: "subtitle"
+    category: "subtitle",
+    restartable: false,
+    subtitleSnapshot: {
+      sourceVideo: {
+        id: "subtitle-demo-source",
+        name: "直播切片_0820.mp4",
+        url: "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4",
+        coverUrl: "https://images.unsplash.com/photo-1485462537746-965f33f7f6a7?w=600&auto=format&fit=crop&q=80",
+        size: "18.4 MB",
+        duration: 15,
+        resolution: "1920 x 1080"
+      },
+      regions: [{ id: "demo-subtitle-region", x: 8, y: 78, width: 84, height: 15 }]
+    }
   },
   {
     id: "t_demo_agent_success",
@@ -645,29 +645,38 @@ export const INITIAL_TASKS: Task[] = [
     category: "agent"
   },
   {
-    id: "t_demo_digital_human",
-    name: "品牌主理人数字人分身",
-    type: "digital_human",
-    status: "completed",
-    progress: 100,
-    inputFiles: ["主理人口播样片.mp4"],
-    outputFiles: ["https://images.unsplash.com/photo-1560250097-0b93528c311a?w=480&auto=format&fit=crop&q=80"],
-    createdAt: "2026-08-20 14:25",
-    creditsCost: 40,
-    source: "tool",
-    category: "digital_human"
-  },
-  {
     id: "t_demo_watermark",
     name: "春季女装视频去水印",
     type: "watermark",
     status: "completed",
     progress: 100,
-    inputFiles: ["女装走秀原片.mp4"],
+    inputFiles: ["https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4"],
+    outputFiles: ["https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4"],
     createdAt: "2026-08-20 13:16",
-    creditsCost: 2.5,
+    creditsCost: 40,
     source: "tool",
-    category: "watermark"
+    category: "watermark",
+    restartable: false,
+    watermarkSnapshot: {
+      sourceVideo: {
+        id: "a3",
+        name: "模特红裙走秀素材_原图.mp4",
+        url: "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4",
+        coverUrl: "https://images.unsplash.com/photo-1485462537746-965f33f7f6a7?w=600&auto=format&fit=crop&q=80",
+        size: "18.4 MB",
+        duration: 15,
+        resolution: "1920 x 1080"
+      },
+      regions: [{ id: "demo-watermark-region", x: 77, y: 6, width: 18, height: 11 }]
+    },
+    watermarkOutput: {
+      name: "模特红裙走秀素材_原图_去水印.mp4",
+      videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4",
+      coverUrl: "https://images.unsplash.com/photo-1485462537746-965f33f7f6a7?w=600&auto=format&fit=crop&q=80",
+      size: "18.4 MB",
+      duration: 15,
+      resolution: "1920 x 1080"
+    }
   },
   {
     id: "t_demo_fission",
@@ -700,13 +709,28 @@ export const INITIAL_TASKS: Task[] = [
     id: "t_old_2",
     name: "去除视频右下角水印_15s",
     type: "watermark",
-    status: "completed",
-    progress: 100,
-    inputFiles: ["模特红裙走秀素材_原图.mp4"],
+    status: "failed",
+    progress: 72,
+    inputFiles: ["https://assets.mixkit.co/videos/preview/mixkit-hand-holding-a-blue-glass-bottle-with-dropper-44365-large.mp4"],
     createdAt: "2026-07-08 16:12",
-    creditsCost: 2.5,
+    creditsCost: 40,
+    refundedCredits: 40,
+    failureReason: "视频解码异常，任务已停止，40 积分已全额退回。",
     source: "tool",
-    category: "watermark"
+    category: "watermark",
+    restartable: false,
+    watermarkSnapshot: {
+      sourceVideo: {
+        id: "a4",
+        name: "七夕美妆礼盒_送礼场景成片_V3.mp4",
+        url: "https://assets.mixkit.co/videos/preview/mixkit-hand-holding-a-blue-glass-bottle-with-dropper-44365-large.mp4",
+        coverUrl: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=600&auto=format&fit=crop&q=80",
+        size: "42.6 MB",
+        duration: 15,
+        resolution: "1920 x 1080"
+      },
+      regions: [{ id: "old-watermark-region", x: 73, y: 82, width: 22, height: 12 }]
+    }
   },
   {
     id: "t_old_3",
@@ -728,13 +752,31 @@ export const INITIAL_TASKS: Task[] = [
     type: "enhance",
     status: "cancelled",
     progress: 0,
-    inputFiles: ["秋季风衣原片.mp4"],
+    inputFiles: ["https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4"],
     createdAt: "2026-08-19 13:06",
-    creditsCost: 5,
-    refundedCredits: 5,
+    creditsCost: 10,
+    refundedCredits: 10,
     cancelledAt: "2026-08-19 13:07",
     source: "tool",
-    category: "enhance"
+    category: "enhance",
+    restartable: false,
+    enhanceSnapshot: {
+      sourceVideo: {
+        id: "enhance-demo-source",
+        name: "秋季风衣原片.mp4",
+        url: "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4",
+        coverUrl: "https://images.unsplash.com/photo-1485462537746-965f33f7f6a7?w=600&auto=format&fit=crop&q=80",
+        size: "18.4 MB",
+        duration: 15,
+        resolution: "1280 x 720",
+        fps: 30
+      },
+      requestedResolution: "1080p",
+      outputResolution: "1080p",
+      frameRate: "source",
+      outputFps: 30,
+      billingMinutes: 1
+    }
   }
 ];
 
@@ -751,7 +793,7 @@ export const INITIAL_TRANSACTIONS: CreditTransaction[] = [
     id: "tx3",
     type: "consume",
     tool: "水印擦除",
-    amount: -2.50,
+    amount: -40,
     time: "2026-07-08 16:12:00",
     remark: "视频去水印 [模特红裙走秀素材_原图.mp4]"
   }

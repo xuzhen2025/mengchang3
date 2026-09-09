@@ -115,6 +115,8 @@ interface PublicTagFilterProps {
   onSelectTag?: (tag: string, groupName?: string) => void;
   tagGroups?: TagGroupItem[];
   showSearchInput?: boolean;
+  searchKeyword?: string;
+  onSearchKeywordChange?: (keyword: string) => void;
 }
 
 export const PublicTagFilter: React.FC<PublicTagFilterProps> = ({
@@ -122,10 +124,17 @@ export const PublicTagFilter: React.FC<PublicTagFilterProps> = ({
   onSelectTag,
   tagGroups = DEFAULT_PUBLIC_TAG_GROUPS,
   showSearchInput = true,
+  searchKeyword,
+  onSearchKeywordChange,
 }) => {
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [popoverSearchKey, setPopoverSearchKey] = useState("");
-  const [topSearchKey, setTopSearchKey] = useState("");
+  const [localSearchKey, setLocalSearchKey] = useState("");
+  const topSearchKey = searchKeyword ?? localSearchKey;
+  const setTopSearchKey = (keyword: string) => {
+    setLocalSearchKey(keyword);
+    onSearchKeywordChange?.(keyword);
+  };
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleMouseEnter = (groupId: string) => {

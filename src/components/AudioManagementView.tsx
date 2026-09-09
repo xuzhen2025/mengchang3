@@ -4,12 +4,18 @@ import AudioDetailView from "./AudioDetailView";
 import { Pagination } from "./Pagination";
 import { ResourceSearchIntent } from "../types";
 import ResourceSearchCondition from "./ResourceSearchCondition";
+import ResourceFilterPresets from "./ResourceFilterPresets";
+import { AUDIO_PRESET_DEFAULTS } from "../lib/resourceFilterPresets";
+import ResourceActionMenu from "./ResourceActionMenu";
+import ResourceTagModal from "./ResourceTagModal";
+import OverlayPortal from "./overlays/OverlayPortal";
+import { appendTags } from "../lib/resourceBatch";
+import { useResourceEdits } from "../lib/useResourceEdits";
 import {
   Search,
   ChevronDown,
   ChevronUp,
   Calendar,
-  Filter,
   Download,
   Edit2,
   Edit3,
@@ -74,6 +80,7 @@ export interface AudioItem {
   secondaryCategory: string;
   publicTags: string[];
   personalTag: string;
+  personalTags?: string[];
   size: string;
 }
 
@@ -232,6 +239,9 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
   const [searchAuthorKeyword, setSearchAuthorKeyword] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [selectedPreset, setSelectedPreset] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearch?.query || "");
+  React.useEffect(() => { setSearchQuery(initialSearch?.query || ""); }, [initialSearch?.requestId, initialSearch?.query]);
 
   // View Mode
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -250,12 +260,12 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
 
   // Dropdown States
   const [showMoreActionsMenu, setShowMoreActionsMenu] = useState(false);
-  const [showCopyJianyingMenu, setShowCopyJianyingMenu] = useState(false);
-  const [showModifyMenu, setShowModifyMenu] = useState(false);
-  const [showTagMenu, setShowTagMenu] = useState(false);
 
   // Audio items list
-  const [audioList, setAudioList] = useState<AudioItem[]>(INITIAL_AUDIO_LIST);
+  const [baseAudioList, setAudioList] = useState<AudioItem[]>(INITIAL_AUDIO_LIST);
+  const { edits: audioEdits, saveEdits: saveAudioEdits } = useResourceEdits<AudioItem>("audio");
+  const audioList = baseAudioList.map(item => ({ ...item, ...audioEdits[item.id] }));
+  const [batchTagKind, setBatchTagKind] = useState<"public" | "personal" | null>(null);
 
   // Audio Detail Modal State
   const [detailAudioItem, setDetailAudioItem] = useState<AudioItem | null>(null);
@@ -375,9 +385,29 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
     setCurrentTimeMap((prev) => ({ ...prev, [id]: val }));
   };
 
+  const presetFilters = { searchQuery, selectedMainCategory, selectedPrimaryCategory, selectedSecondaryCategory, selectedPublicTag, selectedPersonalTag, sortBy, searchCategoryKeyword, searchPublicTagKeyword, searchPersonalTagKeyword, searchAuthorKeyword, startDate, endDate };
+  const applyPresetFilters = (next: typeof AUDIO_PRESET_DEFAULTS) => {
+    setSearchQuery(next.searchQuery);
+    setSelectedMainCategory(next.selectedMainCategory);
+    setSelectedPrimaryCategory(next.selectedPrimaryCategory);
+    setSelectedSecondaryCategory(next.selectedSecondaryCategory);
+    setSelectedPublicTag(next.selectedPublicTag);
+    setSelectedPersonalTag(next.selectedPersonalTag);
+    setSortBy(next.sortBy);
+    setSearchCategoryKeyword(next.searchCategoryKeyword);
+    setSearchPublicTagKeyword(next.searchPublicTagKeyword);
+    setSearchPersonalTagKeyword(next.searchPersonalTagKeyword);
+    setSearchAuthorKeyword(next.searchAuthorKeyword);
+    setStartDate(next.startDate);
+    setEndDate(next.endDate);
+    setCurrentPage(1);
+    setSelectedIds([]);
+    setIsSelectionMode(false);
+  };
+
   // Filter logic
   const filteredAudios = audioList.filter((item) => {
-    const homeSearch = (initialSearch?.query || "").trim().toLowerCase();
+    const homeSearch = searchQuery.trim().toLowerCase();
     const matchesHomeSearch = !homeSearch || [item.title, item.subtitle, item.primaryCategory, item.secondaryCategory, item.personalTag, item.author, ...item.publicTags]
       .some((value) => value.toLowerCase().includes(homeSearch));
     if (!matchesHomeSearch) return false;
@@ -397,7 +427,7 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
     if (selectedPersonalTag !== "全部") {
       if (selectedPersonalTag === "无个人标签" && item.personalTag !== "无个人标签") return false;
       if (selectedPersonalTag === "有个人标签" && item.personalTag === "无个人标签") return false;
-      if (selectedPersonalTag !== "无个人标签" && selectedPersonalTag !== "有个人标签" && item.personalTag !== selectedPersonalTag) {
+      if (selectedPersonalTag !== "无个人标签" && selectedPersonalTag !== "有个人标签" && !(item.personalTags || [item.personalTag]).includes(selectedPersonalTag)) {
         return false;
       }
     }
@@ -493,10 +523,10 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
     <div className="flex-1 bg-slate-100/70 p-4 min-h-0 flex flex-col font-sans text-slate-800 overflow-y-auto space-y-3">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-slate-900/90 text-white px-5 py-2.5 rounded-2xl shadow-2xl backdrop-blur-md border border-slate-700/80 text-xs font-bold flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
+        <OverlayPortal layer="toast" role="status" className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-slate-900/90 text-white px-5 py-2.5 rounded-2xl shadow-2xl backdrop-blur-md border border-slate-700/80 text-xs font-bold flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
           <Sparkles className="w-4 h-4 text-purple-400" />
           <span>{toastMessage}</span>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* Top Cascading Filter Section */}
@@ -523,17 +553,12 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
-            <select className="border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-500 bg-white focus:outline-none focus:border-purple-400 cursor-pointer">
-              <option value="">选择常用筛选预设</option>
-              <option value="preset-1">音频速查预设1</option>
-              <option value="preset-2">高下载口播旁白</option>
-            </select>
-            <button
-              onClick={() => showToast("常用筛选预设已保存")}
-              className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3.5 py-1 rounded-lg font-bold shadow-xs cursor-pointer transition-colors"
-            >
-              保存
-            </button>
+            <ResourceFilterPresets scope="audio" defaults={AUDIO_PRESET_DEFAULTS} value={presetFilters}
+              selectedName={selectedPreset} onSelectName={setSelectedPreset} onApply={applyPresetFilters}
+              seeds={[
+                { name: "音频速查预设1", filters: {} },
+                { name: "高下载口播旁白", filters: { selectedSecondaryCategory: "口播切片", sortBy: "最多下载" } },
+              ]} />
           </div>
         </div>
 
@@ -600,6 +625,8 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
         <div className="flex items-center gap-2 pb-2 border-b border-slate-100 flex-wrap">
           <span className="text-slate-900 font-bold shrink-0 w-20">公共标签：</span>
           <PublicTagFilter
+            searchKeyword={searchPublicTagKeyword}
+            onSearchKeywordChange={setSearchPublicTagKeyword}
             selectedTag={selectedPublicTag}
             onSelectTag={(tag) => setSelectedPublicTag(tag)}
           />
@@ -648,7 +675,7 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
           </div>
         </div>
 
-        <ResourceSearchCondition query={initialSearch?.query} onClear={onClearSearch} />
+        <ResourceSearchCondition query={searchQuery} onClear={() => { setSearchQuery(""); onClearSearch?.(); }} />
 
         {/* Row 6: 高级搜索与排序 */}
         <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
@@ -669,20 +696,9 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => showToast("已执行高级筛选")}
-              className="border border-purple-300 text-purple-600 bg-purple-50 hover:bg-purple-100 font-bold px-4 py-1.5 rounded-xl text-xs cursor-pointer transition-colors flex items-center gap-1.5"
-            >
-              <Filter className="w-3.5 h-3.5" />
-              <span>筛选</span>
-            </button>
-            <button
               onClick={() => {
-                setSelectedMainCategory("全部");
-                setSelectedPrimaryCategory("全部");
-                setSelectedSecondaryCategory("全部");
-                setSelectedPublicTag("全部");
-                setSelectedPersonalTag("全部");
-                setSearchAuthorKeyword("");
+                applyPresetFilters({ ...AUDIO_PRESET_DEFAULTS, searchQuery });
+                setSelectedPreset("");
                 showToast("已重置所有筛选");
               }}
               className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-1.5 rounded-xl text-xs cursor-pointer transition-colors shadow-xs"
@@ -699,6 +715,21 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
         </div>
 
       </div>
+
+      {batchTagKind && <ResourceTagModal kind={batchTagKind}
+        title={batchTagKind === "public" ? "添加公共标签" : "添加个人标签"}
+        publicGroups={PUBLIC_TAG_GROUPS} personalGroups={PERSONAL_TAG_GROUPS} requireSelection
+        onClose={() => setBatchTagKind(null)} showToast={showToast}
+        onConfirm={added => {
+          const patches = Object.fromEntries(audioList.filter(item => selectedIds.includes(item.id)).map(item => {
+            if (batchTagKind === "public") return [item.id, { publicTags: appendTags(item.publicTags, added) }];
+            const original = item.personalTags || (item.personalTag && item.personalTag !== "无个人标签" ? [item.personalTag] : []);
+            const tags = appendTags(original, added);
+            return [item.id, { personalTags: tags, personalTag: tags[0] || "无个人标签" }];
+          }));
+          if (!saveAudioEdits(patches)) { showToast("保存失败，请检查浏览器存储空间后重新操作"); return false; }
+          showToast(`已为 ${selectedIds.length} 个音频添加${batchTagKind === "public" ? "公共" : "个人"}标签`);
+        }} />}
 
       {/* Sub Toolbar: Selection mode or Batch Action Toolbar (Matches Screenshot 3 & 4) */}
       <div className="bg-white rounded-2xl p-2.5 border border-slate-200/80 shadow-2xs flex items-center justify-between flex-wrap gap-2 text-xs">
@@ -735,109 +766,8 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
               下载
             </button>
 
-            {/* 复制到剪映 下拉 */}
-            <div className="relative">
-              <button
-                onClick={() => setShowCopyJianyingMenu(!showCopyJianyingMenu)}
-                className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-3 py-1.5 rounded-xl font-medium flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-              >
-                <span>复制到剪映</span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-              </button>
-              {showCopyJianyingMenu && (
-                <div className="absolute left-0 top-full mt-1 w-40 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-30">
-                  <button
-                    onClick={() => {
-                      setShowCopyJianyingMenu(false);
-                      showToast("已成功复制草稿轨道链接到剪映");
-                    }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-purple-50 text-slate-700 font-medium"
-                  >
-                    复制音频轨道草稿
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={() => showToast(`已将 ${selectedIds.length} 个音频添加至工作台`)}
-              className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-3 py-1.5 rounded-xl font-medium cursor-pointer transition-colors shadow-2xs"
-            >
-              添加到工作台
-            </button>
-
-            {/* 修改 下拉 */}
-            <div className="relative">
-              <button
-                onClick={() => setShowModifyMenu(!showModifyMenu)}
-                className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-3 py-1.5 rounded-xl font-medium flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-              >
-                <span>修改</span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-              </button>
-              {showModifyMenu && (
-                <div className="absolute left-0 top-full mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-30">
-                  <button
-                    onClick={() => {
-                      setShowModifyMenu(false);
-                      showToast("批量修改作者完成");
-                    }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-purple-50 text-slate-700"
-                  >
-                    修改归属作者
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowModifyMenu(false);
-                      showToast("批量修改分类完成");
-                    }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-purple-50 text-slate-700"
-                  >
-                    修改所属分类
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* 添加标签 下拉 */}
-            <div className="relative">
-              <button
-                onClick={() => setShowTagMenu(!showTagMenu)}
-                className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-3 py-1.5 rounded-xl font-medium flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-              >
-                <span>添加标签</span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-              </button>
-              {showTagMenu && (
-                <div className="absolute left-0 top-full mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-30">
-                  <button
-                    onClick={() => {
-                      setShowTagMenu(false);
-                      showToast("批量打标签 [高转口播] 完成");
-                    }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-purple-50 text-slate-700"
-                  >
-                    + 爆款BGM
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowTagMenu(false);
-                      showToast("批量打标签 [高转化旁白] 完成");
-                    }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-purple-50 text-slate-700"
-                  >
-                    + 推荐音频
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={() => showToast("已复制音频在线分享链接")}
-              className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-3 py-1.5 rounded-xl font-medium cursor-pointer transition-colors shadow-2xs"
-            >
-              复制链接
-            </button>
+            <ResourceActionMenu label="添加标签" options={["添加公共标签", "添加个人标签"]}
+              onSelect={option => setBatchTagKind(option === "添加公共标签" ? "public" : "personal")} />
 
             {/* 操作 下拉 (投放数据分析, 发送消息提醒, 放入回收站) */}
             <div className="relative ml-auto">

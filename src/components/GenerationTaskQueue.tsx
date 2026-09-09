@@ -12,6 +12,7 @@ interface GenerationTaskQueueProps {
 }
 
 const STATUS_META: Record<Task["status"], { label: string; className: string }> = {
+  ready: { label: "待配置", className: "bg-amber-50 text-amber-700" },
   queue: { label: "排队", className: "bg-slate-100 text-slate-600" },
   generating: { label: "生成中", className: "bg-violet-50 text-violet-700" },
   completed: { label: "生成成功", className: "bg-emerald-50 text-emerald-700" },

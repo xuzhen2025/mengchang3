@@ -2,8 +2,18 @@ import React, { useState } from "react";
 import FinishedVideoDetailModal from "./FinishedVideoDetailModal";
 import { PublicTagFilter } from "./PublicTagFilter";
 import { Pagination } from "./Pagination";
-import { ResourceSearchIntent } from "../types";
+import { Asset, ResourceSearchIntent } from "../types";
+import { toPublishedVideo } from "../lib/publishedVideo";
 import ResourceSearchCondition from "./ResourceSearchCondition";
+import ResourceFilterPresets from "./ResourceFilterPresets";
+import { VIDEO_PRESET_DEFAULTS } from "../lib/resourceFilterPresets";
+import VideoBatchActions from "./VideoBatchActions";
+import OverlayPortal from "./overlays/OverlayPortal";
+import { useResourceEdits } from "../lib/useResourceEdits";
+import { applyVideoBatchChange, VideoBatchChange, VideoResourceMetadata } from "../lib/resourceBatch";
+import { DEFAULT_ASSOCIATED_SCRIPTS, DEFAULT_RELATED_VIDEOS } from "../data/videoResourceOptions";
+import { useViralVideoRule } from "../lib/useViralVideoRule";
+import { formatViralVideoRule, getViralVideoSpend, isViralVideo } from "../lib/viralVideoRule";
 import { 
   Film, 
   Play, 
@@ -33,7 +43,6 @@ import {
   User,
   ChevronDown,
   ChevronUp,
-  Filter,
   Grid,
   List,
   Calendar,
@@ -58,14 +67,14 @@ interface UsedMaterial {
   category?: string;
 }
 
-interface FinishedVideo {
+interface FinishedVideo extends VideoResourceMetadata {
   id: string;
   numericId?: string;
   title: string;
   videoUrl: string;
   coverUrl: string;
   duration: string;
-  resolution: "720p" | "1080p" | "2K";
+  resolution: string;
   size: string;
   creator: "ai" | "human";
   aiModel?: string;
@@ -81,6 +90,7 @@ interface FinishedVideo {
   author: string;      // 作者
   todayCost?: number;  // 今日消耗
   cost: number;        // 总消耗
+  monthlyCosts?: Record<string, number>;
   roi?: number;        // Return on Investment
   category?: string;
   typeLabel?: string;  // 示例: 混剪, 剪辑, AI画质
@@ -119,6 +129,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     author: "刘弯",
     todayCost: 0,
     cost: 0,
+    monthlyCosts: { "2026-09": 0 },
     roi: 3.85,
     category: "女士内衣",
     typeLabel: "混剪",
@@ -155,6 +166,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     author: "张小花",
     todayCost: 120,
     cost: 3200,
+    monthlyCosts: { "2026-09": 2400 },
     roi: 1.95,
     category: "草本初色内衣",
     typeLabel: "AI画质提升",
@@ -191,7 +203,8 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     comments: 1800,
     author: "李阿牛",
     todayCost: 1500,
-    cost: 8900,
+    cost: 120000,
+    monthlyCosts: { "2026-09": 99999.99 },
     roi: 2.64,
     category: "女士睡衣",
     typeLabel: "高质感原创",
@@ -227,6 +240,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     author: "赵铁柱",
     todayCost: 0,
     cost: 500,
+    monthlyCosts: { "2026-09": 250 },
     roi: 1.20,
     category: "塑身裤",
     typeLabel: "切片重构",
@@ -262,7 +276,8 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     comments: 1200,
     author: "王大锤",
     todayCost: 2800,
-    cost: 52000,
+    cost: 152000,
+    monthlyCosts: { "2026-09": 120000 },
     roi: 4.12,
     category: "女士内裤",
     typeLabel: "混剪",
@@ -299,6 +314,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     author: "陈晨",
     todayCost: 600,
     cost: 15400,
+    monthlyCosts: { "2026-09": 12000 },
     roi: 3.12,
     category: "4199美肤衣",
     typeLabel: "AI画质",
@@ -334,6 +350,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     author: "林杰",
     todayCost: 1200,
     cost: 28000,
+    monthlyCosts: { "2026-09": 22000 },
     roi: 3.45,
     category: "保暖内衣",
     typeLabel: "高质感原创",
@@ -369,6 +386,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     author: "赵雪",
     todayCost: 0,
     cost: 1800,
+    monthlyCosts: { "2026-09": 500 },
     roi: 1.80,
     category: "秒缇8024前扣内衣",
     typeLabel: "混剪",
@@ -404,6 +422,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     author: "孙强",
     todayCost: 800,
     cost: 21000,
+    monthlyCosts: { "2026-09": 15000 },
     roi: 2.98,
     category: "男士内裤",
     typeLabel: "剪辑",
@@ -440,6 +459,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     author: "周婷",
     todayCost: 350,
     cost: 6700,
+    monthlyCosts: { "2026-09": 6000 },
     roi: 2.25,
     category: "少女内衣",
     typeLabel: "AI画质提升",
@@ -474,7 +494,8 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     comments: 4100,
     author: "吴磊",
     todayCost: 3200,
-    cost: 89000,
+    cost: 189000,
+    monthlyCosts: { "2026-09": 100000 },
     roi: 4.88,
     category: "8811纯棉",
     typeLabel: "高质感原创",
@@ -510,6 +531,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     author: "郑敏",
     todayCost: 450,
     cost: 12300,
+    monthlyCosts: { "2026-09": 10000 },
     roi: 2.75,
     category: "草本8018",
     typeLabel: "混剪",
@@ -572,7 +594,7 @@ const COST_RANGE_OPTIONS = [
   "不限",
   "无消耗",
   "无消耗（TK）",
-  "爆款视频（总消耗5w）",
+  "爆款视频",
   "有消耗",
   "有消耗（TK）",
   "消耗达到1w",
@@ -596,6 +618,7 @@ const PUBLIC_TAGS = [
 ];
 
 interface FinishedVideosViewProps {
+  uploadedVideos?: Asset[];
   onTriggerTask?: (type: any, name: string, inputUrls: string[], cost: number) => void;
   onNavigateToDelivery?: () => void;
   onDetailStateChange?: (isDetail: boolean) => void;
@@ -603,13 +626,22 @@ interface FinishedVideosViewProps {
   onClearSearch?: () => void;
 }
 
-export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery, onDetailStateChange, initialSearch, onClearSearch }: FinishedVideosViewProps) {
-  const [videos, setVideos] = useState<FinishedVideo[]>(INITIAL_FINISHED);
+export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask, onNavigateToDelivery, onDetailStateChange, initialSearch, onClearSearch }: FinishedVideosViewProps) {
+  const { rule: viralVideoRule, month: spendMonth } = useViralVideoRule();
+  const viralRuleLabel = formatViralVideoRule(viralVideoRule);
+  const [baseVideos, setVideos] = useState<FinishedVideo[]>(() => [...uploadedVideos.map(toPublishedVideo), ...INITIAL_FINISHED]);
+  const { edits, saveEdits } = useResourceEdits<VideoResourceMetadata>("finished");
+  const videos = baseVideos.map(video => ({
+    ...video, associatedScripts: DEFAULT_ASSOCIATED_SCRIPTS, relatedVideos: DEFAULT_RELATED_VIDEOS,
+    ...edits[video.id],
+  }));
   const [activeTab, setActiveTab] = useState<"all" | "secondary" | "performance">("all");
   
   // Screenshot Filter States
   const [mainCat, setMainCat] = useState("全部");
-  const [selectedPreset, setSelectedPreset] = useState("选择常用筛选预设");
+  const [selectedPreset, setSelectedPreset] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearch?.query || "");
+  React.useEffect(() => { setSearchQuery(initialSearch?.query || ""); }, [initialSearch?.requestId, initialSearch?.query]);
   const [primaryCat, setPrimaryCat] = useState("全部");
   const [primaryMore, setPrimaryMore] = useState(false);
   
@@ -618,6 +650,7 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
   const [statusVal, setStatusVal] = useState("全部");
   
   const [publicTagSearch, setPublicTagSearch] = useState("");
+  const [publicTagKeyword, setPublicTagKeyword] = useState("");
   const [selectedPublicTag, setSelectedPublicTag] = useState("全部");
   
   const [personalTagSearch, setPersonalTagSearch] = useState("");
@@ -649,6 +682,8 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
   } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [initialTagModalType, setInitialTagModalType] = useState<"public" | "personal" | undefined>(undefined);
+
+  React.useEffect(() => { setCurrentPage(1); }, [costRange, viralVideoRule.period, viralVideoRule.thresholdWan, spendMonth]);
 
   React.useEffect(() => {
     const tag = initialSearch?.tag;
@@ -711,15 +746,44 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
     }
   }, []);
 
+  const presetFilters = { searchQuery, mainCat, primaryCat, secondarySearch, secondaryCat, statusVal, publicTagSearch, publicTagKeyword, selectedPublicTag, personalTagSearch, personalTagFilter, sortBy, adPlatformTag, costRange, systemAutoTag, authorType, authorInput, timeType, startDate, endDate };
+  const applyPresetFilters = (next: typeof VIDEO_PRESET_DEFAULTS) => {
+    setSearchQuery(next.searchQuery);
+    setMainCat(next.mainCat);
+    setPrimaryCat(next.primaryCat);
+    setSecondarySearch(next.secondarySearch);
+    setSecondaryCat(next.secondaryCat);
+    setStatusVal(next.statusVal);
+    setPublicTagSearch(next.publicTagSearch);
+    setPublicTagKeyword(next.publicTagKeyword);
+    setSelectedPublicTag(next.selectedPublicTag);
+    setPersonalTagSearch(next.personalTagSearch);
+    setPersonalTagFilter(next.personalTagFilter as "all" | "none" | "has");
+    setSortBy(next.sortBy);
+    setAdPlatformTag(next.adPlatformTag);
+    setCostRange(next.costRange);
+    setSystemAutoTag(next.systemAutoTag);
+    setAuthorType(next.authorType);
+    setAuthorInput(next.authorInput);
+    setTimeType(next.timeType);
+    setStartDate(next.startDate);
+    setEndDate(next.endDate);
+    setCurrentPage(1);
+    setSelectedVideoIds([]);
+    setSelectAllPage(false);
+    setIsSelectionActive(false);
+  };
+
   // Reset Filters
   const handleResetFilters = () => {
     setMainCat("全部");
-    setSelectedPreset("选择常用筛选预设");
+    setSelectedPreset("");
     setPrimaryCat("全部");
     setSecondarySearch("");
     setSecondaryCat("全部");
     setStatusVal("全部");
     setPublicTagSearch("");
+    setPublicTagKeyword("");
     setSelectedPublicTag("全部");
     setPersonalTagSearch("");
     setPersonalTagFilter("all");
@@ -740,7 +804,7 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
 
   // Filter Logic
   const filteredVideos = videos.filter(v => {
-    const homeSearch = (initialSearch?.query || "").trim().toLowerCase();
+    const homeSearch = searchQuery.trim().toLowerCase();
     const matchesHomeSearch = !homeSearch || [v.title, v.category, v.typeLabel, v.author, ...(v.tags || [])]
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(homeSearch));
@@ -764,8 +828,8 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
     const matchesPublicTagSelect = selectedPublicTag === "全部" ? true : v.tags?.includes(selectedPublicTag);
 
     // Personal tag
-    const matchesPersonalSearch = !personalTagSearch ? true : v.tags?.some(t => t.toLowerCase().includes(personalTagSearch.toLowerCase()));
-    const matchesPersonalFilter = personalTagFilter === "all" ? true : (personalTagFilter === "none" ? !v.tags || v.tags.length === 0 : v.tags && v.tags.length > 0);
+    const matchesPersonalSearch = !personalTagSearch || v.personalTags?.some(tag => tag.includes(personalTagSearch));
+    const matchesPersonalFilter = personalTagFilter === "all" || (personalTagFilter === "none" ? !v.personalTags?.length : Boolean(v.personalTags?.length));
 
     // Author
     const matchesAuthor = !authorInput ? true : v.author.toLowerCase().includes(authorInput.toLowerCase());
@@ -780,7 +844,8 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
       if (costRange === "不限") return true;
       if (costRange === "无消耗" || costRange === "无消耗（TK）") return v.cost === 0;
       if (costRange === "有消耗" || costRange === "有消耗（TK）") return v.cost > 0;
-      if (costRange === "爆款视频（总消耗5w）" || costRange === "消耗达到5w") return v.cost >= 50000;
+      if (costRange === "爆款视频") return isViralVideo(v, viralVideoRule, spendMonth);
+      if (costRange === "消耗达到5w") return v.cost >= 50000;
       if (costRange === "消耗达到1w") return v.cost >= 10000;
       if (costRange === "消耗达到100w") return v.cost >= 1000000;
       return true;
@@ -807,6 +872,10 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
     currentPage * pageSize
   );
 
+  React.useEffect(() => {
+    setSelectAllPage(paginatedVideos.length > 0 && paginatedVideos.every(video => selectedVideoIds.includes(video.id)));
+  }, [currentPage, pageSize, selectedVideoIds.join(","), paginatedVideos.map(video => video.id).join(",")]);
+
   const handleSelectAllPageToggle = () => {
     if (selectAllPage) {
       const currentIds = paginatedVideos.map(v => v.id);
@@ -820,25 +889,15 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
     }
   };
 
-  const handleBatchOptionSelect = (category: string, option: string) => {
-    setOpenDropdown(null);
-    const count = selectedVideoIds.length;
-    
-    if (count === 0) {
-      setActionSuccessToast(`请先勾选需要【${option}】的成片`);
-      return;
-    }
-    
-    if (option === "放入回收站") {
-      if (!window.confirm(`删除后将把选中的 ${count} 个成片移入管理端集中回收站，当前用户将无法继续查看；如需恢复请联系管理员。确认继续吗？`)) return;
-      setVideos(prev => prev.filter(v => !selectedVideoIds.includes(v.id)));
-      setSelectedVideoIds([]);
-      setSelectAllPage(false);
-      setActionSuccessToast(`已成功将 ${count} 个选中的成片放入回收站`);
-      return;
-    }
-
-    setActionSuccessToast(`已为选中的 ${count} 个成片执行操作：【${option}】`);
+  const applyBatchChange = (ids: string[], change: VideoBatchChange) => {
+    const updated = applyVideoBatchChange(videos, ids, change);
+    const patches = Object.fromEntries(updated.filter(video => ids.includes(video.id)).map(video => [video.id, {
+      tags: video.tags, personalTags: video.personalTags, status: video.status,
+      category: video.category, associatedScripts: video.associatedScripts, relatedVideos: video.relatedVideos,
+    }]));
+    if (saveEdits(patches)) return true;
+    showToast("保存失败，请检查浏览器存储空间后重新操作");
+    return false;
   };
 
   const handleSyncToAd = (video: FinishedVideo) => {
@@ -931,7 +990,9 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
   if (detailModalVideo) {
     return (
       <FinishedVideoDetailModal
-        video={detailModalVideo}
+        key={detailModalVideo.id}
+        video={videos.find(video => video.id === detailModalVideo.id) || detailModalVideo}
+        onUpdate={(patch) => saveEdits({ [detailModalVideo.id]: patch })}
         onClose={() => {
           setDetailModalVideo(null);
           setInitialTagModalType(undefined);
@@ -946,9 +1007,9 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
     <div className="flex-1 overflow-y-auto bg-slate-50 p-5 space-y-4 text-slate-800 font-sans relative">
       {/* Toast Notification Banner */}
       {toastMessage && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[200] bg-slate-900/90 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-2xl backdrop-blur-md border border-white/20 animate-in fade-in slide-in-from-top-4 duration-200 flex items-center gap-2">
+        <OverlayPortal layer="toast" role="status" className="fixed top-6 left-1/2 -translate-x-1/2 z-[200] bg-slate-900/90 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-2xl backdrop-blur-md border border-white/20 animate-in fade-in slide-in-from-top-4 duration-200 flex items-center gap-2">
           <span>{toastMessage}</span>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* Card Dropdown Menu Backdrop */}
@@ -1207,22 +1268,12 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
           </div>
 
           <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
-            <select
-              value={selectedPreset}
-              onChange={(e) => setSelectedPreset(e.target.value)}
-              className="border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-500 bg-white focus:outline-none focus:border-purple-400"
-            >
-              <option>选择常用筛选预设</option>
-              <option>高爆款成片预设</option>
-              <option>女装新品投放预设</option>
-            </select>
-
-            <button
-              onClick={() => alert("✅ 常用筛选预设已成功保存！")}
-              className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3.5 py-1 rounded-lg font-bold shadow-xs cursor-pointer flex items-center gap-1"
-            >
-              <span>保存</span>
-            </button>
+            <ResourceFilterPresets scope="finished" defaults={VIDEO_PRESET_DEFAULTS} value={presetFilters}
+              selectedName={selectedPreset} onSelectName={setSelectedPreset} onApply={applyPresetFilters}
+              seeds={[
+                { name: "高爆款成片预设", filters: { costRange: "爆款视频", sortBy: "总消耗" } },
+                { name: "女装新品投放预设", filters: { primaryCat: "女士内衣" } },
+              ]} />
           </div>
         </div>
 
@@ -1309,6 +1360,8 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
         <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
           <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">公共标签：</span>
           <PublicTagFilter
+            searchKeyword={publicTagKeyword}
+            onSearchKeywordChange={setPublicTagKeyword}
             selectedTag={selectedPublicTag}
             onSelectTag={(tag) => setSelectedPublicTag(tag)}
           />
@@ -1371,7 +1424,7 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
 
       </div>
 
-      <ResourceSearchCondition query={initialSearch?.query} onClear={onClearSearch} />
+      <ResourceSearchCondition query={searchQuery} onClear={() => { setSearchQuery(""); onClearSearch?.(); }} />
 
       {/* ===== ROW 7: 高级搜索 ===== */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
@@ -1410,12 +1463,13 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
           <div className="flex items-center gap-1.5 border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white shadow-2xs">
             <span className="text-slate-900 font-bold shrink-0">消耗：</span>
             <select
+              aria-label="成片消耗筛选"
               value={costRange}
               onChange={(e) => setCostRange(e.target.value)}
               className="bg-transparent font-normal text-slate-700 focus:outline-none cursor-pointer"
             >
               {COST_RANGE_OPTIONS.map(opt => (
-                <option key={opt} value={opt}>{opt}</option>
+                <option key={opt} value={opt}>{opt === "爆款视频" ? `爆款视频（${viralRuleLabel}）` : opt}</option>
               ))}
             </select>
           </div>
@@ -1436,16 +1490,8 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
           </div>
         </div>
 
-        {/* Buttons: 筛选 / 重置 */}
+        {/* Reset filters */}
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => {}}
-            className="border border-purple-500 text-purple-600 hover:bg-purple-50 px-3.5 py-1.5 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition-all"
-          >
-            <Filter className="w-3.5 h-3.5" />
-            <span>筛选</span>
-          </button>
-
           <button
             onClick={handleResetFilters}
             className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-1.5 rounded-lg font-bold transition-all shadow-xs cursor-pointer"
@@ -1457,13 +1503,6 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
 
       {/* ===== ROW 8: BOTTOM ACTION TOOLBAR ===== */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs relative">
-        {/* Backdrop for closing open dropdown */}
-        {openDropdown && (
-          <div 
-            className="fixed inset-0 z-40 bg-transparent" 
-            onClick={() => setOpenDropdown(null)} 
-          />
-        )}
 
         {isSelectionActive || selectedVideoIds.length > 0 ? (
           /* ACTIVE SELECTION TOOLBAR (Matching reference screenshot) */
@@ -1499,214 +1538,8 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
               已选： <span className="text-purple-600 font-bold font-mono text-sm px-0.5">{selectedVideoIds.length}</span> 个
             </div>
 
-            {/* 1. 下载转码视频 ∨ */}
-            <div className="relative shrink-0">
-              <button
-                onClick={() => handleBatchOptionSelect("下载", "按当前权限直接下载原文件")}
-                className="border border-slate-200 hover:border-purple-300 bg-white text-slate-700 font-normal px-2.5 py-1.5 rounded-lg shadow-2xs cursor-pointer flex items-center gap-1.5 transition-all text-xs"
-              >
-                <span>下载</span>
-              </button>
-              {openDropdown === "download" && (
-                <div className="absolute top-full left-0 mt-1 w-44 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
-                  {[
-                    "下载原片",
-                    "下载转码视频",
-                    "下载预览视频（带水印）"
-                  ].map(item => (
-                    <button
-                      key={item}
-                      onClick={() => handleBatchOptionSelect("下载转码视频", item)}
-                      className="w-full text-left px-3.5 py-2 text-xs text-slate-700 hover:bg-purple-50 hover:text-purple-700 font-medium transition-colors cursor-pointer"
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* 2. 推送 ∨ */}
-            <div className="relative hidden shrink-0">
-              <button
-                onClick={() => setOpenDropdown(openDropdown === "push" ? null : "push")}
-                className="border border-slate-200 hover:border-purple-300 bg-white text-slate-700 font-normal px-2.5 py-1.5 rounded-lg shadow-2xs cursor-pointer flex items-center gap-1.5 transition-all text-xs"
-              >
-                <span>推送</span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              </button>
-              {openDropdown === "push" && (
-                <div className="absolute top-full left-0 mt-1 w-40 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
-                  {[
-                    "推送",
-                    "衍生新视频并推送"
-                  ].map(item => (
-                    <button
-                      key={item}
-                      onClick={() => handleBatchOptionSelect("推送", item)}
-                      className="w-full text-left px-3.5 py-2 text-xs text-slate-700 hover:bg-purple-50 hover:text-purple-700 font-medium transition-colors cursor-pointer"
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* 3. 复制到剪映 ∨ */}
-            <div className="relative hidden shrink-0">
-              <button
-                onClick={() => setOpenDropdown(openDropdown === "jianying" ? null : "jianying")}
-                className="border border-slate-200 hover:border-purple-300 bg-white text-slate-700 font-normal px-2.5 py-1.5 rounded-lg shadow-2xs cursor-pointer flex items-center gap-1.5 transition-all text-xs"
-              >
-                <span>复制到剪映</span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              </button>
-              {openDropdown === "jianying" && (
-                <div className="absolute top-full left-0 mt-1 w-44 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
-                  {[
-                    "复制到剪映（原片）",
-                    "复制到剪映（转码视频）"
-                  ].map(item => (
-                    <button
-                      key={item}
-                      onClick={() => handleBatchOptionSelect("复制到剪映", item)}
-                      className="w-full text-left px-3.5 py-2 text-xs text-slate-700 hover:bg-purple-50 hover:text-purple-700 font-medium transition-colors cursor-pointer"
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* 4. 添加到工作台 */}
-            <button
-              onClick={() => handleBatchOptionSelect("工作台", "添加到工作台")}
-              className="hidden border border-slate-200 hover:border-purple-300 bg-white text-slate-700 font-normal px-2.5 py-1.5 rounded-lg shadow-2xs cursor-pointer hover:text-purple-600 transition-all text-xs shrink-0"
-            >
-              添加到工作台
-            </button>
-
-            {/* 5. 修改 ∨ */}
-            <div className="relative shrink-0">
-              <button
-                onClick={() => setOpenDropdown(openDropdown === "edit" ? null : "edit")}
-                className="border border-slate-200 hover:border-purple-300 bg-white text-slate-700 font-normal px-2.5 py-1.5 rounded-lg shadow-2xs cursor-pointer flex items-center gap-1.5 transition-all text-xs"
-              >
-                <span>修改</span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              </button>
-              {openDropdown === "edit" && (
-                <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 max-h-64 overflow-y-auto">
-                  {[
-                    "修改状态",
-                    "修改公共标签",
-                    "修改个人标签",
-                    "修改标题",
-                    "修改分类",
-                    "修改剪辑时间",
-                    "修改授权有效时间",
-                    "修改查看权限（可见性）",
-                    "批量关联脚本",
-                    "批量关联视频"
-                  ].map(item => (
-                    <button
-                      key={item}
-                      onClick={() => handleBatchOptionSelect("修改", item)}
-                      className="w-full text-left px-3.5 py-2 text-xs text-slate-700 hover:bg-purple-50 hover:text-purple-700 font-medium transition-colors cursor-pointer"
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* 6. 添加标签 ∨ */}
-            <div className="relative shrink-0">
-              <button
-                onClick={() => setOpenDropdown(openDropdown === "addTag" ? null : "addTag")}
-                className="border border-slate-200 hover:border-purple-300 bg-white text-slate-700 font-normal px-2.5 py-1.5 rounded-lg shadow-2xs cursor-pointer flex items-center gap-1.5 transition-all text-xs"
-              >
-                <span>添加标签</span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              </button>
-              {openDropdown === "addTag" && (
-                <div className="absolute top-full left-0 mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
-                  {[
-                    "添加公共标签",
-                    "添加个人标签"
-                  ].map(item => (
-                    <button
-                      key={item}
-                      onClick={() => handleBatchOptionSelect("添加标签", item)}
-                      className="w-full text-left px-3.5 py-2 text-xs text-slate-700 hover:bg-purple-50 hover:text-purple-700 font-medium transition-colors cursor-pointer"
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* 7. 复制链接 ∨ */}
-            <div className="relative shrink-0">
-              <button
-                onClick={() => setOpenDropdown(openDropdown === "copyLink" ? null : "copyLink")}
-                className="border border-slate-200 hover:border-purple-300 bg-white text-slate-700 font-normal px-2.5 py-1.5 rounded-lg shadow-2xs cursor-pointer flex items-center gap-1.5 transition-all text-xs"
-              >
-                <span>复制链接</span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              </button>
-              {openDropdown === "copyLink" && (
-                <div className="absolute top-full left-0 mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
-                  {[
-                    "复制PC端链接",
-                    "复制移动端链接"
-                  ].map(item => (
-                    <button
-                      key={item}
-                      onClick={() => handleBatchOptionSelect("复制链接", item)}
-                      className="w-full text-left px-3.5 py-2 text-xs text-slate-700 hover:bg-purple-50 hover:text-purple-700 font-medium transition-colors cursor-pointer"
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* 8. 操作 ∨ */}
-            <div className="relative shrink-0">
-              <button
-                onClick={() => setOpenDropdown(openDropdown === "moreActions" ? null : "moreActions")}
-                className="border border-slate-200 hover:border-purple-300 bg-white text-slate-700 font-normal px-2.5 py-1.5 rounded-lg shadow-2xs cursor-pointer flex items-center gap-1.5 transition-all text-xs"
-              >
-                <span>操作</span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              </button>
-              {openDropdown === "moreActions" && (
-                <div className="absolute top-full right-0 mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
-                  {[
-                    "投放数据分析",
-                    "发送消息提醒",
-                    "转码失败重试",
-                    "放入回收站"
-                  ].map(item => (
-                    <button
-                      key={item}
-                      onClick={() => handleBatchOptionSelect("操作", item)}
-                      className={`w-full text-left px-3.5 py-2 text-xs font-medium transition-colors cursor-pointer ${
-                        item === "放入回收站" ? "text-rose-600 hover:bg-rose-50" : "text-slate-700 hover:bg-purple-50 hover:text-purple-700"
-                      }`}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <VideoBatchActions videos={videos} selectedIds={selectedVideoIds}
+              isMaterialMode={false} onApply={applyBatchChange} showToast={showToast} />
           </div>
         ) : (
           /* STANDARD UNSELECTED BAR */
@@ -1959,10 +1792,21 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
             const isSelected = selectedVideoIds.includes(video.id);
             const isSelectionModeActive = isSelectionActive || selectedVideoIds.length > 0;
             const isMenuOpen = activeCardMenu?.videoId === video.id;
+            const isPreviewVisible = (hoveredVideoId === video.id || isMenuOpen) && !isSelectionModeActive;
+            const viral = isViralVideo(video, viralVideoRule, spendMonth);
+            const viralBadge = viral ? <span
+              role="img"
+              aria-label="爆款视频"
+              data-testid="viral-video-badge"
+              title={`爆款视频 · ${viralRuleLabel}\n${viralVideoRule.period === "monthly" ? `${spendMonth} 月消耗` : "总消耗"}：¥${getViralVideoSpend(video, viralVideoRule, spendMonth)?.toLocaleString("zh-CN", { maximumFractionDigits: 2 })}`}
+              className="flex h-6 w-6 items-center justify-center rounded-md border border-orange-200 bg-white/95 text-orange-600 shadow-sm"
+            ><Flame aria-hidden="true" size={18} fill="currentColor" strokeWidth={1.5} /></span> : null;
 
             return (
               <div 
                 key={video.id}
+                data-testid="finished-video-card"
+                data-video-id={video.id}
                 onMouseEnter={() => setHoveredVideoId(video.id)}
                 onMouseLeave={() => {
                   if (!isMenuOpen) {
@@ -1988,8 +1832,8 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
                 }`}
               >
                 {/* HOVER VIDEO PREVIEW OVERLAY (only when NOT in selection mode) */}
-                {(hoveredVideoId === video.id || isMenuOpen) && !isSelectionModeActive && (
-                  <div className={`absolute inset-0 z-40 bg-slate-950 rounded-2xl flex flex-col justify-between pointer-events-auto ${
+                {isPreviewVisible && (
+                  <div data-testid="finished-video-hover-preview" className={`absolute inset-0 z-40 bg-slate-950 rounded-2xl flex flex-col justify-between pointer-events-auto ${
                     isMenuOpen ? "overflow-visible" : "overflow-hidden"
                   }`}>
                     {/* Media Layer with rounded corner clipping */}
@@ -2209,7 +2053,8 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
 
                     {/* BOTTOM PLAYBACK CONTROLS & PROGRESS BAR */}
                     <div className="relative z-10 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-2.5 pt-4 flex flex-col gap-2 w-full">
-                      <div className="flex items-center justify-between text-white">
+                      <div className="relative flex items-center justify-between text-white">
+                        {viralBadge && <div className="absolute bottom-full right-0 mb-1.5">{viralBadge}</div>}
                         <button onClick={(e) => e.stopPropagation()} className="p-0.5 hover:scale-110 transition-transform cursor-pointer" title="暂停/播放">
                           <Pause className="w-4 h-4 text-white fill-white" />
                         </button>
@@ -2230,7 +2075,7 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
                 )}
 
                 {/* Top Cover / Thumbnail Section */}
-                <div className="relative aspect-[3/4] w-full bg-slate-900 overflow-hidden shrink-0">
+                <div data-testid="finished-video-cover" className="relative aspect-[3/4] w-full bg-slate-900 overflow-hidden shrink-0">
                   <img 
                     src={video.coverUrl} 
                     alt={video.title} 
@@ -2280,9 +2125,9 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
                   </div>
 
                   {/* Bottom Overlay on Thumbnail */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 z-10 text-white flex items-center justify-center text-[10px] font-mono">
+                  <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 z-10 text-white flex items-center justify-center text-[10px] font-mono ${viral ? "pr-10" : ""}`}>
                     {/* 3 icons centered */}
-                    <div className="flex items-center justify-center gap-3.5 text-white/90">
+                    <div data-testid="finished-video-stats" className={`flex items-center justify-center text-white/90 ${viral ? "min-w-0 flex-wrap gap-1" : "gap-3.5"}`}>
                       <span className="flex items-center gap-0.5" title="剪切/分镜数">
                         <Scissors className="w-3 h-3 text-white/80" />
                         <span>{video.cuts || 0}</span>
@@ -2297,6 +2142,7 @@ export default function FinishedVideosView({ onTriggerTask, onNavigateToDelivery
                       </span>
                     </div>
                   </div>
+                  {!isPreviewVisible && viralBadge && <div className="absolute bottom-1.5 right-1.5 z-40">{viralBadge}</div>}
                 </div>
 
                 {/* Middle Content Section */}

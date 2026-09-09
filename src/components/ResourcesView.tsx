@@ -8,7 +8,7 @@ import UploadFinishedVideoModal from "./UploadFinishedVideoModal";
 import UploadImageModal from "./UploadImageModal";
 import UploadGenericResourcePage from "./UploadGenericResourcePage";
 import { TaskItem } from "./TaskCollaborationView";
-import { ResourceSearchIntent } from "../types";
+import { Asset, ResourceSearchIntent } from "../types";
 import { 
   ShoppingBag, 
   Film, 
@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 
 interface ResourcesViewProps {
+  uploadedVideos?: Asset[];
   initialTab?: "finished_videos" | "materials" | "scripts" | "images" | "audio";
   onTriggerTask?: (type: any, name: string, inputFiles: string[], cost: number) => void;
   onNavigateToDelivery?: () => void;
@@ -38,6 +39,7 @@ interface ResourcesViewProps {
 export type UploadFileType = "成片" | "素材" | "脚本" | "图片" | "音频";
 
 export default function ResourcesView({
+  uploadedVideos = [],
   initialTab = "finished_videos",
   onTriggerTask,
   onNavigateToDelivery,
@@ -315,6 +317,7 @@ export default function ResourcesView({
           <>
             {activeTab === "finished_videos" && (
               <FinishedVideosView
+                uploadedVideos={uploadedVideos.filter((asset) => asset.resourceCategory === "成片")}
                 initialSearch={activeSearch}
                 onClearSearch={clearHomeSearch}
                 onTriggerTask={onTriggerTask}
@@ -324,6 +327,7 @@ export default function ResourcesView({
             )}
             {activeTab === "materials" && (
               <MaterialsView
+                uploadedVideos={uploadedVideos.filter((asset) => asset.resourceCategory === "素材")}
                 initialSearch={activeSearch}
                 onClearSearch={clearHomeSearch}
                 onTriggerTask={onTriggerTask}

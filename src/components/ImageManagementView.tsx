@@ -4,12 +4,14 @@ import ImageDetailView from "./ImageDetailView";
 import { Pagination } from "./Pagination";
 import { ResourceSearchIntent } from "../types";
 import ResourceSearchCondition from "./ResourceSearchCondition";
+import ResourceFilterPresets from "./ResourceFilterPresets";
+import { IMAGE_PRESET_DEFAULTS } from "../lib/resourceFilterPresets";
+import ResourceActionMenu from "./ResourceActionMenu";
 import {
   Search,
   ChevronDown,
   ChevronUp,
   Calendar,
-  Filter,
   Download,
   Edit2,
   Copy,
@@ -205,9 +207,16 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
   const [secondarySearch, setSecondarySearch] = useState("");
   const [selectedSecondaryCat, setSelectedSecondaryCat] = useState("全部");
   const [publicTagSearch, setPublicTagSearch] = useState("");
+  const [publicTagKeyword, setPublicTagKeyword] = useState("");
   const [personalTagSearch, setPersonalTagSearch] = useState("");
   const [selectedPersonalTag, setSelectedPersonalTag] = useState("全部");
   const [selectedPreset, setSelectedPreset] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearch?.query || "");
+  React.useEffect(() => { setSearchQuery(initialSearch?.query || ""); }, [initialSearch?.requestId, initialSearch?.query]);
+  const [authorSearch, setAuthorSearch] = useState("");
+  const [systemAutoTag, setSystemAutoTag] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [sortBy, setSortBy] = useState("最新发布");
   const [authorFilter, setAuthorFilter] = useState("");
   const [selectedShopLink, setSelectedShopLink] = useState("");
@@ -237,12 +246,6 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
   }, [detailItem, onDetailStateChange]);
   const [selectedDetailThumbIndex, setSelectedDetailThumbIndex] = useState<number>(0);
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
-  const [showSavePresetModal, setShowSavePresetModal] = useState(false);
-  const [presetNameInput, setPresetNameInput] = useState("");
-  const [presets, setPresets] = useState<{ name: string }[]>([
-    { name: "常用美妆素材组" },
-    { name: "店铺资质文件库" }
-  ]);
   const [showExportModal, setShowExportModal] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
@@ -287,7 +290,7 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
 
   // Filtered list
   const filteredImages = MOCK_IMAGES.filter(item => {
-    const homeSearch = (initialSearch?.query || "").trim().toLowerCase();
+    const homeSearch = searchQuery.trim().toLowerCase();
     const matchesHomeSearch = !homeSearch || [item.title, item.subtitle, item.primaryCategory, item.secondaryCategory, item.personalTag, item.author, ...item.publicTags]
       .some((value) => value.toLowerCase().includes(homeSearch));
     if (!matchesHomeSearch) return false;
@@ -345,20 +348,26 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
     );
   };
 
-  const handleApplyPreset = (name: string) => {
-    setSelectedPreset(name);
-    if (name) {
-      showToast(`已加载常用筛选预设: ${name}`);
-    }
-  };
-
-  const handleSavePreset = () => {
-    if (!presetNameInput.trim()) return;
-    setPresets(prev => [...prev, { name: presetNameInput.trim() }]);
-    setSelectedPreset(presetNameInput.trim());
-    setShowSavePresetModal(false);
-    setPresetNameInput("");
-    showToast("筛选预设保存成功！");
+  const presetFilters = { searchQuery, selectedPrimaryCat, secondarySearch, selectedSecondaryCat, publicTagSearch, publicTagKeyword, personalTagSearch, selectedPersonalTag, sortBy, authorFilter, authorSearch, selectedShopLink, systemAutoTag, startDate, endDate };
+  const applyPresetFilters = (next: typeof IMAGE_PRESET_DEFAULTS) => {
+    setSearchQuery(next.searchQuery);
+    setSelectedPrimaryCat(next.selectedPrimaryCat);
+    setSecondarySearch(next.secondarySearch);
+    setSelectedSecondaryCat(next.selectedSecondaryCat);
+    setPublicTagSearch(next.publicTagSearch);
+    setPublicTagKeyword(next.publicTagKeyword);
+    setPersonalTagSearch(next.personalTagSearch);
+    setSelectedPersonalTag(next.selectedPersonalTag);
+    setSortBy(next.sortBy);
+    setAuthorFilter(next.authorFilter);
+    setAuthorSearch(next.authorSearch);
+    setSelectedShopLink(next.selectedShopLink);
+    setSystemAutoTag(next.systemAutoTag);
+    setStartDate(next.startDate);
+    setEndDate(next.endDate);
+    setCurrentPage(1);
+    setSelectedImageIds([]);
+    setIsSelectionMode(false);
   };
 
   const handleResetFilters = () => {
@@ -366,12 +375,18 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
     setSecondarySearch("");
     setSelectedSecondaryCat("全部");
     setPublicTagSearch("");
+    setPublicTagKeyword("");
     setPersonalTagSearch("");
     setSelectedPersonalTag("全部");
     setSelectedPreset("");
     setSortBy("最新发布");
     setAuthorFilter("");
     setSelectedShopLink("");
+    setAuthorSearch("");
+    setSystemAutoTag("");
+    setStartDate("");
+    setEndDate("");
+    setCurrentPage(1);
     showToast("筛选条件已重置");
   };
 
@@ -399,23 +414,12 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
       <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-3.5 text-xs text-slate-700">
         {/* Row 1: 常用筛选预设 (Top Right Corner inside card or aligned) */}
         <div className="flex justify-end items-center gap-2 pb-1 border-b border-slate-100/60">
-          <select
-            value={selectedPreset}
-            onChange={(e) => handleApplyPreset(e.target.value)}
-            className="border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-500 bg-white focus:outline-none focus:border-purple-400 cursor-pointer min-w-[150px]"
-          >
-            <option value="">选择常用筛选预设</option>
-            {presets.map(p => (
-              <option key={p.name} value={p.name}>{p.name}</option>
-            ))}
-          </select>
-
-          <button
-            onClick={() => setShowSavePresetModal(true)}
-            className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3.5 py-1 rounded-lg font-bold shadow-xs cursor-pointer flex items-center gap-1 transition-colors"
-          >
-            <span>保存</span>
-          </button>
+          <ResourceFilterPresets scope="images" defaults={IMAGE_PRESET_DEFAULTS} value={presetFilters}
+            selectedName={selectedPreset} onSelectName={setSelectedPreset} onApply={applyPresetFilters}
+            seeds={[
+              { name: "常用美妆素材组", filters: { selectedPrimaryCat: "美妆护肤" } },
+              { name: "店铺资质文件库", filters: { selectedPrimaryCat: "资质文件" } },
+            ]} />
         </div>
 
         {/* Row 2: 一级分类 */}
@@ -484,6 +488,8 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
         <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
           <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">公共标签：</span>
           <PublicTagFilter
+            searchKeyword={publicTagKeyword}
+            onSearchKeywordChange={setPublicTagKeyword}
             selectedTag={publicTagSearch || "全部"}
             onSelectTag={(tag) => setPublicTagSearch(tag === "全部" ? "" : tag)}
           />
@@ -550,7 +556,7 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
         </div>
       </div>
 
-      <ResourceSearchCondition query={initialSearch?.query} onClear={onClearSearch} />
+      <ResourceSearchCondition query={searchQuery} onClear={() => { setSearchQuery(""); onClearSearch?.(); }} />
 
       {/* Filter Card 2: 高级搜索 Bar */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs text-slate-700">
@@ -572,7 +578,7 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
           </div>
 
           {/* 系统自动标签 */}
-          <select className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-500 bg-white focus:outline-none focus:border-purple-400 cursor-pointer">
+          <select value={systemAutoTag} onChange={e => setSystemAutoTag(e.target.value)} aria-label="系统自动标签" className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-500 bg-white focus:outline-none focus:border-purple-400 cursor-pointer">
             <option value="">系统自动标签: 请选择系统标签</option>
             <option value="ai_generated">AI识别渲染</option>
             <option value="high_res">高精修大图</option>
@@ -601,16 +607,8 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
           </div>
         </div>
 
-        {/* Buttons: 筛选, 重置, 导出 */}
+        {/* Reset and export */}
         <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => showToast("已应用高级筛选条件")}
-            className="border border-purple-500 text-purple-600 hover:bg-purple-50 font-bold px-3.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-          >
-            <Filter className="w-3.5 h-3.5" />
-            <span>筛选</span>
-          </button>
-
           <button
             onClick={handleResetFilters}
             className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs"
@@ -676,73 +674,10 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
                 下载
               </button>
 
-              <div className="relative">
-                <button
-                  onClick={() => setOpenDropdown(openDropdown === "edit" ? null : "edit")}
-                  className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-                >
-                  <span>修改</span>
-                  <ChevronDown className="w-3 h-3 text-slate-400" />
-                </button>
-                {openDropdown === "edit" && (
-                  <div className="absolute top-full left-0 mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50 animate-fade-in">
-                    {["修改一级分类", "修改二级分类", "修改个人标签"].map(opt => (
-                      <button
-                        key={opt}
-                        onClick={() => {
-                          showToast(`批量操作: ${opt}`);
-                          setOpenDropdown(null);
-                        }}
-                        className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-purple-50 hover:text-purple-700 cursor-pointer"
-                      >
-                        {opt}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="relative">
-                <button
-                  onClick={() => setOpenDropdown(openDropdown === "tag" ? null : "tag")}
-                  className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-                >
-                  <span>添加标签</span>
-                  <ChevronDown className="w-3 h-3 text-slate-400" />
-                </button>
-                {openDropdown === "tag" && (
-                  <div className="absolute top-full left-0 mt-1 w-36 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50 animate-fade-in">
-                    {["添加公共标签", "添加个人标签"].map(opt => (
-                      <button
-                        key={opt}
-                        onClick={() => {
-                          showToast(`批量操作: ${opt}`);
-                          setOpenDropdown(null);
-                        }}
-                        className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-purple-50 hover:text-purple-700 cursor-pointer"
-                      >
-                        {opt}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <button
-                onClick={() => showToast("已复制选中的图片素材链接")}
-                className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-              >
-                <span>复制链接</span>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
-              </button>
-
-              <button
-                onClick={() => showToast("批量更多操作")}
-                className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-              >
-                <span>操作</span>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
-              </button>
+              <ResourceActionMenu label="修改" options={["修改一级分类", "修改二级分类"]}
+                onSelect={option => showToast(`批量操作: ${option}`)} />
+              <ResourceActionMenu label="添加标签" options={["添加公共标签", "添加个人标签"]}
+                onSelect={option => showToast(`批量操作: ${option}`)} />
             </>
           ) : (
             <>
@@ -784,6 +719,7 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
             <input
               type="text"
               placeholder="请选择(支持输入搜索)"
+              value={authorSearch} onChange={e => setAuthorSearch(e.target.value)}
               className="text-xs focus:outline-none w-full placeholder:text-slate-400 font-normal"
             />
           </div>
@@ -792,9 +728,9 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
             <Calendar className="w-3.5 h-3.5 text-slate-400" />
             <span>上传时间</span>
             <span className="text-slate-300">|</span>
-            <input type="text" placeholder="开始日期" className="w-14 focus:outline-none text-center" />
+            <input type="text" placeholder="开始日期" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-24 focus:outline-none text-center" />
             <span>至</span>
-            <input type="text" placeholder="结束日期" className="w-14 focus:outline-none text-center" />
+            <input type="text" placeholder="结束日期" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-24 focus:outline-none text-center" />
           </div>
 
           <div className="flex items-center border border-slate-200 rounded-lg p-0.5 bg-white ml-1">
@@ -1085,45 +1021,6 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
         </div>
       )}
 
-      {/* Modal 1: 保存为常用筛选 (Save Preset Modal) */}
-      {showSavePresetModal && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-2xs animate-fade-in p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-sm p-5 space-y-4 relative">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <h3 className="font-black text-sm text-slate-900">保存常用筛选预设</h3>
-              <button onClick={() => setShowSavePresetModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">预设名称</label>
-              <input
-                type="text"
-                placeholder="请输入预设名称 (例如: 美妆图片全集)"
-                value={presetNameInput}
-                onChange={(e) => setPresetNameInput(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 text-xs font-bold">
-              <button
-                onClick={() => setShowSavePresetModal(false)}
-                className="px-3.5 py-1.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 cursor-pointer"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleSavePreset}
-                className="px-3.5 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 cursor-pointer"
-              >
-                确认保存
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal 2: 导出模态框 */}
       {showExportModal && (

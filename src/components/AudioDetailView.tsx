@@ -22,6 +22,7 @@ export interface AudioItem {
   secondaryCategory: string;
   publicTags: string[];
   personalTag: string;
+  personalTags?: string[];
   starred?: boolean;
 }
 
@@ -66,7 +67,7 @@ export default function AudioDetailView({
     item.publicTags && item.publicTags.length > 0 ? item.publicTags : ["场景: 模特"]
   );
   const [audioPersonalTags, setAudioPersonalTags] = useState<string[]>(
-    item.personalTag && item.personalTag !== "无个人标签" ? [item.personalTag] : ["Zs测试一"]
+    item.personalTags || (item.personalTag && item.personalTag !== "无个人标签" ? [item.personalTag] : [])
   );
 
   // Player State

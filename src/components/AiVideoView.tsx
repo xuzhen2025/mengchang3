@@ -14,7 +14,6 @@ import {
   Film,
   FolderOpen,
   Images,
-  ListTodo,
   Loader2,
   Mic2,
   Pause,
@@ -54,7 +53,6 @@ interface AiVideoViewProps {
   onCreateTask: (snapshot: AiVideoTaskSnapshot, creditsCost: number) => string | null;
   onConsumeCredits: (creditsCost: number, remark: string) => boolean;
   onCancelTask: (taskId: string) => void;
-  onOpenTaskQueue: () => void;
   onUploadVideos: (videos: Array<{ name: string; cover: string }>) => void;
   presetPrompt?: string;
   presetReferences?: string[];
@@ -275,7 +273,6 @@ export default function AiVideoView({
   onCreateTask,
   onConsumeCredits,
   onCancelTask,
-  onOpenTaskQueue,
   onUploadVideos,
   presetPrompt,
   presetReferences,
@@ -792,7 +789,7 @@ export default function AiVideoView({
         <div className="min-h-0 flex-1 overflow-y-auto p-4">{renderControlBody()}</div>
         {(mode !== "outfit" || outfitPreview) && <div className="shrink-0 border-t border-slate-200 bg-white p-4"><button disabled={!canGenerate || (mode === "outfit" && outfitPreviewProgress < 100)} onClick={submitGeneration} className="flex w-full items-center justify-center gap-2 rounded-md bg-violet-600 py-3 text-sm font-bold text-white shadow-sm hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"><Sparkles className="h-4 w-4" />立即生成 <span className="text-violet-200">· {currentCost} 积分</span></button></div>}
       </aside>
-      <main className="flex min-h-0 flex-col rounded-lg border border-slate-200 bg-white shadow-sm max-lg:mt-3 max-lg:min-h-[700px]"><div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-950 text-white"><Sparkles className="h-5 w-5 text-violet-300" /></span><div><h2 className="text-sm font-bold text-slate-900">{mode === "background" || mode === "outfit" ? "AI视频编辑工作台" : `${MODE_LABELS[mode]}工作台`}</h2><p className="mt-1 text-[11px] text-slate-400">当前类别共 {modeRecords.length} 条生成记录</p></div></div><button onClick={onOpenTaskQueue} className="flex items-center gap-2 rounded-md bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-violet-50 hover:text-violet-700"><ListTodo className="h-4 w-4" />任务队列</button></div><div className="min-h-0 flex-1 overflow-y-auto px-5 pb-8">{modeRecords.length === 0 ? <div className="flex h-full min-h-[420px] flex-col items-center justify-center text-center"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400"><Video className="h-6 w-6" /></span><p className="mt-4 text-sm font-bold text-slate-700">还没有生成记录</p><p className="mt-1 text-xs text-slate-400">配置左侧内容后即可创建第一条视频原料</p></div> : <div className="divide-y divide-slate-100">{modeRecords.map((task) => <GenerationRecordCard key={task.id} task={task} selected={activeTaskId === task.id} onSelect={() => onActiveTaskChange(task.id)} onCancel={() => cancelRecord(task)} onPreview={(output) => setPreviewSelection({ task, output })} onDownload={downloadOutput} onUpload={(outputs) => setUploadSelection({ task, outputs })} onReEdit={() => reEditTask(task)} />)}</div>}</div></main>
+      <main className="flex min-h-0 flex-col rounded-lg border border-slate-200 bg-white shadow-sm max-lg:mt-3 max-lg:min-h-[700px]"><div className="flex shrink-0 items-center border-b border-slate-200 px-5 py-4"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-950 text-white"><Sparkles className="h-5 w-5 text-violet-300" /></span><div><h2 className="text-sm font-bold text-slate-900">{mode === "background" || mode === "outfit" ? "AI视频编辑工作台" : `${MODE_LABELS[mode]}工作台`}</h2><p className="mt-1 text-[11px] text-slate-400">当前类别共 {modeRecords.length} 条生成记录</p></div></div></div><div className="min-h-0 flex-1 overflow-y-auto px-5 pb-8">{modeRecords.length === 0 ? <div className="flex h-full min-h-[420px] flex-col items-center justify-center text-center"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400"><Video className="h-6 w-6" /></span><p className="mt-4 text-sm font-bold text-slate-700">还没有生成记录</p><p className="mt-1 text-xs text-slate-400">配置左侧内容后即可创建第一条视频原料</p></div> : <div className="divide-y divide-slate-100">{modeRecords.map((task) => <GenerationRecordCard key={task.id} task={task} selected={activeTaskId === task.id} onSelect={() => onActiveTaskChange(task.id)} onCancel={() => cancelRecord(task)} onPreview={(output) => setPreviewSelection({ task, output })} onDownload={downloadOutput} onUpload={(outputs) => setUploadSelection({ task, outputs })} onReEdit={() => reEditTask(task)} />)}</div>}</div></main>
     </div>
     {modelMediaTypePickerOpen && <MediaTypeChoiceModal onClose={() => setModelMediaTypePickerOpen(false)} onSelect={(allowed) => { setModelMediaTypePickerOpen(false); openPicker("modelMedia", allowed, 1); }} />}
     {picker && <MediaPickerModal allowed={picker.allowed} maxSelections={picker.max} initialSelected={pickerSelection()} items={libraryItems} onClose={() => setPicker(null)} onConfirm={applyPickerSelection} />}

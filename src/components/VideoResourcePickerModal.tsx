@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
-import { Check, Search, Trash2, Upload, X } from "lucide-react";
+import { AlertCircle, Check, Search, Trash2, Upload, X } from "lucide-react";
 import AssetPagination from "./AssetPagination";
 import OverlayPortal from "./overlays/OverlayPortal";
 
@@ -17,6 +17,10 @@ export interface VideoResourcePickerItem {
   author: string;
   duration: string;
   size: string;
+  sizeBytes?: number;
+  url?: string;
+  resolution?: string;
+  fps?: number;
 }
 
 interface VideoResourcePickerModalProps {
@@ -25,6 +29,8 @@ interface VideoResourcePickerModalProps {
   initialSection?: VideoResourceSection;
   allowLocalUpload?: boolean;
   showAllSection?: boolean;
+  maxSelections?: number;
+  maxFileSizeMB?: number;
   onClose: () => void;
   onConfirm: (items: VideoResourcePickerItem[]) => void;
 }
@@ -39,6 +45,8 @@ export default function VideoResourcePickerModal({
   initialSection = "成片",
   allowLocalUpload = false,
   showAllSection = false,
+  maxSelections,
+  maxFileSizeMB = 1000,
   onClose,
   onConfirm,
 }: VideoResourcePickerModalProps) {
@@ -51,8 +59,12 @@ export default function VideoResourcePickerModal({
   const [author, setAuthor] = useState("全部上传人");
   const [search, setSearch] = useState("");
   const [onlyMine, setOnlyMine] = useState(false);
-  const [selectedIds, setSelectedIds] = useState(() => uniqueValues(initialSelectedIds));
+  const [selectedIds, setSelectedIds] = useState(() => {
+    const initial = uniqueValues(initialSelectedIds);
+    return maxSelections ? initial.slice(0, maxSelections) : initial;
+  });
   const [localItems, setLocalItems] = useState<VideoResourcePickerItem[]>([]);
+  const [uploadError, setUploadError] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const uploadRef = useRef<HTMLInputElement | null>(null);
@@ -88,14 +100,48 @@ export default function VideoResourcePickerModal({
   const pagedItems = filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const resetPage = () => setPage(1);
+  const getFileSizeMB = (size: string) => {
+    const match = size.replace(/,/g, "").match(/([\d.]+)\s*(KB|MB|GB)/i);
+    if (!match) return null;
+    const value = Number(match[1]);
+    const unit = match[2].toUpperCase();
+    if (!Number.isFinite(value)) return null;
+    if (unit === "GB") return value * 1024;
+    if (unit === "KB") return value / 1024;
+    return value;
+  };
+
   const toggleItem = (id: string) => {
-    setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+    const item = allItems.find((video) => video.id === id);
+    if (item && !/\.(mp4|mpeg|mov)$/i.test(item.name)) {
+      setUploadError(`“${item.name}”格式不受支持，仅可选择 MP4、MPEG、MOV 视频。`);
+      return;
+    }
+    const sizeMB = item ? getFileSizeMB(item.size) : null;
+    if (sizeMB !== null && sizeMB >= maxFileSizeMB) {
+      setUploadError(`“${item?.name}”大小为 ${item?.size}，单个视频需小于 ${maxFileSizeMB} MB。`);
+      return;
+    }
+    setUploadError("");
+    setSelectedIds((current) => {
+      if (current.includes(id)) return current.filter((item) => item !== id);
+      if (maxSelections === 1) return [id];
+      if (maxSelections && current.length >= maxSelections) return current;
+      return [...current, id];
+    });
   };
 
   const handleLocalUpload = (files?: FileList | null) => {
     if (!files?.length) return;
-    const uploaded = Array.from(files)
-      .filter((file) => file.type.startsWith("video/") || /\.(mp4|mpeg|mov)$/i.test(file.name))
+    const candidates = Array.from(files);
+    const supported = candidates.filter((file) => /\.(mp4|mpeg|mov)$/i.test(file.name));
+    const accepted = supported.filter((file) => file.size < maxFileSizeMB * 1024 * 1024);
+    const errors: string[] = [];
+    if (supported.length < candidates.length) errors.push("仅支持 MP4、MPEG、MOV 格式");
+    if (accepted.length < supported.length) errors.push(`单个视频需小于 ${maxFileSizeMB} MB`);
+    setUploadError(errors.join("；"));
+
+    const uploaded = accepted
       .map((file, index): VideoResourcePickerItem => ({
         id: `script-video-local-${Date.now()}-${index}`,
         name: file.name,
@@ -108,9 +154,19 @@ export default function VideoResourcePickerModal({
         author: "当前用户",
         duration: "--:--",
         size: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
+        sizeBytes: file.size,
+        url: URL.createObjectURL(file),
       }));
+    if (uploaded.length === 0) {
+      if (uploadRef.current) uploadRef.current.value = "";
+      return;
+    }
     setLocalItems((current) => [...current, ...uploaded]);
-    setSelectedIds((current) => [...current, ...uploaded.map((item) => item.id)]);
+    setSelectedIds((current) => {
+      if (maxSelections === 1) return uploaded.slice(-1).map((item) => item.id);
+      const next = [...current, ...uploaded.map((item) => item.id)];
+      return maxSelections ? next.slice(0, maxSelections) : next;
+    });
     if (uploadRef.current) uploadRef.current.value = "";
   };
 
@@ -209,7 +265,7 @@ export default function VideoResourcePickerModal({
                   const selected = selectedIds.includes(item.id);
                   return (
                     <tr key={item.id} onClick={() => toggleItem(item.id)} className={`cursor-pointer border-t border-slate-100 ${selected ? "bg-violet-50" : "hover:bg-slate-50"}`}>
-                      <td className="px-4 py-3"><span className={`flex h-4 w-4 items-center justify-center rounded border ${selected ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300 bg-white"}`}>{selected && <Check className="h-2.5 w-2.5" />}</span></td>
+                      <td className="px-4 py-3"><span className={`flex h-4 w-4 items-center justify-center border ${maxSelections === 1 ? "rounded-full" : "rounded"} ${selected ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300 bg-white"}`}>{selected && <Check className="h-2.5 w-2.5" />}</span></td>
                       <td className="px-3 py-2"><img src={item.cover} alt="" className="h-10 w-16 rounded object-cover" referrerPolicy="no-referrer" /></td>
                       <td className="px-3 py-3"><p className="truncate font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.id}</p></td>
                       <td className="px-3 py-3"><span className="rounded bg-slate-100 px-2 py-1 text-[10px] text-slate-600">{item.status}</span></td>
@@ -233,17 +289,18 @@ export default function VideoResourcePickerModal({
                 <Upload className="h-6 w-6" />
                 <span className="mt-3 text-xs font-semibold">点击选择本地视频</span>
               </button>
-              <input ref={uploadRef} type="file" multiple accept=".mp4,.mpeg,.mov,video/mp4,video/mpeg,video/quicktime" className="hidden" onChange={(event) => handleLocalUpload(event.target.files)} />
-              <p className="mt-3 text-center text-xs leading-6 text-slate-400">支持 mp4、mpeg、mov 格式，单个视频大小需小于 1000MB。<br />请确保上传素材为原创内容或已取得合法授权。</p>
+              <input ref={uploadRef} type="file" multiple={maxSelections !== 1} accept=".mp4,.mpeg,.mov,video/mp4,video/mpeg,video/quicktime" className="hidden" onChange={(event) => handleLocalUpload(event.target.files)} />
+              <p className="mt-3 text-center text-xs leading-6 text-slate-400">支持 MP4、MPEG、MOV 格式，单个视频大小需小于 {maxFileSizeMB} MB。<br />请确保上传素材为原创内容或已取得合法授权。</p>
+              {uploadError && <p className="mt-2 flex items-center justify-center gap-1.5 text-xs font-medium text-rose-600"><AlertCircle className="h-3.5 w-3.5" />{uploadError}</p>}
               {localItems.length > 0 && <div className="mt-4 space-y-2">{localItems.map((item) => <div key={item.id} className="flex items-center gap-3 rounded-md border border-slate-200 p-2.5"><img src={item.cover} alt="" className="h-11 w-16 rounded object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.size}</p></div><button type="button" onClick={() => { setLocalItems((current) => current.filter((video) => video.id !== item.id)); setSelectedIds((current) => current.filter((id) => id !== item.id)); }} title="删除" className="p-1.5 text-slate-400 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div>}
             </div>
           )}
         </div>
 
         <div className="flex shrink-0 items-center gap-3 border-t border-slate-200 bg-white px-5 py-4">
-          <p className="mr-auto text-xs text-slate-500">已选择 <b className="text-violet-700">{selectedIds.length}</b> 个视频</p>
+          <div className="mr-auto min-w-0"><p className="text-xs text-slate-500">已选择 <b className="text-violet-700">{selectedIds.length}</b>{maxSelections ? ` / ${maxSelections}` : ""} 个视频</p>{sourceTab === "library" && uploadError && <p className="mt-1 truncate text-[10px] font-medium text-rose-600">{uploadError}</p>}</div>
           <button type="button" onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">取消</button>
-          <button type="button" onClick={() => onConfirm(allItems.filter((item) => selectedIds.includes(item.id)))} className="rounded-md bg-violet-600 px-5 py-2 text-xs font-semibold text-white hover:bg-violet-700">确认选择</button>
+          <button type="button" disabled={selectedIds.length === 0} onClick={() => onConfirm(allItems.filter((item) => selectedIds.includes(item.id)))} className="rounded-md bg-violet-600 px-5 py-2 text-xs font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400">确认选择</button>
         </div>
       </div>
     </OverlayPortal>

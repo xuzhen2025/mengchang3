@@ -153,7 +153,7 @@ export const DEFAULT_SCRIPT_LIST: ScriptResourceItem[] = [
 interface LinkScriptModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (selectedScript: ScriptResourceItem | ScriptResourceItem[]) => void;
+  onConfirm: (selectedScript: ScriptResourceItem | ScriptResourceItem[]) => boolean | void;
   initialSelectedId?: string;
   initialSelectedIds?: string[];
   multiSelect?: boolean;
@@ -162,7 +162,11 @@ interface LinkScriptModalProps {
   zIndexClass?: string;
 }
 
-export default function LinkScriptModal({
+export default function LinkScriptModal(props: LinkScriptModalProps) {
+  return props.isOpen ? <LinkScriptModalContent {...props} /> : null;
+}
+
+function LinkScriptModalContent({
   isOpen,
   onClose,
   onConfirm,
@@ -173,13 +177,11 @@ export default function LinkScriptModal({
   customScripts,
   zIndexClass = "z-[300]"
 }: LinkScriptModalProps) {
-  if (!isOpen) return null;
-
   const scriptList = customScripts || DEFAULT_SCRIPT_LIST;
 
   // Selected State
   const [selectedIds, setSelectedIds] = useState<string[]>(() => {
-    if (initialSelectedIds && initialSelectedIds.length > 0) return initialSelectedIds;
+    if (initialSelectedIds) return initialSelectedIds;
     if (initialSelectedId) return [initialSelectedId];
     return ["S001"]; // default select S001 like screenshot
   });
@@ -256,12 +258,13 @@ export default function LinkScriptModal({
   };
 
   const handleConfirm = () => {
+    if (!selectedIds.length) return;
     if (multiSelect) {
       const selectedItems = scriptList.filter((i) => selectedIds.includes(i.id));
-      onConfirm(selectedItems);
+      if (!selectedItems.length || onConfirm(selectedItems) === false) return;
     } else {
-      const selectedItem = scriptList.find((i) => selectedIds.includes(i.id)) || scriptList[0];
-      onConfirm(selectedItem);
+      const selectedItem = scriptList.find((i) => selectedIds.includes(i.id));
+      if (!selectedItem || onConfirm(selectedItem) === false) return;
     }
     onClose();
   };
@@ -395,12 +398,12 @@ export default function LinkScriptModal({
               <thead>
                 <tr className="border-b border-slate-200/80 text-slate-600 font-bold bg-[#F8F9FA]/90">
                   <th className="py-3 px-4 w-10 text-center">
-                    <input
+                    {multiSelect && <input
                       type="checkbox"
                       checked={isAllCurrentSelected}
                       onChange={handleSelectAllCurrentPage}
                       className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
-                    />
+                    />}
                   </th>
                   <th className="py-3 px-4 font-bold text-slate-700">脚本标题</th>
                   <th className="py-3 px-4 font-bold text-slate-700">脚本模板</th>
@@ -599,7 +602,8 @@ export default function LinkScriptModal({
             <button
               type="button"
               onClick={handleConfirm}
-              className="px-6 py-2 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer shadow-xs active:scale-95"
+              disabled={!selectedIds.length}
+              className="px-6 py-2 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer shadow-xs active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               确认关联
             </button>

@@ -14,6 +14,7 @@ export interface ImageResourcePickerItem {
   author: string;
   resolution: string;
   size: string;
+  sizeBytes?: number;
   source?: "library" | "local";
 }
 
@@ -97,6 +98,7 @@ export default function ImageResourcePickerModal({
         author: "当前用户",
         resolution: "读取中",
         size: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
+        sizeBytes: file.size,
         source: "local",
       }));
     setLocalItems((current) => multiple ? [...current, ...uploaded] : uploaded);

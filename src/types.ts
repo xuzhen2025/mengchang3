@@ -82,8 +82,7 @@ export type GenerationTaskCategory =
   | "watermark"
   | "subtitle"
   | "enhance"
-  | "digital_human"
-  | "model_change"
+  | "face_swap"
   | "fission"
   | "ai_video";
 
@@ -130,11 +129,63 @@ export interface AiVideoTaskOutput {
   sourceVideoId?: string;
 }
 
+export interface WatermarkRegion {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface WatermarkVideo {
+  id: string;
+  name: string;
+  url: string;
+  coverUrl?: string;
+  size: string;
+  duration: number;
+  resolution: string;
+}
+
+export interface WatermarkTaskSnapshot {
+  sourceVideo: WatermarkVideo;
+  regions: WatermarkRegion[];
+}
+
+export interface WatermarkTaskOutput {
+  name: string;
+  videoUrl: string;
+  coverUrl?: string;
+  size: string;
+  duration: number;
+  resolution: string;
+}
+
+export type EnhanceResolution = "auto" | "1080p" | "2k" | "4k";
+export type EnhanceFrameRate = "source" | "60";
+
+export interface EnhanceVideo extends WatermarkVideo {
+  fps: number;
+}
+
+export interface EnhanceTaskSnapshot {
+  sourceVideo: EnhanceVideo;
+  requestedResolution: EnhanceResolution;
+  outputResolution: Exclude<EnhanceResolution, "auto">;
+  frameRate: EnhanceFrameRate;
+  outputFps: number;
+  billingMinutes: number;
+}
+
+export interface EnhanceTaskOutput extends WatermarkTaskOutput {
+  fps: number;
+}
+
 export interface Task {
   id: string;
   name: string;
-  type: "video" | "watermark" | "subtitle" | "enhance" | "digital_human" | "model_change" | "video_gen" | "image_gen" | "fission";
-  status: "queue" | "generating" | "completed" | "failed" | "cancelled";
+  type: "video" | "watermark" | "subtitle" | "enhance" | "face_swap" | "video_gen" | "image_gen" | "fission";
+  status: "queue" | "generating" | "completed" | "failed" | "cancelled" | "ready";
   progress: number;
   inputFiles: string[];
   outputFiles?: string[];
@@ -154,7 +205,14 @@ export interface Task {
   aiVideoSnapshot?: AiVideoTaskSnapshot;
   aiVideoOutput?: AiVideoTaskOutput;
   aiVideoOutputs?: AiVideoTaskOutput[];
+  watermarkSnapshot?: WatermarkTaskSnapshot;
+  watermarkOutput?: WatermarkTaskOutput;
+  subtitleSnapshot?: WatermarkTaskSnapshot;
+  subtitleOutput?: WatermarkTaskOutput;
+  enhanceSnapshot?: EnhanceTaskSnapshot;
+  enhanceOutput?: EnhanceTaskOutput;
   simulationStartedAt?: number;
+  faceSwap?: import("./lib/videoFaceSwap").FaceSwapSession;
 }
 
 export interface CreditTransaction {
@@ -185,7 +243,7 @@ export interface GalleryItem {
   tags?: string[];
 }
 
-export type ActiveScreen = "home" | "quick_creation" | "agent_creation" | "video_remake" | "ai_video" | "canvas" | "live_management" | "assets" | "enhance" | "watermark" | "subtitle" | "credits" | "resources" | "materials" | "finished_videos" | "scripts" | "images" | "audio" | "ad_delivery" | "same_style_video" | "task_collaboration" | "message_center";
+export type ActiveScreen = "home" | "quick_creation" | "face_swap" | "agent_creation" | "video_remake" | "ai_video" | "canvas" | "live_management" | "assets" | "enhance" | "watermark" | "subtitle" | "credits" | "resources" | "materials" | "finished_videos" | "scripts" | "images" | "audio" | "ad_delivery" | "same_style_video" | "task_collaboration" | "message_center";
 
 export type ResourceSearchType = "成片" | "素材" | "脚本" | "图片" | "音频";
 

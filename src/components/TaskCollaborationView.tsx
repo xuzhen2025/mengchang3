@@ -91,7 +91,6 @@ export interface TaskItem {
   associatedWorks?: AssociatedWorkItem[];
   product?: string;
   scriptType?: string;
-  scriptDeconstruction?: string;
   visibilityType?: "none" | "specified" | "group";
   visibilityRange?: "public" | "public_resource" | "specified_range";
   specifiedTeam?: string;
@@ -204,7 +203,6 @@ export const INITIAL_TASKS: TaskItem[] = [
     ],
     product: "秋季通勤风衣",
     scriptType: "场景混剪",
-    scriptDeconstruction: "已拆解",
     remark: "资源数量已达标，等待任务发布人验收确认"
   },
   {
@@ -229,7 +227,6 @@ export const INITIAL_TASKS: TaskItem[] = [
     ],
     product: "6017无钢圈内衣",
     scriptType: "剧情演绎",
-    scriptDeconstruction: "填写拆解表",
     remark: "另：复刻可正常提交当储备，合适也会安排"
   },
   {
@@ -259,7 +256,6 @@ export const INITIAL_TASKS: TaskItem[] = [
     ],
     product: "6017无钢圈内衣",
     scriptType: "痛点对比",
-    scriptDeconstruction: "填写拆解表",
     remark: "本周训练二创为主，8条的任务都是二创。\n另：复刻可正常提交当储备，合适也会安排"
   },
   {
@@ -287,7 +283,6 @@ export const INITIAL_TASKS: TaskItem[] = [
     completedBy: "蔡卓良",
     product: "抗衰精华液",
     scriptType: "口播种草",
-    scriptDeconstruction: "已拆解",
     remark: "质感要求极高，请使用高清晰度4K打光源"
   },
   {
@@ -315,7 +310,6 @@ export const INITIAL_TASKS: TaskItem[] = [
     ],
     product: "补水面膜",
     scriptType: "特写展示",
-    scriptDeconstruction: "填写拆解表",
     remark: "加急制作，本周首发"
   },
   {
@@ -345,7 +339,6 @@ export const INITIAL_TASKS: TaskItem[] = [
     completedBy: "蔡卓良",
     product: "加绒风衣",
     scriptType: "混剪卡点",
-    scriptDeconstruction: "已拆解",
     remark: "效果优异，已完成跑量"
   },
   {
@@ -369,7 +362,6 @@ export const INITIAL_TASKS: TaskItem[] = [
     ],
     product: "防晒冰袖",
     scriptType: "开箱测评",
-    scriptDeconstruction: "填写拆解表",
     remark: "突出冰感触感与透气网眼细节"
   },
   {
@@ -394,7 +386,6 @@ export const INITIAL_TASKS: TaskItem[] = [
     completedBy: "徐振",
     product: "修护霜",
     scriptType: "痛点对比",
-    scriptDeconstruction: "已拆解",
     remark: "投放千川大盘，消耗突破5万"
   },
   {
@@ -418,7 +409,6 @@ export const INITIAL_TASKS: TaskItem[] = [
     ],
     product: "七夕美妆礼盒",
     scriptType: "开箱测评",
-    scriptDeconstruction: "已拆解",
     remark: "所有已上传资源均可计数，数量达标后等待发布人验收"
   },
   {
@@ -439,7 +429,6 @@ export const INITIAL_TASKS: TaskItem[] = [
     },
     product: "星光吊坠",
     scriptType: "剧情演绎",
-    scriptDeconstruction: "填写拆解表",
     remark: "强调情侣节日赠礼情感价值"
   },
   {
@@ -465,7 +454,6 @@ export const INITIAL_TASKS: TaskItem[] = [
     ],
     product: "复古马丁靴",
     scriptType: "混剪卡点",
-    scriptDeconstruction: "已拆解",
     remark: "注意配合潮流BGM音频节奏"
   },
   {
@@ -492,7 +480,6 @@ export const INITIAL_TASKS: TaskItem[] = [
     ],
     product: "抗衰精华液",
     scriptType: "口播种草",
-    scriptDeconstruction: "已拆解",
     remark: "二创卡点素材已同步上传"
   }
 ];
@@ -1204,137 +1191,6 @@ export default function TaskCollaborationView({
 
   // FULLSCREEN TOGGLE
   const [isFullscreen, setIsFullscreen] = useState(false);
-
-  // DECONSTRUCTION MODAL STATES
-  const [isDeconstructionModalOpen, setIsDeconstructionModalOpen] = useState(false);
-  const [deconstructionTask, setDeconstructionTask] = useState<TaskItem | null>(null);
-  const [deconstructionZoom, setDeconstructionZoom] = useState(100);
-
-  const [deconstructionForm, setDeconstructionForm] = useState({
-    deconstructionId: "CJB-883921",
-    // 对接环节 1: 人员
-    photographer: "张华",
-    editor: "李明",
-    frameReviewer: "王强",
-    techReviewer: "赵雷",
-    creativeModel: "Anna",
-    creativeAudio: "解说-男声1",
-
-    // 对接环节 2: 场景与道具
-    creativeScene: "室内浴室/洗手台",
-    creativeLighting: "柔和明亮暖光",
-    modelClothing: "简约居家服",
-    modelProps: ["耳环"] as string[],
-    prepProps: ["洗发露/护发素", "毛巾", "镜子"] as string[],
-    prepPropsOther: "",
-    specialNeeds: "例如：泼水脚本，提醒模特自带服装",
-
-    // 备注
-    remark: "请注意控制拍摄时长在15秒内，重点突出前后效果对比",
-
-    // 拍摄拆解 - 动态分镜头行
-    shots: [
-      {
-        id: "1",
-        storyboard: "开场前3秒：模特拿洗发露特写，展示受损发质与修复效果对比",
-        dialogue: "“头发干枯毛躁？别再用传统洗发水了！”",
-        sampleImage: "",
-        notes: "抓取强对比特写，前3秒背景音效要吸引人"
-      },
-      {
-        id: "2",
-        storyboard: "挤出产品质地特写，泡沫丰富绵密",
-        dialogue: "“看看这绵密的云朵泡沫，蕴含多种植物精油”",
-        sampleImage: "",
-        notes: "特写镜头需光线充足，突出泡沫光泽感"
-      }
-    ],
-
-    // 视频规范
-    videoFormat: "MP4 / H.264",
-    videoSize: "9:16 竖屏 (1080x1920)",
-    subtitleType: "双语花字字幕",
-    videoQuality: "1080P / 60fps",
-    bgm: "轻快卡点轻音乐",
-
-    // 过审必备
-    videoBottomText: "【特惠活动】点击下方链接，买一送一限量抢购！",
-    otherText: "请勿包含违禁词及夸大宣传词汇"
-  });
-
-  const handleOpenDeconstructionModal = (task: TaskItem) => {
-    setDeconstructionTask(task);
-    setDeconstructionForm(prev => ({
-      ...prev,
-      deconstructionId: `CJB-${task.id.replace('#', '')}-${Math.floor(1000 + Math.random() * 9000)}`
-    }));
-    setIsDeconstructionModalOpen(true);
-  };
-
-  const handleSaveDeconstruction = () => {
-    if (!deconstructionTask) return;
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === deconstructionTask.id
-          ? { ...t, scriptDeconstruction: "已拆解" }
-          : t
-      )
-    );
-    showToast(`✅ 脚本拆解表保存成功 (${deconstructionTask.id})`);
-    setIsDeconstructionModalOpen(false);
-  };
-
-  const toggleModelProp = (prop: string) => {
-    setDeconstructionForm(prev => ({
-      ...prev,
-      modelProps: prev.modelProps.includes(prop)
-        ? prev.modelProps.filter(p => p !== prop)
-        : [...prev.modelProps, prop]
-    }));
-  };
-
-  const togglePrepProp = (prop: string) => {
-    setDeconstructionForm(prev => ({
-      ...prev,
-      prepProps: prev.prepProps.includes(prop)
-        ? prev.prepProps.filter(p => p !== prop)
-        : [...prev.prepProps, prop]
-    }));
-  };
-
-  const addShotRow = () => {
-    setDeconstructionForm(prev => ({
-      ...prev,
-      shots: [
-        ...prev.shots,
-        {
-          id: String(Date.now()),
-          storyboard: "",
-          dialogue: "",
-          sampleImage: "",
-          notes: ""
-        }
-      ]
-    }));
-  };
-
-  const removeShotRow = (id: string) => {
-    if (deconstructionForm.shots.length <= 1) {
-      showToast("⚠️ 至少保留一行分镜头");
-      return;
-    }
-    setDeconstructionForm(prev => ({
-      ...prev,
-      shots: prev.shots.filter(s => s.id !== id)
-    }));
-  };
-
-  const updateShotRow = (id: string, field: string, value: string) => {
-    setDeconstructionForm(prev => ({
-      ...prev,
-      shots: prev.shots.map(s => s.id === id ? { ...s, [field]: value } : s)
-    }));
-  };
 
   // MODAL STATES
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -3095,14 +2951,13 @@ export default function TaskCollaborationView({
                     <Search className="w-3 h-3 text-slate-400" />
                   </div>
                 </th>
-                <th className="py-3 px-4 min-w-[110px] text-center whitespace-nowrap">脚本拆解表</th>
               </tr>
             </thead>
 
             <tbody className="divide-y divide-slate-100 font-medium text-center">
               {filteredTasks.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-400 font-bold">
+                  <td colSpan={10} className="py-12 text-center text-slate-400 font-bold">
                     暂无符合条件的任务数据
                   </td>
                 </tr>
@@ -3424,18 +3279,6 @@ export default function TaskCollaborationView({
                     {/* 10. 脚本类型 */}
                     <td className="py-3.5 px-4 text-center align-middle text-slate-800 font-medium whitespace-nowrap">
                       {task.scriptType || "--"}
-                    </td>
-
-                    {/* 11. 脚本拆解表 */}
-                    <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
-                      <button
-                        disabled={task.status === "completed"}
-                        onClick={() => task.status !== "completed" && handleOpenDeconstructionModal(task)}
-                        className={task.status === "completed" ? "cursor-not-allowed text-xs font-bold text-slate-300" : "text-purple-600 hover:text-purple-800 font-bold hover:underline cursor-pointer text-xs"}
-                        title={task.status === "completed" ? "已完成任务不可修改脚本拆解表" : "编辑脚本拆解表"}
-                      >
-                        {task.scriptDeconstruction || "填写拆解表"}
-                      </button>
                     </td>
                   </tr>
                 ))
@@ -4320,364 +4163,6 @@ export default function TaskCollaborationView({
         );
       })()}
 
-      {/* SCRIPT DECONSTRUCTION FORM MODAL MATCHING USER SCREENSHOT */}
-      {isDeconstructionModalOpen && deconstructionTask && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-3 md:p-6 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl max-w-6xl w-full overflow-hidden shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] relative">
-            
-            {/* Modal Header */}
-            <div className="px-6 py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-4 bg-[#7C3AED] rounded-full inline-block"></span>
-                <h3 className="text-base font-bold text-slate-800">
-                  拆解表
-                </h3>
-              </div>
-              <button
-                onClick={() => setIsDeconstructionModalOpen(false)}
-                className="w-7 h-7 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer transition-colors"
-                title="关闭"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Action Bar */}
-            <div className="px-6 py-3 border-b border-slate-100 flex items-center gap-3 bg-white shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(deconstructionForm.deconstructionId);
-                  showToast("📋 拆解表ID已复制到剪贴板");
-                }}
-                className="bg-[#7C3AED] hover:bg-purple-700 text-white font-medium px-4 py-1.5 rounded-lg text-xs transition-colors cursor-pointer active:scale-95 shadow-2xs"
-              >
-                复制拆解表ID
-              </button>
-              <input
-                type="text"
-                value={deconstructionForm.deconstructionId}
-                onChange={(e) => setDeconstructionForm({ ...deconstructionForm, deconstructionId: e.target.value })}
-                placeholder="请输入拆解表ID"
-                className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs w-52 focus:outline-none focus:border-purple-500 bg-slate-50/50"
-              />
-              <button
-                type="button"
-                onClick={() => showToast(`🔍 已识别拆解表信息 (${deconstructionForm.deconstructionId})`)}
-                className="bg-[#7C3AED] hover:bg-purple-700 text-white font-medium px-5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer active:scale-95 shadow-2xs"
-              >
-                识别
-              </button>
-            </div>
-
-            {/* Modal Scrollable Body */}
-            <div className="p-6 overflow-y-auto space-y-4 text-xs flex-1">
-              <div 
-                className="border border-slate-200 rounded-lg overflow-hidden text-slate-800 bg-white shadow-2xs transition-transform origin-top-left"
-                style={{ transform: `scale(${deconstructionZoom / 100})`, width: deconstructionZoom !== 100 ? `${10000 / deconstructionZoom}%` : '100%' }}
-              >
-                
-                {/* 1. 对接环节 (人员) */}
-                <div className="flex border-b border-slate-200">
-                  <div className="w-24 bg-slate-50/80 font-bold text-slate-700 p-3 flex items-center justify-center border-r border-slate-200 shrink-0 text-center select-none">
-                    对接环节
-                  </div>
-                  <div className="flex-1 overflow-x-auto">
-                    <table className="w-full text-center border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50/60 border-b border-slate-200 font-bold text-slate-600">
-                          <th className="p-2 border-r border-slate-200">拍摄人员</th>
-                          <th className="p-2 border-r border-slate-200">剪辑人员</th>
-                          <th className="p-2 border-r border-slate-200">框架审核</th>
-                          <th className="p-2 border-r border-slate-200">技术审核</th>
-                          <th className="p-2 border-r border-slate-200">创意模特</th>
-                          <th className="p-2">创意声源</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td className="p-1 border-r border-slate-200">
-                            <input type="text" value={deconstructionForm.photographer} onChange={e => setDeconstructionForm({...deconstructionForm, photographer: e.target.value})} className="w-full text-center py-1 px-1 focus:bg-purple-50/30 rounded focus:outline-none" />
-                          </td>
-                          <td className="p-1 border-r border-slate-200">
-                            <input type="text" value={deconstructionForm.editor} onChange={e => setDeconstructionForm({...deconstructionForm, editor: e.target.value})} className="w-full text-center py-1 px-1 focus:bg-purple-50/30 rounded focus:outline-none" />
-                          </td>
-                          <td className="p-1 border-r border-slate-200">
-                            <input type="text" value={deconstructionForm.frameReviewer} onChange={e => setDeconstructionForm({...deconstructionForm, frameReviewer: e.target.value})} className="w-full text-center py-1 px-1 focus:bg-purple-50/30 rounded focus:outline-none" />
-                          </td>
-                          <td className="p-1 border-r border-slate-200">
-                            <input type="text" value={deconstructionForm.techReviewer} onChange={e => setDeconstructionForm({...deconstructionForm, techReviewer: e.target.value})} className="w-full text-center py-1 px-1 focus:bg-purple-50/30 rounded focus:outline-none" />
-                          </td>
-                          <td className="p-1 border-r border-slate-200">
-                            <input type="text" value={deconstructionForm.creativeModel} onChange={e => setDeconstructionForm({...deconstructionForm, creativeModel: e.target.value})} className="w-full text-center py-1 px-1 focus:bg-purple-50/30 rounded focus:outline-none" />
-                          </td>
-                          <td className="p-1">
-                            <input type="text" value={deconstructionForm.creativeAudio} onChange={e => setDeconstructionForm({...deconstructionForm, creativeAudio: e.target.value})} className="w-full text-center py-1 px-1 focus:bg-purple-50/30 rounded focus:outline-none" />
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* 2. 对接环节 (场景/服饰/道具/特殊需求) */}
-                <div className="flex border-b border-slate-200">
-                  <div className="w-24 bg-slate-50/80 font-bold text-slate-700 p-3 flex items-center justify-center border-r border-slate-200 shrink-0 text-center select-none">
-                    对接环节
-                  </div>
-                  <div className="flex-1 divide-y divide-slate-200">
-                    {/* Row 1: 创意场景 & 创意灯光 */}
-                    <div className="flex items-stretch">
-                      <div className="w-28 bg-slate-50/60 font-bold text-slate-600 p-2 text-center border-r border-slate-200 flex items-center justify-center shrink-0">创意场景</div>
-                      <div className="flex-1 p-1 border-r border-slate-200 flex items-center">
-                        <input type="text" value={deconstructionForm.creativeScene} onChange={e => setDeconstructionForm({...deconstructionForm, creativeScene: e.target.value})} className="w-full py-1 px-2 focus:bg-purple-50/30 rounded focus:outline-none" />
-                      </div>
-                      <div className="w-28 bg-slate-50/60 font-bold text-slate-600 p-2 text-center border-r border-slate-200 flex items-center justify-center shrink-0">创意灯光</div>
-                      <div className="flex-1 p-1 flex items-center">
-                        <input type="text" value={deconstructionForm.creativeLighting} onChange={e => setDeconstructionForm({...deconstructionForm, creativeLighting: e.target.value})} className="w-full py-1 px-2 focus:bg-purple-50/30 rounded focus:outline-none" />
-                      </div>
-                    </div>
-
-                    {/* Row 2: 模特服饰 & 模特道具 */}
-                    <div className="flex items-stretch">
-                      <div className="w-28 bg-slate-50/60 font-bold text-slate-600 p-2 text-center border-r border-slate-200 flex items-center justify-center shrink-0">模特服饰</div>
-                      <div className="flex-1 p-1 border-r border-slate-200 flex items-center">
-                        <input type="text" value={deconstructionForm.modelClothing} onChange={e => setDeconstructionForm({...deconstructionForm, modelClothing: e.target.value})} className="w-full py-1 px-2 focus:bg-purple-50/30 rounded focus:outline-none" />
-                      </div>
-                      <div className="w-28 bg-slate-50/60 font-bold text-slate-600 p-2 text-center border-r border-slate-200 flex items-center justify-center shrink-0">模特道具</div>
-                      <div className="flex-1 p-2 flex items-center gap-6 text-slate-700">
-                        {["耳环", "项链"].map((item) => (
-                          <label key={item} className="inline-flex items-center gap-1.5 cursor-pointer hover:text-purple-700 font-medium select-none">
-                            <input type="checkbox" checked={deconstructionForm.modelProps.includes(item)} onChange={() => toggleModelProp(item)} className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 cursor-pointer" />
-                            <span>{item}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Row 3: 编导开拍前需准备道具列表 */}
-                    <div className="flex items-stretch">
-                      <div className="w-36 bg-slate-50/60 font-bold text-slate-600 p-2.5 text-center border-r border-slate-200 flex items-center justify-center shrink-0 leading-snug">
-                        编导开拍前需<br />准备道具列表
-                      </div>
-                      <div className="flex-1 p-2.5 text-slate-700 space-y-2">
-                        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-                          {["洗发露/护发素", "精油", "头皮喷雾", "毛巾", "镜子", "发箍", "梳子", "吹风机", "热水"].map((item) => (
-                            <label key={item} className="inline-flex items-center gap-1.5 cursor-pointer hover:text-purple-700 font-medium select-none">
-                              <input type="checkbox" checked={deconstructionForm.prepProps.includes(item)} onChange={() => togglePrepProp(item)} className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 cursor-pointer" />
-                              <span>{item}</span>
-                            </label>
-                          ))}
-                        </div>
-                        <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
-                          <span className="text-slate-500 font-medium shrink-0">其他</span>
-                          <input type="text" value={deconstructionForm.prepPropsOther} onChange={e => setDeconstructionForm({...deconstructionForm, prepPropsOther: e.target.value})} placeholder="输入其他需要准备的道具..." className="w-full bg-transparent border-b border-slate-200 focus:border-purple-500 py-0.5 px-1 focus:outline-none text-xs" />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Row 4: 特殊需求 */}
-                    <div className="flex items-stretch">
-                      <div className="w-28 bg-slate-50/60 font-bold text-slate-600 p-2.5 text-center border-r border-slate-200 flex items-center justify-center shrink-0">特殊需求</div>
-                      <div className="flex-1 p-1 flex items-center">
-                        <input type="text" value={deconstructionForm.specialNeeds} onChange={e => setDeconstructionForm({...deconstructionForm, specialNeeds: e.target.value})} placeholder="例如：泼水脚本，提醒模特自带服装" className="w-full py-1 px-2 focus:bg-purple-50/30 rounded focus:outline-none placeholder:text-slate-400" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. 备注 */}
-                <div className="flex border-b border-slate-200">
-                  <div className="w-24 bg-slate-50/80 font-bold text-slate-700 p-3 flex items-center justify-center border-r border-slate-200 shrink-0 text-center select-none">
-                    备注
-                  </div>
-                  <div className="flex-1 p-1">
-                    <input type="text" value={deconstructionForm.remark} onChange={e => setDeconstructionForm({...deconstructionForm, remark: e.target.value})} placeholder="请输入相关备注..." className="w-full py-1 px-2 focus:bg-purple-50/30 rounded focus:outline-none" />
-                  </div>
-                </div>
-
-                {/* 4. 拍摄拆解 */}
-                <div className="flex border-b border-slate-200">
-                  <div className="w-24 bg-slate-50/80 font-bold text-slate-700 p-3 flex items-center justify-center border-r border-slate-200 shrink-0 text-center select-none">
-                    拍摄拆解
-                  </div>
-                  <div className="flex-1 overflow-x-auto">
-                    {/* Shots Table */}
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50/60 border-b border-slate-200 font-bold text-slate-600 text-center">
-                          <th className="p-2 border-r border-slate-200 w-1/4"><span className="text-rose-500 mr-0.5">*</span>脚本分镜</th>
-                          <th className="p-2 border-r border-slate-200 w-1/4"><span className="text-rose-500 mr-0.5">*</span>对话过程</th>
-                          <th className="p-2 border-r border-slate-200 w-1/4">分镜头例图</th>
-                          <th className="p-2 w-1/4">注意点</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200">
-                        {deconstructionForm.shots.map((shot) => (
-                          <tr key={shot.id} className="align-top">
-                            {/* 脚本分镜 */}
-                            <td className="p-2 border-r border-slate-200">
-                              <textarea rows={4} value={shot.storyboard} onChange={e => updateShotRow(shot.id, "storyboard", e.target.value)} placeholder="请输入分镜描述..." className="w-full bg-slate-50/50 border border-slate-200 rounded p-2 focus:bg-white focus:border-purple-500 focus:outline-none text-xs resize-none" />
-                            </td>
-                            {/* 对话过程 */}
-                            <td className="p-2 border-r border-slate-200">
-                              <textarea rows={4} value={shot.dialogue} onChange={e => updateShotRow(shot.id, "dialogue", e.target.value)} placeholder="请输入台词对白..." className="w-full bg-slate-50/50 border border-slate-200 rounded p-2 focus:bg-white focus:border-purple-500 focus:outline-none text-xs resize-none" />
-                            </td>
-                            {/* 分镜头例图 */}
-                            <td className="p-2 border-r border-slate-200 text-center">
-                              <div className="p-3 bg-slate-50/80 rounded-lg border border-slate-200 border-dashed flex flex-col items-center justify-center min-h-[120px] text-slate-400 group relative hover:border-purple-400 transition-colors">
-                                {shot.sampleImage ? (
-                                  <div className="relative w-full h-24">
-                                    <img src={shot.sampleImage} alt="例图" className="w-full h-full object-cover rounded" />
-                                    <button onClick={() => updateShotRow(shot.id, "sampleImage", "")} className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1 hover:bg-rose-600 transition-colors">
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full">
-                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                                      const file = e.target.files?.[0];
-                                      if (file) {
-                                        const reader = new FileReader();
-                                        reader.onload = (ev) => updateShotRow(shot.id, "sampleImage", ev.target?.result as string);
-                                        reader.readAsDataURL(file);
-                                      }
-                                    }} />
-                                    <span className="text-[11px] text-slate-500 font-medium mb-2">粘贴或拖拽至这里上传</span>
-                                    <div className="w-12 h-8 border border-dashed border-slate-300 rounded flex items-center justify-center text-slate-400 group-hover:border-purple-500 group-hover:text-purple-600 transition-colors bg-white shadow-2xs">
-                                      <Plus className="w-4 h-4" />
-                                    </div>
-                                  </label>
-                                )}
-                              </div>
-                            </td>
-                            {/* 注意点 */}
-                            <td className="p-2 relative">
-                              <textarea rows={4} value={shot.notes} onChange={e => updateShotRow(shot.id, "notes", e.target.value)} placeholder="请输入注意事项..." className="w-full bg-slate-50/50 border border-slate-200 rounded p-2 focus:bg-white focus:border-purple-500 focus:outline-none text-xs resize-none" />
-                              {deconstructionForm.shots.length > 1 && (
-                                <button onClick={() => removeShotRow(shot.id)} className="absolute bottom-3 right-3 text-slate-400 hover:text-rose-600 text-[11px] font-medium hover:underline cursor-pointer">
-                                  删除行
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-
-                    {/* 新增一行 */}
-                    <div className="border-t border-slate-200 p-2 text-center bg-slate-50/50">
-                      <button onClick={addShotRow} className="inline-flex items-center gap-1 text-slate-600 hover:text-purple-700 font-bold hover:bg-purple-50 py-1.5 px-4 rounded-lg transition-colors cursor-pointer text-xs">
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>新增一行</span>
-                      </button>
-                    </div>
-
-                    {/* 视频格式规范 */}
-                    <div className="border-t border-slate-200">
-                      <table className="w-full text-center border-collapse">
-                        <thead>
-                          <tr className="bg-slate-50/60 border-b border-slate-200 font-bold text-slate-600">
-                            <th className="p-2 border-r border-slate-200">视频格式</th>
-                            <th className="p-2 border-r border-slate-200">视频尺寸</th>
-                            <th className="p-2 border-r border-slate-200">字幕类型</th>
-                            <th className="p-2 border-r border-slate-200">视频画质</th>
-                            <th className="p-2">BGM</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td className="p-1 border-r border-slate-200">
-                              <input type="text" value={deconstructionForm.videoFormat} onChange={e => setDeconstructionForm({...deconstructionForm, videoFormat: e.target.value})} className="w-full text-center py-1 px-1 focus:bg-purple-50/30 rounded focus:outline-none" />
-                            </td>
-                            <td className="p-1 border-r border-slate-200">
-                              <input type="text" value={deconstructionForm.videoSize} onChange={e => setDeconstructionForm({...deconstructionForm, videoSize: e.target.value})} className="w-full text-center py-1 px-1 focus:bg-purple-50/30 rounded focus:outline-none" />
-                            </td>
-                            <td className="p-1 border-r border-slate-200">
-                              <input type="text" value={deconstructionForm.subtitleType} onChange={e => setDeconstructionForm({...deconstructionForm, subtitleType: e.target.value})} className="w-full text-center py-1 px-1 focus:bg-purple-50/30 rounded focus:outline-none" />
-                            </td>
-                            <td className="p-1 border-r border-slate-200">
-                              <input type="text" value={deconstructionForm.videoQuality} onChange={e => setDeconstructionForm({...deconstructionForm, videoQuality: e.target.value})} className="w-full text-center py-1 px-1 focus:bg-purple-50/30 rounded focus:outline-none" />
-                            </td>
-                            <td className="p-1">
-                              <input type="text" value={deconstructionForm.bgm} onChange={e => setDeconstructionForm({...deconstructionForm, bgm: e.target.value})} className="w-full text-center py-1 px-1 focus:bg-purple-50/30 rounded focus:outline-none" />
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 5. 过审必备 */}
-                <div className="flex">
-                  <div className="w-24 bg-slate-50/80 font-bold text-slate-700 p-3 flex items-center justify-center border-r border-slate-200 shrink-0 text-center select-none">
-                    过审必备
-                  </div>
-                  <div className="flex-1 overflow-x-auto">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50/60 border-b border-slate-200 font-bold text-slate-600 text-center">
-                          <th className="p-2 border-r border-slate-200 w-1/2">视频下方文案</th>
-                          <th className="p-2 w-1/2">其他文案</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td className="p-2 border-r border-slate-200">
-                            <textarea rows={3} value={deconstructionForm.videoBottomText} onChange={e => setDeconstructionForm({...deconstructionForm, videoBottomText: e.target.value})} placeholder="请输入视频下方文案..." className="w-full bg-slate-50/50 border border-slate-200 rounded p-2 focus:bg-white focus:border-purple-500 focus:outline-none text-xs resize-none" />
-                          </td>
-                          <td className="p-2">
-                            <textarea rows={3} value={deconstructionForm.otherText} onChange={e => setDeconstructionForm({...deconstructionForm, otherText: e.target.value})} placeholder="请输入其他文案..." className="w-full bg-slate-50/50 border border-slate-200 rounded p-2 focus:bg-white focus:border-purple-500 focus:outline-none text-xs resize-none" />
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-            {/* Right Side Zoom Controls */}
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-1 bg-white border border-slate-200 shadow-md rounded-lg p-1 z-30 select-none">
-              <button 
-                onClick={() => setDeconstructionZoom(z => Math.min(120, z + 10))} 
-                className="w-6 h-6 hover:bg-purple-50 hover:text-purple-700 rounded flex items-center justify-center font-bold text-slate-600 transition-colors cursor-pointer text-sm" 
-                title="放大表格"
-              >
-                +
-              </button>
-              <button 
-                onClick={() => setDeconstructionZoom(z => Math.max(80, z - 10))} 
-                className="w-6 h-6 hover:bg-purple-50 hover:text-purple-700 rounded flex items-center justify-center font-bold text-slate-600 transition-colors cursor-pointer text-sm" 
-                title="缩小表格"
-              >
-                -
-              </button>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-end items-center gap-2 text-xs shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsDeconstructionModalOpen(false)}
-                className="px-4 py-2 border border-slate-200 hover:bg-slate-100 text-slate-700 font-medium rounded-lg transition-colors cursor-pointer"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveDeconstruction}
-                className="px-5 py-2 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold rounded-lg transition-all cursor-pointer shadow-2xs active:scale-95"
-              >
-                保存拆解表
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
     </div>
   );
 }

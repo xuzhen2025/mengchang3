@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { FACE_PHASE_LABELS } from "../lib/videoFaceSwap";
 import {
   AlertCircle,
+  ArrowLeft,
   Ban,
   Bot,
   CheckCircle2,
@@ -12,12 +14,14 @@ import {
   RefreshCw,
   RotateCcw,
   Sparkles,
+  Upload,
   Video,
   WandSparkles,
   X
 } from "lucide-react";
-import { GenerationTaskCategory, Task } from "../types";
+import { EnhanceTaskOutput, GenerationTaskCategory, Task, WatermarkTaskOutput } from "../types";
 import OverlayPortal from "./overlays/OverlayPortal";
+import UploadFinishedVideoModal from "./UploadFinishedVideoModal";
 
 interface TaskQueuePanelProps {
   tasks: Task[];
@@ -26,6 +30,8 @@ interface TaskQueuePanelProps {
   cancelTask: (taskId: string) => void;
   restartTask: (taskId: string) => void;
   viewResult: (taskId: string) => void;
+  uploadEraseResult: (type: "watermark" | "subtitle", output: WatermarkTaskOutput) => void;
+  uploadEnhanceResult: (output: EnhanceTaskOutput) => void;
 }
 
 const CATEGORY_META: Record<GenerationTaskCategory, { label: string; shortLabel: string }> = {
@@ -34,8 +40,7 @@ const CATEGORY_META: Record<GenerationTaskCategory, { label: string; shortLabel:
   watermark: { label: "视频去水印", shortLabel: "视频去水印" },
   subtitle: { label: "字幕擦除", shortLabel: "字幕擦除" },
   enhance: { label: "画质增强", shortLabel: "画质增强" },
-  digital_human: { label: "数字人分身", shortLabel: "数字人分身" },
-  model_change: { label: "模特换衣", shortLabel: "模特换衣" },
+  face_swap: { label: "视频换脸", shortLabel: "视频换脸" },
   fission: { label: "爆款复刻", shortLabel: "爆款复刻" },
   ai_video: { label: "AI视频原料", shortLabel: "AI视频原料" }
 };
@@ -46,13 +51,13 @@ const ALL_CATEGORIES: GenerationTaskCategory[] = [
   "watermark",
   "subtitle",
   "enhance",
-  "digital_human",
-  "model_change",
+  "face_swap",
   "fission",
   "ai_video"
 ];
 
 const STATUS_META: Record<Task["status"], { label: string; className: string }> = {
+  ready: { label: "待配置", className: "bg-amber-50 text-amber-700" },
   queue: { label: "排队中", className: "bg-slate-100 text-slate-700" },
   generating: { label: "生成中", className: "bg-blue-50 text-blue-700" },
   completed: { label: "生成成功", className: "bg-emerald-50 text-emerald-700" },
@@ -66,11 +71,17 @@ const getTaskCategory = (task: Task): GenerationTaskCategory => {
   if (task.type === "watermark") return "watermark";
   if (task.type === "subtitle") return "subtitle";
   if (task.type === "enhance") return "enhance";
-  if (task.type === "digital_human") return "digital_human";
-  if (task.type === "model_change") return "model_change";
+  if (task.type === "face_swap") return "face_swap";
   if (task.type === "fission") return "fission";
   if (task.type === "video_gen") return "ai_video";
   return "quick_creation";
+};
+
+const hasVideoProcessSnapshot = (task: Task) => {
+  if (task.category === "enhance") return Boolean(task.enhanceSnapshot);
+  if (task.category === "subtitle") return Boolean(task.subtitleSnapshot);
+  if (task.category === "watermark") return Boolean(task.watermarkSnapshot);
+  return false;
 };
 
 const getTimestamp = (value: string) => {
@@ -115,10 +126,14 @@ const getTaskStageLabel = (task: Task, category: GenerationTaskCategory) => {
   return "";
 };
 
-export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, restartTask, viewResult }: TaskQueuePanelProps) {
+export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, restartTask, viewResult, uploadEraseResult, uploadEnhanceResult }: TaskQueuePanelProps) {
   const [tab, setTab] = useState<"recent" | "all">("recent");
   const [recentCategory, setRecentCategory] = useState<"agent" | "tool">("agent");
   const [allCategory, setAllCategory] = useState<"all" | GenerationTaskCategory>("all");
+  const [eraseDetailTaskId, setEraseDetailTaskId] = useState<string | null>(null);
+  const [eraseUploadTaskId, setEraseUploadTaskId] = useState<string | null>(null);
+  const [eraseOutputName, setEraseOutputName] = useState("");
+  const [toast, setToast] = useState("");
   const [launcherTop, setLauncherTop] = useState<number | null>(null);
   const [isLauncherDragging, setIsLauncherDragging] = useState(false);
   const launcherRef = useRef<HTMLDivElement>(null);
@@ -154,6 +169,46 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
     else groups.push({ date, tasks: [task] });
     return groups;
   }, []), [visibleTasks]);
+  const selectedEraseDetailTask = eraseDetailTaskId ? tasks.find((task) => task.id === eraseDetailTaskId) || null : null;
+  const eraseDetailTask = selectedEraseDetailTask && hasVideoProcessSnapshot(selectedEraseDetailTask) ? selectedEraseDetailTask : null;
+  const eraseUploadTask = eraseUploadTaskId ? tasks.find((task) => task.id === eraseUploadTaskId) || null : null;
+  const eraseUploadType = eraseUploadTask?.category === "enhance" ? "enhance" : eraseUploadTask?.category === "subtitle" ? "subtitle" : "watermark";
+  const eraseUploadOutput = eraseUploadType === "enhance" ? eraseUploadTask?.enhanceOutput : eraseUploadType === "subtitle" ? eraseUploadTask?.subtitleOutput : eraseUploadTask?.watermarkOutput;
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(""), 2600);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  const openEraseDetail = (task: Task) => {
+    const output = task.category === "enhance" ? task.enhanceOutput : task.category === "subtitle" ? task.subtitleOutput : task.watermarkOutput;
+    setEraseDetailTaskId(task.id);
+    setEraseOutputName(output?.name || `${task.name}.mp4`);
+  };
+
+  const downloadEraseResult = (task: Task) => {
+    const output = task.category === "enhance" ? task.enhanceOutput : task.category === "subtitle" ? task.subtitleOutput : task.watermarkOutput;
+    if (!output) return;
+    const link = document.createElement("a");
+    link.href = output.videoUrl;
+    link.download = eraseOutputName || output.name;
+    link.target = "_blank";
+    link.rel = "noreferrer";
+    link.click();
+  };
+
+  const uploadProcessedResult = (message: string) => {
+    if (!eraseUploadTask) return;
+    if (eraseUploadTask.category === "enhance" && eraseUploadTask.enhanceOutput) {
+      uploadEnhanceResult({ ...eraseUploadTask.enhanceOutput, name: eraseOutputName || eraseUploadTask.enhanceOutput.name });
+    } else if (eraseUploadTask.category === "subtitle" && eraseUploadTask.subtitleOutput) {
+      uploadEraseResult("subtitle", { ...eraseUploadTask.subtitleOutput, name: eraseOutputName || eraseUploadTask.subtitleOutput.name });
+    } else if (eraseUploadTask.watermarkOutput) {
+      uploadEraseResult("watermark", { ...eraseUploadTask.watermarkOutput, name: eraseOutputName || eraseUploadTask.watermarkOutput.name });
+    }
+    setToast(message);
+  };
 
   useEffect(() => {
     const keepLauncherInView = () => {
@@ -238,6 +293,50 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
     );
   }
 
+  if (eraseDetailTask) {
+    const isSubtitle = eraseDetailTask.category === "subtitle";
+    const isEnhance = eraseDetailTask.category === "enhance";
+    const status = eraseDetailTask.status === "generating"
+      ? { ...STATUS_META.generating, label: isEnhance ? "增强中" : "处理中" }
+      : eraseDetailTask.status === "completed"
+        ? { ...STATUS_META.completed, label: isEnhance ? "增强成功" : "处理成功" }
+        : eraseDetailTask.status === "failed"
+          ? { ...STATUS_META.failed, label: isEnhance ? "增强失败" : "处理失败" }
+          : STATUS_META[eraseDetailTask.status];
+    const source = isEnhance ? eraseDetailTask.enhanceSnapshot?.sourceVideo : isSubtitle ? eraseDetailTask.subtitleSnapshot?.sourceVideo : eraseDetailTask.watermarkSnapshot?.sourceVideo;
+    const output = isEnhance ? eraseDetailTask.enhanceOutput : isSubtitle ? eraseDetailTask.subtitleOutput : eraseDetailTask.watermarkOutput;
+    const previewUrl = output?.videoUrl || source?.url;
+    const previewCover = output?.coverUrl || source?.coverUrl;
+
+    return <>
+      <OverlayPortal layer="drawer" className="fixed right-0 top-0 flex h-screen w-[390px] flex-col border-l border-slate-200 bg-white text-slate-800 shadow-2xl" role="complementary">
+        <header className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-4 py-3.5">
+          <button type="button" onClick={() => setEraseDetailTaskId(null)} title="返回任务列表" className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><ArrowLeft className="h-4 w-4" /></button>
+          <div className="min-w-0 flex-1"><h2 className="text-sm font-bold">{isEnhance ? "视频画质增强" : isSubtitle ? "字幕擦除" : "视频去水印"}</h2><p className="mt-0.5 truncate text-[10px] text-slate-400">{eraseDetailTask.name}</p></div>
+          <button type="button" onClick={() => { setEraseDetailTaskId(null); setIsOpen(false); }} title="收起任务队列" className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="h-4 w-4" /></button>
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="flex items-center justify-between"><span className={`rounded px-2.5 py-1 text-[10px] font-semibold ${status.className}`}>{status.label}</span><span className="text-[10px] text-slate-400">{eraseDetailTask.createdAt}</span></div>
+          <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-slate-950">
+            {previewUrl ? <video src={previewUrl} poster={previewCover} controls className="aspect-video w-full object-contain" preload="metadata" /> : <div className="flex aspect-video items-center justify-center text-slate-500"><Video className="h-8 w-8" /></div>}
+          </div>
+          <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+            <p className="truncate text-xs font-semibold text-slate-700">{source?.name || eraseDetailTask.inputFiles[0] || "待处理视频"}</p>
+            <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400"><span>{source ? `${source.resolution} · ${source.size}` : `${isEnhance ? "视频画质增强" : isSubtitle ? "字幕擦除" : "视频去水印"}任务`}</span><span>消耗 {eraseDetailTask.creditsCost} 积分</span></div>
+            {isEnhance && eraseDetailTask.enhanceSnapshot && <p className="mt-2 border-t border-slate-200 pt-2 text-[10px] text-slate-500">输出 {eraseDetailTask.enhanceSnapshot.outputResolution.toUpperCase()} · {eraseDetailTask.enhanceSnapshot.outputFps} FPS · 计费 {eraseDetailTask.enhanceSnapshot.billingMinutes} 分钟</p>}
+          </div>
+
+          {(eraseDetailTask.status === "queue" || eraseDetailTask.status === "generating") && <div className="mt-4 rounded-md border border-blue-100 bg-blue-50 p-3"><div className="flex items-center justify-between text-[11px] font-semibold text-blue-700"><span className="flex items-center gap-1.5">{eraseDetailTask.status === "queue" ? <Clock3 className="h-3.5 w-3.5" /> : <Loader2 className="h-3.5 w-3.5 animate-spin" />}{eraseDetailTask.status === "queue" ? "等待处理资源" : isEnhance ? "正在增强视频画质" : isSubtitle ? "正在擦除字幕" : "正在去除水印"}</span><span className="font-mono">{eraseDetailTask.progress}%</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-blue-100"><div className="h-full rounded-full bg-blue-600 transition-[width]" style={{ width: `${Math.max(eraseDetailTask.progress, 3)}%` }} /></div>{eraseDetailTask.status === "queue" && <button type="button" onClick={() => cancelTask(eraseDetailTask.id)} className="mt-3 w-full rounded-md border border-rose-200 bg-white py-2 text-[11px] font-semibold text-rose-600 hover:bg-rose-50">取消排队</button>}</div>}
+          {eraseDetailTask.status === "cancelled" && <p className="mt-4 rounded-md border border-amber-100 bg-amber-50 p-3 text-[11px] leading-5 text-amber-700">任务已取消，{eraseDetailTask.creditsCost} 积分已全额退回。</p>}
+          {eraseDetailTask.status === "failed" && <p className="mt-4 rounded-md border border-rose-100 bg-rose-50 p-3 text-[11px] leading-5 text-rose-700">{eraseDetailTask.failureReason || `处理失败，${eraseDetailTask.creditsCost} 积分已全额退回。`}</p>}
+          {eraseDetailTask.status === "completed" && output && <div className="mt-4 space-y-3"><div><label className="mb-1.5 block text-[10px] font-semibold text-slate-500">输出文件名称</label><input value={eraseOutputName} onChange={(event) => setEraseOutputName(event.target.value)} className="h-9 w-full rounded-md border border-slate-200 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-violet-400" /></div><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => downloadEraseResult(eraseDetailTask)} className="flex h-9 items-center justify-center gap-1.5 rounded-md border border-slate-200 text-xs font-semibold text-slate-600 hover:border-violet-300 hover:text-violet-700"><Download className="h-3.5 w-3.5" />下载视频</button><button type="button" onClick={() => setEraseUploadTaskId(eraseDetailTask.id)} className="flex h-9 items-center justify-center gap-1.5 rounded-md bg-violet-600 text-xs font-semibold text-white hover:bg-violet-700"><Upload className="h-3.5 w-3.5" />上传资源库</button></div></div>}
+        </div>
+      </OverlayPortal>
+      {eraseUploadTask && eraseUploadOutput && <UploadFinishedVideoModal key={`${eraseUploadTask.id}-${eraseOutputName}`} isOpen initialFiles={[{ name: eraseOutputName || eraseUploadOutput.name, type: "video/mp4" }]} onClose={() => setEraseUploadTaskId(null)} onPublishSuccess={uploadProcessedResult} />}
+      {toast && <OverlayPortal layer="toast" className="fixed left-1/2 top-6 -translate-x-1/2 rounded-md bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xl">{toast}</OverlayPortal>}
+    </>;
+  }
+
   return (
     <OverlayPortal layer="drawer" className="fixed right-0 top-0 flex h-screen w-[390px] flex-col border-l border-slate-200 bg-white text-slate-800 shadow-2xl" role="complementary">
       <header className="border-b border-slate-200">
@@ -291,20 +390,26 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
                 const isAgent = category === "agent";
                 const isRemake = category === "fission";
                 const isAiVideo = category === "ai_video";
-                const status = STATUS_META[task.status];
-                const canCancel = task.cancellable !== false && (task.status === "queue" || (!isAiVideo && task.status === "generating"));
+                const isFaceSwap = category === "face_swap" && Boolean(task.faceSwap);
+                const isErase = category === "watermark" || category === "subtitle";
+                const isEnhance = category === "enhance";
+                const isVideoProcess = (isErase || isEnhance) && hasVideoProcessSnapshot(task);
+                const processOutput = isEnhance ? task.enhanceOutput : category === "subtitle" ? task.subtitleOutput : category === "watermark" ? task.watermarkOutput : undefined;
+                const processSnapshot = isEnhance ? task.enhanceSnapshot : category === "subtitle" ? task.subtitleSnapshot : category === "watermark" ? task.watermarkSnapshot : undefined;
+                const status = isFaceSwap ? { ...STATUS_META[task.status], label: FACE_PHASE_LABELS[task.faceSwap!.phase] } : isVideoProcess && task.status === "generating" ? { ...STATUS_META.generating, label: isEnhance ? "增强中" : "处理中" } : isVideoProcess && task.status === "completed" ? { ...STATUS_META.completed, label: isEnhance ? "增强成功" : "处理成功" } : isVideoProcess && task.status === "failed" ? { ...STATUS_META.failed, label: isEnhance ? "增强失败" : "处理失败" } : STATUS_META[task.status];
+                const canCancel = task.cancellable !== false && (task.status === "queue" || (!isAiVideo && !isVideoProcess && task.status === "generating"));
                 const canRestart = task.restartable !== false && (task.status === "failed" || task.status === "cancelled");
-                const preview = task.aiVideoOutput?.coverUrl || task.outputFiles?.[0] || task.inputFiles.find((file) => /^https?:\/\//.test(file));
+                const preview = task.faceSwap?.source.coverUrl || processOutput?.coverUrl || processSnapshot?.sourceVideo.coverUrl || task.aiVideoOutput?.coverUrl || task.outputFiles?.[0] || task.inputFiles.find((file) => /^https?:\/\//.test(file));
                 const estimatedMinutes = Math.max(1, Math.ceil((100 - task.progress) / 12));
                 const PreviewIcon = category === "agent" ? Bot : task.type === "image_gen" ? ImageIcon : category === "ai_video" ? Video : WandSparkles;
                 return (
                   <article
                     key={task.id}
-                    role={isAiVideo ? "button" : undefined}
-                    tabIndex={isAiVideo ? 0 : undefined}
-                    onClick={isAiVideo ? () => viewResult(task.id) : undefined}
-                    onKeyDown={isAiVideo ? (event) => { if (event.key === "Enter" || event.key === " ") viewResult(task.id); } : undefined}
-                    className={`rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-slate-300 ${isAiVideo ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-200" : ""}`}
+                    role={isAiVideo || isVideoProcess || isFaceSwap ? "button" : undefined}
+                    tabIndex={isAiVideo || isVideoProcess || isFaceSwap ? 0 : undefined}
+                    onClick={isVideoProcess ? () => openEraseDetail(task) : isAiVideo || isFaceSwap ? () => viewResult(task.id) : undefined}
+                    onKeyDown={isAiVideo || isVideoProcess || isFaceSwap ? (event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); isVideoProcess ? openEraseDetail(task) : viewResult(task.id); } } : undefined}
+                    className={`rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-colors hover:border-slate-300 ${isAiVideo || isVideoProcess || isFaceSwap ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-200" : ""}`}
                   >
                     <div className="flex gap-3">
                       <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-50">
@@ -319,20 +424,23 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
 
                     {(task.status === "queue" || task.status === "generating") && (
                       <div className="mt-3 rounded-md bg-slate-50 p-2.5">
-                        <div className="flex items-center justify-between text-[10px] text-slate-500"><span className="flex items-center gap-1">{task.status === "queue" ? <Clock3 className="h-3 w-3" /> : <Loader2 className="h-3 w-3 animate-spin text-blue-600" />}{task.status === "queue" ? "等待计算资源" : `预计约 ${estimatedMinutes} 分钟完成`}</span><span className="font-mono font-bold">{task.progress}%</span></div>
+                        <div className="flex items-center justify-between text-[10px] text-slate-500"><span className="flex items-center gap-1">{task.status === "queue" ? <Clock3 className="h-3 w-3" /> : <Loader2 className="h-3 w-3 animate-spin text-blue-600" />}{task.status === "queue" ? (isVideoProcess ? "等待处理资源" : "等待计算资源") : isFaceSwap ? (task.faceSwap?.phase === "analyzing" ? "正在分析视频人脸" : "正在处理视频换脸") : category === "enhance" ? "正在增强视频画质" : category === "subtitle" ? "正在擦除字幕" : category === "watermark" ? "正在去除水印" : `预计约 ${estimatedMinutes} 分钟完成`}</span><span className="font-mono font-bold">{task.progress}%</span></div>
                         <div className="mt-1.5 h-1.5 overflow-hidden rounded bg-slate-200"><div className={`h-full rounded ${task.status === "queue" ? "bg-slate-400" : "bg-blue-600"}`} style={{ width: `${Math.max(task.progress, 3)}%` }} /></div>
                       </div>
                     )}
                     {task.status === "failed" && <p className="mt-2 flex items-start gap-1.5 rounded bg-rose-50 p-2 text-[10px] leading-4 text-rose-700"><AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />{task.failureReason || "生成过程异常，任务已停止。"}</p>}
-                    {task.status === "cancelled" && <p className="mt-2 flex items-start gap-1.5 rounded bg-amber-50 p-2 text-[10px] leading-4 text-amber-700"><Ban className="mt-0.5 h-3 w-3 shrink-0" />{task.refundedCredits === task.creditsCost ? "排队阶段取消，积分已全额退回。" : "生成阶段取消，已发生的计算消耗不退回。"}</p>}
+                    {isFaceSwap && <p className="mt-2 text-[10px] text-slate-500">已生成 {task.faceSwap?.versions.length} 个版本</p>}
+                    {task.status === "cancelled" && <p className="mt-2 flex items-start gap-1.5 rounded bg-amber-50 p-2 text-[10px] leading-4 text-amber-700"><Ban className="mt-0.5 h-3 w-3 shrink-0" />{isFaceSwap ? "本次排队取消，40积分已退回，历史版本保留。" : task.refundedCredits === task.creditsCost ? "排队阶段取消，积分已全额退回。" : "生成阶段取消，已发生的计算消耗不退回。"}</p>}
 
                     <div className="mt-2.5 flex justify-end gap-1.5 border-t border-slate-100 pt-2.5">
+                      {isFaceSwap && <button onClick={(event) => { event.stopPropagation(); viewResult(task.id); }} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><Eye className="h-3 w-3" />查看任务</button>}
                       {canCancel && <button onClick={(event) => { event.stopPropagation(); cancelTask(task.id); }} className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><X className="h-3 w-3" />取消任务</button>}
                       {isRemake && <button onClick={() => viewResult(task.id)} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><Eye className="h-3 w-3" />查看任务</button>}
                       {isAgent && <button onClick={() => viewResult(task.id)} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><Eye className="h-3 w-3" />{canRestart ? "继续创作" : "进入会话"}</button>}
                       {isAiVideo && <button onClick={(event) => { event.stopPropagation(); viewResult(task.id); }} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><Eye className="h-3 w-3" />{task.status === "failed" || task.status === "cancelled" ? "重新编辑" : "查看任务"}</button>}
-                      {!isRemake && !isAgent && !isAiVideo && canRestart && <button onClick={() => restartTask(task.id)} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><RotateCcw className="h-3 w-3" />重新生成</button>}
-                      {!isRemake && !isAgent && !isAiVideo && task.status === "completed" && <><button onClick={() => viewResult(task.id)} className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><Eye className="h-3 w-3" />查看结果</button><button className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><Download className="h-3 w-3" />下载</button></>}
+                      {isVideoProcess && <button onClick={(event) => { event.stopPropagation(); openEraseDetail(task); }} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><Eye className="h-3 w-3" />{task.status === "completed" ? "查看结果" : "查看任务"}</button>}
+                      {!isRemake && !isAgent && !isAiVideo && !isVideoProcess && canRestart && <button onClick={() => restartTask(task.id)} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><RotateCcw className="h-3 w-3" />重新生成</button>}
+                      {!isFaceSwap && !isRemake && !isAgent && !isAiVideo && !isVideoProcess && task.status === "completed" && <><button onClick={() => viewResult(task.id)} className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><Eye className="h-3 w-3" />查看结果</button><button className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><Download className="h-3 w-3" />下载</button></>}
                     </div>
                   </article>
                 );

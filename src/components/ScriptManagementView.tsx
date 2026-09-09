@@ -4,6 +4,8 @@ import ScriptDetailPage from "./ScriptDetailPage";
 import { TaskItem } from "./TaskCollaborationView";
 import { ResourceSearchIntent } from "../types";
 import ResourceSearchCondition from "./ResourceSearchCondition";
+import ResourceFilterPresets from "./ResourceFilterPresets";
+import { SCRIPT_PRESET_DEFAULTS } from "../lib/resourceFilterPresets";
 import {
   Search,
   Plus,
@@ -13,7 +15,6 @@ import {
   Eye,
   RotateCcw,
   Download,
-  Filter,
   Check,
   X,
   FileText,
@@ -123,19 +124,21 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
   const [secondarySearch, setSecondarySearch] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("全部");
   const [publicTagSearch, setPublicTagSearch] = useState("");
+  const [publicTagKeyword, setPublicTagKeyword] = useState("");
   const [personalTagSearch, setPersonalTagSearch] = useState("");
   const [selectedPersonalTag, setSelectedPersonalTag] = useState("全部");
   const [sortBy, setSortBy] = useState("最新发布");
   const [isMorePrimaryExpanded, setIsMorePrimaryExpanded] = useState(false);
 
-  // Preset filter saving
+  const [searchQuery, setSearchQuery] = useState(initialSearch?.query || "");
+  React.useEffect(() => { setSearchQuery(initialSearch?.query || ""); }, [initialSearch?.requestId, initialSearch?.query]);
+  const [templateFilter, setTemplateFilter] = useState("");
+  const [authorFilter, setAuthorFilter] = useState("");
+  const [authorSearch, setAuthorSearch] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
   const [selectedPreset, setSelectedPreset] = useState("");
-  const [presets, setPresets] = useState<Array<{ name: string; mainCat: string; primaryCat: string }>>([
-    { name: "洗发水", mainCat: "个护家清", primaryCat: "个人护理" },
-    { name: "卸妆油模板", mainCat: "美妆", primaryCat: "美妆护肤" }
-  ]);
-  const [showSavePresetModal, setShowSavePresetModal] = useState(false);
-  const [presetNameInput, setPresetNameInput] = useState("");
 
   // Export Modal
   const [showExportModal, setShowExportModal] = useState(false);
@@ -231,7 +234,6 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
       },
       product: selectedScriptForTasks.primaryCategory || "美妆护肤",
       scriptType: selectedScriptForTasks.categoryTag || "AI分镜拆解",
-      scriptDeconstruction: "已拆解",
       remark: `关联脚本: ${selectedScriptForTasks.title}`
     };
 
@@ -381,42 +383,37 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
     setSecondarySearch("");
     setSelectedStatus("全部");
     setPublicTagSearch("");
+    setPublicTagKeyword("");
     setPersonalTagSearch("");
     setSelectedPersonalTag("全部");
     setSortBy("最新发布");
     setSelectedPreset("");
+    setTemplateFilter("");
+    setAuthorFilter("");
+    setAuthorSearch("");
+    setStartDate("");
+    setEndDate("");
     showToast("已重置所有筛选条件");
   };
 
-  const handleSavePreset = () => {
-    if (!presetNameInput.trim()) return;
-    const newP = {
-      name: presetNameInput.trim(),
-      mainCat: selectedMainCat,
-      primaryCat: selectedPrimaryCat
-    };
-    setPresets(prev => [...prev, newP]);
-    setSelectedPreset(newP.name);
-    setShowSavePresetModal(false);
-    setPresetNameInput("");
-    showToast(`已成功保存常用筛选预设: ${newP.name}`);
-  };
-
-  const handleRemovePreset = (name: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setPresets(prev => prev.filter(p => p.name !== name));
-    if (selectedPreset === name) setSelectedPreset("");
-    showToast(`已删除筛选预设: ${name}`);
-  };
-
-  const handleApplyPreset = (name: string) => {
-    setSelectedPreset(name);
-    const p = presets.find(item => item.name === name);
-    if (p) {
-      setSelectedMainCat(p.mainCat);
-      setSelectedPrimaryCat(p.primaryCat);
-      showToast(`已载入常用筛选预设: ${name}`);
-    }
+  const presetFilters = { searchQuery, selectedMainCat, selectedPrimaryCat, secondarySearch, selectedStatus, publicTagSearch, publicTagKeyword, personalTagSearch, selectedPersonalTag, sortBy, templateFilter, authorFilter, authorSearch, startDate, endDate };
+  const applyPresetFilters = (next: typeof SCRIPT_PRESET_DEFAULTS) => {
+    setSearchQuery(next.searchQuery);
+    setSelectedMainCat(next.selectedMainCat);
+    setSelectedPrimaryCat(next.selectedPrimaryCat);
+    setSecondarySearch(next.secondarySearch);
+    setSelectedStatus(next.selectedStatus);
+    setPublicTagSearch(next.publicTagSearch);
+    setPublicTagKeyword(next.publicTagKeyword);
+    setPersonalTagSearch(next.personalTagSearch);
+    setSelectedPersonalTag(next.selectedPersonalTag);
+    setSortBy(next.sortBy);
+    setTemplateFilter(next.templateFilter);
+    setAuthorFilter(next.authorFilter);
+    setAuthorSearch(next.authorSearch);
+    setStartDate(next.startDate);
+    setEndDate(next.endDate);
+    setSelectedIds([]);
   };
 
   // Actions
@@ -532,7 +529,7 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
 
   // Filter logic
   const filteredScripts = scripts.filter(s => {
-    const homeSearch = (initialSearch?.query || "").trim().toLowerCase();
+    const homeSearch = searchQuery.trim().toLowerCase();
     const matchesHomeSearch = !homeSearch || [s.title, s.content, s.mainCategory, s.primaryCategory, s.secondaryCategory, s.categoryTag, s.classTag, s.descTag, s.author]
       .some((value) => value.toLowerCase().includes(homeSearch));
     if (!matchesHomeSearch) return false;
@@ -618,23 +615,12 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
 
           {/* Right: 选择常用筛选预设 + 保存 */}
           <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
-            <select
-              value={selectedPreset}
-              onChange={(e) => handleApplyPreset(e.target.value)}
-              className="border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-500 bg-white focus:outline-none focus:border-purple-400 cursor-pointer"
-            >
-              <option value="">选择常用筛选预设</option>
-              {presets.map(p => (
-                <option key={p.name} value={p.name}>{p.name}</option>
-              ))}
-            </select>
-
-            <button
-              onClick={() => setShowSavePresetModal(true)}
-              className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3.5 py-1 rounded-lg font-bold shadow-xs cursor-pointer flex items-center gap-1"
-            >
-              <span>保存</span>
-            </button>
+            <ResourceFilterPresets scope="scripts" defaults={SCRIPT_PRESET_DEFAULTS} value={presetFilters}
+              selectedName={selectedPreset} onSelectName={setSelectedPreset} onApply={applyPresetFilters}
+              seeds={[
+                { name: "洗发水", filters: { selectedMainCat: "个护家清", selectedPrimaryCat: "个人护理" } },
+                { name: "卸妆油模板", filters: { selectedMainCat: "美妆", selectedPrimaryCat: "美妆护肤" } },
+              ]} />
           </div>
         </div>
 
@@ -721,6 +707,8 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
         <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
           <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">公共标签：</span>
           <PublicTagFilter
+            searchKeyword={publicTagKeyword}
+            onSearchKeywordChange={setPublicTagKeyword}
             selectedTag={publicTagSearch || "全部"}
             onSelectTag={(tag) => setPublicTagSearch(tag === "全部" ? "" : tag)}
           />
@@ -771,7 +759,7 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
         </div>
       </div>
 
-      <ResourceSearchCondition query={initialSearch?.query} onClear={onClearSearch} />
+      <ResourceSearchCondition query={searchQuery} onClear={() => { setSearchQuery(""); onClearSearch?.(); }} />
 
       {/* Filter Card 2: 高级搜索 Bar */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs text-slate-700">
@@ -793,14 +781,6 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
           </div>
 
           <button
-            onClick={() => showToast("已执行高级筛选检索")}
-            className="border border-purple-500 text-purple-600 hover:bg-purple-50 font-bold px-3.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-          >
-            <Filter className="w-3.5 h-3.5" />
-            <span>筛选</span>
-          </button>
-
-          <button
             onClick={handleResetFilters}
             className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs"
           >
@@ -817,13 +797,13 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
 
         {/* Secondary Dropdowns Line */}
         <div className="flex items-center gap-2 flex-wrap text-xs">
-          <select className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-500 bg-white focus:outline-none focus:border-purple-400 cursor-pointer">
+          <select value={templateFilter} onChange={e => setTemplateFilter(e.target.value)} aria-label="脚本模板" className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-500 bg-white focus:outline-none focus:border-purple-400 cursor-pointer">
             <option value="">请选择脚本模板</option>
             <option value="t1">美妆爆款拆解模板</option>
             <option value="t2">服饰种草口播模板</option>
           </select>
 
-          <select className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-500 bg-white focus:outline-none focus:border-purple-400 cursor-pointer">
+          <select value={authorFilter} onChange={e => setAuthorFilter(e.target.value)} aria-label="作者" className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-500 bg-white focus:outline-none focus:border-purple-400 cursor-pointer">
             <option value="">作者</option>
             <option value="致上编导">致上编导</option>
             <option value="美妆内容部">美妆内容部</option>
@@ -832,6 +812,7 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
           <input
             type="text"
             placeholder="请选择(支持输入搜索)"
+            value={authorSearch} onChange={e => setAuthorSearch(e.target.value)}
             className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 bg-white focus:outline-none focus:border-purple-400 w-36"
           />
 
@@ -839,9 +820,9 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
             <Calendar className="w-3.5 h-3.5 text-slate-400" />
             <span>上传时间</span>
             <span className="text-slate-300">|</span>
-            <input type="text" placeholder="开始日期" className="w-14 focus:outline-none text-center" />
+            <input type="text" placeholder="开始日期" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-24 focus:outline-none text-center" />
             <span>至</span>
-            <input type="text" placeholder="结束日期" className="w-14 focus:outline-none text-center" />
+            <input type="text" placeholder="结束日期" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-24 focus:outline-none text-center" />
           </div>
         </div>
       </div>
@@ -997,54 +978,6 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
           </table>
         </div>
 
-      {/* Modal 1: 保存为常用筛选 (Save Preset Modal) */}
-      {showSavePresetModal && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-2xs animate-fade-in p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-bold text-slate-900 text-sm border-l-4 border-purple-600 pl-2">
-                保存为常用筛选
-              </h3>
-              <button
-                onClick={() => setShowSavePresetModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4 text-xs">
-              <div className="flex items-center gap-3">
-                <label className="text-slate-600 font-medium shrink-0">
-                  <span className="text-rose-500">*</span> 名称
-                </label>
-                <input
-                  type="text"
-                  placeholder="如：洗发水"
-                  value={presetNameInput}
-                  onChange={(e) => setPresetNameInput(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-purple-400 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                />
-              </div>
-            </div>
-
-            <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end gap-3">
-              <button
-                onClick={() => setShowSavePresetModal(false)}
-                className="px-4 py-1.5 border border-slate-300 hover:bg-slate-100 text-slate-600 font-bold rounded-lg cursor-pointer text-xs"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleSavePreset}
-                className="px-4 py-1.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold rounded-lg cursor-pointer shadow-2xs text-xs"
-              >
-                保存
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal 2: 导出 (Export Modal) */}
       {showExportModal && (
