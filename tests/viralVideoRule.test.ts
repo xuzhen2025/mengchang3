@@ -1,13 +1,29 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  DEFAULT_VIRAL_VIDEO_RULE, formatViralVideoRule, getVideoSpendMonth, isValidViralVideoRule, isViralVideo,
+  DEFAULT_VIRAL_VIDEO_RULE, formatViralVideoRule, getVideoSpendMonth, getViralVideoHeat, isValidViralVideoRule, isViralVideo,
   loadViralVideoRule, saveViralVideoRule, VIRAL_VIDEO_RULE_STORAGE_KEY, VIRAL_VIDEO_RULE_CHANGE_EVENT,
 } from "../src/lib/viralVideoRule.ts";
 
 const month = "2026-09";
 const monthly = { period: "monthly", thresholdWan: 10 } as const;
 const total = { period: "total", thresholdWan: 10 } as const;
+
+test("heat uses one point per 100 yuan of current-month spending", () => {
+  assert.equal(getViralVideoHeat({ cost: 9999999, monthlyCosts: { [month]: 120000 } }, month), 1200);
+  assert.equal(getViralVideoHeat({ monthlyCosts: { [month]: 199.99 } }, month), 1);
+  assert.equal(getViralVideoHeat({ monthlyCosts: { [month]: 100 } }, month), 1);
+  assert.equal(getViralVideoHeat({ monthlyCosts: { [month]: 0 } }, month), 0);
+});
+
+test("missing monthly spending is distinct from zero heat and never uses lifetime spending", () => {
+  const video = { cost: 200000, monthlyCosts: { [month]: 120000 } };
+  assert.equal(getViralVideoHeat(video, "2026-10"), null);
+  assert.equal(isViralVideo(video, total, "2026-10"), true);
+  for (const value of [-1, NaN, Infinity]) {
+    assert.equal(getViralVideoHeat({ monthlyCosts: { [month]: value } }, month), null);
+  }
+});
 
 test("monthly spending includes equality, but not one cent below the threshold", () => {
   assert.equal(isViralVideo({ cost: 200000, monthlyCosts: { [month]: 100000 } }, monthly, month), true);

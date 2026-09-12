@@ -1,7 +1,10 @@
+import { getAdActor, updateAdStore, type AdDraft } from "../lib/adPush";
+import { useAdStore } from "../lib/useAdStore";
 import React, { useState, useRef, useEffect } from "react";
 import LinkScriptModal from "./LinkScriptModal";
 import ResourceTagModal from "./ResourceTagModal";
 import OverlayPortal from "./overlays/OverlayPortal";
+import AnchoredPopover from "./overlays/AnchoredPopover";
 import { ResourceCategoryModal, VideoStatusSelect } from "./ResourceEditDialog";
 import { appendById, toRelatedVideo, VideoResourceMetadata } from "../lib/resourceBatch";
 import { DEFAULT_ASSOCIATED_SCRIPTS, DEFAULT_RELATED_VIDEOS, RELATED_VIDEO_OPTIONS, AssociatedScript } from "../data/videoResourceOptions";
@@ -13,8 +16,6 @@ import VideoResourcePickerModal, { VideoResourcePickerItem } from "./VideoResour
 import {
   AdAccountPushWorkspace,
   PushRecordsModal,
-  advanceAdPushRecords,
-  createDefaultAdPushRecords,
   type AdPushRecord,
 } from "./AdAccountPush";
 import {
@@ -227,22 +228,6 @@ interface FinishedVideoDetailModalProps {
   onUpdate?: (patch: VideoResourceMetadata) => boolean | void;
   isAdminMode?: boolean;
 }
-
-const AD_PUSH_RECORDS_STORAGE_KEY = "mengchang-ad-push-records-v1";
-
-const loadAdPushRecords = (): AdPushRecord[] => {
-  if (typeof window === "undefined") return createDefaultAdPushRecords();
-  try {
-    const stored = window.sessionStorage.getItem(AD_PUSH_RECORDS_STORAGE_KEY);
-    if (!stored) return createDefaultAdPushRecords();
-    const parsed = JSON.parse(stored);
-    return Array.isArray(parsed)
-      ? parsed.filter((record: AdPushRecord) => record.kind === "push_video")
-      : createDefaultAdPushRecords();
-  } catch {
-    return createDefaultAdPushRecords();
-  }
-};
 
 // Mock campaign plans data
 interface CampaignPlan {
@@ -666,6 +651,7 @@ export default function FinishedVideoDetailModal({
   const [attachments, setAttachments] = useState<string[]>([]);
   const [showShareDropdown, setShowShareDropdown] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [showJianyingMenu, setShowJianyingMenu] = useState(false);
 
@@ -888,22 +874,11 @@ export default function FinishedVideoDetailModal({
   // Ad account push workflow
   const [showAdPushWorkspace, setShowAdPushWorkspace] = useState(false);
   const [showPushRecordsModal, setShowPushRecordsModal] = useState(false);
-  const [adPushRecords, setAdPushRecords] = useState<AdPushRecord[]>(loadAdPushRecords);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.sessionStorage.setItem(AD_PUSH_RECORDS_STORAGE_KEY, JSON.stringify(adPushRecords));
-  }, [adPushRecords]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setAdPushRecords((current) => advanceAdPushRecords(current));
-    }, 250);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const handleCreateAdPushTask = (record: AdPushRecord) => {
-    setAdPushRecords((current) => [record, ...current]);
+  const adStore = useAdStore();
+  const [adDraft, setAdDraft] = useState<AdDraft | undefined>();
+  const handleCreateAdPushTask = (records: AdPushRecord[]) => {
+    updateAdStore(s => ({ ...s, records: [...records, ...s.records] }));
+    setAdDraft(undefined);
     setShowAdPushWorkspace(false);
     setShowPushRecordsModal(true);
   };
@@ -2650,7 +2625,7 @@ export default function FinishedVideoDetailModal({
                           <div className="inline-flex items-stretch rounded-xl border border-purple-300 bg-white text-purple-700 shadow-2xs">
                             <button
                               type="button"
-                              onClick={() => setShowAdPushWorkspace(true)}
+                              onClick={() => { if (!getAdActor().permissions.includes("uc_ad_push")) { setToastMsg("暂无推送权限"); window.setTimeout(() => setToastMsg(null), 4000); return; } setAdDraft(undefined); setShowAdPushWorkspace(true); }}
                               className="flex items-center gap-1.5 rounded-l-[11px] px-3 py-2 text-xs font-bold transition-colors hover:bg-purple-50"
                             >
                               <Send className="h-3.5 w-3.5" />
@@ -2685,6 +2660,7 @@ export default function FinishedVideoDetailModal({
                         {/* 更多 v Popover Menu */}
                         <div className="relative">
                           <button
+                            ref={moreButtonRef}
                             onClick={() => setShowMoreMenu(!showMoreMenu)}
                             className="px-3 py-2 border border-purple-300 hover:bg-purple-50 text-purple-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs flex items-center gap-1"
                           >
@@ -2693,15 +2669,7 @@ export default function FinishedVideoDetailModal({
                           </button>
 
                           {showMoreMenu && (
-                            <>
-                              {/* Backdrop for outside click */}
-                              <div
-                                className="fixed inset-0 z-40"
-                                onClick={() => setShowMoreMenu(false)}
-                              />
-
-                              {/* Menu Card */}
-                              <div className="absolute bottom-full right-0 mb-3 z-50 bg-white border border-slate-200 shadow-xl rounded-2xl p-2 w-48 flex flex-col gap-0.5 text-center font-medium text-slate-700 text-xs animate-in fade-in zoom-in-95 duration-100">
+                              <AnchoredPopover anchorRef={moreButtonRef} align="end" side="top" width={192} gap={12} onClose={() => setShowMoreMenu(false)} className="bg-white border border-slate-200 shadow-xl rounded-2xl p-2 flex flex-col gap-0.5 text-center font-medium text-slate-700 text-xs animate-in fade-in zoom-in-95 duration-100">
                                 <button
                                   onClick={() => {
                                     setShowMoreMenu(false);
@@ -2710,16 +2678,6 @@ export default function FinishedVideoDetailModal({
                                   className="w-full py-2 px-3 text-slate-600 hover:text-purple-700 hover:bg-purple-50 rounded-xl transition-colors cursor-pointer text-center font-medium"
                                 >
                                   下载原片
-                                </button>
-
-                                <button
-                                  onClick={() => {
-                                    setShowMoreMenu(false);
-                                    showToast("▶️ 正在播放原片...");
-                                  }}
-                                  className="w-full py-2 px-3 text-slate-600 hover:text-purple-700 hover:bg-purple-50 rounded-xl transition-colors cursor-pointer text-center font-medium"
-                                >
-                                  播放原片
                                 </button>
 
                                 <button
@@ -2735,16 +2693,6 @@ export default function FinishedVideoDetailModal({
                                 <button
                                   onClick={() => {
                                     setShowMoreMenu(false);
-                                    setShowModifyTitleModal(true);
-                                  }}
-                                  className="w-full py-2 px-3 text-slate-600 hover:text-purple-700 hover:bg-purple-50 rounded-xl transition-colors cursor-pointer text-center font-medium"
-                                >
-                                  编辑
-                                </button>
-
-                                <button
-                                  onClick={() => {
-                                    setShowMoreMenu(false);
                                     if (window.confirm("删除后将移入回收站，可在回收站恢复。确认继续吗？")) {
                                       showToast("视频已移至回收站");
                                     }
@@ -2754,10 +2702,7 @@ export default function FinishedVideoDetailModal({
                                   删除
                                 </button>
 
-                                {/* Bottom Arrow Indicator */}
-                                <div className="absolute -bottom-1.5 right-6 w-3 h-3 bg-white rotate-45 border-r border-b border-slate-200/90 pointer-events-none"></div>
-                              </div>
-                            </>
+                              </AnchoredPopover>
                           )}
                         </div>
                       </div>
@@ -5037,7 +4982,8 @@ export default function FinishedVideoDetailModal({
 
       {showAdPushWorkspace && (
         <AdAccountPushWorkspace
-          video={{ id: video.id, title: titleText, coverUrl: video.coverUrl }}
+          video={{ id: video.id, title: titleText, coverUrl: video.coverUrl, author: video.author }}
+          initialDraft={adDraft}
           onClose={() => setShowAdPushWorkspace(false)}
           onCreate={handleCreateAdPushTask}
         />
@@ -5045,7 +4991,9 @@ export default function FinishedVideoDetailModal({
 
       {showPushRecordsModal && (
         <PushRecordsModal
-          records={adPushRecords}
+          records={adStore.records}
+          videoId={video.id}
+          onEdit={draft => { setAdDraft(draft); setShowPushRecordsModal(false); setShowAdPushWorkspace(true); }}
           onClose={() => setShowPushRecordsModal(false)}
         />
       )}

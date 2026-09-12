@@ -3,17 +3,17 @@ import FinishedVideoDetailModal from "./FinishedVideoDetailModal";
 import { PublicTagFilter } from "./PublicTagFilter";
 import { Pagination } from "./Pagination";
 import { Asset, ResourceSearchIntent } from "../types";
-import { toPublishedVideo } from "../lib/publishedVideo";
+import { FinishedVideo } from "../data/finishedVideos";
+import { useFinishedVideos } from "../lib/useFinishedVideos";
 import ResourceSearchCondition from "./ResourceSearchCondition";
 import ResourceFilterPresets from "./ResourceFilterPresets";
 import { VIDEO_PRESET_DEFAULTS } from "../lib/resourceFilterPresets";
 import VideoBatchActions from "./VideoBatchActions";
 import OverlayPortal from "./overlays/OverlayPortal";
-import { useResourceEdits } from "../lib/useResourceEdits";
-import { applyVideoBatchChange, VideoBatchChange, VideoResourceMetadata } from "../lib/resourceBatch";
-import { DEFAULT_ASSOCIATED_SCRIPTS, DEFAULT_RELATED_VIDEOS } from "../data/videoResourceOptions";
+import { applyVideoBatchChange, VideoBatchChange } from "../lib/resourceBatch";
 import { useViralVideoRule } from "../lib/useViralVideoRule";
 import { formatViralVideoRule, getViralVideoSpend, isViralVideo } from "../lib/viralVideoRule";
+import { getVideoSecondaryCategories, parseVideoCategory } from "../lib/videoCategories";
 import { 
   Film, 
   Play, 
@@ -59,493 +59,6 @@ import {
   Columns
 } from "lucide-react";
 
-interface UsedMaterial {
-  id: string;
-  name: string;
-  type: "video" | "image" | "audio";
-  thumbnail?: string;
-  category?: string;
-}
-
-interface FinishedVideo extends VideoResourceMetadata {
-  id: string;
-  numericId?: string;
-  title: string;
-  videoUrl: string;
-  coverUrl: string;
-  duration: string;
-  resolution: string;
-  size: string;
-  creator: "ai" | "human";
-  aiModel?: string;
-  createdAt: string;
-  relativeTime?: string;
-  syncStatus: "unsynced" | "syncing" | "synced";
-  syncedAccounts?: string[];
-  shares: number;      // 转发
-  likes: number;       // 赞
-  comments: number;    // 评论
-  cuts?: number;       // 剪切数
-  downloads?: number;  // 下载数
-  author: string;      // 作者
-  todayCost?: number;  // 今日消耗
-  cost: number;        // 总消耗
-  monthlyCosts?: Record<string, number>;
-  roi?: number;        // Return on Investment
-  category?: string;
-  typeLabel?: string;  // 示例: 混剪, 剪辑, AI画质
-  subtitle?: string;   // 视频底部台词/文字
-  tags?: string[];
-  status?: string;
-  version?: string;
-  secondaryCount?: number;
-  performanceRating?: "S" | "A" | "B" | "C";
-  brandName?: string;
-  authorAvatar?: string;
-  usedMaterials?: UsedMaterial[];
-}
-
-const INITIAL_FINISHED: FinishedVideo[] = [
-  {
-    id: "fv1",
-    numericId: "110332274",
-    title: "0730-8835-鲁月园-复古耳环动态奢感视频.mp4",
-    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4",
-    coverUrl: "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=800&auto=format&fit=crop&q=80",
-    duration: "15s",
-    resolution: "1080p",
-    size: "14.2 MB",
-    creator: "ai",
-    aiModel: "seedance_2.5",
-    createdAt: "2026-07-31 19:15",
-    relativeTime: "1 小时前",
-    syncStatus: "synced",
-    syncedAccounts: ["抖音小店首饰专营", "巨量千川-黄金海岸推广账户"],
-    shares: 0,
-    downloads: 0,
-    cuts: 0,
-    likes: 45200,
-    comments: 3200,
-    author: "刘弯",
-    todayCost: 0,
-    cost: 0,
-    monthlyCosts: { "2026-09": 0 },
-    roi: 3.85,
-    category: "女士内衣",
-    typeLabel: "混剪",
-    subtitle: "不管咱胖不胖",
-    tags: ["达人成片", "腾讯广告", "8015-摄影/编导（基础）"],
-    status: "待审核",
-    version: "v2.0 爆款优化版",
-    secondaryCount: 5,
-    performanceRating: "S",
-    usedMaterials: [
-      { id: "m1", name: "法式古法金耳环-光泽特写Raw.mp4", type: "video", category: "商品原料" },
-      { id: "m2", name: "模特夏日风情佩戴走秀-剪辑切片.mp4", type: "video", category: "模特分镜" },
-      { id: "m3", name: "AI算法配音-高奢质感解说.mp3", type: "audio", category: "AI音轨" }
-    ]
-  },
-  {
-    id: "fv2",
-    numericId: "110332275",
-    title: "0730-8836-水光针去黄测评-爆款对比.mp4",
-    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-vegetables-cooking-in-a-pan-40502-large.mp4",
-    coverUrl: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&auto=format&fit=crop&q=80",
-    duration: "30s",
-    resolution: "1080p",
-    size: "24.1 MB",
-    creator: "human",
-    createdAt: "2026-07-31 18:22",
-    relativeTime: "2 小时前",
-    syncStatus: "unsynced",
-    shares: 12,
-    downloads: 5,
-    cuts: 2,
-    likes: 9800,
-    comments: 890,
-    author: "张小花",
-    todayCost: 120,
-    cost: 3200,
-    monthlyCosts: { "2026-09": 2400 },
-    roi: 1.95,
-    category: "草本初色内衣",
-    typeLabel: "AI画质提升",
-    subtitle: "透气无痕聚拢体验",
-    tags: ["快手投手", "草本剪辑"],
-    status: "审核通过",
-    version: "v1.0 剪辑初稿",
-    secondaryCount: 1,
-    performanceRating: "B",
-    usedMaterials: [
-      { id: "m4", name: "水光针瓶身360度展示.mp4", type: "video", category: "实拍材质" },
-      { id: "m5", name: "去黄效果前后对比分镜.png", type: "image", category: "对比图" }
-    ]
-  },
-  {
-    id: "fv3",
-    numericId: "110332276",
-    title: "0730-8837-防晒冰丝T恤冷感微距分镜.mp4",
-    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4",
-    coverUrl: "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=800&auto=format&fit=crop&q=80",
-    duration: "10s",
-    resolution: "2K",
-    size: "19.8 MB",
-    creator: "ai",
-    aiModel: "seedance_2.0-VIP",
-    createdAt: "2026-07-31 15:40",
-    relativeTime: "5 小时前",
-    syncStatus: "synced",
-    syncedAccounts: ["抖音号: AIGC潮牌夏装"],
-    shares: 88,
-    downloads: 34,
-    cuts: 6,
-    likes: 24000,
-    comments: 1800,
-    author: "李阿牛",
-    todayCost: 1500,
-    cost: 120000,
-    monthlyCosts: { "2026-09": 99999.99 },
-    roi: 2.64,
-    category: "女士睡衣",
-    typeLabel: "高质感原创",
-    subtitle: "瞬间冰感降温",
-    tags: ["短视频推广", "达人姓名"],
-    status: "已上机",
-    version: "v1.5 迭代分镜版",
-    secondaryCount: 3,
-    performanceRating: "A",
-    usedMaterials: [
-      { id: "m6", name: "冰丝面料微距放大切片.mp4", type: "video", category: "3D渲染" },
-      { id: "m7", name: "透气粒子流动特写.mp4", type: "video", category: "AI粒子" }
-    ]
-  },
-  {
-    id: "fv4",
-    numericId: "110332277",
-    title: "0730-8838-不粘锅真实口播展示.mp4",
-    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-vegetables-cooking-in-a-pan-40502-large.mp4",
-    coverUrl: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800&auto=format&fit=crop&q=80",
-    duration: "15s",
-    resolution: "720p",
-    size: "11.5 MB",
-    creator: "human",
-    createdAt: "2026-07-31 10:05",
-    relativeTime: "10 小时前",
-    syncStatus: "unsynced",
-    shares: 3,
-    downloads: 1,
-    cuts: 0,
-    likes: 920,
-    comments: 88,
-    author: "赵铁柱",
-    todayCost: 0,
-    cost: 500,
-    monthlyCosts: { "2026-09": 250 },
-    roi: 1.20,
-    category: "塑身裤",
-    typeLabel: "切片重构",
-    subtitle: "真实防粘不粘底",
-    tags: ["直播", "8018-沈阳分组"],
-    status: "审核驳回",
-    version: "v1.0 测试版",
-    secondaryCount: 0,
-    performanceRating: "C",
-    usedMaterials: [
-      { id: "m8", name: "厨房无油煎蛋对比录屏.mp4", type: "video", category: "现场录屏" }
-    ]
-  },
-  {
-    id: "fv5",
-    numericId: "110332278",
-    title: "0730-8839-高弹透气提臀内裤走秀实拍.mp4",
-    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4",
-    coverUrl: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&auto=format&fit=crop&q=80",
-    duration: "18s",
-    resolution: "1080p",
-    size: "16.8 MB",
-    creator: "ai",
-    aiModel: "seedance_2.5",
-    createdAt: "2026-07-30 22:10",
-    relativeTime: "1 天前",
-    syncStatus: "synced",
-    syncedAccounts: ["巨量千川-爆款账户02"],
-    shares: 150,
-    downloads: 62,
-    cuts: 12,
-    likes: 18200,
-    comments: 1200,
-    author: "王大锤",
-    todayCost: 2800,
-    cost: 152000,
-    monthlyCosts: { "2026-09": 120000 },
-    roi: 4.12,
-    category: "女士内裤",
-    typeLabel: "混剪",
-    subtitle: "收腹高腰无痕提臀",
-    tags: ["AD优质素材", "首发素材"],
-    status: "已搭",
-    version: "v3.0 爆款冲榜版",
-    secondaryCount: 8,
-    performanceRating: "S",
-    usedMaterials: [
-      { id: "m9", name: "高弹面料拉伸特写.mp4", type: "video", category: "面料展示" }
-    ]
-  },
-  {
-    id: "fv6",
-    numericId: "110332279",
-    title: "0730-8840-极简美肤衣无感贴合对比镜头.mp4",
-    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4",
-    coverUrl: "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=800&auto=format&fit=crop&q=80",
-    duration: "12s",
-    resolution: "1080p",
-    size: "13.5 MB",
-    creator: "ai",
-    aiModel: "seedance_2.5",
-    createdAt: "2026-07-30 20:15",
-    relativeTime: "1 天前",
-    syncStatus: "synced",
-    syncedAccounts: ["微信视频号小店推广-01"],
-    shares: 42,
-    downloads: 18,
-    cuts: 3,
-    likes: 12400,
-    comments: 890,
-    author: "陈晨",
-    todayCost: 600,
-    cost: 15400,
-    monthlyCosts: { "2026-09": 12000 },
-    roi: 3.12,
-    category: "4199美肤衣",
-    typeLabel: "AI画质",
-    subtitle: "隐形无痕 贴肤如丝",
-    tags: ["美肤衣", "爆款视频"],
-    status: "审核通过",
-    version: "v2.1 优化音轨版",
-    secondaryCount: 4,
-    performanceRating: "A",
-    usedMaterials: [
-      { id: "m10", name: "美肤衣特写反光面料.mp4", type: "video", category: "面料展示" }
-    ]
-  },
-  {
-    id: "fv7",
-    numericId: "110332280",
-    title: "0730-8841-保暖内衣发热纤维实验展示.mp4",
-    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-vegetables-cooking-in-a-pan-40502-large.mp4",
-    coverUrl: "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?w=800&auto=format&fit=crop&q=80",
-    duration: "20s",
-    resolution: "2K",
-    size: "32.0 MB",
-    creator: "human",
-    createdAt: "2026-07-30 18:30",
-    relativeTime: "1 天前",
-    syncStatus: "synced",
-    syncedAccounts: ["美妆潮流品线巨量账号"],
-    shares: 95,
-    downloads: 40,
-    cuts: 8,
-    likes: 31000,
-    comments: 2400,
-    author: "林杰",
-    todayCost: 1200,
-    cost: 28000,
-    monthlyCosts: { "2026-09": 22000 },
-    roi: 3.45,
-    category: "保暖内衣",
-    typeLabel: "高质感原创",
-    subtitle: "德绒发热 37度恒温",
-    tags: ["秋冬新品", "千川投流"],
-    status: "已上机",
-    version: "v1.0 官方正片",
-    secondaryCount: 6,
-    performanceRating: "S",
-    usedMaterials: [
-      { id: "m11", name: "红外线测温对比实拍.mp4", type: "video", category: "实验分镜" }
-    ]
-  },
-  {
-    id: "fv8",
-    numericId: "110332281",
-    title: "0730-8842-秒缇8024前扣内衣搭扣方便性演示.mp4",
-    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4",
-    coverUrl: "https://images.unsplash.com/photo-1509631179647-0177331693ae?w=800&auto=format&fit=crop&q=80",
-    duration: "15s",
-    resolution: "1080p",
-    size: "15.4 MB",
-    creator: "ai",
-    aiModel: "seedance_2.0-VIP",
-    createdAt: "2026-07-30 14:00",
-    relativeTime: "1 天前",
-    syncStatus: "unsynced",
-    shares: 10,
-    downloads: 2,
-    cuts: 1,
-    likes: 5600,
-    comments: 420,
-    author: "赵雪",
-    todayCost: 0,
-    cost: 1800,
-    monthlyCosts: { "2026-09": 500 },
-    roi: 1.80,
-    category: "秒缇8024前扣内衣",
-    typeLabel: "混剪",
-    subtitle: "前扣一秒穿脱 聚拢不空杯",
-    tags: ["秒缇前扣", "抖音卡片"],
-    status: "审核通过",
-    version: "v1.2 修改试看",
-    secondaryCount: 2,
-    performanceRating: "B",
-    usedMaterials: [
-      { id: "m12", name: "前扣快速扣合慢动作.mp4", type: "video", category: "特写展示" }
-    ]
-  },
-  {
-    id: "fv9",
-    numericId: "110332282",
-    title: "0730-8843-男士莫代尔冰丝内裤蜂窝透气性实测.mp4",
-    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-vegetables-cooking-in-a-pan-40502-large.mp4",
-    coverUrl: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&auto=format&fit=crop&q=80",
-    duration: "16s",
-    resolution: "1080p",
-    size: "17.1 MB",
-    creator: "human",
-    createdAt: "2026-07-30 11:20",
-    relativeTime: "1 天前",
-    syncStatus: "synced",
-    syncedAccounts: ["快手金牛-母婴品线账号"],
-    shares: 68,
-    downloads: 25,
-    cuts: 4,
-    likes: 19800,
-    comments: 1530,
-    author: "孙强",
-    todayCost: 800,
-    cost: 21000,
-    monthlyCosts: { "2026-09": 15000 },
-    roi: 2.98,
-    category: "男士内裤",
-    typeLabel: "剪辑",
-    subtitle: "干爽不闷热 告别黏腻",
-    tags: ["男士爆款", "快手挂车"],
-    status: "已搭",
-    version: "v2.0 精剪混剪",
-    secondaryCount: 3,
-    performanceRating: "A",
-    usedMaterials: [
-      { id: "m13", name: "干冰穿透布料透气演示.mp4", type: "video", category: "实验特写" }
-    ]
-  },
-  {
-    id: "fv10",
-    numericId: "110332283",
-    title: "0730-8844-少女无钢圈发育期文胸舒爽棉切片.mp4",
-    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4",
-    coverUrl: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=800&auto=format&fit=crop&q=80",
-    duration: "14s",
-    resolution: "1080p",
-    size: "14.8 MB",
-    creator: "ai",
-    aiModel: "seedance_2.5",
-    createdAt: "2026-07-30 09:10",
-    relativeTime: "1 天前",
-    syncStatus: "synced",
-    syncedAccounts: ["抖音小店首饰专营"],
-    shares: 33,
-    downloads: 12,
-    cuts: 2,
-    likes: 8700,
-    comments: 610,
-    author: "周婷",
-    todayCost: 350,
-    cost: 6700,
-    monthlyCosts: { "2026-09": 6000 },
-    roi: 2.25,
-    category: "少女内衣",
-    typeLabel: "AI画质提升",
-    subtitle: "天然有机棉 保护成长期",
-    tags: ["少女系列", "安全舒适"],
-    status: "待审核",
-    version: "v1.0 试跑版",
-    secondaryCount: 1,
-    performanceRating: "B",
-    usedMaterials: [
-      { id: "m14", name: "纯棉柔软弯折捏压.mp4", type: "video", category: "触感展示" }
-    ]
-  },
-  {
-    id: "fv11",
-    numericId: "110332284",
-    title: "0730-8845-8811纯棉舒适家居服情侣款温馨镜头.mp4",
-    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-vegetables-cooking-in-a-pan-40502-large.mp4",
-    coverUrl: "https://images.unsplash.com/photo-1516762689617-e1cffcef479d?w=800&auto=format&fit=crop&q=80",
-    duration: "22s",
-    resolution: "2K",
-    size: "26.5 MB",
-    creator: "human",
-    createdAt: "2026-07-29 21:00",
-    relativeTime: "2 天前",
-    syncStatus: "synced",
-    syncedAccounts: ["微信视频号小店推广-01", "巨量千川-黄金海岸推广账户"],
-    shares: 210,
-    downloads: 88,
-    cuts: 15,
-    likes: 54000,
-    comments: 4100,
-    author: "吴磊",
-    todayCost: 3200,
-    cost: 189000,
-    monthlyCosts: { "2026-09": 100000 },
-    roi: 4.88,
-    category: "8811纯棉",
-    typeLabel: "高质感原创",
-    subtitle: "居家触感 亲肤软糯",
-    tags: ["情侣家居", "S级爆款"],
-    status: "已上机",
-    version: "v3.2 全量终版",
-    secondaryCount: 10,
-    performanceRating: "S",
-    usedMaterials: [
-      { id: "m15", name: "情侣晨起生活互动切片.mp4", type: "video", category: "场景故事" }
-    ]
-  },
-  {
-    id: "fv12",
-    numericId: "110332285",
-    title: "0730-8846-草本8018无痛矫正姿态塑身衣效果.mp4",
-    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4",
-    coverUrl: "https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=800&auto=format&fit=crop&q=80",
-    duration: "18s",
-    resolution: "1080p",
-    size: "18.3 MB",
-    creator: "ai",
-    aiModel: "seedance_2.5",
-    createdAt: "2026-07-29 16:45",
-    relativeTime: "2 天前",
-    syncStatus: "unsynced",
-    shares: 55,
-    downloads: 19,
-    cuts: 5,
-    likes: 16500,
-    comments: 1100,
-    author: "郑敏",
-    todayCost: 450,
-    cost: 12300,
-    monthlyCosts: { "2026-09": 10000 },
-    roi: 2.75,
-    category: "草本8018",
-    typeLabel: "混剪",
-    subtitle: "提背直腰 塑造开肩美姿",
-    tags: ["体态矫正", "草本塑身"],
-    status: "已搭",
-    version: "v2.0 优化对比版",
-    secondaryCount: 4,
-    performanceRating: "A",
-    usedMaterials: [
-      { id: "m16", name: "侧面站姿矫正对比图.mp4", type: "video", category: "3D骨骼演示" }
-    ]
-  }
-];
 
 const AD_ACCOUNTS_MOCK = [
   "抖音小店首饰专营",
@@ -557,14 +70,6 @@ const AD_ACCOUNTS_MOCK = [
 
 // Categories from Screenshot
 const MAIN_CATEGORIES = ["全部", "达人成片", "草本初色内衣", "短视频推广", "直播"];
-
-const PRIMARY_CATEGORIES = [
-  "全部", "女士内衣", "女士内裤", "女士睡衣", "塑身裤", "塑身衣", "保暖内衣", "少女内衣", "袜子", "男士内裤", "男士睡衣", "购买达人视频",
-  "秒缇8024前扣内衣", "草本8015", "8018内衣", "4199美肤衣", "草本8018", "8015内衣", "102修容衣", "8811纯棉", "2640内裤"
-];
-
-// Custom invented secondary categories as requested
-const SECONDARY_CATEGORIES = ["全部", "抹胸款", "无钢圈", "聚拢款", "蕾丝杯面", "无痕塑形", "爆款走秀", "高弹透气", "情侣套盒", "收腹高腰"];
 
 const STATUS_OPTIONS = ["全部", "待审核", "审核通过", "审核驳回", "已修改", "二次修改", "已上机", "已搭", "放弃"];
 
@@ -629,12 +134,7 @@ interface FinishedVideosViewProps {
 export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask, onNavigateToDelivery, onDetailStateChange, initialSearch, onClearSearch }: FinishedVideosViewProps) {
   const { rule: viralVideoRule, month: spendMonth } = useViralVideoRule();
   const viralRuleLabel = formatViralVideoRule(viralVideoRule);
-  const [baseVideos, setVideos] = useState<FinishedVideo[]>(() => [...uploadedVideos.map(toPublishedVideo), ...INITIAL_FINISHED]);
-  const { edits, saveEdits } = useResourceEdits<VideoResourceMetadata>("finished");
-  const videos = baseVideos.map(video => ({
-    ...video, associatedScripts: DEFAULT_ASSOCIATED_SCRIPTS, relatedVideos: DEFAULT_RELATED_VIDEOS,
-    ...edits[video.id],
-  }));
+  const { videos, saveEdits } = useFinishedVideos(uploadedVideos);
   const [activeTab, setActiveTab] = useState<"all" | "secondary" | "performance">("all");
   
   // Screenshot Filter States
@@ -647,6 +147,14 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
   
   const [secondarySearch, setSecondarySearch] = useState("");
   const [secondaryCat, setSecondaryCat] = useState("全部");
+  const primaryCategories = React.useMemo(() => ["全部", ...new Set(videos.map(video => parseVideoCategory(video.category).primary).filter(Boolean))], [videos]);
+  const secondaryCategories = React.useMemo(() => ["全部", ...getVideoSecondaryCategories(
+    videos.filter(video => primaryCat === "全部" || parseVideoCategory(video.category).primary === primaryCat)
+  )], [videos, primaryCat]);
+  React.useEffect(() => {
+    if (!primaryCategories.includes(primaryCat)) setPrimaryCat("全部");
+    if (!secondaryCategories.includes(secondaryCat)) setSecondaryCat("全部");
+  }, [primaryCategories, secondaryCategories, primaryCat, secondaryCat]);
   const [statusVal, setStatusVal] = useState("全部");
   
   const [publicTagSearch, setPublicTagSearch] = useState("");
@@ -683,14 +191,14 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [initialTagModalType, setInitialTagModalType] = useState<"public" | "personal" | undefined>(undefined);
 
-  React.useEffect(() => { setCurrentPage(1); }, [costRange, viralVideoRule.period, viralVideoRule.thresholdWan, spendMonth]);
+  React.useEffect(() => { setCurrentPage(1); }, [costRange, viralVideoRule.period, viralVideoRule.thresholdWan, spendMonth, primaryCat, secondaryCat, secondarySearch]);
 
   React.useEffect(() => {
     const tag = initialSearch?.tag;
     if (!tag) return;
     if (MAIN_CATEGORIES.includes(tag)) setMainCat(tag);
-    else if (PRIMARY_CATEGORIES.includes(tag)) setPrimaryCat(tag);
-    else if (SECONDARY_CATEGORIES.includes(tag)) setSecondaryCat(tag);
+    else if (primaryCategories.includes(tag)) setPrimaryCat(tag);
+    else if (secondaryCategories.includes(tag)) setSecondaryCat(tag);
     else if (STATUS_OPTIONS.includes(tag)) setStatusVal(tag);
     else if (AD_PLATFORM_TAG_OPTIONS.includes(tag)) setAdPlatformTag(tag);
     else if (PUBLIC_TAGS.includes(tag)) setSelectedPublicTag(tag);
@@ -813,12 +321,12 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
     // Main category
     const matchesMain = mainCat === "全部" ? true : (v.tags?.includes(mainCat) || v.title.includes(mainCat));
     
-    // Primary category
-    const matchesPrimary = primaryCat === "全部" ? true : (v.category === primaryCat || v.title.includes(primaryCat));
+    const category = parseVideoCategory(v.category);
+    const matchesPrimary = primaryCat === "全部" || category.primary === primaryCat;
     
     // Secondary category search / option
-    const matchesSecondarySearch = !secondarySearch ? true : v.title.toLowerCase().includes(secondarySearch.toLowerCase());
-    const matchesSecondaryCat = secondaryCat === "全部" ? true : v.title.includes(secondaryCat);
+    const matchesSecondarySearch = category.secondary.toLowerCase().includes(secondarySearch.trim().toLowerCase());
+    const matchesSecondaryCat = secondaryCat === "全部" || category.secondary === secondaryCat;
     
     // Status
     const matchesStatus = statusVal === "全部" ? true : (v.status === statusVal || (statusVal === "已上机" && v.status === "已投放"));
@@ -913,18 +421,12 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
       setSyncLoading(false);
       setShowSyncModal(false);
       
-      setVideos(prev => prev.map(v => {
-        if (v.id === selectedVideo.id) {
-          const originalAccounts = v.syncedAccounts || [];
-          return {
-            ...v,
-            syncStatus: "synced",
-            status: "已投放",
-            syncedAccounts: Array.from(new Set([...originalAccounts, targetAccount, "巨量千川同步组"]))
-          };
-        }
-        return v;
-      }));
+      const originalAccounts = videos.find(video => video.id === selectedVideo.id)?.syncedAccounts || [];
+      saveEdits({ [selectedVideo.id]: {
+        syncStatus: "synced",
+        status: "已投放",
+        syncedAccounts: Array.from(new Set([...originalAccounts, targetAccount, "巨量千川同步组"])),
+      } });
 
       try {
         const newTask = {
@@ -983,7 +485,7 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
 
   const handleDeleteVideo = (id: string) => {
     if (confirm("删除后将移入管理端集中回收站，当前用户将无法继续查看；如需恢复请联系管理员。确认继续吗？")) {
-      setVideos(prev => prev.filter(v => v.id !== id));
+      saveEdits({ [id]: { deleted: true } });
     }
   };
 
@@ -1281,10 +783,10 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
         <div className="flex items-start gap-2 border-t border-slate-100 pt-3">
           <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2 mt-0.5">一级分类：</span>
           <div className="flex-1 flex flex-wrap items-center gap-x-3.5 gap-y-2">
-            {(primaryMore ? PRIMARY_CATEGORIES : PRIMARY_CATEGORIES.slice(0, 12)).map(cat => (
+            {(primaryMore ? primaryCategories : primaryCategories.slice(0, 12)).map(cat => (
               <button
                 key={cat}
-                onClick={() => setPrimaryCat(cat)}
+                onClick={() => { setPrimaryCat(cat); setSecondaryCat("全部"); setSecondarySearch(""); }}
                 className={`transition-colors cursor-pointer text-xs ${
                   primaryCat === cat 
                     ? "text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded" 
@@ -1305,7 +807,7 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
           </button>
         </div>
 
-        {/* ROW 3: 二级分类 (Custom invented options) */}
+        {/* ROW 3: 二级分类 */}
         <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
           <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">二级分类：</span>
           <div className="flex items-center gap-3 flex-wrap">
@@ -1320,7 +822,7 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
               />
             </div>
 
-            {SECONDARY_CATEGORIES.map(sec => (
+            {secondaryCategories.filter(sec => sec === "全部" || sec.toLowerCase().includes(secondarySearch.trim().toLowerCase())).map(sec => (
               <button
                 key={sec}
                 onClick={() => setSecondaryCat(sec)}

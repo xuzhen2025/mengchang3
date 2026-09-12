@@ -566,7 +566,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
       <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs space-y-4 text-xs">
         {/* 一级分类 */}
         <div className="flex items-start gap-4">
-          <span className="w-20 font-bold text-slate-500 shrink-0 pt-1">一级分类:</span>
+          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2 mt-0.5">一级分类：</span>
           <div className="flex flex-wrap items-center gap-1.5">
             {activeFilterOptions.categories.map((cat) => (
               <button
@@ -688,53 +688,69 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
         {/* 高级搜索 Bar */}
         <div className="border-t border-slate-100 pt-3 space-y-3">
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="w-20 font-bold text-slate-500 shrink-0">高级搜索:</span>
+            <span className="text-slate-900 font-bold shrink-0">高级搜索：</span>
 
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-md px-3 py-1 font-medium text-slate-700 focus:outline-none focus:border-purple-500"
-            >
-              <option value="最新发布">排序: 最新发布</option>
-              <option value="最早发布">排序: 最早发布</option>
-              <option value="消耗最高">排序: 消耗最高</option>
-            </select>
+            {/* 排序 */}
+            <div className="flex items-center gap-1.5 border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white shadow-2xs">
+              <span className="text-slate-900 font-bold shrink-0">排序：</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="bg-transparent font-normal text-slate-700 focus:outline-none cursor-pointer"
+              >
+                <option value="最新发布">最新发布</option>
+                <option value="最早发布">最早发布</option>
+                <option value="消耗最高">消耗最高</option>
+              </select>
+            </div>
 
-            <select
-              value={adPlatformTag}
-              onChange={(e) => setAdPlatformTag(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-md px-3 py-1 font-medium text-slate-400 focus:outline-none focus:border-purple-500"
-            >
-              <option value="">广告平台标签: 请选择广告平台</option>
-              <option value="抖音">抖音</option>
-              <option value="快手">快手</option>
-              <option value="小红书">小红书</option>
-            </select>
+            {/* 广告平台标签 */}
+            <div className="flex items-center gap-1.5 border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white shadow-2xs">
+              <span className="text-slate-900 font-bold shrink-0">广告平台标签：</span>
+              <select
+                value={adPlatformTag}
+                onChange={(e) => setAdPlatformTag(e.target.value)}
+                className="bg-transparent font-normal text-slate-700 focus:outline-none cursor-pointer"
+              >
+                <option value="">请选择广告平台</option>
+                <option value="抖音">抖音</option>
+                <option value="快手">快手</option>
+                <option value="小红书">小红书</option>
+              </select>
+            </div>
 
-            <select
-              value={costRange}
-              onChange={(e) => setCostRange(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-md px-3 py-1 font-medium text-slate-700 focus:outline-none focus:border-purple-500"
-            >
-              <option value="不限">消耗: 不限</option>
-              <option value="1000以下">¥1000 以下</option>
-              <option value="1000-5000">¥1000 - ¥5000</option>
-              <option value="5000以上">¥5000 以上</option>
-            </select>
+            {/* 消耗 */}
+            <div className="flex items-center gap-1.5 border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white shadow-2xs">
+              <span className="text-slate-900 font-bold shrink-0">消耗：</span>
+              <select
+                value={costRange}
+                onChange={(e) => setCostRange(e.target.value)}
+                className="bg-transparent font-normal text-slate-700 focus:outline-none cursor-pointer"
+              >
+                <option value="不限">不限</option>
+                <option value="1000以下">¥1000 以下</option>
+                <option value="1000-5000">¥1000 - ¥5000</option>
+                <option value="5000以上">¥5000 以上</option>
+              </select>
+            </div>
 
-            <select
-              value={systemTag}
-              onChange={(e) => setSystemTag(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-md px-3 py-1 font-medium text-slate-400 focus:outline-none focus:border-purple-500"
-            >
-              <option value="">系统自动标签: 请选择系统自动标签</option>
-              <option value="爆款素材">爆款素材</option>
-              <option value="潜力素材">潜力素材</option>
-            </select>
+            {/* 系统自动标签 */}
+            <div className="flex items-center gap-1.5 border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white shadow-2xs">
+              <span className="text-slate-900 font-bold shrink-0">系统自动标签：</span>
+              <select
+                value={systemTag}
+                onChange={(e) => setSystemTag(e.target.value)}
+                className="bg-transparent font-normal text-slate-700 focus:outline-none cursor-pointer"
+              >
+                <option value="">请选择系统自动标签</option>
+                <option value="爆款素材">爆款素材</option>
+                <option value="潜力素材">潜力素材</option>
+              </select>
+            </div>
 
             <button
               onClick={() => onShowToast("已执行高级筛选")}
-              className="px-3.5 py-1 border border-[#7C3AED] text-[#7C3AED] hover:bg-purple-50 font-bold rounded-md flex items-center gap-1 cursor-pointer transition-colors"
+              className="px-3.5 py-1.5 border border-[#7C3AED] text-[#7C3AED] hover:bg-purple-50 font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
             >
               <Filter className="w-3.5 h-3.5" />
               <span>筛选</span>
@@ -742,7 +758,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
 
             <button
               onClick={handleResetFilters}
-              className="px-3.5 py-1 bg-[#7C3AED] text-white hover:bg-purple-700 font-bold rounded-md cursor-pointer transition-colors shadow-2xs"
+              className="px-3.5 py-1.5 bg-[#7C3AED] text-white hover:bg-purple-700 font-bold rounded-lg cursor-pointer transition-colors shadow-xs"
             >
               重置
             </button>

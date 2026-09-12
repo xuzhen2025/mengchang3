@@ -21,13 +21,18 @@ const newPage = async () => {
 const user = await newPage();
 try {
   await user.getByRole("button", { name: "资源库", exact: true }).click();
+  await user.locator("select").filter({ has: user.locator('option[value="50"]') }).last().selectOption("50");
   const cards = user.getByTestId("finished-video-card");
+  const sampleIds = Array.from({ length: 10 }, (_, index) => `fv${index + 13}`);
+  const monthlyIds = ["fv11", "fv5", ...sampleIds].sort();
+  const totalIds = ["fv11", "fv3", "fv5", ...sampleIds].sort();
+  const twelveWanIds = ["fv5", "fv13", "fv14", "fv15", "fv17", "fv18", "fv19", "fv21"].sort();
   const badgeIds = () => cards.filter({ has: user.getByTestId("viral-video-badge") }).evaluateAll(nodes => nodes.map(node => node.dataset.videoId).sort());
   const expectBadgeIds = async (ids) => {
     await user.waitForFunction(expected => JSON.stringify([...document.querySelectorAll('[data-testid="finished-video-card"]')].filter(node => node.querySelector('[data-testid="viral-video-badge"]')).map(node => node.dataset.videoId).sort()) === JSON.stringify(expected), ids);
     assert.deepEqual(await badgeIds(), ids);
   };
-  await expectBadgeIds(["fv11", "fv5"]);
+  await expectBadgeIds(monthlyIds);
   const card = cards.filter({ has: user.locator('[data-testid="viral-video-badge"]') }).first();
   for (const width of [1920, 1440, 1280, 1024, 768, 390]) {
     await user.setViewportSize({ width, height: 1000 });
@@ -76,11 +81,11 @@ try {
   const preset = user.getByRole("button", { name: "选择常用筛选预设", exact: true });
   await preset.click();
   await user.getByRole("menuitemcheckbox", { name: "高爆款成片预设", exact: true }).click();
-  await expectBadgeIds(["fv11", "fv5"]);
+  await expectBadgeIds(monthlyIds);
   assert.equal(await filter.inputValue(), "爆款视频");
   assert.match(await preset.innerText(), /高爆款成片预设/);
   await filter.selectOption("爆款视频");
-  assert.equal(await cards.count(), 2);
+  assert.equal(await cards.count(), 12);
 
   const admin = await newPage();
   await admin.locator("#btn-client-mode-dropdown").click();
@@ -93,7 +98,7 @@ try {
   const save = settings.getByRole("button", { name: "保存设置", exact: true });
   assert.equal(await threshold.inputValue(), "10");
   await threshold.fill("20");
-  assert.deepEqual(await badgeIds(), ["fv11", "fv5"]);
+  assert.deepEqual(await badgeIds(), monthlyIds);
   await save.click();
   await expectBadgeIds([]);
   assert.equal(await cards.count(), 0);
@@ -102,29 +107,30 @@ try {
   await period.selectOption("total");
   await threshold.fill("10");
   await save.click();
-  await expectBadgeIds(["fv11", "fv3", "fv5"]);
-  assert.equal(await cards.count(), 3);
+  await expectBadgeIds(totalIds);
+  assert.equal(await cards.count(), 13);
   assert.match(await filter.locator('option[value="爆款视频"]').innerText(), /总消耗达到10万/);
   assert.match(await preset.innerText(), /高爆款成片预设/);
   await period.selectOption("monthly");
   await threshold.fill("12");
   await save.click();
-  await expectBadgeIds(["fv5"]);
+  await expectBadgeIds(twelveWanIds);
 
   for (const invalid of ["", "0", "-1"]) {
     await threshold.fill(invalid);
     await save.click();
     assert.equal(await threshold.getAttribute("aria-invalid"), "true");
     assert.equal(await threshold.evaluate(el => document.activeElement === el), true);
-    assert.deepEqual(await badgeIds(), ["fv5"]);
+    assert.deepEqual(await badgeIds(), twelveWanIds);
   }
   await threshold.fill("10");
   await save.click();
-  await expectBadgeIds(["fv11", "fv5"]);
+  await expectBadgeIds(monthlyIds);
   await settings.screenshot({ path: fileURLToPath(new URL("finished-video-viral-settings.png", previews)) });
   await user.reload({ waitUntil: "domcontentloaded" });
   await user.getByRole("button", { name: "资源库", exact: true }).click();
-  await expectBadgeIds(["fv11", "fv5"]);
+  await user.locator("select").filter({ has: user.locator('option[value="50"]') }).last().selectOption("50");
+  await expectBadgeIds(monthlyIds);
   await filter.selectOption("爆款视频");
   await user.clock.setFixedTime(new Date("2026-09-30T16:00:01Z"));
   await user.clock.runFor(60_001);
@@ -132,7 +138,7 @@ try {
   assert.equal(await cards.count(), 0);
   await period.selectOption("total");
   await save.click();
-  await expectBadgeIds(["fv11", "fv3", "fv5"]);
+  await expectBadgeIds(totalIds);
   assert.deepEqual(errors, []);
   console.log("PASS: badge placement and hover, saved-rule/filter/preset synchronization, exact threshold, draft and invalid settings, reload, and month rollover.");
 } catch (error) {

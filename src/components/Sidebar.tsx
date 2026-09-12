@@ -68,7 +68,7 @@ export default function Sidebar({
     { id: "ai_video", label: "AI视频原料", icon: Video },
     { id: "canvas", label: "画布", icon: Layers },
     { id: "live_management", label: "直播管理", icon: Radio },
-    { id: "task_collaboration", label: "任务协作", icon: ListTodo, badge: "协作" },
+    { id: "task_collaboration", label: "任务协作", icon: ListTodo },
     { id: "resources", label: "资源库", icon: FolderHeart },
     { id: "ad_delivery", label: "数据分析", icon: BarChart3 },
   ];

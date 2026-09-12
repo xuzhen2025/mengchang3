@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
+import AnchoredPopover from "./overlays/AnchoredPopover";
 import {
   ArrowLeft,
   X,
@@ -83,7 +84,6 @@ export default function ImageDetailView({
   // Lightbox
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [selectedDetailThumbIndex, setSelectedDetailThumbIndex] = useState<number>(0);
-  const [activeBottomTab, setActiveBottomTab] = useState<"usage" | "associated" | "logs">("usage");
 
   // Basic Info Fields & States (Matches FinishedVideoDetailModal pattern)
   const [categoryText, setCategoryText] = useState(
@@ -124,6 +124,7 @@ export default function ImageDetailView({
 
   // More Menu
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
 
   // Operation Logs
   const [logs, setLogs] = useState<OperationLogItem[]>([
@@ -395,22 +396,9 @@ export default function ImageDetailView({
                 <Share2 className="w-4 h-4" />
               </button>
 
-              <button
-                onClick={() => {
-                  setActiveBottomTab("usage");
-                  showToast("已切换至【使用记录】列表");
-                }}
-                className={`px-4 py-1.5 rounded-xl border font-bold text-xs cursor-pointer transition-colors ml-1 ${
-                  activeBottomTab === "usage"
-                    ? "bg-purple-600 text-white border-purple-600 shadow-xs"
-                    : "border-purple-400 text-purple-600 hover:bg-purple-50"
-                }`}
-              >
-                使用记录
-              </button>
-
               <div className="relative">
                 <button
+                  ref={moreButtonRef}
                   onClick={() => setShowMoreMenu(!showMoreMenu)}
                   className="px-3.5 py-1.5 rounded-xl border border-purple-400 text-purple-600 hover:bg-purple-50 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
                 >
@@ -419,26 +407,17 @@ export default function ImageDetailView({
                 </button>
 
                 {showMoreMenu && (
-                  <div className="absolute right-0 top-full mt-1.5 z-30 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 w-40 space-y-1 text-xs">
+                  <AnchoredPopover anchorRef={moreButtonRef} align="end" width={160} gap={6} onClose={() => setShowMoreMenu(false)} className="bg-white rounded-2xl shadow-xl border border-slate-100 p-2 space-y-1 text-xs">
                     <button
                       onClick={() => {
                         setShowMoreMenu(false);
-                        showToast("已重新生成智能色彩标签");
-                      }}
-                      className="w-full text-left px-3 py-1.5 hover:bg-slate-50 rounded-xl text-slate-700 font-medium"
-                    >
-                      重新智能分类
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowMoreMenu(false);
-                        showToast("已下架该图片资源");
+                        showToast("已删除该图片资源");
                       }}
                       className="w-full text-left px-3 py-1.5 hover:bg-red-50 text-red-600 rounded-xl font-medium"
                     >
-                      下架图片
+                      删除
                     </button>
-                  </div>
+                  </AnchoredPopover>
                 )}
               </div>
             </div>
@@ -450,12 +429,6 @@ export default function ImageDetailView({
                 className="bg-[#7C3AED] hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl text-center shadow-xs cursor-pointer transition-colors text-xs active:scale-95"
               >
                 下载无水印图片
-              </button>
-              <button
-                onClick={() => showToast(`已将图片【${titleText}】发送至剪映`)}
-                className="hidden bg-[#7C3AED] hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl text-center shadow-xs cursor-pointer transition-colors text-xs active:scale-95"
-              >
-                复制到剪映
               </button>
             </div>
 
@@ -499,7 +472,7 @@ export default function ImageDetailView({
               {/* Editable Note */}
               <div className="pt-2 border-t border-slate-200/60">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">备注:</span>
+                  <span className="text-slate-400">图片备注:</span>
                   <button
                     onClick={() => {
                       setTempNoteText(noteText);

@@ -880,6 +880,7 @@ export default function AgentCreationView({
   const [selectedStyle, setSelectedStyle] = useState("");
   const [homePromptOrder, setHomePromptOrder] = useState<HomePromptPart[]>([]);
   const homePromptEditorRef = useRef<HTMLSpanElement | null>(null);
+  const settingsAnchorRef = useRef<HTMLButtonElement | null>(null);
   const [selectedCreativeId, setSelectedCreativeId] = useState(1);
   const [scriptSubjectDetailOpen, setScriptSubjectDetailOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
@@ -1482,7 +1483,6 @@ export default function AgentCreationView({
               <h1 className="text-2xl font-bold text-slate-900">想做什么视频？</h1>
               <p className="mt-2 text-sm text-slate-500">告诉 Agent 你的创作需求，从素材到成片一站式完成</p>
             </div>
-
             <div className="mx-auto max-w-4xl rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-colors focus-within:border-violet-400">
               <div
                 className="flex min-h-40 flex-wrap content-start items-center gap-x-1 gap-y-2 text-sm leading-7 text-slate-800"
@@ -1522,7 +1522,7 @@ export default function AgentCreationView({
                       <MenuAction icon={Film} label="添加原料" onClick={() => { setHomeMenu(null); setHomeModal("sources"); }} />
                     </MenuPopup>}
                   </HomeMenuButton>
-                  <HomeMenuButton icon={Settings} label={`${videoDuration}秒 · ${videoRatio}`} active={homeModal === "settings"} onClick={() => { setHomeMenu(null); setHomeModal("settings"); }} />
+                  <HomeMenuButton anchorRef={settingsAnchorRef} icon={Settings} label={`${videoDuration}秒 · ${videoRatio}`} active={homeModal === "settings"} onClick={() => { setHomeMenu(null); setHomeModal(homeModal === "settings" ? null : "settings"); }} />
                   <HomeMenuButton icon={Palette} label="风格" active={homeModal === "style" || !!selectedStyle} onClick={() => { setHomeMenu(null); setHomeModal("style"); }} />
                 </div>
               </div>
@@ -1543,7 +1543,7 @@ export default function AgentCreationView({
         {homeModal === "product_image" && <ProductImageModal existingCount={productImageCount} onClose={() => setHomeModal(null)} onConfirm={(images) => addProductImageBatch(images)} showToast={showToast} />}
         {homeModal === "script" && <ScriptSelectorModal selected={selectedScript} onClose={() => setHomeModal(null)} onConfirm={(item) => { setSelectedScript(item); appendPromptPart("script"); setHomeModal(null); }} />}
         {homeModal === "sources" && <SourceSelectorModal selected={selectedSources} onClose={() => setHomeModal(null)} onConfirm={(items) => { setSelectedSources(items); if (items.length) appendPromptPart("sources"); else removePromptPart("sources"); setHomeModal(null); }} showToast={showToast} />}
-        {homeModal === "settings" && <SettingsModal duration={videoDuration} ratio={videoRatio} removeWatermark={removeWatermark} onClose={() => setHomeModal(null)} onConfirm={(settings) => { setVideoDuration(settings.duration); setVideoRatio(settings.ratio); setRemoveWatermark(settings.removeWatermark); setHomeModal(null); }} />}
+        {homeModal === "settings" && <SettingsModal anchorRef={settingsAnchorRef} duration={videoDuration} ratio={videoRatio} removeWatermark={removeWatermark} onClose={() => setHomeModal(null)} onConfirm={(settings) => { setVideoDuration(settings.duration); setVideoRatio(settings.ratio); setRemoveWatermark(settings.removeWatermark); setHomeModal(null); }} />}
         {homeModal === "style" && <StyleModal value={selectedStyle} onClose={() => setHomeModal(null)} onConfirm={(value) => { setSelectedStyle(value); if (value) appendPromptPart("style"); else removePromptPart("style"); setHomeModal(null); }} />}
       </div>
     );
@@ -2637,14 +2637,15 @@ function SelectionChip({ icon: Icon, prefix, label, image, onRemove, compact = f
 
 const HomeMenuAnchorContext = React.createContext<React.RefObject<HTMLButtonElement | null> | null>(null);
 
-function HomeMenuButton({ icon: Icon, label, active, disabled = false, disabledHint, onClick, children }: { icon: React.ComponentType<{ className?: string }>; label: string; active?: boolean; disabled?: boolean; disabledHint?: string; onClick: () => void; children?: React.ReactNode }) {
-  const anchorRef = useRef<HTMLButtonElement | null>(null);
+function HomeMenuButton({ anchorRef, icon: Icon, label, active, disabled = false, disabledHint, onClick, children }: { anchorRef?: React.RefObject<HTMLButtonElement | null>; icon: React.ComponentType<{ className?: string }>; label: string; active?: boolean; disabled?: boolean; disabledHint?: string; onClick: () => void; children?: React.ReactNode }) {
+  const localAnchorRef = useRef<HTMLButtonElement | null>(null);
+  const resolvedAnchorRef = anchorRef || localAnchorRef;
   const [hintOpen, setHintOpen] = useState(false);
   return (
-    <HomeMenuAnchorContext.Provider value={anchorRef}>
+    <HomeMenuAnchorContext.Provider value={resolvedAnchorRef}>
       <div className="relative" onPointerEnter={() => disabled && disabledHint && setHintOpen(true)} onPointerLeave={() => setHintOpen(false)}>
-        <button ref={anchorRef} disabled={disabled} onClick={onClick} className={`flex items-center gap-1.5 rounded-xl border px-4 py-2 text-xs font-bold transition-all ${disabled ? "cursor-not-allowed border-slate-200/60 bg-slate-50 text-slate-300" : active ? "border-purple-300 bg-purple-50 text-purple-700 shadow-sm" : "border-slate-200/60 bg-slate-50 text-slate-600 hover:bg-slate-100"}`}><Icon className={`h-3.5 w-3.5 ${disabled ? "text-slate-300" : active ? "text-purple-600" : "text-slate-500"}`} /><span className="max-w-[120px] truncate">{label}</span></button>
-        {hintOpen && disabledHint && <AnchoredPopover anchorRef={anchorRef} side="top" align="center" gap={8} onClose={() => setHintOpen(false)} className="pointer-events-none whitespace-nowrap rounded-md bg-slate-800 px-2.5 py-1.5 text-[11px] font-medium text-white shadow-lg">{disabledHint}<span className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-slate-800" /></AnchoredPopover>}
+        <button ref={resolvedAnchorRef} disabled={disabled} onClick={onClick} className={`flex items-center gap-1.5 rounded-xl border px-4 py-2 text-xs font-bold transition-all ${disabled ? "cursor-not-allowed border-slate-200/60 bg-slate-50 text-slate-300" : active ? "border-purple-300 bg-purple-50 text-purple-700 shadow-sm" : "border-slate-200/60 bg-slate-50 text-slate-600 hover:bg-slate-100"}`}><Icon className={`h-3.5 w-3.5 ${disabled ? "text-slate-300" : active ? "text-purple-600" : "text-slate-500"}`} /><span className="max-w-[120px] truncate">{label}</span></button>
+        {hintOpen && disabledHint && <AnchoredPopover anchorRef={resolvedAnchorRef} side="top" align="center" gap={8} onClose={() => setHintOpen(false)} className="pointer-events-none whitespace-nowrap rounded-md bg-slate-800 px-2.5 py-1.5 text-[11px] font-medium text-white shadow-lg">{disabledHint}<span className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-slate-800" /></AnchoredPopover>}
         {children}
       </div>
     </HomeMenuAnchorContext.Provider>
@@ -2895,16 +2896,23 @@ function SourceSelectorModal({ selected, onClose, onConfirm, showToast, selectio
   </ModalFrame>;
 }
 
-function SettingsModal({ duration, ratio, removeWatermark, onClose, onConfirm }: { duration: number; ratio: "9:16" | "16:9"; removeWatermark: boolean; onClose: () => void; onConfirm: (value: { duration: number; ratio: "9:16" | "16:9"; removeWatermark: boolean }) => void }) {
+function SettingsModal({ anchorRef, duration, ratio, removeWatermark, onClose, onConfirm }: { anchorRef: React.RefObject<HTMLButtonElement | null>; duration: number; ratio: "9:16" | "16:9"; removeWatermark: boolean; onClose: () => void; onConfirm: (value: { duration: number; ratio: "9:16" | "16:9"; removeWatermark: boolean }) => void }) {
   const [draftDuration, setDraftDuration] = useState(duration);
   const [draftRatio, setDraftRatio] = useState(ratio);
   const [draftWatermark, setDraftWatermark] = useState(removeWatermark);
-  return <ModalFrame title="生成设置" onClose={onClose} width="max-w-lg" footer={<><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">取消</button><button onClick={() => onConfirm({ duration: draftDuration, ratio: draftRatio, removeWatermark: draftWatermark })} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white">确认</button></>}>
-    <div className="space-y-6 p-5"><div><div className="mb-3 flex items-center justify-between"><label className="text-xs font-semibold text-slate-700">视频时长</label><div className="flex items-center gap-1"><input type="number" min={15} max={120} value={draftDuration} onChange={(event) => setDraftDuration(Math.min(120, Math.max(15, Number(event.target.value))))} className="h-8 w-16 rounded-md border border-slate-200 text-center text-xs outline-none" /><span className="text-xs text-slate-400">秒</span></div></div><input type="range" min={15} max={120} step={5} value={draftDuration} onChange={(event) => setDraftDuration(Number(event.target.value))} className="w-full accent-violet-600" /><div className="mt-1 flex justify-between text-[10px] text-slate-400"><span>15秒</span><span>120秒</span></div></div>
-      <div><label className="mb-3 block text-xs font-semibold text-slate-700">视频比例</label><div className="grid grid-cols-2 gap-2">{(["9:16", "16:9"] as const).map((item) => <button key={item} onClick={() => setDraftRatio(item)} className={`rounded-md border py-3 text-xs font-semibold ${draftRatio === item ? "border-violet-500 bg-violet-50 text-violet-700" : "border-slate-200 text-slate-600"}`}>{item}</button>)}</div></div>
-      <div className="flex items-center justify-between"><label className="text-xs font-semibold text-slate-700">去水印</label><button onClick={() => setDraftWatermark(!draftWatermark)} className={`relative h-6 w-11 rounded-full transition-colors ${draftWatermark ? "bg-violet-600" : "bg-slate-300"}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${draftWatermark ? "left-6" : "left-1"}`} /></button></div>
+  return <AnchoredPopover anchorRef={anchorRef} side="top" align="start" gap={8} width={380} maxHeight={520} onClose={onClose} className="rounded-lg border border-slate-200 bg-white p-4 shadow-2xl">
+    <div role="dialog" aria-label="生成设置" className="space-y-5">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-3"><h3 className="text-sm font-bold text-slate-900">生成设置</h3><button type="button" onClick={onClose} title="关闭生成设置" className="rounded p-1 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>
+      <div>
+        <div className="mb-3 flex items-center justify-between"><label htmlFor="agent-video-duration" className="text-xs font-semibold text-slate-700">视频时长</label><div className="flex items-center gap-1"><input id="agent-video-duration" type="number" min={15} max={120} value={draftDuration} onChange={(event) => setDraftDuration(Math.min(120, Math.max(15, Number(event.target.value))))} className="h-8 w-16 rounded-md border border-slate-200 text-center text-xs outline-none focus:border-violet-400" /><span className="text-xs text-slate-400">秒</span></div></div>
+        <input aria-label="视频时长滑杆" type="range" min={15} max={120} step={5} value={draftDuration} onChange={(event) => setDraftDuration(Number(event.target.value))} className="h-4 w-full cursor-pointer accent-violet-600" />
+        <div className="mt-1 flex justify-between text-[10px] text-slate-400"><span>15秒</span><span>120秒</span></div>
+      </div>
+      <fieldset><legend className="mb-3 text-xs font-semibold text-slate-700">视频比例</legend><div className="grid grid-cols-2 gap-2">{(["9:16", "16:9"] as const).map((item) => <button type="button" key={item} onClick={() => setDraftRatio(item)} className={`rounded-md border py-3 text-xs font-semibold ${draftRatio === item ? "border-violet-500 bg-violet-50 text-violet-700" : "border-slate-200 text-slate-600 hover:border-violet-200"}`}>{item}</button>)}</div></fieldset>
+      <div className="flex items-center justify-between"><span className="text-xs font-semibold text-slate-700">去水印</span><button type="button" aria-pressed={draftWatermark} onClick={() => setDraftWatermark((current) => !current)} className={`relative h-6 w-11 rounded-full transition-colors ${draftWatermark ? "bg-violet-600" : "bg-slate-300"}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${draftWatermark ? "left-6" : "left-1"}`} /></button></div>
+      <div className="flex justify-end gap-2 border-t border-slate-100 pt-3"><button type="button" onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">取消</button><button type="button" onClick={() => onConfirm({ duration: draftDuration, ratio: draftRatio, removeWatermark: draftWatermark })} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white hover:bg-violet-700">确认</button></div>
     </div>
-  </ModalFrame>;
+  </AnchoredPopover>;
 }
 
 function StyleModal({ value, onClose, onConfirm }: { value: string; onClose: () => void; onConfirm: (value: string) => void }) {

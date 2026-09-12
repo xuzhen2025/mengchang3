@@ -2,18 +2,14 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   ArrowLeft,
-  Ban,
   Box,
   Check,
-  CheckCircle2,
   ChevronDown,
-  Clock3,
-  CloudUpload,
   Download,
-  Edit3,
   Film,
   FolderOpen,
   Images,
+  GitCompareArrows,
   Loader2,
   Mic2,
   Pause,
@@ -32,12 +28,18 @@ import {
 } from "lucide-react";
 import AssetPagination from "./AssetPagination";
 import UploadFinishedVideoModal from "./UploadFinishedVideoModal";
+import MediaTypeChoiceModal from "./MediaTypeChoiceModal";
 import AnchoredPopover from "./overlays/AnchoredPopover";
 import OverlayPortal from "./overlays/OverlayPortal";
+import AiVideoSceneMediaPicker from "./AiVideoSceneMediaPicker";
+import GenerationResultCard from "./GenerationResultCard";
+import { AI_VIDEO_MODE_LABELS, AI_VIDEO_SCENE_MODELS, isAiVideoSceneMode, validateAiVideoScene } from "../lib/aiVideo";
 import {
   Asset,
   AiVideoMediaItem,
   AiVideoMode,
+  AiVideoSceneMode,
+  AiVideoSceneInputs,
   AiVideoTaskOutput,
   AiVideoTaskSnapshot,
   GalleryItem,
@@ -99,7 +101,9 @@ const MODE_OPTIONS: Array<{
   { id: "reference", label: "参考生视频", description: "多图参考，生成连续动态画面", icon: Images },
   { id: "first_last", label: "首尾帧生视频", description: "连接首尾画面，生成自然过渡", icon: Film },
   { id: "dubbing", label: "配音生视频", description: "人物、音色与文案驱动口播", icon: Mic2 },
-  { id: "video_edit", label: "视频编辑", description: "为原视频换背景或完成换装", icon: WandSparkles }
+  { id: "video_edit", label: "视频编辑", description: "为原视频换背景或完成换装", icon: WandSparkles },
+  { id: "pain_comparison", label: "痛点对比", description: "结合痛点与解决素材，生成对比视频", icon: GitCompareArrows },
+  { id: "usage_process", label: "使用过程", description: "参考使用视频与商品图片，生成演示视频", icon: Play }
 ];
 
 const MODEL_OPTIONS = [
@@ -159,7 +163,11 @@ const getAiVideoTaskOutputs = (task: Task): DisplayAiVideoOutput[] => {
       || snapshot?.firstFrame
       || snapshot?.references?.[0]
       || snapshot?.modelMedia
-      || snapshot?.clothingImages?.[0];
+      || snapshot?.clothingImages?.[0]
+      || snapshot?.productImage
+      || snapshot?.solutionMaterial
+      || snapshot?.painMaterial
+      || snapshot?.usageVideo;
     const duration = output.duration || (snapshot?.mode === "background"
       ? Math.min(sourceVideo?.durationSeconds || snapshot.duration || 8, 8)
       : snapshot?.duration || 8);
@@ -227,20 +235,16 @@ const VOICES: VoiceOption[] = [
   { id: "warm-aunt", name: "温暖生活家", scene: "生活分享", tone: "松弛、可信", avatar: STOCK_IMAGES[13].url, source: "system" }
 ];
 
-const MODE_LABELS: Record<AiVideoMode, string> = {
-  reference: "参考生视频",
-  first_last: "首尾帧生视频",
-  dubbing: "配音生视频",
-  background: "视频编辑-换背景",
-  outfit: "视频编辑-换装"
-};
+const MODE_LABELS = AI_VIDEO_MODE_LABELS;
 
 const DEFAULT_PROMPTS: Record<AiVideoMode, string> = {
   reference: "镜头缓慢推进，商品始终保持清晰，人物自然展示产品细节，光线柔和，画面具有真实电商广告质感。",
   first_last: "从首帧自然过渡到尾帧，主体动作连贯，镜头轻微环绕，商品外观与背景结构保持一致。",
   dubbing: "这款精华质地清透，上脸吸收很快，日常护肤使用也不会有黏腻感。",
   background: "将背景替换为明亮整洁的现代家居空间，保留人物与商品主体，光线方向和原视频一致。",
-  outfit: "模特先正面展示服装，再缓慢向右转身，动作自然舒展，完整呈现服装正面、侧面与背面细节。"
+  outfit: "模特先正面展示服装，再缓慢向右转身，动作自然舒展，完整呈现服装正面、侧面与背面细节。",
+  pain_comparison: "",
+  usage_process: ""
 };
 
 const demoSnapshot = (mode: AiVideoMode): AiVideoTaskSnapshot => ({
@@ -283,8 +287,11 @@ export default function AiVideoView({
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [model, setModel] = useState(MODEL_OPTIONS[0].id);
+  const [sceneModels, setSceneModels] = useState<Record<AiVideoSceneMode, string>>({ pain_comparison: AI_VIDEO_SCENE_MODELS[0].id, usage_process: AI_VIDEO_SCENE_MODELS[0].id });
+  const [sceneInputs, setSceneInputs] = useState<Record<AiVideoSceneMode, AiVideoSceneInputs>>({ pain_comparison: {}, usage_process: {} });
+  const [scenePicker, setScenePicker] = useState<{ mode: AiVideoSceneMode; target: Exclude<keyof AiVideoSceneInputs, "prompt">; allowed: "image" | "video" | "both" } | null>(null);
   const [ratio, setRatio] = useState<AiVideoTaskSnapshot["ratio"]>("9:16");
-  const [durations, setDurations] = useState({ reference: 8, first_last: 8, outfit: 8 });
+  const [durations, setDurations] = useState({ reference: 8, first_last: 8, outfit: 8, pain_comparison: 8, usage_process: 8 });
   const [referencePrompt, setReferencePrompt] = useState(DEFAULT_PROMPTS.reference);
   const [firstLastPrompt, setFirstLastPrompt] = useState(DEFAULT_PROMPTS.first_last);
   const [references, setReferences] = useState<AiVideoMediaItem[]>([]);
@@ -407,9 +414,12 @@ export default function AiVideoView({
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  const selectedModel = MODEL_OPTIONS.find((item) => item.id === model) || MODEL_OPTIONS[0];
+  const sceneMode = isAiVideoSceneMode(mode) ? mode : null;
+  const sceneModel = AI_VIDEO_SCENE_MODELS.find((item) => item.id === (sceneMode ? sceneModels[sceneMode] : "")) || AI_VIDEO_SCENE_MODELS[0];
+  const availableModels = sceneMode ? AI_VIDEO_SCENE_MODELS : MODEL_OPTIONS;
+  const selectedModel = sceneMode ? sceneModel : MODEL_OPTIONS.find((item) => item.id === model) || MODEL_OPTIONS[0];
   const speechDuration = Math.max(3, Math.ceil(Math.max(1, speech.trim().length) / 4));
-  const currentDuration = mode === "reference"
+  const currentDuration = sceneMode ? Math.max(4, Math.min(durations[sceneMode], sceneModel.maxSeconds)) : mode === "reference"
     ? durations.reference
     : mode === "first_last"
       ? durations.first_last
@@ -419,14 +429,15 @@ export default function AiVideoView({
           ? 8
           : speechDuration;
   const currentCost = useMemo(() => {
+    if (sceneMode) return sceneModel.videoCost;
     if (mode === "reference") return 16 + durations.reference * 3;
     if (mode === "first_last") return 20 + durations.first_last * 5;
     if (mode === "dubbing") return 16 + Math.ceil(speech.trim().length / 5) * 3;
     if (mode === "background") return 24 + Math.max(1, backgroundVideos.length) * 10;
     return 27 + durations.outfit * 3 + (outfitMode === "multiple" ? 10 : 5);
-  }, [backgroundVideos.length, durations.first_last, durations.outfit, durations.reference, mode, outfitMode, speech]);
+  }, [backgroundVideos.length, durations.first_last, durations.outfit, durations.reference, mode, outfitMode, speech, sceneMode, sceneModel]);
 
-  const canGenerate = mode === "reference"
+  const canGenerate = sceneMode ? !validateAiVideoScene(sceneMode, sceneInputs[sceneMode]) : mode === "reference"
     ? references.length > 0 && Boolean(referencePrompt.trim())
     : mode === "first_last"
       ? Boolean(firstFrame && lastFrame && firstLastPrompt.trim())
@@ -476,7 +487,15 @@ export default function AiVideoView({
 
   const hydrateSnapshot = (snapshot: AiVideoTaskSnapshot) => {
     setMode(snapshot.mode);
-    setModel(snapshot.model || MODEL_OPTIONS[0].id);
+    if (isAiVideoSceneMode(snapshot.mode)) {
+      const restoredModel = AI_VIDEO_SCENE_MODELS.find((item) => item.id === snapshot.model) || AI_VIDEO_SCENE_MODELS[0];
+      setSceneModels((current) => ({ ...current, [snapshot.mode]: restoredModel.id }));
+      setSceneInputs((current) => ({ ...current, [snapshot.mode]: {
+        painMaterial: snapshot.painMaterial, solutionMaterial: snapshot.solutionMaterial,
+        usageVideo: snapshot.usageVideo, productImage: snapshot.productImage, prompt: snapshot.prompt || "",
+      } }));
+      setDurations((current) => ({ ...current, [snapshot.mode]: Math.max(4, Math.min(snapshot.duration || 8, restoredModel.maxSeconds)) }));
+    } else setModel(snapshot.model || MODEL_OPTIONS[0].id);
     setRatio(snapshot.ratio || "9:16");
     if (snapshot.mode === "reference") {
       setReferences(snapshot.references || []);
@@ -517,7 +536,16 @@ export default function AiVideoView({
   };
 
   const buildSnapshot = (): AiVideoTaskSnapshot => {
-    const baseSnapshot = { mode, model, ratio, duration: currentDuration };
+    const baseSnapshot = { mode, model: selectedModel.id, ratio, duration: currentDuration };
+
+    if (sceneMode) {
+      const inputs = sceneInputs[sceneMode];
+      return { ...baseSnapshot, prompt: inputs.prompt?.trim() || "",
+        ...(sceneMode === "pain_comparison"
+          ? { painMaterial: inputs.painMaterial, solutionMaterial: inputs.solutionMaterial }
+          : { usageVideo: inputs.usageVideo, productImage: inputs.productImage }),
+      };
+    }
 
     if (mode === "reference") {
       return { ...baseSnapshot, prompt: referencePrompt, references };
@@ -599,10 +627,10 @@ export default function AiVideoView({
     <img src={item.url} alt={item.name} referrerPolicy="no-referrer" className={className} />
   );
 
-  const renderUploadTile = (item: AiVideoMediaItem | null, label: string, onClick: () => void, onRemove?: () => void, compact = false) => (
+  const renderUploadTile = (item: AiVideoMediaItem | null, label: string, onClick: () => void, onRemove?: () => void, compact = false, hideLabel = false) => (
     <div className="group relative">
       <button type="button" onClick={onClick} className={`relative flex w-full flex-col items-center justify-center overflow-hidden rounded-md border border-dashed transition-colors ${compact ? "h-28" : "h-36"} ${item ? "border-slate-200 bg-slate-100" : "border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:bg-violet-50/40 hover:text-violet-700"}`}>
-        {item ? <>{renderMedia(item, "h-full w-full object-cover")}<span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-2 py-1.5 text-left text-[10px] text-white">{item.name}</span></> : <><Plus className="h-5 w-5" /><span className="mt-2 text-xs font-semibold">{label}</span><span className="mt-1 text-[10px] text-slate-400">资源库选择或本地上传</span></>}
+        {item ? <>{renderMedia(item, "h-full w-full object-cover")}<span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-2 py-1.5 text-left text-[10px] text-white">{item.name}</span></> : <><Plus className="h-5 w-5" /><span className={hideLabel ? "sr-only" : "mt-2 text-xs font-semibold"}>{label}</span><span className="mt-1 text-[10px] text-slate-400">资源库选择或本地上传</span></>}
       </button>
       {item && onRemove && <button type="button" title="移除" onClick={onRemove} className="absolute right-2 top-2 hidden h-7 w-7 items-center justify-center rounded bg-black/65 text-white group-hover:flex"><Trash2 className="h-3.5 w-3.5" /></button>}
     </div>
@@ -630,7 +658,27 @@ export default function AiVideoView({
 
   const renderOutfitPreview = () => <div className="space-y-5"><button onClick={() => outfitCandidates.length ? setConfirmOutfitReturn(true) : setOutfitPreview(false)} className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-violet-700"><ArrowLeft className="h-4 w-4" />返回</button><div><div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-bold text-slate-800">选择搭配效果</h3><p className="mt-1 text-[10px] text-slate-400">系统将生成 4 张搭配预览</p></div>{outfitCandidates.length > 0 && <button onClick={startOutfitPreview} className="flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-violet-700"><RefreshCw className="h-3.5 w-3.5" />重新生成</button>}</div><div className="grid grid-cols-4 gap-2">{outfitPreviewProgress < 100 ? [0, 1, 2, 3].map((index) => <div key={index} className="relative aspect-[3/5] overflow-hidden rounded-md bg-violet-100"><div className="absolute inset-0 animate-pulse bg-gradient-to-b from-violet-100 to-violet-200" /><span className="absolute left-1.5 top-1.5 rounded bg-white/85 px-1.5 py-0.5 text-[9px] font-semibold text-violet-700">生成中 {outfitPreviewProgress}%</span></div>) : outfitCandidates.map((item) => <button key={item.id} onClick={() => setSelectedLook(item)} className={`relative aspect-[3/5] overflow-hidden rounded-md border-2 ${selectedLook?.id === item.id ? "border-violet-600 ring-2 ring-violet-100" : "border-transparent hover:border-violet-300"}`}><img src={item.url} alt={item.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" />{selectedLook?.id === item.id && <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-white"><Check className="h-3 w-3" /></span>}</button>)}</div></div>{outfitPreviewProgress < 100 ? <div className="rounded-md border border-violet-100 bg-violet-50 p-3"><div className="mb-2 flex justify-between text-[10px] font-semibold text-violet-700"><span>正在生成搭配预览</span><span>{outfitPreviewProgress}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-violet-100"><div className="h-full rounded-full bg-violet-600 transition-all" style={{ width: `${outfitPreviewProgress}%` }} /></div></div> : <div><label className="mb-2 block text-xs font-bold text-slate-700">动作描述</label>{renderPromptEditor(outfitAction, setOutfitAction, "描述模特动作，例如：微微向右侧转动，再缓慢转身展示背面服装")}</div>}</div>;
 
+  const renderSceneControls = (selectedMode: AiVideoSceneMode) => {
+    const inputs = sceneInputs[selectedMode];
+    const slots: Array<{ target: Exclude<keyof AiVideoSceneInputs, "prompt">; label: string; allowed: "image" | "video" | "both" }> = selectedMode === "pain_comparison"
+      ? [{ target: "painMaterial", label: "痛点素材", allowed: "both" }, { target: "solutionMaterial", label: "解决痛点素材", allowed: "both" }]
+      : [{ target: "usageVideo", label: "使用过程视频", allowed: "video" }, { target: "productImage", label: "商品图片", allowed: "image" }];
+    return <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        {slots.map(({ target, label, allowed }) => <div key={target}>
+          <label className="mb-2 block text-xs font-bold text-slate-700">{label}</label>
+          {renderUploadTile(inputs[target] || null, `添加${label}`, () => setScenePicker({ mode: selectedMode, target, allowed }), () => setSceneInputs((current) => ({ ...current, [selectedMode]: { ...current[selectedMode], [target]: null } })), true, true)}
+        </div>)}
+      </div>
+      <div>
+        <label className="mb-2 block text-xs font-bold text-slate-700">提示词</label>
+        {renderPromptEditor(inputs.prompt || "", (prompt) => setSceneInputs((current) => ({ ...current, [selectedMode]: { ...current[selectedMode], prompt } })), selectedMode === "pain_comparison" ? "可补充对比重点、镜头或风格要求；留空则根据素材生成" : "可补充使用步骤、镜头或风格要求；留空则根据素材生成")}
+      </div>
+    </div>;
+  };
+
   const renderControlBody = () => {
+    if (sceneMode) return renderSceneControls(sceneMode);
     if (mode === "reference") return renderReferenceControls();
     if (mode === "first_last") return renderFirstLastControls();
     if (mode === "dubbing") return renderDubbingControls();
@@ -638,7 +686,9 @@ export default function AiVideoView({
     return outfitPreview ? renderOutfitPreview() : renderOutfitSetup();
   };
 
-  const rangeConfig = mode === "reference"
+  const rangeConfig = sceneMode
+    ? { min: 4, max: sceneModel.maxSeconds, value: currentDuration, set: (value: number) => setDurations((current) => ({ ...current, [sceneMode]: value })) }
+    : mode === "reference"
     ? { min: 1, max: 10, value: durations.reference, set: (value: number) => setDurations((current) => ({ ...current, reference: value })) }
     : mode === "first_last"
       ? { min: 3, max: 12, value: durations.first_last, set: (value: number) => setDurations((current) => ({ ...current, first_last: value })) }
@@ -738,11 +788,18 @@ export default function AiVideoView({
                 className="rounded-lg border border-slate-200 bg-white p-3 shadow-xl"
               >
                 <p className="mb-2 text-[11px] font-semibold text-slate-500">选择模型</p>
-                {MODEL_OPTIONS.map((item) => (
-                  <button key={item.id} type="button" onClick={() => { setModel(item.id); setModelMenuOpen(false); }} className={`mb-1 flex w-full items-center gap-3 rounded-md p-2.5 text-left hover:bg-slate-50 ${model === item.id ? "bg-violet-50" : ""}`}>
+                {availableModels.map((item) => (
+                  <button key={item.id} type="button" onClick={() => {
+                    if (sceneMode) {
+                      setSceneModels((current) => ({ ...current, [sceneMode]: item.id }));
+                      const nextModel = AI_VIDEO_SCENE_MODELS.find((option) => option.id === item.id)!;
+                      setDurations((current) => ({ ...current, [sceneMode]: Math.max(4, Math.min(current[sceneMode], nextModel.maxSeconds)) }));
+                    } else setModel(item.id);
+                    setModelMenuOpen(false);
+                  }} className={`mb-1 flex w-full items-center gap-3 rounded-md p-2.5 text-left hover:bg-slate-50 ${selectedModel.id === item.id ? "bg-violet-50" : ""}`}>
                     <span className="flex h-9 w-9 items-center justify-center rounded-md bg-gradient-to-br from-cyan-400 via-violet-500 to-fuchsia-500 text-xs font-black text-white">{item.name.slice(-3)}</span>
                     <span className="min-w-0 flex-1"><span className="flex items-center gap-2 text-xs font-bold text-slate-700">{item.name}{item.badge && <b className="rounded bg-violet-600 px-1.5 py-0.5 text-[9px] text-white">{item.badge}</b>}</span><span className="mt-1 block text-[10px] text-slate-400">{item.description}</span></span>
-                    {model === item.id && <Check className="h-4 w-4 text-violet-600" />}
+                    {selectedModel.id === item.id && <Check className="h-4 w-4 text-violet-600" />}
                   </button>
                 ))}
               </AnchoredPopover>
@@ -793,6 +850,10 @@ export default function AiVideoView({
     </div>
     {modelMediaTypePickerOpen && <MediaTypeChoiceModal onClose={() => setModelMediaTypePickerOpen(false)} onSelect={(allowed) => { setModelMediaTypePickerOpen(false); openPicker("modelMedia", allowed, 1); }} />}
     {picker && <MediaPickerModal allowed={picker.allowed} maxSelections={picker.max} initialSelected={pickerSelection()} items={libraryItems} onClose={() => setPicker(null)} onConfirm={applyPickerSelection} />}
+    {scenePicker && <AiVideoSceneMediaPicker assets={assets} allowed={scenePicker.allowed} selected={sceneInputs[scenePicker.mode][scenePicker.target] || null} onClose={() => setScenePicker(null)} onConfirm={(item) => {
+      setSceneInputs((current) => ({ ...current, [scenePicker.mode]: { ...current[scenePicker.mode], [scenePicker.target]: item } }));
+      setScenePicker(null);
+    }} />}
     {voicePickerOpen && <VoicePickerModal selected={voice} resourceVoices={resourceVoices} onClose={() => setVoicePickerOpen(false)} onConfirm={(item) => { setVoice(item); setVoicePickerOpen(false); }} />}
     {previewSelection && <VideoPreviewModal task={previewSelection.task} output={previewSelection.output} onClose={() => setPreviewSelection(null)} />}
     {confirmOutfitReturn && <ConfirmDialog title="确认返回？" description="返回后当前搭配预览将无法找回，预览积分无法退还；已提交的视频任务仍会在后台继续。" onCancel={() => setConfirmOutfitReturn(false)} onConfirm={() => { setConfirmOutfitReturn(false); setOutfitPreview(false); setOutfitCandidates([]); setSelectedLook(null); }} />}
@@ -801,54 +862,25 @@ export default function AiVideoView({
 }
 
 function GenerationRecordCard({ task, selected, onSelect, onCancel, onPreview, onDownload, onUpload, onReEdit }: { task: Task; selected: boolean; onSelect: () => void; onCancel: () => void; onPreview: (output: DisplayAiVideoOutput) => void; onDownload: (output: DisplayAiVideoOutput) => void; onUpload: (outputs: DisplayAiVideoOutput[]) => void; onReEdit: () => void }) {
-  const outputs = getAiVideoTaskOutputs(task);
-  const [selectedOutputIds, setSelectedOutputIds] = useState<string[]>([]);
-  const selectedOutputs = outputs.filter((output) => selectedOutputIds.includes(output.id));
-  const toggleOutput = (outputId: string) => {
-    setSelectedOutputIds((current) => current.includes(outputId)
-      ? current.filter((id) => id !== outputId)
-      : [...current, outputId]);
-  };
-  const statusHeading = task.status === "queue" ? "正在排队，预计很快开始生成" : task.status === "generating" ? "正在生成视频，预计 5 秒内完成" : task.status === "completed" ? `已为你生成 ${outputs.length} 个视频` : task.status === "failed" ? "生成遇到问题，请重新编辑后再试" : "排队已取消";
-  return <article id={`ai-video-record-${task.id}`} onClick={onSelect} className={`my-5 rounded-lg border p-4 transition-all ${selected ? "border-violet-500 bg-violet-50/30 ring-2 ring-violet-100" : "border-slate-200 bg-white hover:border-slate-300"}`}>
-    <div className="flex items-start justify-between gap-4">
-      <div className="flex min-w-0 items-start gap-3">
-        <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${task.status === "failed" ? "bg-rose-50 text-rose-600" : task.status === "cancelled" ? "bg-amber-50 text-amber-600" : "bg-slate-950 text-violet-300"}`}>{task.status === "failed" ? <AlertCircle className="h-4 w-4" /> : task.status === "cancelled" ? <Ban className="h-4 w-4" /> : task.status === "generating" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}</span>
-        <div className="min-w-0"><h3 className="text-sm font-bold text-slate-800">{statusHeading}</h3><p className="mt-1 truncate text-[10px] text-slate-400">任务名称：{task.name}　·　{task.createdAt}　·　ID：{task.id.replace(/\D/g, "").slice(-11) || task.id.slice(-11)}</p></div>
-      </div>
-      {task.status === "completed" ? <div className="flex shrink-0 items-center justify-end gap-2">
-        <button disabled={selectedOutputs.length === 0} onClick={(event) => { event.stopPropagation(); if (selectedOutputs.length) onUpload(selectedOutputs); }} className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"><CloudUpload className="h-3.5 w-3.5" />上传资源库{selectedOutputs.length > 0 && ` (${selectedOutputs.length})`}</button>
-        <button onClick={(event) => { event.stopPropagation(); onReEdit(); }} className="flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:border-violet-300 hover:text-violet-700"><Edit3 className="h-3.5 w-3.5" />重新编辑</button>
-      </div> : <span className={`shrink-0 rounded px-2 py-1 text-[10px] font-semibold ${task.status === "failed" ? "bg-rose-50 text-rose-700" : task.status === "cancelled" ? "bg-amber-50 text-amber-700" : task.status === "generating" ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600"}`}>{task.status === "queue" ? "排队中" : task.status === "generating" ? "生成中" : task.status === "failed" ? "生成失败" : "已取消"}</span>}
-    </div>
-    {task.status === "queue" && <div className="mt-4 flex h-48 flex-col items-center justify-center rounded-md bg-slate-100 text-slate-500"><Clock3 className="h-7 w-7" /><p className="mt-2 text-xs font-bold">排队中</p><p className="mt-1 text-[10px] text-slate-400">正在等待可用计算资源</p><button onClick={(event) => { event.stopPropagation(); onCancel(); }} className="mt-4 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:border-rose-300 hover:text-rose-600">取消排队</button></div>}
-    {task.status === "generating" && <div className="mt-4 flex h-48 flex-col items-center justify-center rounded-md bg-slate-100"><span className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-950 text-violet-300"><Sparkles className="h-6 w-6" /></span><div className="mt-5 flex w-72 items-center gap-3"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-violet-600 transition-all" style={{ width: `${task.progress}%` }} /></div><span className="w-8 text-right text-[10px] font-bold text-slate-600">{task.progress}%</span></div><p className="mt-2 text-[10px] text-slate-400">正在渲染合成视频...</p></div>}
-    {task.status === "failed" && <div className="mt-4 flex h-44 flex-col items-center justify-center rounded-md bg-rose-50/60 px-8 text-center"><AlertCircle className="h-8 w-8 text-rose-500" /><p className="mt-3 text-xs font-bold text-rose-700">任务生成失败</p><p className="mt-1 text-[11px] leading-5 text-rose-500">{task.failureReason || "生成服务发生异常，请检查素材后重试。"}</p>{task.refundedCredits === task.creditsCost && <p className="mt-2 text-[10px] font-semibold text-emerald-600">本次消耗的 {task.creditsCost} 积分已退还</p>}</div>}
-    {task.status === "cancelled" && <div className="mt-4 flex h-40 flex-col items-center justify-center rounded-md bg-amber-50/60 text-center"><Ban className="h-7 w-7 text-amber-500" /><p className="mt-2 text-xs font-bold text-amber-700">已取消排队</p><p className="mt-1 text-[10px] text-amber-600">积分已退还，点击重新编辑可再次提交</p></div>}
-    {task.status === "completed" && outputs.length > 0 && <div className="mt-4">
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(144px,176px))] gap-3">
-        {outputs.map((output) => {
-          const checked = selectedOutputIds.includes(output.id);
-          return <article key={output.id} className={`min-w-0 overflow-hidden rounded-md border bg-white transition-colors ${checked ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200"}`}>
-            <div className="relative aspect-[9/16] overflow-hidden bg-slate-950">
-              <button type="button" onClick={(event) => { event.stopPropagation(); onPreview(output); }} title={`预览 ${output.name}`} className="group block h-full w-full text-left">
-                <img src={output.coverUrl} alt={output.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                <span className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity group-hover:opacity-100"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-violet-700"><Play className="ml-0.5 h-4 w-4 fill-current" /></span></span>
-              </button>
-              <button type="button" onClick={(event) => { event.stopPropagation(); toggleOutput(output.id); }} title={checked ? "取消选择" : "选择视频"} aria-pressed={checked} className={`absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded border shadow-sm ${checked ? "border-violet-600 bg-violet-600 text-white" : "border-white bg-white/90 text-transparent hover:text-slate-300"}`}><Check className="h-3.5 w-3.5" /></button>
-              <button type="button" onClick={(event) => { event.stopPropagation(); onDownload(output); }} title="下载视频" className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded bg-black/65 text-white shadow-sm hover:bg-black/80"><Download className="h-3.5 w-3.5" /></button>
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/65 to-transparent px-2 pb-2 pt-10 text-white">
-                <div className="flex items-center justify-between gap-2 text-[10px]"><span>{formatAiVideoDuration(output.duration)}</span><span>{output.size}</span></div>
-                <p title={output.name} className="mt-1 truncate text-[10px] font-semibold">{output.name}</p>
-              </div>
-            </div>
-          </article>;
-        })}
-      </div>
-      <p className="mt-2 flex items-center gap-1.5 text-[10px] text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" />已通过素材初审，具体请以最终投放平台规则为准</p>
-    </div>}
-    {(task.status === "failed" || task.status === "cancelled") && <div className="mt-3 flex justify-end"><button onClick={(event) => { event.stopPropagation(); onReEdit(); }} className="flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:border-violet-300 hover:text-violet-700"><Edit3 className="h-3.5 w-3.5" />重新编辑</button></div>}
-  </article>;
+  const outputs = getAiVideoTaskOutputs(task).map((output) => ({
+    ...output,
+    url: output.videoUrl,
+    metadata: formatAiVideoDuration(output.duration),
+    secondaryMetadata: output.size,
+  }));
+  return <GenerationResultCard<(typeof outputs)[number]>
+    id={`ai-video-record-${task.id}`}
+    task={task}
+    mediaType="video"
+    outputs={outputs}
+    selected={selected}
+    onSelect={onSelect}
+    onCancel={onCancel}
+    onPreview={onPreview}
+    onDownload={onDownload}
+    onUpload={onUpload}
+    onReEdit={onReEdit}
+  />;
 }
 
 interface MediaPickerModalProps {
@@ -909,19 +941,6 @@ function getMediaPickerRowMeta(item: AiVideoMediaItem): MediaPickerRowMeta {
 function MediaPickerModal(props: MediaPickerModalProps) {
   if (props.allowed === "both") return <MixedMediaPickerModal {...props} />;
   return <StandardMediaPickerModal {...props} allowed={props.allowed} />;
-}
-
-function MediaTypeChoiceModal({ onClose, onSelect }: { onClose: () => void; onSelect: (allowed: "image" | "video") => void }) {
-  return <OverlayPortal layer="modal" className="fixed inset-0 flex items-center justify-center bg-slate-900/45 p-5 backdrop-blur-sm">
-    <div className="w-full max-w-md overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl">
-      <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><h3 className="text-sm font-bold text-slate-800">选择模特素材类型</h3><button onClick={onClose} title="关闭" className="rounded p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="h-4 w-4" /></button></div>
-      <div className="grid grid-cols-2 gap-3 p-5">
-        <button onClick={() => onSelect("image")} className="flex h-32 flex-col items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:border-violet-400 hover:bg-violet-50/40 hover:text-violet-700"><Images className="h-6 w-6" /><span className="mt-3 text-sm font-bold">选择图片</span><span className="mt-1 text-[10px] text-slate-400">图片管理或本地上传</span></button>
-        <button onClick={() => onSelect("video")} className="flex h-32 flex-col items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:border-violet-400 hover:bg-violet-50/40 hover:text-violet-700"><Video className="h-6 w-6" /><span className="mt-3 text-sm font-bold">选择视频</span><span className="mt-1 text-[10px] text-slate-400">资源库或本地上传</span></button>
-      </div>
-      <div className="flex justify-end border-t border-slate-200 bg-slate-50 px-5 py-4"><button onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">取消</button></div>
-    </div>
-  </OverlayPortal>;
 }
 
 function StandardMediaPickerModal({ allowed, maxSelections, initialSelected, items, onClose, onConfirm }: MediaPickerModalProps & { allowed: "image" | "video" }) {

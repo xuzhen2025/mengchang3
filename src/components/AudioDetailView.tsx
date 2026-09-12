@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import AnchoredPopover from "./overlays/AnchoredPopover";
 import {
   ArrowLeft,
   X,
@@ -79,6 +80,7 @@ export default function AudioDetailView({
 
   // Detail Menu & Modals State
   const [showDetailMoreMenu, setShowDetailMoreMenu] = useState<boolean>(false);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
   const [showModifyCategoryModal, setShowModifyCategoryModal] = useState<boolean>(false);
   const [showModifyTitleModal, setShowModifyTitleModal] = useState<boolean>(false);
   const [showPublicTagModal, setShowPublicTagModal] = useState<boolean>(false);
@@ -188,6 +190,7 @@ export default function AudioDetailView({
               {/* 更多操作 Dropdown */}
               <div className="relative">
                 <button
+                  ref={moreButtonRef}
                   onClick={() => setShowDetailMoreMenu(!showDetailMoreMenu)}
                   className="border border-purple-300 text-purple-600 hover:bg-purple-50 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1 transition-colors cursor-pointer"
                 >
@@ -196,35 +199,7 @@ export default function AudioDetailView({
                 </button>
 
                 {showDetailMoreMenu && (
-                  <div className="absolute right-0 top-full mt-1.5 w-40 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 z-50 text-xs font-medium animate-in fade-in duration-100">
-                    <button
-                      onClick={() => {
-                        setShowDetailMoreMenu(false);
-                        showToast("已推送至剪映工作台");
-                      }}
-                      className="w-full text-left px-3.5 py-2 hover:bg-purple-50 text-slate-700 cursor-pointer"
-                    >
-                      推送给部门剪辑人员
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowDetailMoreMenu(false);
-                        setShowModifyCategoryModal(true);
-                      }}
-                      className="w-full text-left px-3.5 py-2 hover:bg-purple-50 text-slate-700 cursor-pointer"
-                    >
-                      修改所属分类
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowDetailMoreMenu(false);
-                        showToast("已发送提醒通知");
-                      }}
-                      className="w-full text-left px-3.5 py-2 hover:bg-purple-50 text-slate-700 cursor-pointer"
-                    >
-                      发送消息提醒
-                    </button>
-                    <div className="border-t border-slate-100 my-1" />
+                  <AnchoredPopover anchorRef={moreButtonRef} align="end" width={160} gap={6} onClose={() => setShowDetailMoreMenu(false)} className="bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 text-xs font-medium animate-in fade-in duration-100">
                     <button
                       onClick={() => {
                         setShowDetailMoreMenu(false);
@@ -237,7 +212,7 @@ export default function AudioDetailView({
                     >
                       放入回收站
                     </button>
-                  </div>
+                  </AnchoredPopover>
                 )}
               </div>
             </div>
@@ -337,9 +312,9 @@ export default function AudioDetailView({
               </div>
             </div>
 
-            {/* Row 6: 音频说明 */}
+            {/* Row 6: 音频备注 */}
             <div className="text-xs pt-1">
-              <span className="text-slate-400 font-medium">音频说明</span>
+              <span className="text-slate-400 font-medium">音频备注</span>
             </div>
           </div>
         </div>

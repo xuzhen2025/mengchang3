@@ -17,7 +17,7 @@ import {
   RefreshCw,
   Sliders,
   ChevronRight,
-  ChevronDown
+  ChevronDown,
 } from "lucide-react";
 
 interface UploadImageModalProps {
@@ -25,22 +25,23 @@ interface UploadImageModalProps {
   isPage?: boolean;
   onClose: () => void;
   onPublishSuccess?: (msg: string) => void;
+  initialFiles?: Array<{ name: string; type?: string; url?: string }>;
 }
 
 // Category Cascade Options
 const CATEGORY_TREE = [
   {
     name: "肖像权",
-    children: ["外拍剧情", "内部模特", "合作达人", "雅慧肖像"]
+    children: ["外拍剧情", "内部模特", "合作达人", "雅慧肖像"],
   },
   {
     name: "产品视觉",
-    children: ["主图透光", "场景展示", "细节放大", "白底铺平"]
+    children: ["主图透光", "场景展示", "细节放大", "白底铺平"],
   },
   {
     name: "开店资料",
-    children: ["营业执照", "品牌授权", "质检报告", "商标注册"]
-  }
+    children: ["营业执照", "品牌授权", "质检报告", "商标注册"],
+  },
 ];
 
 // Preset Template Interface
@@ -58,43 +59,49 @@ const INITIAL_PRESETS: PresetTemplate[] = [
     name: "默认肖像图片模板",
     category: "肖像权 / 外拍剧情",
     nameType: "title_suffix",
-    imageTitle: "模特肖像精修图"
+    imageTitle: "模特肖像精修图",
   },
   {
     id: "p2",
     name: "电商产品主图模板",
     category: "产品视觉 / 主图透光",
     nameType: "title_suffix",
-    imageTitle: "高清商品主图"
-  }
+    imageTitle: "高清商品主图",
+  },
 ];
 
 // Mock Tag Groups & Sub-Tags for Personal & Public Tags
 const TAG_GROUPS_DATA: Record<string, string[]> = {
-  "电商痛点": ["价格昂贵", "穿戴繁琐", "臃肿显胖", "闷热不透气", "掉档跑偏"],
-  "产品亮点": ["极致无痕", "高弹透气", "轻盈裸感", "德绒蓄热", "防勾抗起球"],
-  "剪辑风格": ["硬广直投", "剧情反转", "口播种草", "高光切片", "混剪卡点"],
-  "人群画像": ["年轻职场", "宝妈群体", "学生党", "大码人群", "精致高净值"]
+  电商痛点: ["价格昂贵", "穿戴繁琐", "臃肿显胖", "闷热不透气", "掉档跑偏"],
+  产品亮点: ["极致无痕", "高弹透气", "轻盈裸感", "德绒蓄热", "防勾抗起球"],
+  剪辑风格: ["硬广直投", "剧情反转", "口播种草", "高光切片", "混剪卡点"],
+  人群画像: ["年轻职场", "宝妈群体", "学生党", "大码人群", "精致高净值"],
 };
 
 export default function UploadImageModal({
   isOpen,
   isPage = true,
   onClose,
-  onPublishSuccess
+  onPublishSuccess,
+  initialFiles = [],
 }: UploadImageModalProps) {
   // Mode Selection: 发布图组 vs 发布多张图片
   const [publishMode, setPublishMode] = useState<"group" | "multiple">("group");
-  
+
   // Group Tabs for 发布图组
   const [groups, setGroups] = useState<string[]>(["分组1"]);
   const [activeGroupIdx, setActiveGroupIdx] = useState<number>(0);
 
   // File State
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>(() =>
+    initialFiles.map(
+      (file) => new File([""], file.name, { type: file.type || "image/png" }),
+    ),
+  );
 
   // Preset Templates State
-  const [presetTemplates, setPresetTemplates] = useState<PresetTemplate[]>(INITIAL_PRESETS);
+  const [presetTemplates, setPresetTemplates] =
+    useState<PresetTemplate[]>(INITIAL_PRESETS);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState("");
@@ -106,9 +113,13 @@ export default function UploadImageModal({
   const [selectedCategory, setSelectedCategory] = useState<string>("");
 
   // Basic Info Form States
-  const [nameType, setNameType] = useState<"title_suffix" | "individual">("title_suffix");
-  const [imageTitle, setImageTitle] = useState<string>("邓彦晨_2026-08-07_10:41:58_634630");
-  
+  const [nameType, setNameType] = useState<"title_suffix" | "individual">(
+    "title_suffix",
+  );
+  const [imageTitle, setImageTitle] = useState<string>(
+    "邓彦晨_2026-08-07_10:41:58_634630",
+  );
+
   // Task Association
   const [associatedTask, setAssociatedTask] = useState<string>("1148431");
   const [showTaskDropdown, setShowTaskDropdown] = useState(false);
@@ -123,15 +134,22 @@ export default function UploadImageModal({
   const [publicSearchText, setPublicSearchText] = useState("");
   const [publicGroupSearch, setPublicGroupSearch] = useState("");
   const [publicSubSearch, setPublicSubSearch] = useState("");
-  const [selectedPublicGroupKey, setSelectedPublicGroupKey] = useState("电商痛点");
-  const [addedPublicTags, setAddedPublicTags] = useState<string[]>(["极致无痕", "硬广直投"]);
+  const [selectedPublicGroupKey, setSelectedPublicGroupKey] =
+    useState("电商痛点");
+  const [addedPublicTags, setAddedPublicTags] = useState<string[]>([
+    "极致无痕",
+    "硬广直投",
+  ]);
 
   // Personal Tag 3-Column States
   const [personalSearchText, setPersonalSearchText] = useState("");
   const [personalGroupSearch, setPersonalGroupSearch] = useState("");
   const [personalSubSearch, setPersonalSubSearch] = useState("");
-  const [selectedPersonalGroupKey, setSelectedPersonalGroupKey] = useState("电商痛点");
-  const [addedPersonalTags, setAddedPersonalTags] = useState<string[]>(["年轻职场"]);
+  const [selectedPersonalGroupKey, setSelectedPersonalGroupKey] =
+    useState("电商痛点");
+  const [addedPersonalTags, setAddedPersonalTags] = useState<string[]>([
+    "年轻职场",
+  ]);
 
   // Date & Other Info States
   const [startDate, setStartDate] = useState("");
@@ -139,7 +157,9 @@ export default function UploadImageModal({
   const [imageDescription, setImageDescription] = useState("");
 
   // Permission Settings States
-  const [permission, setPermission] = useState<"公开" | "部门成员" | "分组成员" | "公用资源" | "指定范围">("公开");
+  const [permission, setPermission] = useState<
+    "公开" | "部门成员" | "分组成员" | "公用资源" | "指定范围"
+  >("公开");
   const [scheduledDate, setScheduledDate] = useState("");
   const [receiver, setReceiver] = useState("");
   const [messageContent, setMessageContent] = useState("");
@@ -185,7 +205,7 @@ export default function UploadImageModal({
       name: newTemplateName.trim(),
       category: selectedCategory || "肖像权 / 外拍剧情",
       nameType,
-      imageTitle
+      imageTitle,
     };
     setPresetTemplates((prev) => [...prev, newTpl]);
     setSelectedTemplateId(newTpl.id);
@@ -204,9 +224,10 @@ export default function UploadImageModal({
 
   // Handle Publish
   const handlePublish = (mode: string) => {
-    const msg = mode === "相同配置继续上传" 
-      ? "✅ 发布成功！已保留当前配置，可继续上传下一批图片素材。"
-      : "✅ 图片发布成功！已存入资源库。";
+    const msg =
+      mode === "相同配置继续上传"
+        ? "✅ 发布成功！已保留当前配置，可继续上传下一批图片素材。"
+        : "✅ 图片发布成功！已存入资源库。";
     if (onPublishSuccess) {
       onPublishSuccess(msg);
     } else {
@@ -241,7 +262,9 @@ export default function UploadImageModal({
           </div>
           <div>
             <div className="flex items-center gap-3">
-              <h2 className="text-base font-extrabold text-slate-900">图片上传页面</h2>
+              <h2 className="text-base font-extrabold text-slate-900">
+                图片上传页面
+              </h2>
               <span className="text-xs text-slate-400">
                 支持拖拽 200 个图片，上传的图片将显示在资源库列表中。
               </span>
@@ -252,7 +275,6 @@ export default function UploadImageModal({
 
       {/* Main Form Scrollable Container */}
       <div className="flex-1 overflow-y-auto p-6 space-y-5 w-full">
-        
         {/* ================= 1. Top Card: 图片上传 (Upload Section) ================= */}
         <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-2xs space-y-4">
           <div className="flex items-center gap-2">
@@ -275,7 +297,9 @@ export default function UploadImageModal({
               }`}
             >
               <span className="font-bold text-xs">发布图组</span>
-              <span className="text-[11px] opacity-75 font-normal mt-0.5">多张图片为一组</span>
+              <span className="text-[11px] opacity-75 font-normal mt-0.5">
+                多张图片为一组
+              </span>
             </button>
 
             {/* Option 2: 发布多张图片 */}
@@ -289,7 +313,9 @@ export default function UploadImageModal({
               }`}
             >
               <span className="font-bold text-xs">发布多张图片</span>
-              <span className="text-[11px] opacity-75 font-normal mt-0.5">每张图片单独一组</span>
+              <span className="text-[11px] opacity-75 font-normal mt-0.5">
+                每张图片单独一组
+              </span>
             </button>
           </div>
 
@@ -334,7 +360,7 @@ export default function UploadImageModal({
               onChange={handleFileSelect}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
             />
-            
+
             <div className="flex flex-col items-center justify-center space-y-3">
               <span className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-5 py-2 rounded-xl text-xs inline-flex items-center gap-2 shadow-xs transition-colors z-20">
                 <UploadCloud className="w-4 h-4" />
@@ -346,7 +372,8 @@ export default function UploadImageModal({
               </p>
 
               <p className="text-[11px] text-slate-400 max-w-2xl mx-auto leading-relaxed">
-                支持上传: jpg、png、pdf、gif、txt、mp4、mov、psd、ai、jpeg、psb、pptx、ppt、doc、docx、xls、xlsx、heic、arw、zip、max、obj、raw、raf、tif、webp、eps、key、3ds、fbx、dwg、mxf、aep、prproj、c4d、wav、CR2、CR3、json、stp、stl、aep
+                支持上传:
+                jpg、png、pdf、gif、txt、mp4、mov、psd、ai、jpeg、psb、pptx、ppt、doc、docx、xls、xlsx、heic、arw、zip、max、obj、raw、raf、tif、webp、eps、key、3ds、fbx、dwg、mxf、aep、prproj、c4d、wav、CR2、CR3、json、stp、stl、aep
               </p>
 
               <p className="text-[11px] text-slate-400 font-medium">
@@ -374,10 +401,16 @@ export default function UploadImageModal({
                     key={idx}
                     className="bg-white border border-slate-200 rounded-lg p-2 flex items-center justify-between gap-2 text-[11px]"
                   >
-                    <span className="truncate text-slate-700 font-medium">{file.name}</span>
+                    <span className="truncate text-slate-700 font-medium">
+                      {file.name}
+                    </span>
                     <button
                       type="button"
-                      onClick={() => setUploadedFiles((prev) => prev.filter((_, i) => i !== idx))}
+                      onClick={() =>
+                        setUploadedFiles((prev) =>
+                          prev.filter((_, i) => i !== idx),
+                        )
+                      }
                       className="text-slate-400 hover:text-rose-500 cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -391,7 +424,6 @@ export default function UploadImageModal({
 
         {/* ================= 2. Second Card: 图片信息 (Image Info Card) ================= */}
         <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-2xs space-y-6">
-          
           {/* Card Header */}
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div className="flex items-center gap-2">
@@ -421,7 +453,9 @@ export default function UploadImageModal({
               <button
                 type="button"
                 onClick={() => {
-                  setNewTemplateName(`图片预设模板_${new Date().toISOString().slice(5, 10).replace("-", "")}`);
+                  setNewTemplateName(
+                    `图片预设模板_${new Date().toISOString().slice(5, 10).replace("-", "")}`,
+                  );
                   setShowSaveTemplateModal(true);
                 }}
                 className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
@@ -441,7 +475,6 @@ export default function UploadImageModal({
             </div>
 
             <div className="space-y-4 pl-3.5 border-l-2 border-slate-100">
-              
               {/* 1. 图片分类 */}
               <div className="relative">
                 <div className="flex items-center gap-4">
@@ -450,10 +483,18 @@ export default function UploadImageModal({
                   </label>
                   <div className="flex-1 relative">
                     <div
-                      onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                      onClick={() =>
+                        setShowCategoryDropdown(!showCategoryDropdown)
+                      }
                       className="w-full bg-white border border-slate-200 hover:border-purple-400 rounded-xl px-3.5 py-2 text-xs text-slate-700 flex items-center justify-between cursor-pointer transition-colors shadow-2xs"
                     >
-                      <span className={selectedCategory ? "text-slate-800 font-bold" : "text-slate-400"}>
+                      <span
+                        className={
+                          selectedCategory
+                            ? "text-slate-800 font-bold"
+                            : "text-slate-400"
+                        }
+                      >
                         {selectedCategory || "请选择分类，支持输入文字搜索"}
                       </span>
                       <ChevronDown className="w-4 h-4 text-slate-400" />
@@ -482,11 +523,15 @@ export default function UploadImageModal({
 
                         {/* Right Column (Sub Categories) */}
                         <div className="flex-1 p-2 bg-white space-y-1">
-                          {CATEGORY_TREE.find((c) => c.name === hoveredCategory)?.children.map((sub) => (
+                          {CATEGORY_TREE.find(
+                            (c) => c.name === hoveredCategory,
+                          )?.children.map((sub) => (
                             <div
                               key={sub}
                               onClick={() => {
-                                setSelectedCategory(`${hoveredCategory} / ${sub}`);
+                                setSelectedCategory(
+                                  `${hoveredCategory} / ${sub}`,
+                                );
                                 setShowCategoryDropdown(false);
                               }}
                               className="px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-purple-50 hover:text-purple-700 rounded-lg cursor-pointer transition-colors"
@@ -502,7 +547,9 @@ export default function UploadImageModal({
 
                 {/* Quick Category Selection Tags Box */}
                 <div className="ml-28 mt-2.5 bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/60 flex items-center gap-2">
-                  <span className="text-[11px] font-bold text-slate-500 mr-1">一级分类</span>
+                  <span className="text-[11px] font-bold text-slate-500 mr-1">
+                    一级分类
+                  </span>
                   <button
                     type="button"
                     onClick={() => {
@@ -586,7 +633,9 @@ export default function UploadImageModal({
                       value={associatedTask}
                       onChange={(e) => setAssociatedTask(e.target.value)}
                       onFocus={() => setShowTaskDropdown(true)}
-                      onBlur={() => setTimeout(() => setShowTaskDropdown(false), 200)}
+                      onBlur={() =>
+                        setTimeout(() => setShowTaskDropdown(false), 200)
+                      }
                       placeholder="输入任务编号 / 备注 / ID 搜索"
                       className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:outline-none transition-colors shadow-2xs pr-8"
                     />
@@ -604,7 +653,9 @@ export default function UploadImageModal({
                   {/* Task Popover */}
                   {showTaskDropdown && (
                     <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl p-6 w-80 animate-in fade-in duration-100">
-                      <p className="font-bold text-xs text-slate-700 mb-4">我的待办任务</p>
+                      <p className="font-bold text-xs text-slate-700 mb-4">
+                        我的待办任务
+                      </p>
                       <div className="flex flex-col items-center justify-center text-slate-400 py-4 space-y-2">
                         <Folder className="w-10 h-10 stroke-1 text-slate-300" />
                         <span className="text-xs">暂无待办任务</span>
@@ -623,7 +674,7 @@ export default function UploadImageModal({
                   <input
                     type="text"
                     value={associatedScript}
-                    onClick={() => setShowScriptDropdown(prev => !prev)}
+                    onClick={() => setShowScriptDropdown((prev) => !prev)}
                     readOnly
                     placeholder="关联脚本，后续可自动统计脚本效果数据"
                     className="w-full bg-white border border-slate-200 hover:border-purple-400 focus:border-purple-500 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 cursor-pointer focus:outline-none transition-colors shadow-2xs"
@@ -647,7 +698,9 @@ export default function UploadImageModal({
                     <div className="absolute top-full left-0 mt-1.5 z-50 bg-white border border-slate-200/90 rounded-2xl shadow-2xl p-5 w-full max-w-md animate-in fade-in duration-100 space-y-4">
                       {/* Header */}
                       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <span className="font-bold text-xs text-slate-800">任务关联脚本</span>
+                        <span className="font-bold text-xs text-slate-800">
+                          任务关联脚本
+                        </span>
                         <button
                           type="button"
                           onClick={() => {
@@ -666,14 +719,15 @@ export default function UploadImageModal({
                           <Folder className="w-7 h-7 stroke-[1.25]" />
                         </div>
                         <p className="text-xs text-slate-400 font-medium">
-                          {associatedTask ? "暂无关联脚本" : "暂无关联脚本，请先选择任务"}
+                          {associatedTask
+                            ? "暂无关联脚本"
+                            : "暂无关联脚本，请先选择任务"}
                         </p>
                       </div>
                     </div>
                   )}
                 </div>
               </div>
-
             </div>
           </div>
 
@@ -734,7 +788,7 @@ export default function UploadImageModal({
                   />
                   <div className="flex-1 overflow-y-auto space-y-1 pr-1">
                     {Object.keys(TAG_GROUPS_DATA)
-                      .filter(g => g.includes(publicGroupSearch.trim()))
+                      .filter((g) => g.includes(publicGroupSearch.trim()))
                       .map((group) => (
                         <div
                           key={group}
@@ -755,7 +809,9 @@ export default function UploadImageModal({
                 <div className="bg-white border border-slate-200 rounded-lg p-2.5 space-y-2 flex flex-col h-[220px]">
                   <div className="flex items-center justify-between text-xs font-bold text-slate-700 border-b border-slate-100 pb-1.5 shrink-0">
                     <span>子标签</span>
-                    <span className="text-[10px] text-slate-400 font-normal">多选</span>
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      多选
+                    </span>
                   </div>
                   <input
                     type="text"
@@ -766,7 +822,7 @@ export default function UploadImageModal({
                   />
                   <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 pt-1">
                     {(TAG_GROUPS_DATA[selectedPublicGroupKey] || [])
-                      .filter(sub => sub.includes(publicSubSearch.trim()))
+                      .filter((sub) => sub.includes(publicSubSearch.trim()))
                       .map((subTag) => {
                         const isChecked = addedPublicTags.includes(subTag);
                         return (
@@ -779,9 +835,14 @@ export default function UploadImageModal({
                               checked={isChecked}
                               onChange={() => {
                                 if (isChecked) {
-                                  setAddedPublicTags(addedPublicTags.filter(t => t !== subTag));
+                                  setAddedPublicTags(
+                                    addedPublicTags.filter((t) => t !== subTag),
+                                  );
                                 } else {
-                                  setAddedPublicTags([...addedPublicTags, subTag]);
+                                  setAddedPublicTags([
+                                    ...addedPublicTags,
+                                    subTag,
+                                  ]);
                                 }
                               }}
                               className="accent-purple-600 w-3.5 h-3.5 rounded"
@@ -822,7 +883,11 @@ export default function UploadImageModal({
                             <span>{tag}</span>
                             <button
                               type="button"
-                              onClick={() => setAddedPublicTags(addedPublicTags.filter(t => t !== tag))}
+                              onClick={() =>
+                                setAddedPublicTags(
+                                  addedPublicTags.filter((t) => t !== tag),
+                                )
+                              }
                               className="text-purple-400 hover:text-rose-600 ml-0.5 cursor-pointer"
                             >
                               ×
@@ -886,7 +951,7 @@ export default function UploadImageModal({
                   />
                   <div className="flex-1 overflow-y-auto space-y-1 pr-1">
                     {Object.keys(TAG_GROUPS_DATA)
-                      .filter(g => g.includes(personalGroupSearch.trim()))
+                      .filter((g) => g.includes(personalGroupSearch.trim()))
                       .map((group) => (
                         <div
                           key={group}
@@ -907,7 +972,9 @@ export default function UploadImageModal({
                 <div className="bg-white border border-slate-200 rounded-lg p-2.5 space-y-2 flex flex-col h-[220px]">
                   <div className="flex items-center justify-between text-xs font-bold text-slate-700 border-b border-slate-100 pb-1.5 shrink-0">
                     <span>子标签</span>
-                    <span className="text-[10px] text-slate-400 font-normal">多选</span>
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      多选
+                    </span>
                   </div>
                   <input
                     type="text"
@@ -918,7 +985,7 @@ export default function UploadImageModal({
                   />
                   <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 pt-1">
                     {(TAG_GROUPS_DATA[selectedPersonalGroupKey] || [])
-                      .filter(sub => sub.includes(personalSubSearch.trim()))
+                      .filter((sub) => sub.includes(personalSubSearch.trim()))
                       .map((subTag) => {
                         const isChecked = addedPersonalTags.includes(subTag);
                         return (
@@ -931,9 +998,16 @@ export default function UploadImageModal({
                               checked={isChecked}
                               onChange={() => {
                                 if (isChecked) {
-                                  setAddedPersonalTags(addedPersonalTags.filter(t => t !== subTag));
+                                  setAddedPersonalTags(
+                                    addedPersonalTags.filter(
+                                      (t) => t !== subTag,
+                                    ),
+                                  );
                                 } else {
-                                  setAddedPersonalTags([...addedPersonalTags, subTag]);
+                                  setAddedPersonalTags([
+                                    ...addedPersonalTags,
+                                    subTag,
+                                  ]);
                                 }
                               }}
                               className="accent-purple-600 w-3.5 h-3.5 rounded"
@@ -974,7 +1048,11 @@ export default function UploadImageModal({
                             <span>{tag}</span>
                             <button
                               type="button"
-                              onClick={() => setAddedPersonalTags(addedPersonalTags.filter(t => t !== tag))}
+                              onClick={() =>
+                                setAddedPersonalTags(
+                                  addedPersonalTags.filter((t) => t !== tag),
+                                )
+                              }
                               className="text-purple-400 hover:text-rose-600 ml-0.5 cursor-pointer"
                             >
                               ×
@@ -994,7 +1072,9 @@ export default function UploadImageModal({
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-4 bg-purple-600 rounded-full" />
               <h3 className="font-bold text-slate-900 text-xs">时间设置</h3>
-              <span className="text-[11px] text-slate-400 font-normal">剪辑时间、授权有效期</span>
+              <span className="text-[11px] text-slate-400 font-normal">
+                剪辑时间、授权有效期
+              </span>
             </div>
 
             <div className="space-y-4 pl-3.5 border-l-2 border-slate-100">
@@ -1032,25 +1112,26 @@ export default function UploadImageModal({
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-4 bg-purple-600 rounded-full" />
               <h3 className="font-bold text-slate-900 text-xs">其他信息</h3>
-              <span className="text-[11px] text-slate-400 font-normal">补充说明</span>
+              <span className="text-[11px] text-slate-400 font-normal">
+                补充说明
+              </span>
             </div>
 
             <div className="space-y-4 pl-3.5 border-l-2 border-slate-100">
               <div className="flex items-center gap-4">
                 <label className="w-24 font-bold text-slate-700 text-right shrink-0">
-                  图片说明
+                  图片备注
                 </label>
                 <input
                   type="text"
                   value={imageDescription}
                   onChange={(e) => setImageDescription(e.target.value)}
-                  placeholder="请输入图片说明"
+                  placeholder="请输入图片备注"
                   className="flex-1 bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:outline-none transition-colors shadow-2xs"
                 />
               </div>
             </div>
           </div>
-
         </div>
 
         {/* ================= 3. Third Card: 权限设置 (Permissions Card) ================= */}
@@ -1062,7 +1143,9 @@ export default function UploadImageModal({
               </div>
               <div>
                 <h2 className="text-sm font-bold text-slate-900">权限设置</h2>
-                <p className="text-[11px] text-slate-400">设置查看权限、定时权限变更和消息提醒</p>
+                <p className="text-[11px] text-slate-400">
+                  设置查看权限、定时权限变更和消息提醒
+                </p>
               </div>
             </div>
 
@@ -1094,8 +1177,19 @@ export default function UploadImageModal({
                   <span className="text-rose-500 mr-1">*</span>图片查看权限
                 </label>
                 <div className="flex items-center gap-5 text-xs font-bold text-slate-700">
-                  {(["公开", "部门成员", "分组成员", "公用资源", "指定范围"] as const).map((opt) => (
-                    <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                  {(
+                    [
+                      "公开",
+                      "部门成员",
+                      "分组成员",
+                      "公用资源",
+                      "指定范围",
+                    ] as const
+                  ).map((opt) => (
+                    <label
+                      key={opt}
+                      className="flex items-center gap-1.5 cursor-pointer"
+                    >
                       <input
                         type="radio"
                         name="permission"
@@ -1104,7 +1198,9 @@ export default function UploadImageModal({
                         className="text-purple-600 focus:ring-purple-500"
                       />
                       <span>{opt}</span>
-                      {opt === "公用资源" && <HelpCircle className="w-3.5 h-3.5 text-slate-400 ml-0.5" />}
+                      {opt === "公用资源" && (
+                        <HelpCircle className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
+                      )}
                     </label>
                   ))}
                 </div>
@@ -1120,7 +1216,9 @@ export default function UploadImageModal({
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-4 bg-purple-600 rounded-full" />
               <h3 className="font-bold text-slate-900 text-xs">定期权限</h3>
-              <span className="text-[11px] text-slate-400 font-normal">可选，到期后自动修改查看权限</span>
+              <span className="text-[11px] text-slate-400 font-normal">
+                可选，到期后自动修改查看权限
+              </span>
             </div>
 
             <div className="space-y-2 pl-3.5 border-l-2 border-slate-100">
@@ -1138,7 +1236,9 @@ export default function UploadImageModal({
                       className="bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-700 focus:outline-none focus:border-purple-500"
                     />
                   </div>
-                  <span className="text-[11px] text-slate-400">将在所选日期 00:00 自动修改查看权限</span>
+                  <span className="text-[11px] text-slate-400">
+                    将在所选日期 00:00 自动修改查看权限
+                  </span>
                 </div>
               </div>
             </div>
@@ -1181,9 +1281,7 @@ export default function UploadImageModal({
               </div>
             </div>
           </div>
-
         </div>
-
       </div>
 
       {/* Footer Action Bar */}
@@ -1200,7 +1298,9 @@ export default function UploadImageModal({
           </button>
 
           <div className="absolute bottom-full right-0 mb-2.5 hidden group-hover:block z-50 w-80 sm:w-96 p-3 bg-[#2D2D2D] text-white rounded-lg shadow-2xl text-[11px] leading-relaxed pointer-events-none animate-in fade-in duration-150">
-            <p className="font-normal text-slate-100">适用于图片上传数量超过200个的情况。</p>
+            <p className="font-normal text-slate-100">
+              适用于图片上传数量超过200个的情况。
+            </p>
             <p className="font-normal text-slate-200 mt-1">
               使用此功能，可直接再次上传图片，系统将自动填写当前的分类、标签等配置信息，无需重复操作。只需选择文件，即可快速完成上传，省时高效。
             </p>
@@ -1227,7 +1327,9 @@ export default function UploadImageModal({
                 <div className="p-1.5 bg-purple-100 rounded-lg text-purple-600">
                   <FileText className="w-4 h-4" />
                 </div>
-                <h3 className="font-bold text-slate-900 text-sm">存为预设模板</h3>
+                <h3 className="font-bold text-slate-900 text-sm">
+                  存为预设模板
+                </h3>
               </div>
               <button
                 type="button"
@@ -1256,16 +1358,22 @@ export default function UploadImageModal({
               <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-2">
                 <div className="text-[11px] font-bold text-slate-500 border-b border-slate-200/60 pb-1.5 flex items-center justify-between">
                   <span>提取预设内容预览</span>
-                  <span className="text-purple-600 font-medium text-[10px]">仅保存图片分类与命名</span>
+                  <span className="text-purple-600 font-medium text-[10px]">
+                    仅保存图片分类与命名
+                  </span>
                 </div>
                 <div className="space-y-2 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">1. 图片分类:</span>
-                    <span className="font-bold text-purple-600">{selectedCategory || "未选择"}</span>
+                    <span className="font-bold text-purple-600">
+                      {selectedCategory || "未选择"}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">2. 图片名称:</span>
-                    <span className="font-bold text-slate-800">{imageTitle}</span>
+                    <span className="font-bold text-slate-800">
+                      {imageTitle}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1303,7 +1411,6 @@ export default function UploadImageModal({
           }
         }}
       />
-
     </div>
   );
 }

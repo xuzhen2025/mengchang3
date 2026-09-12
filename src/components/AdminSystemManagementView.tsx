@@ -55,6 +55,11 @@ import { DeptNode, AccountMember, INITIAL_DEPTS, INITIAL_MEMBERS } from "../data
 import AssetPagination from "./AssetPagination";
 import { useViralVideoRule } from "../lib/useViralVideoRule";
 import { isValidViralVideoRule, saveViralVideoRule, type ViralVideoRule } from "../lib/viralVideoRule";
+import OverlayPortal from "./overlays/OverlayPortal";
+import { useAdStore } from "../lib/useAdStore";
+import { AD_CHANGE_EVENT, adDate, adId, getAdActor, revokeAdAccounts, updateAdStore, type AdAccount, type AdAccountGroup } from "../lib/adPush";
+import { AdDialog } from "./AdAccountPush";
+import AdAuthorizationDialog from "./AdAuthorizationDialog";
 
 type SystemTabType =
   | "depts"
@@ -194,7 +199,7 @@ export const USER_CLIENT_PERMISSION_TREE: PermissionNode[] = [
     label: "数据分析与投放",
     children: [
       { id: "uc_data_dashboard", label: "查看数据看板" },
-      { id: "uc_ad_account_manage", label: "管理广告账户授权" },
+      { id: "uc_ad_push", label: "推送广告账户" },
       { id: "uc_ad_plan_manage", label: "管理投放计划" },
       { id: "uc_data_export", label: "导出业务数据" },
     ]
@@ -319,7 +324,7 @@ const LIVE_MANAGER_KEYS = [
 
 const AD_OPERATOR_KEYS = [
   ...BASIC_USER_KEYS,
-  "uc_finished_download", "uc_data_dashboard", "uc_ad_account_manage", "uc_ad_plan_manage", "uc_data_export"
+  "uc_finished_download", "uc_data_dashboard", "uc_ad_push", "uc_ad_plan_manage", "uc_data_export"
 ];
 
 const ADMIN_CONTENT_KEYS = [
@@ -1487,6 +1492,7 @@ export default function AdminSystemManagementView() {
   });
 
   const [selectedRoleId, setSelectedRoleId] = useState<string>("role_super_admin");
+  React.useEffect(() => { window.dispatchEvent(new Event(AD_CHANGE_EVENT)); }, [roles]);
   const selectedRole = roles.find((r) => r.id === selectedRoleId) || roles[0];
   
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
@@ -1639,6 +1645,7 @@ export default function AdminSystemManagementView() {
   const handleSaveRolePermissions = () => {
     if (!selectedRole) return;
     localStorage.setItem("cloud_video_roles_v2", JSON.stringify(roles));
+    window.dispatchEvent(new Event(AD_CHANGE_EVENT));
     showToast(`✅ 角色【${selectedRole.name}】权限矩阵保存成功！`);
   };
 
@@ -2071,107 +2078,17 @@ export default function AdminSystemManagementView() {
   const [adSubTab, setAdSubTab] = useState<"account" | "group">("account");
 
   // 广告账户数据列表
-  const [adAccounts, setAdAccounts] = useState([
-    {
-      id: "1779353789485063",
-      name: "厦门十梦俪_达人小蓝词_罗福强_ELL卸妆油_童欣园_AD",
-      platform: "巨量广告",
-      status: "authorized" as "authorized" | "expired",
-      category: "卸妆油类目",
-      group: "核心投手一组",
-      user: "一凡最帅",
-      remark: "1129新增",
-      isStarred: true,
-    },
-    {
-      id: "1785333912040523",
-      name: "厦门十梦俪_达人小蓝词_罗福强_ELL卸妆油_童欣园_AD-3",
-      platform: "巨量广告",
-      status: "authorized" as "authorized" | "expired",
-      category: "卸妆油类目",
-      group: "核心投手一组",
-      user: "一凡最帅",
-      remark: "1129新增",
-      isStarred: false,
-    },
-    {
-      id: "1785333911414795",
-      name: "厦门十梦俪__ELL卸妆油_备款账号_罗福强_AD-2",
-      platform: "巨量广告",
-      status: "expired" as "authorized" | "expired",
-      category: "",
-      group: "",
-      user: "",
-      remark: "失效待重新授权",
-      isStarred: false,
-    },
-    {
-      id: "1785879573969932",
-      name: "ELL卸妆油-吴嘉辉-厦门十梦俪-潼欣园-AD-1",
-      platform: "巨量广告",
-      status: "authorized" as "authorized" | "expired",
-      category: "核心精选",
-      group: "第二投放组",
-      user: "罗福强",
-      remark: "",
-      isStarred: true,
-    },
-    {
-      id: "1785879574627594",
-      name: "ELL卸妆油-吴嘉辉-厦门十梦俪-潼欣园-AD-4",
-      platform: "巨量广告",
-      status: "authorized" as "authorized" | "expired",
-      category: "核心精选",
-      group: "第二投放组",
-      user: "童欣园",
-      remark: "1129新增",
-      isStarred: false,
-    },
-    {
-      id: "1785879575435273",
-      name: "ELL卸妆油-吴嘉辉-厦门十梦俪-潼欣园-AD-5",
-      platform: "巨量广告",
-      status: "authorized" as "authorized" | "expired",
-      category: "",
-      group: "第一投放组",
-      user: "一凡最帅",
-      remark: "",
-      isStarred: false,
-    },
-    {
-      id: "1785879576071178",
-      name: "ELL卸妆油-吴嘉辉-厦门十梦俪-潼欣园-AD-6",
-      platform: "巨量广告",
-      status: "authorized" as "authorized" | "expired",
-      category: "",
-      group: "",
-      user: "",
-      remark: "",
-      isStarred: false,
-    },
-    {
-      id: "1785879580123888",
-      name: "厦门十梦俪__ELL卸妆油4_陈斌_AD-7",
-      platform: "巨量广告",
-      status: "expired" as "authorized" | "expired",
-      category: "备选类目",
-      group: "",
-      user: "",
-      remark: "致上致上致上",
-      isStarred: false,
-    },
-    {
-      id: "2881940182740112",
-      name: "巨量千川_千川专效爆视频-账号01",
-      platform: "巨量千川",
-      status: "authorized" as "authorized" | "expired",
-      category: "千川引流",
-      group: "千川第一组",
-      user: "张小梅",
-      remark: "专效千川",
-      isStarred: true,
-    },
-  ]);
+  const adStore = useAdStore();
+  const adAccounts = adStore.accounts;
+  const checkAdManagement = () => {
+    if (getAdActor().permissions.includes("ab_ad_group_manage")) return true;
+    showToast("暂无管理广告组权限");
+    return false;
+  };
+  const setAdAccounts = (change: (accounts: AdAccount[]) => AdAccount[]) => {
+    if (checkAdManagement()) updateAdStore(s => ({ ...s, accounts: change(s.accounts) }));
+  };
+  const [adVisibility, setAdVisibility] = useState(adStore.visibility);
 
   // 账户筛选 State
   const [adAuthFilter, setAdAuthFilter] = useState<"authorized" | "expired">("authorized");
@@ -2223,27 +2140,17 @@ export default function AdminSystemManagementView() {
   // 批量取消授权 Modal State
   const [batchCancelAuthModalOpen, setBatchCancelAuthModalOpen] = useState(false);
 
+  // 千川授权流程：仅管理端发起，授权成功后回填账户列表。
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [reauthorizingAccount, setReauthorizingAccount] = useState<AdAccount | undefined>();
+  const [syncingAdAccounts, setSyncingAdAccounts] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ success: number; failures: { name: string; reason: string }[] } | null>(null);
+
   // 账户分组 STATE
-  const [accountGroups, setAccountGroups] = useState([
-    {
-      id: "AG-001",
-      platform: "巨量广告",
-      name: "广告分组",
-      viewTeam: "华东运营部",
-      viewGroup: "核心投手一组",
-      viewUsers: ["一凡最帅", "罗福强", "童欣园"],
-      accountIds: ["1779353789485063", "1785333912040523", "1785879574627594"],
-    },
-    {
-      id: "AG-002",
-      platform: "巨量广告",
-      name: "千川常规推广组",
-      viewTeam: "电商事业部",
-      viewGroup: "第二投放组",
-      viewUsers: ["张小梅", "李强"],
-      accountIds: ["1785879573969932"],
-    },
-  ]);
+  const accountGroups = adStore.groups;
+  const setAccountGroups = (change: (groups: AdAccountGroup[]) => AdAccountGroup[]) => {
+    if (checkAdManagement()) updateAdStore(s => ({ ...s, groups: change(s.groups) }));
+  };
 
   // 新增/编辑分组 Modal State
   const [groupModalOpen, setGroupModalOpen] = useState(false);
@@ -2278,8 +2185,8 @@ export default function AdminSystemManagementView() {
   // 下拉可选项
   const availableTeamsList = ["华东运营部", "电商事业部", "品牌营销部", "海外推广部"];
   const availableGroupsList = ["核心投手一组", "第二投放组", "第一投放组", "千川第一组"];
-  const availableUsersList = ["一凡最帅", "罗福强", "童欣园", "张小梅", "李强", "陈斌"];
-  const availableCategoriesList = ["卸妆油类目", "核心精选", "备选类目", "爆款连衣裙", "防晒系列"];
+  const availableUsersList = ["徐振", "普通用户", "一凡最帅", "罗福强", "童欣园", "张小梅", "李强", "陈斌"];
+  const availableCategoriesList = ["千川引流", "卸妆油类目", "核心精选", "备选类目", "爆款连衣裙", "防晒系列"];
 
   // 删除分组 Modal State
   const [deleteGroupModalOpen, setDeleteGroupModalOpen] = useState(false);
@@ -2287,6 +2194,7 @@ export default function AdminSystemManagementView() {
 
   // 批量绑定的点击处理
   const handleConfirmBatchBind = () => {
+    if (!checkAdManagement()) return;
     if (selectedAdAccountIds.length === 0) {
       showToast("请先选择要绑定的广告账户");
       return;
@@ -2309,6 +2217,7 @@ export default function AdminSystemManagementView() {
 
   // 批量备注的点击处理
   const handleConfirmBatchRemark = () => {
+    if (!checkAdManagement()) return;
     if (selectedAdAccountIds.length === 0) {
       showToast("请先选择要备注的广告账户");
       return;
@@ -2333,32 +2242,41 @@ export default function AdminSystemManagementView() {
 
   // 批量取消授权的点击处理
   const handleConfirmBatchCancelAuth = () => {
-    if (selectedAdAccountIds.length === 0) {
-      showToast("请先选择要取消授权的广告账户");
-      return;
-    }
-    setAdAccounts((prev) =>
-      prev.map((acc) => {
-        if (!selectedAdAccountIds.includes(acc.id)) return acc;
-        return {
-          ...acc,
-          status: "expired",
-        };
-      })
-    );
+    if (!selectedAdAccountIds.length) return;
+    try { revokeAdAccounts(selectedAdAccountIds, adPlatform); }
+    catch (error) { showToast(error instanceof Error ? error.message : "取消授权失败"); return; }
     showToast(`已成功取消 ${selectedAdAccountIds.length} 个账户的授权！`);
     setBatchCancelAuthModalOpen(false);
     setSelectedAdAccountIds([]);
   };
 
+  const handleSyncAdAccounts = () => {
+    if (!checkAdManagement() || syncingAdAccounts) return;
+    setSyncingAdAccounts(true);
+    window.setTimeout(() => {
+      const failures: { name: string; reason: string }[] = [];
+      let success = 0;
+      if (!checkAdManagement()) { setSyncingAdAccounts(false); return; }
+      updateAdStore(s => ({ ...s, accounts: s.accounts.map(account => {
+        const reason = account.status === "expired" || account.revoked ? "授权已失效，请重新授权" : "";
+        if (reason) { failures.push({ name: `${account.name} (${account.id})`, reason }); return { ...account, syncError: reason }; }
+        success++;
+        return { ...account, syncedAt: adDate(), syncError: "" };
+      }) }));
+      setSyncingAdAccounts(false);
+      setSyncResult({ success, failures });
+    }, 700);
+  };
+
   // 打开新增分组模态框
   const handleOpenCreateGroupModal = () => {
+    if (!checkAdManagement()) return;
     setGroupModalMode("create");
     setEditingGroupId(null);
     setGroupFormName("");
     setGroupFormTeam("");
     setGroupFormGroup("");
-    setGroupFormUsers(["一凡最帅"]);
+    setGroupFormUsers([getAdActor().name]);
     setGroupFormAccountIds([]);
     setGroupFormSearch("");
     setGroupAccountPage(1);
@@ -2381,17 +2299,18 @@ export default function AdminSystemManagementView() {
 
   // 保存分组
   const handleSaveGroup = () => {
+    if (!checkAdManagement()) return;
     if (!groupFormName.trim()) {
       showToast("请输入账户分组名称");
       return;
     }
     if (groupModalMode === "create") {
       const newGroup = {
-        id: `AG-${Date.now().toString().slice(-4)}`,
+        id: `AG-${adId()}`,
         platform: adPlatform,
         name: groupFormName,
-        viewTeam: groupFormTeam || "全部部门",
-        viewGroup: groupFormGroup || "全部分组",
+        viewTeam: groupFormTeam,
+        viewGroup: groupFormGroup,
         viewUsers: groupFormUsers,
         accountIds: groupFormAccountIds,
       };
@@ -2419,6 +2338,7 @@ export default function AdminSystemManagementView() {
 
   // 删除分组
   const handleConfirmDeleteGroup = () => {
+    if (!checkAdManagement()) return;
     if (!deletingGroupId) return;
     setAccountGroups((prev) => prev.filter((g) => g.id !== deletingGroupId));
     showToast("账户分组已被删除！");
@@ -2669,14 +2589,12 @@ export default function AdminSystemManagementView() {
               {tabs.map((t) => {
                 const Icon = t.icon;
                 const isActive = activeTab === t.id;
-                const hasTooltip = t.id === "ad_groups";
 
                 return (
                   <div key={t.id} className="relative group/tab">
                     <button
                       type="button"
                       onClick={() => setActiveTab(t.id)}
-                      title={hasTooltip ? "该模板内容需要看云视频管家系统才能确认" : undefined}
                       className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
                         isActive
                           ? "bg-white text-[#7C3AED] shadow-2xs border border-purple-200/80 ring-1 ring-purple-100"
@@ -2687,12 +2605,6 @@ export default function AdminSystemManagementView() {
                       <span>{t.label}</span>
                     </button>
 
-                    {hasTooltip && (
-                      <div className="absolute top-full right-0 mt-2 hidden group-hover/tab:flex items-center gap-1.5 bg-slate-900/95 text-white text-[11px] font-medium px-3 py-1.5 rounded-lg whitespace-nowrap shadow-2xl z-[100] pointer-events-none animate-in fade-in zoom-in-95 duration-100 border border-slate-700/50">
-                        <span>该模板内容需要看云视频管家系统才能确认</span>
-                        <div className="absolute -top-1 right-5 w-2 h-2 bg-slate-900/95 rotate-45 border-l border-t border-slate-700/50" />
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -3993,6 +3905,13 @@ export default function AdminSystemManagementView() {
         {/* --------------------------------------------------------------------------- */}
         {activeTab === "system_settings" && (
           <div className="space-y-6 pb-12">
+            <section className="space-y-4 border-b border-slate-200 bg-white p-5">
+              <h3 className="text-sm font-extrabold text-slate-900">广告账户可见性</h3>
+              <div className="flex flex-wrap gap-6 text-xs">
+                {([['all', '全部'], ['personal', '个人'], ['group', '小组'], ['category', '分类']] as const).map(([value, label]) => <label key={value} className="flex items-center gap-2"><input type="radio" name="ad-visibility" value={value} checked={adVisibility === value} onChange={() => setAdVisibility(value)} className="accent-violet-600" />{label}</label>)}
+              </div>
+              <div className="flex justify-end"><button type="button" className="rounded-md bg-violet-600 px-4 py-2 text-xs font-bold text-white" onClick={() => { if (!getAdActor().permissions.includes('ab_system_setting_manage')) { showToast('暂无系统设置权限'); return; } updateAdStore(s => ({ ...s, visibility: adVisibility })); showToast('广告账户可见性已保存'); }}>保存账户可见性</button></div>
+            </section>
             {/* 1. 视频下载/推送/复制到剪映 */}
             <div className="hidden bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
               <div className="flex items-center gap-2 border-l-4 border-[#7C3AED] pl-2.5">
@@ -5096,10 +5015,23 @@ export default function AdminSystemManagementView() {
                     {/* 去授权按钮 */}
                     <button
                       type="button"
-                      onClick={() => showToast("已跳转去第三方平台进行 OAuth 账号授权")}
+                      onClick={() => {
+                        if (!checkAdManagement()) return;
+                        setReauthorizingAccount(undefined);
+                        setAuthModalOpen(true);
+                      }}
                       className="px-4 py-1.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold rounded-xl shadow-2xs transition-colors cursor-pointer"
                     >
                       去授权
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSyncAdAccounts}
+                      disabled={syncingAdAccounts}
+                      className="px-4 py-1.5 border border-slate-200 bg-white text-slate-700 text-xs font-bold rounded-xl shadow-2xs transition-colors cursor-pointer disabled:opacity-60"
+                    >
+                      <RefreshCw className={`mr-1 inline h-3.5 w-3.5 ${syncingAdAccounts ? "animate-spin" : ""}`} />
+                      {syncingAdAccounts ? "同步中" : "手动同步"}
                     </button>
 
                     {/* 已授权 / 已失效 Tab 开关 */}
@@ -5219,16 +5151,17 @@ export default function AdminSystemManagementView() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (selectedAdAccountIds.length === 0) {
-                        showToast("请先勾选需要取消授权的广告账户");
+                      onClick={() => {
+                        if (!checkAdManagement()) return;
+                        if (!selectedAdAccountIds.length) {
+                        showToast("请先选择广告账户");
                         return;
                       }
                       setBatchCancelAuthModalOpen(true);
                     }}
                     className="px-4 py-1.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold rounded-xl shadow-2xs transition-colors cursor-pointer"
                   >
-                    批量取消授权
+                    取消授权
                   </button>
                 </div>
 
@@ -5343,9 +5276,7 @@ export default function AdminSystemManagementView() {
                                     已授权
                                   </span>
                                 ) : (
-                                  <span className="px-2 py-0.5 bg-rose-100 text-rose-700 rounded text-[11px] font-bold">
-                                    已失效
-                                  </span>
+                                  <div className="space-y-2"><span className="px-2 py-0.5 bg-rose-100 text-rose-700 rounded text-[11px] font-bold">已失效</span><button type="button" className="block mx-auto text-xs text-violet-600" onClick={() => { if (!checkAdManagement()) return; setReauthorizingAccount(acc); setAuthModalOpen(true); }}>重新授权</button></div>
                                 )}
                               </td>
                             </tr>
@@ -5419,14 +5350,16 @@ export default function AdminSystemManagementView() {
                                 <div className="text-xs space-y-1 text-slate-600">
                                   <div>
                                     <span className="text-slate-400">部门：</span>
-                                    {group.viewTeam || "所有部门"}
+                                    {group.viewTeam || "未指定"}
                                   </div>
                                   <div>
                                     <span className="text-slate-400">用户：</span>
                                     {group.viewUsers && group.viewUsers.length > 0
                                       ? group.viewUsers.join(", ")
-                                      : "公开"}
+                                      : "未指定"}
                                   </div>
+                                  <div><span className="text-slate-400">小组：</span>{group.viewGroup || "未指定"}</div>
+                                  {!group.viewTeam && !group.viewGroup && !group.viewUsers.length && <div>全部成员</div>}
                                 </div>
                               </td>
                               <td className="py-3.5 px-5 text-right space-x-3">
@@ -5467,11 +5400,16 @@ export default function AdminSystemManagementView() {
           </div>
         )}
 
+        {authModalOpen && (
+          <AdAuthorizationDialog platform={adPlatform} account={reauthorizingAccount} onClose={() => setAuthModalOpen(false)} onSuccess={() => { setAuthModalOpen(false); setAdAuthFilter('authorized'); setAdSearchKeyword(''); setAdCategoryFilter('all'); setAdGroupFilter('all'); setAdUserFilter('all'); setAdGroupSelectFilter('all'); showToast('广告账户授权成功'); }} />
+        )}
+        {syncResult && <AdDialog title="同步结果" onClose={() => setSyncResult(null)}><div className="space-y-4 text-sm"><p>同步成功 {syncResult.success} 个，失败 {syncResult.failures.length} 个</p><p className="text-xs text-slate-500">原型演示 · {adDate()}</p>{syncResult.failures.map((f, i) => <div key={i} className="border-b border-slate-200 py-3"><p className="break-all">{f.name}</p><p className="mt-2 text-rose-600">{f.reason}</p></div>)}</div></AdDialog>}
+
         {/* =========================================================================== */}
         {/* MODAL 1: 批量绑定 MODAL (参见截图5)                                         */}
         {/* =========================================================================== */}
         {batchBindModalOpen && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-2xs z-50 flex items-center justify-center p-4">
+          <OverlayPortal layer="dialog" role="dialog" aria-modal="true" aria-label="批量绑定" className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-scale-up">
               {/* Modal 标题 */}
               <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -5546,14 +5484,14 @@ export default function AdminSystemManagementView() {
                 </button>
               </div>
             </div>
-          </div>
+          </OverlayPortal>
         )}
 
         {/* =========================================================================== */}
         {/* MODAL 2: 批量备注 MODAL (参见截图6)                                         */}
         {/* =========================================================================== */}
         {batchRemarkModalOpen && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-2xs z-50 flex items-center justify-center p-4">
+          <OverlayPortal layer="dialog" role="dialog" aria-modal="true" aria-label="批量备注" className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-scale-up">
               <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -5598,14 +5536,14 @@ export default function AdminSystemManagementView() {
                 </button>
               </div>
             </div>
-          </div>
+          </OverlayPortal>
         )}
 
         {/* =========================================================================== */}
         {/* MODAL 3: 批量取消授权 二次确认 MODAL (参见截图7)                             */}
         {/* =========================================================================== */}
         {batchCancelAuthModalOpen && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-2xs z-50 flex items-center justify-center p-4">
+          <OverlayPortal layer="dialog" role="dialog" aria-modal="true" aria-label="取消授权" className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl max-w-sm w-full shadow-2xl border border-slate-200 overflow-hidden animate-scale-up">
               <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
                 <h3 className="text-xs font-extrabold text-slate-900">取消授权</h3>
@@ -5620,7 +5558,7 @@ export default function AdminSystemManagementView() {
                   <AlertCircle className="w-5 h-5 text-amber-600" />
                 </div>
                 <p className="text-xs font-bold text-slate-800">
-                  请确认是否取消账户授权
+                  请确认是否取消所选 {selectedAdAccountIds.length} 个账户的授权，历史推送记录将保留。
                 </p>
               </div>
 
@@ -5641,14 +5579,14 @@ export default function AdminSystemManagementView() {
                 </button>
               </div>
             </div>
-          </div>
+          </OverlayPortal>
         )}
 
         {/* =========================================================================== */}
         {/* MODAL 4: 新增/编辑账户分组 MODAL (参见截图8, 9)                              */}
         {/* =========================================================================== */}
         {groupModalOpen && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-2xs z-50 flex items-center justify-center p-4">
+          <OverlayPortal layer="dialog" role="dialog" aria-modal="true" aria-label="账户分组" className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-scale-up max-h-[90vh] flex flex-col">
               {/* Modal Header */}
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
@@ -5665,9 +5603,9 @@ export default function AdminSystemManagementView() {
               </div>
 
               {/* Modal Body */}
-              <div className="p-6 space-y-5 overflow-y-auto flex-1">
+              <div className="p-4 sm:p-6 space-y-5 overflow-y-auto min-h-0 flex-1">
                 {/* 账户分组名称 */}
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap sm:flex-nowrap items-center gap-4">
                   <label className="w-24 text-xs font-bold text-slate-700 text-right shrink-0">
                     <span className="text-rose-500 mr-0.5">*</span>账户分组名称
                   </label>
@@ -5676,22 +5614,22 @@ export default function AdminSystemManagementView() {
                     placeholder="请输入账户分组名称"
                     value={groupFormName}
                     onChange={(e) => setGroupFormName(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:border-[#7C3AED] outline-none shadow-2xs"
+                    className="flex-1 min-w-0 px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:border-[#7C3AED] outline-none shadow-2xs"
                   />
                 </div>
 
                 {/* 谁能查看 */}
                 <div className="space-y-3 pt-1 border-t border-slate-100">
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                     <label className="w-24 text-xs font-bold text-slate-700 text-right shrink-0">
                       谁能查看
                     </label>
-                    <div className="flex items-center gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
                       <span className="text-xs text-slate-500 w-12 text-right">部门：</span>
                       <select
                         value={groupFormTeam}
                         onChange={(e) => setGroupFormTeam(e.target.value)}
-                        className="w-64 px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:border-[#7C3AED] outline-none"
+                        className="min-w-0 flex-1 sm:w-64 px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:border-[#7C3AED] outline-none"
                       >
                         <option value="">请选择</option>
                         {availableTeamsList.map((t) => (
@@ -5703,13 +5641,13 @@ export default function AdminSystemManagementView() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4 pl-24">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-4 sm:pl-24">
+                    <div className="flex min-w-0 w-full sm:w-auto items-center gap-2">
                       <span className="text-xs text-slate-500 w-12 text-right">小组：</span>
                       <select
                         value={groupFormGroup}
                         onChange={(e) => setGroupFormGroup(e.target.value)}
-                        className="w-64 px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:border-[#7C3AED] outline-none"
+                        className="min-w-0 flex-1 sm:w-64 px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:border-[#7C3AED] outline-none"
                       >
                         <option value="">请选择</option>
                         {availableGroupsList.map((g) => (
@@ -5721,10 +5659,10 @@ export default function AdminSystemManagementView() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4 pl-24">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-4 sm:pl-24">
+                    <div className="flex min-w-0 w-full sm:w-auto items-center gap-2">
                       <span className="text-xs text-slate-500 w-12 text-right">用户：</span>
-                      <div className="w-64 px-2.5 py-1.5 border border-slate-200 rounded-xl bg-white flex items-center gap-1.5 flex-wrap">
+                      <div className="min-w-0 flex-1 sm:w-64 px-2.5 py-1.5 border border-slate-200 rounded-xl bg-white flex items-center gap-1.5 flex-wrap">
                         {groupFormUsers.map((u, idx) => (
                           <span
                             key={idx}
@@ -5765,14 +5703,19 @@ export default function AdminSystemManagementView() {
                 </div>
 
                 {/* 穿梭框 (两栏选号) */}
-                <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-100">
                   {/* 左栏：关联的账户 */}
                   <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50 space-y-3">
                     <div className="flex items-center justify-between text-xs font-bold text-slate-800">
                       <span>关联的账户</span>
                       <button
                         type="button"
-                        onClick={() => showToast("转向页面授权页面...")}
+                        onClick={() => {
+                          setGroupModalOpen(false);
+                          if (!checkAdManagement()) return;
+                          setReauthorizingAccount(undefined);
+                          setAuthModalOpen(true);
+                        }}
                         className="text-[#7C3AED] hover:underline font-bold text-[11px] cursor-pointer"
                       >
                         去授权
@@ -5942,14 +5885,14 @@ export default function AdminSystemManagementView() {
                 </button>
               </div>
             </div>
-          </div>
+          </OverlayPortal>
         )}
 
         {/* =========================================================================== */}
         {/* MODAL 5: 删除账户分组 确认 MODAL (参见截图10)                              */}
         {/* =========================================================================== */}
         {deleteGroupModalOpen && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-2xs z-50 flex items-center justify-center p-4">
+          <OverlayPortal layer="dialog" role="dialog" aria-modal="true" aria-label="删除账户分组" className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl max-w-sm w-full shadow-2xl border border-slate-200 overflow-hidden animate-scale-up">
               <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
                 <h3 className="text-xs font-extrabold text-slate-900">删除</h3>
@@ -5985,7 +5928,7 @@ export default function AdminSystemManagementView() {
                 </button>
               </div>
             </div>
-          </div>
+          </OverlayPortal>
         )}
 
         {/* --------------------------------------------------------------------------- */}

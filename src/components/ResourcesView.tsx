@@ -9,31 +9,41 @@ import UploadImageModal from "./UploadImageModal";
 import UploadGenericResourcePage from "./UploadGenericResourcePage";
 import { TaskItem } from "./TaskCollaborationView";
 import { Asset, ResourceSearchIntent } from "../types";
-import { 
-  ShoppingBag, 
-  Film, 
-  FileText, 
-  Image as ImageIcon, 
-  Upload, 
-  ChevronDown, 
-  Music, 
-  X, 
-  CloudUpload, 
-  Check, 
+import {
+  ShoppingBag,
+  Film,
+  FileText,
+  Image as ImageIcon,
+  Upload,
+  ChevronDown,
+  Music,
+  X,
+  CloudUpload,
+  Check,
   Sparkles,
   Plus,
   FolderPlus,
-  File
+  File,
 } from "lucide-react";
 
 interface ResourcesViewProps {
   uploadedVideos?: Asset[];
   initialTab?: "finished_videos" | "materials" | "scripts" | "images" | "audio";
-  onTriggerTask?: (type: any, name: string, inputFiles: string[], cost: number) => void;
+  onTriggerTask?: (
+    type: any,
+    name: string,
+    inputFiles: string[],
+    cost: number,
+  ) => void;
   onNavigateToDelivery?: () => void;
   onNavigateToTaskDetail?: (task: TaskItem) => void;
   initialSearch?: ResourceSearchIntent | null;
   onClearInitialSearch?: () => void;
+  initialUpload?: {
+    type: "图片" | "成片";
+    files: Array<{ name: string; type: string; url: string }>;
+  } | null;
+  onClearInitialUpload?: () => void;
 }
 
 export type UploadFileType = "成片" | "素材" | "脚本" | "图片" | "音频";
@@ -45,21 +55,31 @@ export default function ResourcesView({
   onNavigateToDelivery,
   onNavigateToTaskDetail,
   initialSearch,
-  onClearInitialSearch
+  onClearInitialSearch,
+  initialUpload = null,
+  onClearInitialUpload,
 }: ResourcesViewProps) {
   const tabByType = {
     成片: "finished_videos",
     素材: "materials",
     脚本: "scripts",
     图片: "images",
-    音频: "audio"
+    音频: "audio",
   } as const;
-  const [activeTab, setActiveTab] = useState<"finished_videos" | "materials" | "scripts" | "images" | "audio">(initialSearch ? tabByType[initialSearch.type] : initialTab);
-  const [activeSearch, setActiveSearch] = useState<ResourceSearchIntent | null>(initialSearch && (initialSearch.query || initialSearch.tag) ? initialSearch : null);
-  
+  const [activeTab, setActiveTab] = useState<
+    "finished_videos" | "materials" | "scripts" | "images" | "audio"
+  >(initialSearch ? tabByType[initialSearch.type] : initialTab);
+  const [activeSearch, setActiveSearch] = useState<ResourceSearchIntent | null>(
+    initialSearch && (initialSearch.query || initialSearch.tag)
+      ? initialSearch
+      : null,
+  );
+
   useEffect(() => {
     if (initialSearch) {
-      setActiveSearch(initialSearch.query || initialSearch.tag ? initialSearch : null);
+      setActiveSearch(
+        initialSearch.query || initialSearch.tag ? initialSearch : null,
+      );
       setActiveTab(tabByType[initialSearch.type]);
     } else if (initialTab) {
       setActiveTab(initialTab);
@@ -70,13 +90,21 @@ export default function ResourcesView({
     setActiveSearch(null);
     onClearInitialSearch?.();
   };
-  
+
   // Dropdown menu state
   const [showUploadDropdown, setShowUploadDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // In-page upload view state ("成片" | "素材" | "脚本" | "图片" | "音频" | null)
-  const [uploadPageView, setUploadPageView] = useState<UploadFileType | null>(null);
+  const [uploadPageView, setUploadPageView] = useState<UploadFileType | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!initialUpload) return;
+    setActiveTab(initialUpload.type === "图片" ? "images" : "finished_videos");
+    setUploadPageView(initialUpload.type);
+  }, [initialUpload]);
 
   // Sub-view detail page open state (when viewing video detail, script detail, image detail, audio detail, etc.)
   const [isSubViewDetailOpen, setIsSubViewDetailOpen] = useState(false);
@@ -94,7 +122,10 @@ export default function ResourcesView({
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setShowUploadDropdown(false);
       }
     };
@@ -107,32 +138,32 @@ export default function ResourcesView({
       id: "finished_videos" as const,
       name: "成片管理",
       icon: Film,
-      desc: "渲染成片 / AI 生成视频 / 投放推送"
+      desc: "渲染成片 / AI 生成视频 / 投放推送",
     },
     {
       id: "materials" as const,
       name: "素材管理",
       icon: ShoppingBag,
-      desc: "原始片源 / 图片 / 音频 / 关联图谱"
+      desc: "原始片源 / 图片 / 音频 / 关联图谱",
     },
     {
       id: "scripts" as const,
       name: "脚本管理",
       icon: FileText,
-      desc: "口播文案 / AI分镜拆解 / 关联任务发布"
+      desc: "口播文案 / AI分镜拆解 / 关联任务发布",
     },
     {
       id: "images" as const,
       name: "图片管理",
       icon: ImageIcon,
-      desc: "商品高清图 / 资质设计 / 宣发素材"
+      desc: "商品高清图 / 资质设计 / 宣发素材",
     },
     {
       id: "audio" as const,
       name: "音频管理",
       icon: Music,
-      desc: "人声音效 / 口播旁白 / BGM衬乐库"
-    }
+      desc: "人声音效 / 口播旁白 / BGM衬乐库",
+    },
   ];
 
   const uploadOptions: {
@@ -149,7 +180,7 @@ export default function ResourcesView({
       icon: Film,
       formats: "MP4, MOV, MKV (最大 2GB)",
       tabTarget: "finished_videos",
-      desc: "上传高画质视频，一键关联投放广告"
+      desc: "上传高画质视频，一键关联投放广告",
     },
     {
       type: "脚本",
@@ -157,7 +188,7 @@ export default function ResourcesView({
       icon: FileText,
       formats: "TXT, DOCX, PDF, MD",
       tabTarget: "scripts",
-      desc: "分镜脚本、口播文案与AI裂变灵感模板"
+      desc: "分镜脚本、口播文案与AI裂变灵感模板",
     },
     {
       type: "图片",
@@ -165,7 +196,7 @@ export default function ResourcesView({
       icon: ImageIcon,
       formats: "PNG, JPG, WEBP, PSD (最大 100MB)",
       tabTarget: "images",
-      desc: "资质证明、店铺主图、场景海报与宣发素材"
+      desc: "资质证明、店铺主图、场景海报与宣发素材",
     },
     {
       type: "音频",
@@ -173,8 +204,8 @@ export default function ResourcesView({
       icon: Music,
       formats: "MP3, WAV, AAC, M4A",
       tabTarget: "audio",
-      desc: "背景音乐、旁白配音与音效素材库"
-    }
+      desc: "背景音乐、旁白配音与音效素材库",
+    },
   ];
 
   const handleOpenUploadModal = (type: UploadFileType) => {
@@ -201,12 +232,14 @@ export default function ResourcesView({
         <div className="pt-4 px-5 pb-1 bg-slate-50 shrink-0 z-30 relative">
           <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs relative">
             <div className="flex items-center justify-between p-1.5 bg-slate-50/70 rounded-xl">
-              
               {/* Left side: Category Tabs */}
               <div className="flex items-center gap-2 overflow-x-auto">
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
-                  const isActive = activeTab === tab.id && !uploadPageView && !isSubViewDetailOpen;
+                  const isActive =
+                    activeTab === tab.id &&
+                    !uploadPageView &&
+                    !isSubViewDetailOpen;
                   return (
                     <button
                       key={tab.id}
@@ -222,7 +255,9 @@ export default function ResourcesView({
                           : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
                       }`}
                     >
-                      <Icon className={`w-4 h-4 ${isActive ? "text-[#7C3AED]" : "text-slate-400"}`} />
+                      <Icon
+                        className={`w-4 h-4 ${isActive ? "text-[#7C3AED]" : "text-slate-400"}`}
+                      />
                       <span>{tab.name}</span>
                     </button>
                   );
@@ -238,7 +273,9 @@ export default function ResourcesView({
                 >
                   <Upload className="w-4 h-4" />
                   <span>上传文件</span>
-                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showUploadDropdown ? "rotate-180" : ""}`} />
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 transition-transform duration-200 ${showUploadDropdown ? "rotate-180" : ""}`}
+                  />
                 </button>
 
                 {/* 下拉菜单 (Dropdown Menu) */}
@@ -276,7 +313,6 @@ export default function ResourcesView({
                   </div>
                 )}
               </div>
-
             </div>
           </div>
         </div>
@@ -288,36 +324,56 @@ export default function ResourcesView({
           <UploadImageModal
             isOpen={true}
             isPage={true}
-            onClose={() => setUploadPageView(null)}
+            onClose={() => {
+              setUploadPageView(null);
+              onClearInitialUpload?.();
+            }}
+            initialFiles={
+              initialUpload?.type === "图片" ? initialUpload.files : []
+            }
             onPublishSuccess={(msg) => {
               showToast(msg);
               setUploadPageView(null);
+              onClearInitialUpload?.();
             }}
           />
         ) : uploadPageView === "脚本" || uploadPageView === "音频" ? (
           <UploadGenericResourcePage
             type={uploadPageView}
-            onClose={() => setUploadPageView(null)}
+            onClose={() => {
+              setUploadPageView(null);
+              onClearInitialUpload?.();
+            }}
             onPublishSuccess={(msg) => {
               showToast(msg);
               setUploadPageView(null);
+              onClearInitialUpload?.();
             }}
           />
         ) : uploadPageView ? (
           <UploadFinishedVideoModal
             isOpen={true}
             isPage={true}
-            onClose={() => setUploadPageView(null)}
+            initialFiles={
+              initialUpload?.type === "成片" ? initialUpload.files : []
+            }
+            onClose={() => {
+              setUploadPageView(null);
+              onClearInitialUpload?.();
+            }}
             onPublishSuccess={(msg) => {
               showToast(msg);
               setUploadPageView(null);
+              onClearInitialUpload?.();
             }}
           />
         ) : (
           <>
             {activeTab === "finished_videos" && (
               <FinishedVideosView
-                uploadedVideos={uploadedVideos.filter((asset) => asset.resourceCategory === "成片")}
+                uploadedVideos={uploadedVideos.filter(
+                  (asset) => asset.resourceCategory === "成片",
+                )}
                 initialSearch={activeSearch}
                 onClearSearch={clearHomeSearch}
                 onTriggerTask={onTriggerTask}
@@ -327,7 +383,9 @@ export default function ResourcesView({
             )}
             {activeTab === "materials" && (
               <MaterialsView
-                uploadedVideos={uploadedVideos.filter((asset) => asset.resourceCategory === "素材")}
+                uploadedVideos={uploadedVideos.filter(
+                  (asset) => asset.resourceCategory === "素材",
+                )}
                 initialSearch={activeSearch}
                 onClearSearch={clearHomeSearch}
                 onTriggerTask={onTriggerTask}
@@ -363,7 +421,6 @@ export default function ResourcesView({
           </>
         )}
       </div>
-
     </div>
   );
 }

@@ -535,7 +535,7 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
         {/* Row 1: 主类目 */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 pb-2 border-b border-slate-100">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-slate-900 font-bold shrink-0 w-20">主 类 目：</span>
+            <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">主 类 目：</span>
             <div className="flex items-center gap-1.5 flex-wrap">
               {mainCategories.map((cat) => (
                 <button
@@ -565,7 +565,7 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
         {/* Row 2: 一级分类 */}
         <div className="flex items-start justify-between pb-2 border-b border-slate-100">
           <div className="flex items-start gap-2 flex-1 flex-wrap">
-            <span className="text-slate-900 font-bold shrink-0 w-20 pt-1">一级分类：</span>
+            <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2 mt-0.5">一级分类：</span>
             <div className="flex items-center gap-1 flex-wrap flex-1">
               {(showMorePrimary ? primaryCategories : primaryCategories.slice(0, 14)).map((cat) => (
                 <button
@@ -593,7 +593,7 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
 
         {/* Row 3: 二级分类 */}
         <div className="flex items-center gap-2 pb-2 border-b border-slate-100 flex-wrap">
-          <span className="text-slate-900 font-bold shrink-0 w-20">二级分类：</span>
+          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">二级分类：</span>
           <div className="relative border border-slate-200 rounded-lg px-2.5 py-1 flex items-center gap-1.5 bg-white w-32 shrink-0 focus-within:border-purple-400 mr-1">
             <Search className="w-3.5 h-3.5 text-slate-400" />
             <input
@@ -623,7 +623,7 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
 
         {/* Row 4: 公共标签 */}
         <div className="flex items-center gap-2 pb-2 border-b border-slate-100 flex-wrap">
-          <span className="text-slate-900 font-bold shrink-0 w-20">公共标签：</span>
+          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">公共标签：</span>
           <PublicTagFilter
             searchKeyword={searchPublicTagKeyword}
             onSearchKeywordChange={setSearchPublicTagKeyword}
@@ -634,7 +634,7 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
 
         {/* Row 5: 个人标签 */}
         <div className="flex items-center gap-2 pb-2 border-b border-slate-100 flex-wrap">
-          <span className="text-slate-900 font-bold shrink-0 w-20">个人标签：</span>
+          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">个人标签：</span>
           <div className="relative border border-slate-200 rounded-lg px-2.5 py-1 flex items-center gap-1.5 bg-white w-32 shrink-0 focus-within:border-purple-400 mr-1">
             <Search className="w-3.5 h-3.5 text-slate-400" />
             <input
@@ -645,75 +645,122 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
               className="text-xs focus:outline-none w-full placeholder:text-slate-400 font-normal"
             />
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {personalTags.map((tag) => (
+          <div className="flex-1 flex flex-wrap items-center gap-2">
+            {/* Selector group for [全部 | 无个人标签 | 有个人标签] */}
+            <div className="flex items-center gap-1 border border-slate-200 rounded-lg p-0.5 bg-white shrink-0">
+              {personalTags.slice(0, 3).map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => setSelectedPersonalTag(tag)}
+                  className={`px-3 py-1 rounded-md text-xs transition-all cursor-pointer ${
+                    selectedPersonalTag === tag
+                      ? "bg-purple-600 text-white font-bold shadow-xs"
+                      : "text-slate-600 hover:bg-slate-50 font-medium"
+                  }`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+
+            {/* Extended Personal Tags */}
+            {personalTags.slice(3).map((tag) => (
               <button
                 key={tag}
                 onClick={() => setSelectedPersonalTag(tag)}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`transition-colors cursor-pointer text-xs px-2 py-0.5 rounded ${
                   selectedPersonalTag === tag
-                    ? "bg-purple-600 text-white font-bold shadow-xs"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium"
+                    ? "text-purple-600 font-bold bg-purple-100/70 border border-purple-200"
+                    : "text-slate-600 hover:text-purple-600 font-normal"
                 }`}
               >
                 {tag}
               </button>
             ))}
-            <button
-              onClick={() => setSelectedPersonalTag("全部")}
-              className="text-slate-400 hover:text-purple-600 text-xs ml-2 cursor-pointer font-normal underline"
-            >
-              重置个人标签
-            </button>
-            <button
-              onClick={() => showToast("正在打开个人标签管理...")}
-              className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              title="编辑个人标签"
-            >
-              <Edit2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
 
-        <ResourceSearchCondition query={searchQuery} onClear={() => { setSearchQuery(""); onClearSearch?.(); }} />
-
-        {/* Row 6: 高级搜索与排序 */}
-        <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-slate-900 font-bold shrink-0 w-20">高级搜索：</span>
-            <div className="flex items-center gap-2">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-slate-700 font-bold text-xs cursor-pointer focus:outline-none focus:border-purple-400"
-              >
-                <option value="最新发布">排序: 最新发布</option>
-                <option value="最多下载">排序: 最多下载</option>
-                <option value="时长降序">排序: 时长从长到短</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
             <button
               onClick={() => {
-                applyPresetFilters({ ...AUDIO_PRESET_DEFAULTS, searchQuery });
-                setSelectedPreset("");
-                showToast("已重置所有筛选");
+                setSearchPersonalTagKeyword("");
+                setSelectedPersonalTag("全部");
               }}
-              className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-1.5 rounded-xl text-xs cursor-pointer transition-colors shadow-xs"
+              className="text-slate-500 hover:text-purple-600 text-xs flex items-center gap-1 cursor-pointer ml-2 font-normal"
             >
-              重置
-            </button>
-            <button
-              onClick={() => showToast(`已成功导出 ${filteredAudios.length} 条音频资源数据`)}
-              className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-1.5 rounded-xl text-xs cursor-pointer transition-colors shadow-xs"
-            >
-              导出
+              <span>重置个人标签</span>
+              <Edit2 className="w-3 h-3 text-slate-400" />
             </button>
           </div>
         </div>
+      </div>
 
+      <ResourceSearchCondition query={searchQuery} onClear={() => { setSearchQuery(""); onClearSearch?.(); }} />
+
+      {/* Filter Card 2: 高级搜索 Bar */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs text-slate-700">
+        <div className="flex items-center gap-3 flex-wrap flex-1">
+          <span className="text-slate-900 font-bold shrink-0">高级搜索：</span>
+
+          {/* 排序 */}
+          <div className="flex items-center gap-1.5 border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white shadow-2xs">
+            <span className="text-slate-900 font-bold shrink-0">排序：</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="bg-transparent font-normal text-slate-700 focus:outline-none cursor-pointer"
+            >
+              <option value="最新发布">最新发布</option>
+              <option value="最多下载">最多下载</option>
+              <option value="时长降序">时长从长到短</option>
+            </select>
+          </div>
+
+          {/* 系统自动标签 */}
+          <select aria-label="系统自动标签" className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-500 bg-white focus:outline-none focus:border-purple-400 cursor-pointer">
+            <option value="">系统自动标签: 请选择系统标签</option>
+            <option value="voice_tag">AI识别配音</option>
+            <option value="bgm_tag">BGM音效</option>
+          </select>
+
+          {/* 近期未使用 */}
+          <span className="text-slate-500 font-normal shrink-0">近期未使用:</span>
+
+          {/* 店铺+链接ID */}
+          <select
+            className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-500 bg-white focus:outline-none focus:border-purple-400 cursor-pointer"
+          >
+            <option value="">请选择店铺+链接ID</option>
+            <option value="shop_a">a店铺-草本洗发水链接</option>
+            <option value="shop_b">b店铺-古法金饰链接</option>
+          </select>
+
+          {/* 日历时间区间 */}
+          <div className="flex items-center gap-1 text-slate-500 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg">
+            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+            <span>请选择时间</span>
+            <span className="text-slate-300 mx-1">|</span>
+            <span>至今</span>
+          </div>
+        </div>
+
+        {/* Reset and export */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => {
+              applyPresetFilters({ ...AUDIO_PRESET_DEFAULTS, searchQuery });
+              setSelectedPreset("");
+              showToast("已重置所有筛选");
+            }}
+            className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs"
+          >
+            重置
+          </button>
+
+          <button
+            onClick={() => showToast(`已成功导出 ${filteredAudios.length} 条音频资源数据`)}
+            className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs"
+          >
+            导出
+          </button>
+        </div>
       </div>
 
       {batchTagKind && <ResourceTagModal kind={batchTagKind}

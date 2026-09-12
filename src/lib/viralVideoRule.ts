@@ -28,9 +28,14 @@ export function isValidViralVideoRule(value: unknown): value is ViralVideoRule {
   return cents > 0 && Number.isSafeInteger(cents);
 }
 
-export function getViralVideoSpend(video: VideoSpendMetrics, rule: ViralVideoRule, month: string): number | null {
+export function getViralVideoSpend(video: VideoSpendMetrics, rule: Pick<ViralVideoRule, "period">, month: string): number | null {
   const value = rule.period === "monthly" ? video.monthlyCosts?.[month] : video.cost;
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+export function getViralVideoHeat(video: VideoSpendMetrics, month: string): number | null {
+  const spend = getViralVideoSpend(video, { period: "monthly" }, month);
+  return spend === null ? null : Math.floor(Math.round(spend * 100) / 10_000);
 }
 
 export function isViralVideo(video: VideoSpendMetrics, rule: ViralVideoRule, month: string): boolean {

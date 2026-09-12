@@ -1,4 +1,11 @@
-export type AssetLibraryType = "finished" | "viral" | "template" | "component" | "ad_delivery" | "archive" | "trash";
+export type AssetLibraryType =
+  | "finished"
+  | "viral"
+  | "template"
+  | "component"
+  | "ad_delivery"
+  | "archive"
+  | "trash";
 
 export interface AssetVersion {
   id: string;
@@ -54,7 +61,7 @@ export interface Asset {
   publicTags?: string[];
   coverUrl?: string;
   status?: string;
-  
+
   // Rich Asset Library extensions
   libraryType?: AssetLibraryType;
   isViral?: boolean;
@@ -86,7 +93,18 @@ export type GenerationTaskCategory =
   | "fission"
   | "ai_video";
 
-export type AiVideoMode = "reference" | "first_last" | "dubbing" | "background" | "outfit";
+export type AiVideoMode =
+  "reference" | "first_last" | "dubbing" | "background" | "outfit" | "pain_comparison" | "usage_process";
+
+export type AiVideoSceneMode = "pain_comparison" | "usage_process";
+
+export interface AiVideoSceneInputs {
+  painMaterial?: AiVideoMediaItem | null;
+  solutionMaterial?: AiVideoMediaItem | null;
+  usageVideo?: AiVideoMediaItem | null;
+  productImage?: AiVideoMediaItem | null;
+  prompt?: string;
+}
 
 export interface AiVideoMediaItem {
   id: string;
@@ -98,7 +116,7 @@ export interface AiVideoMediaItem {
   source?: "library" | "local" | "generated";
 }
 
-export interface AiVideoTaskSnapshot {
+export interface AiVideoTaskSnapshot extends AiVideoSceneInputs {
   mode: AiVideoMode;
   model: string;
   ratio: "9:16" | "16:9" | "4:3" | "3:4" | "1:1";
@@ -181,11 +199,36 @@ export interface EnhanceTaskOutput extends WatermarkTaskOutput {
   fps: number;
 }
 
+export interface QuickCreationTaskSnapshot {
+  mode: "image" | "video";
+  preset: "产品素材" | "痛点对比" | "使用过程" | null;
+  prompt: string;
+  referenceImages: string[];
+  referenceVideo?: string;
+  roleMaterials?: Array<{ role: string; url: string; type: "image" | "video" }>;
+  imageAspectRatio: "1:1" | "3:4" | "9:16" | "16:9";
+  imageQuality: "HD" | "2K" | "4K";
+  imageCount: number;
+  videoAspectRatio: "9:16" | "16:9";
+  videoLength: number;
+  model: string;
+  outputLabels?: string[];
+}
+
 export interface Task {
   id: string;
   name: string;
-  type: "video" | "watermark" | "subtitle" | "enhance" | "face_swap" | "video_gen" | "image_gen" | "fission";
-  status: "queue" | "generating" | "completed" | "failed" | "cancelled" | "ready";
+  type:
+    | "video"
+    | "watermark"
+    | "subtitle"
+    | "enhance"
+    | "face_swap"
+    | "video_gen"
+    | "image_gen"
+    | "fission";
+  status:
+    "queue" | "generating" | "completed" | "failed" | "cancelled" | "ready";
   progress: number;
   inputFiles: string[];
   outputFiles?: string[];
@@ -211,6 +254,7 @@ export interface Task {
   subtitleOutput?: WatermarkTaskOutput;
   enhanceSnapshot?: EnhanceTaskSnapshot;
   enhanceOutput?: EnhanceTaskOutput;
+  quickCreationSnapshot?: QuickCreationTaskSnapshot;
   simulationStartedAt?: number;
   faceSwap?: import("./lib/videoFaceSwap").FaceSwapSession;
 }
@@ -243,7 +287,30 @@ export interface GalleryItem {
   tags?: string[];
 }
 
-export type ActiveScreen = "home" | "quick_creation" | "face_swap" | "agent_creation" | "video_remake" | "ai_video" | "canvas" | "live_management" | "assets" | "enhance" | "watermark" | "subtitle" | "credits" | "resources" | "materials" | "finished_videos" | "scripts" | "images" | "audio" | "ad_delivery" | "same_style_video" | "task_collaboration" | "message_center";
+export type ActiveScreen =
+  | "home"
+  | "quick_creation"
+  | "face_swap"
+  | "agent_creation"
+  | "video_remake"
+  | "ai_video"
+  | "canvas"
+  | "live_management"
+  | "assets"
+  | "enhance"
+  | "watermark"
+  | "subtitle"
+  | "credits"
+  | "resources"
+  | "materials"
+  | "finished_videos"
+  | "scripts"
+  | "images"
+  | "audio"
+  | "ad_delivery"
+  | "same_style_video"
+  | "task_collaboration"
+  | "message_center";
 
 export type ResourceSearchType = "成片" | "素材" | "脚本" | "图片" | "音频";
 

@@ -22,6 +22,8 @@ interface ImageResourcePickerModalProps {
   items: ImageResourcePickerItem[];
   initialSelectedIds: string[];
   multiple?: boolean;
+  initialSourceTab?: "library" | "local";
+  maxSelections?: number;
   onClose: () => void;
   onConfirm: (items: ImageResourcePickerItem[]) => void;
 }
@@ -33,10 +35,12 @@ export default function ImageResourcePickerModal({
   items,
   initialSelectedIds,
   multiple = false,
+  initialSourceTab = "library",
+  maxSelections,
   onClose,
   onConfirm,
 }: ImageResourcePickerModalProps) {
-  const [sourceTab, setSourceTab] = useState<"library" | "local">("library");
+  const [sourceTab, setSourceTab] = useState(initialSourceTab);
   const [primaryCategory, setPrimaryCategory] = useState("全部一级分类");
   const [secondaryCategory, setSecondaryCategory] = useState("全部二级分类");
   const [tag, setTag] = useState("全部标签");
@@ -44,8 +48,10 @@ export default function ImageResourcePickerModal({
   const [author, setAuthor] = useState("全部上传人");
   const [search, setSearch] = useState("");
   const [onlyMine, setOnlyMine] = useState(false);
-  const [selectedIds, setSelectedIds] = useState(() => multiple ? uniqueValues(initialSelectedIds) : uniqueValues(initialSelectedIds).slice(0, 1));
+  const selectionLimit = multiple ? maxSelections : 1;
+  const [selectedIds, setSelectedIds] = useState(() => uniqueValues(initialSelectedIds).slice(0, selectionLimit));
   const [localItems, setLocalItems] = useState<ImageResourcePickerItem[]>([]);
+  const [selectionError, setSelectionError] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const uploadRef = useRef<HTMLInputElement | null>(null);
@@ -76,6 +82,11 @@ export default function ImageResourcePickerModal({
 
   const resetPage = () => setPage(1);
   const toggleItem = (id: string) => {
+    if (multiple && selectionLimit !== undefined && selectedIds.length >= selectionLimit && !selectedIds.includes(id)) {
+      setSelectionError(`最多选择 ${selectionLimit} 张图片。`);
+      return;
+    }
+    setSelectionError("");
     setSelectedIds((current) => {
       if (current.includes(id)) return current.filter((item) => item !== id);
       return multiple ? [...current, id] : [id];
@@ -84,7 +95,11 @@ export default function ImageResourcePickerModal({
 
   const handleLocalUpload = (files?: FileList | null) => {
     if (!files?.length) return;
-    const selectedFiles = multiple ? Array.from(files) : Array.from(files).slice(0, 1);
+    const candidates = multiple ? Array.from(files) : Array.from(files).slice(0, 1);
+    const valid = candidates.filter(file => file.type.startsWith("image/") || /\.(jpe?g|png|webp|bmp|gif|tiff?)$/i.test(file.name));
+    const capacity = multiple && selectionLimit !== undefined ? Math.max(0, selectionLimit - selectedIds.length) : undefined;
+    const selectedFiles = valid.slice(0, capacity);
+    setSelectionError(valid.length !== candidates.length ? "请选择图片文件。" : selectedFiles.length < valid.length ? `最多选择 ${selectionLimit} 张图片，超出部分未添加。` : "");
     const uploaded = selectedFiles
       .filter((file) => file.type.startsWith("image/") || /\.(jpe?g|png|webp|bmp|gif|tiff?)$/i.test(file.name))
       .map((file, index): ImageResourcePickerItem => ({
@@ -142,7 +157,7 @@ export default function ImageResourcePickerModal({
             {localItems.length > 0 && <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">{localItems.map((item) => <div key={item.id} className="flex min-w-0 items-center gap-2 rounded-md border border-slate-200 p-2"><img src={item.url} alt="" className="h-11 w-11 rounded object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.size}</p></div><button type="button" onClick={() => { setLocalItems((current) => current.filter((image) => image.id !== item.id)); setSelectedIds((current) => current.filter((id) => id !== item.id)); }} title="删除" className="p-1 text-slate-400 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div>}
           </div>}
         </div>
-        <div className="flex shrink-0 items-center gap-3 border-t border-slate-200 bg-white px-5 py-4"><p className="mr-auto text-xs text-slate-500">已选择 <b className="text-violet-700">{selectedIds.length}</b> 张图片</p><button type="button" onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">取消</button><button type="button" disabled={!selectedIds.length} onClick={() => onConfirm(allItems.filter((item) => selectedIds.includes(item.id)))} className="rounded-md bg-violet-600 px-5 py-2 text-xs font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40">确认选择</button></div>
+        <div className="flex shrink-0 items-center gap-3 border-t border-slate-200 bg-white px-5 py-4"><div className="mr-auto min-w-0"><p className="text-xs text-slate-500">已选择 <b className="text-violet-700">{selectedIds.length}</b>{maxSelections !== undefined ? ` / ${selectionLimit}` : ""} 张图片</p>{selectionError && <p role="alert" className="mt-1 text-xs text-rose-600">{selectionError}</p>}</div><button type="button" onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">取消</button><button type="button" disabled={!selectedIds.length} onClick={() => onConfirm(selectedIds.flatMap(id => { const item = allItems.find(candidate => candidate.id === id); return item ? [item] : []; }))} className="rounded-md bg-violet-600 px-5 py-2 text-xs font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40">确认选择</button></div>
       </div>
     </OverlayPortal>
   );

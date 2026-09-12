@@ -724,12 +724,12 @@ export default function UploadGenericResourcePage({
 
             <div className="flex items-start gap-4 pl-3">
               <label className="w-24 font-bold text-slate-700 text-right shrink-0 pt-2">
-                {config.title.replace("上传", "")}说明
+                {config.title.replace("上传", "")}备注
               </label>
               <textarea
                 value={audioDescription}
                 onChange={(e) => setAudioDescription(e.target.value)}
-                placeholder={`请输入${config.title.replace("上传", "")}说明`}
+                placeholder={`请输入${config.title.replace("上传", "")}备注`}
                 rows={3}
                 className="flex-1 bg-white border border-slate-200 focus:border-purple-500 rounded-lg p-3 text-xs text-slate-800 focus:outline-none shadow-2xs resize-y"
               />

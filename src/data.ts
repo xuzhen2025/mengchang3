@@ -470,6 +470,38 @@ const AI_VIDEO_DEMO_MEDIA: Record<string, AiVideoMediaItem> = {
 
 export const INITIAL_TASKS: Task[] = [
   {
+    id: "ai-video-demo-pain-comparison",
+    name: "AI视频原料_痛点对比_护肤体验对比",
+    type: "video_gen", status: "completed", progress: 100,
+    inputFiles: [AI_VIDEO_DEMO_MEDIA.character.url, AI_VIDEO_DEMO_MEDIA.sourceVideo.url],
+    outputFiles: [AI_VIDEO_DEMO_RESULT_URL],
+    createdAt: "2026-09-11 09:18:00", creditsCost: 36,
+    category: "ai_video", source: "tool", autoProgress: false, restartable: false,
+    aiVideoSnapshot: {
+      mode: "pain_comparison", model: "星绘 Pro", ratio: "9:16", duration: 8,
+      prompt: "突出使用前后的体验差异，保持自然光线。",
+      painMaterial: { ...AI_VIDEO_DEMO_MEDIA.character, name: "护肤前肌肤状态.jpg" },
+      solutionMaterial: { ...AI_VIDEO_DEMO_MEDIA.sourceVideo, name: "精华使用效果.mp4" },
+    },
+    aiVideoOutput: { videoUrl: AI_VIDEO_DEMO_RESULT_URL, coverUrl: AI_VIDEO_DEMO_MEDIA.skincareProduct.url, duration: 8 },
+  },
+  {
+    id: "ai-video-demo-usage-process",
+    name: "AI视频原料_使用过程_精华使用步骤",
+    type: "video_gen", status: "completed", progress: 100,
+    inputFiles: [AI_VIDEO_DEMO_MEDIA.sourceVideo.url, AI_VIDEO_DEMO_MEDIA.skincareProduct.url],
+    outputFiles: [AI_VIDEO_DEMO_RESULT_URL],
+    createdAt: "2026-09-11 09:10:00", creditsCost: 60,
+    category: "ai_video", source: "tool", autoProgress: false, restartable: false,
+    aiVideoSnapshot: {
+      mode: "usage_process", model: "云镜 Max", ratio: "16:9", duration: 15,
+      prompt: "",
+      usageVideo: { ...AI_VIDEO_DEMO_MEDIA.sourceVideo, name: "精华使用方法.mp4" },
+      productImage: AI_VIDEO_DEMO_MEDIA.skincareProduct,
+    },
+    aiVideoOutput: { videoUrl: AI_VIDEO_DEMO_RESULT_URL, coverUrl: AI_VIDEO_DEMO_MEDIA.skincareProduct.url, duration: 15 },
+  },
+  {
     id: "ai-video-demo-queue",
     name: "AI视频原料_参考生视频_护肤礼盒动态展示",
     type: "video_gen",

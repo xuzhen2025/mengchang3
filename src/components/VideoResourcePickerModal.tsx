@@ -3,7 +3,7 @@ import { AlertCircle, Check, Search, Trash2, Upload, X } from "lucide-react";
 import AssetPagination from "./AssetPagination";
 import OverlayPortal from "./overlays/OverlayPortal";
 
-export type VideoResourceSection = "成片" | "素材";
+export type VideoResourceSection = "成片" | "素材" | "图片";
 
 export interface VideoResourcePickerItem {
   id: string;
@@ -21,16 +21,35 @@ export interface VideoResourcePickerItem {
   url?: string;
   resolution?: string;
   fps?: number;
+  kind?: "video" | "image";
+}
+
+export interface VideoResourcePickerImageItem {
+  id: string;
+  name: string;
+  cover: string;
+  status: string;
+  primaryCategory: string;
+  secondaryCategory: string;
+  tags: string[];
+  author: string;
+  size: string;
+  sizeBytes?: number;
+  url: string;
+  resolution?: string;
 }
 
 interface VideoResourcePickerModalProps {
   items: VideoResourcePickerItem[];
   initialSelectedIds: string[];
   initialSection?: VideoResourceSection;
+  initialSourceTab?: "library" | "local";
   allowLocalUpload?: boolean;
   showAllSection?: boolean;
   maxSelections?: number;
   maxFileSizeMB?: number;
+  allowImageSelection?: boolean;
+  imageItems?: VideoResourcePickerImageItem[];
   onClose: () => void;
   onConfirm: (items: VideoResourcePickerItem[]) => void;
 }
@@ -43,15 +62,18 @@ export default function VideoResourcePickerModal({
   items,
   initialSelectedIds,
   initialSection = "成片",
+  initialSourceTab = "library",
   allowLocalUpload = false,
   showAllSection = false,
   maxSelections,
   maxFileSizeMB = 1000,
+  allowImageSelection = false,
+  imageItems = [],
   onClose,
   onConfirm,
 }: VideoResourcePickerModalProps) {
-  const [sourceTab, setSourceTab] = useState<"library" | "local">("library");
-  const [section, setSection] = useState<VideoResourceSection | "全部">(showAllSection ? "全部" : initialSection);
+  const [sourceTab, setSourceTab] = useState<"library" | "local">(allowLocalUpload ? initialSourceTab : "library");
+  const [section, setSection] = useState<VideoResourceSection | "全部">(allowImageSelection ? initialSection : showAllSection ? "全部" : initialSection);
   const [primaryCategory, setPrimaryCategory] = useState("全部一级分类");
   const [secondaryCategory, setSecondaryCategory] = useState("全部二级分类");
   const [tag, setTag] = useState("全部标签");
@@ -69,10 +91,11 @@ export default function VideoResourcePickerModal({
   const [pageSize, setPageSize] = useState(20);
   const uploadRef = useRef<HTMLInputElement | null>(null);
 
-  const allItems = useMemo(() => [...items, ...localItems], [items, localItems]);
+  const selectableImageItems = useMemo<VideoResourcePickerItem[]>(() => imageItems.map((item) => ({ ...item, section: "图片", duration: "图片", kind: "image" })), [imageItems]);
+  const allItems = useMemo(() => [...items, ...selectableImageItems, ...localItems], [items, localItems, selectableImageItems]);
   const sectionItems = useMemo(
-    () => items.filter((item) => section === "全部" || item.section === section),
-    [items, section],
+    () => [...items, ...(allowImageSelection ? selectableImageItems : [])].filter((item) => section === "全部" || item.section === section),
+    [allowImageSelection, items, section, selectableImageItems],
   );
   const primaryCategories = useMemo(() => uniqueValues(sectionItems.map((item) => item.primaryCategory)), [sectionItems]);
   const secondaryCategories = useMemo(
@@ -113,12 +136,12 @@ export default function VideoResourcePickerModal({
 
   const toggleItem = (id: string) => {
     const item = allItems.find((video) => video.id === id);
-    if (item && !/\.(mp4|mpeg|mov)$/i.test(item.name)) {
+    if (item?.kind !== "image" && item && !/\.(mp4|mpeg|mov)$/i.test(item.name)) {
       setUploadError(`“${item.name}”格式不受支持，仅可选择 MP4、MPEG、MOV 视频。`);
       return;
     }
     const sizeMB = item ? getFileSizeMB(item.size) : null;
-    if (sizeMB !== null && sizeMB >= maxFileSizeMB) {
+    if (item?.kind !== "image" && sizeMB !== null && sizeMB >= maxFileSizeMB) {
       setUploadError(`“${item?.name}”大小为 ${item?.size}，单个视频需小于 ${maxFileSizeMB} MB。`);
       return;
     }
@@ -134,10 +157,12 @@ export default function VideoResourcePickerModal({
   const handleLocalUpload = (files?: FileList | null) => {
     if (!files?.length) return;
     const candidates = Array.from(files);
-    const supported = candidates.filter((file) => /\.(mp4|mpeg|mov)$/i.test(file.name));
+    const supported = candidates.filter((file) => allowImageSelection
+      ? /\.(mp4|mpeg|mov|jpe?g|png|webp|bmp|gif|tiff?)$/i.test(file.name)
+      : /\.(mp4|mpeg|mov)$/i.test(file.name));
     const accepted = supported.filter((file) => file.size < maxFileSizeMB * 1024 * 1024);
     const errors: string[] = [];
-    if (supported.length < candidates.length) errors.push("仅支持 MP4、MPEG、MOV 格式");
+    if (supported.length < candidates.length) errors.push(allowImageSelection ? "仅支持图片、MP4、MPEG、MOV 格式" : "仅支持 MP4、MPEG、MOV 格式");
     if (accepted.length < supported.length) errors.push(`单个视频需小于 ${maxFileSizeMB} MB`);
     setUploadError(errors.join("；"));
 
@@ -145,7 +170,7 @@ export default function VideoResourcePickerModal({
       .map((file, index): VideoResourcePickerItem => ({
         id: `script-video-local-${Date.now()}-${index}`,
         name: file.name,
-        cover: "./assets/prototype/beauty-promo-detail.jpg",
+        cover: file.type.startsWith("image/") ? URL.createObjectURL(file) : "./assets/prototype/beauty-promo-detail.jpg",
         status: "本地文件",
         section: "素材",
         primaryCategory: "本地上传",
@@ -156,6 +181,7 @@ export default function VideoResourcePickerModal({
         size: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
         sizeBytes: file.size,
         url: URL.createObjectURL(file),
+        kind: file.type.startsWith("image/") ? "image" : "video",
       }));
     if (uploaded.length === 0) {
       if (uploadRef.current) uploadRef.current.value = "";
@@ -193,7 +219,7 @@ export default function VideoResourcePickerModal({
           {sourceTab === "library" ? <>
           <div className="flex shrink-0 items-center justify-between border-b border-slate-200">
             <div className="flex items-center gap-1">
-              {(showAllSection ? (["全部", "成片", "素材"] as const) : (["成片", "素材"] as const)).map((item) => (
+              {(allowImageSelection ? (["成片", "素材", "图片"] as const) : showAllSection ? (["全部", "成片", "素材"] as const) : (["成片", "素材"] as const)).map((item) => (
                 <button
                   key={item}
                   type="button"
@@ -251,12 +277,12 @@ export default function VideoResourcePickerModal({
               <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500">
                 <tr>
                   <th className="w-14 px-4 py-3" />
-                  <th className="w-32 px-3 py-3">文件缩略图</th>
+                  <th className="w-32 px-3 py-3">{section === "图片" ? "图片缩略图" : "文件缩略图"}</th>
                   <th className="w-[34%] px-3 py-3">文件名称 / ID</th>
                   <th className="w-28 px-3 py-3">状态</th>
-                  <th className="w-44 px-3 py-3">所在分类</th>
+                  <th className="w-44 px-3 py-3">{section === "图片" ? "分类 / 标签" : "所在分类"}</th>
                   <th className="w-24 px-3 py-3">上传人</th>
-                  <th className="w-20 px-3 py-3">时长</th>
+                  <th className="w-20 px-3 py-3">{section === "图片" ? "分辨率" : "时长"}</th>
                   <th className="w-24 px-3 py-3">大小</th>
                 </tr>
               </thead>
@@ -269,13 +295,13 @@ export default function VideoResourcePickerModal({
                       <td className="px-3 py-2"><img src={item.cover} alt="" className="h-10 w-16 rounded object-cover" referrerPolicy="no-referrer" /></td>
                       <td className="px-3 py-3"><p className="truncate font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.id}</p></td>
                       <td className="px-3 py-3"><span className="rounded bg-slate-100 px-2 py-1 text-[10px] text-slate-600">{item.status}</span></td>
-                      <td className="px-3 py-3"><p className="font-semibold text-slate-700">{item.section}</p><p className="mt-1 truncate text-[10px] text-slate-400">{item.primaryCategory} / {item.secondaryCategory}</p></td>
+                      <td className="px-3 py-3"><p className="font-semibold text-slate-700">{section === "图片" ? `${item.primaryCategory} / ${item.secondaryCategory}` : item.section}</p><p className="mt-1 truncate text-[10px] text-slate-400">{section === "图片" ? item.tags.join("、") : `${item.primaryCategory} / ${item.secondaryCategory}`}</p></td>
                       <td className="truncate px-3 py-3 text-slate-500">{item.author}</td>
-                      <td className="px-3 py-3 text-slate-500">{item.duration}</td>
+                      <td className="px-3 py-3 text-slate-500">{section === "图片" ? item.resolution || "--" : item.kind === "image" ? "图片" : item.duration}</td>
                       <td className="px-3 py-3 text-slate-500">{item.size}</td>
                     </tr>
                   );
-                }) : <tr><td colSpan={8} className="h-48 text-center text-sm text-slate-400">暂无符合条件的视频</td></tr>}
+                }) : <tr><td colSpan={8} className="h-48 text-center text-sm text-slate-400">暂无符合条件的文件</td></tr>}
               </tbody>
             </table>
           </div>
@@ -287,10 +313,10 @@ export default function VideoResourcePickerModal({
             <div className="min-h-0 flex-1 overflow-y-auto py-5">
               <button type="button" onClick={() => uploadRef.current?.click()} className="flex h-48 w-full flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-violet-400 hover:text-violet-700">
                 <Upload className="h-6 w-6" />
-                <span className="mt-3 text-xs font-semibold">点击选择本地视频</span>
+                <span className="mt-3 text-xs font-semibold">点击选择本地{allowImageSelection ? "图片或视频" : "视频"}</span>
               </button>
-              <input ref={uploadRef} type="file" multiple={maxSelections !== 1} accept=".mp4,.mpeg,.mov,video/mp4,video/mpeg,video/quicktime" className="hidden" onChange={(event) => handleLocalUpload(event.target.files)} />
-              <p className="mt-3 text-center text-xs leading-6 text-slate-400">支持 MP4、MPEG、MOV 格式，单个视频大小需小于 {maxFileSizeMB} MB。<br />请确保上传素材为原创内容或已取得合法授权。</p>
+              <input ref={uploadRef} type="file" multiple={maxSelections !== 1} accept={allowImageSelection ? ".jpg,.jpeg,.png,.webp,.bmp,.gif,.tif,.tiff,.mp4,.mpeg,.mov,image/*,video/*" : ".mp4,.mpeg,.mov,video/mp4,video/mpeg,video/quicktime"} className="hidden" onChange={(event) => handleLocalUpload(event.target.files)} />
+              <p className="mt-3 text-center text-xs leading-6 text-slate-400">支持 {allowImageSelection ? "图片、" : ""}MP4、MPEG、MOV 格式，单个文件大小需小于 {maxFileSizeMB} MB。<br />请确保上传素材为原创内容或已取得合法授权。</p>
               {uploadError && <p className="mt-2 flex items-center justify-center gap-1.5 text-xs font-medium text-rose-600"><AlertCircle className="h-3.5 w-3.5" />{uploadError}</p>}
               {localItems.length > 0 && <div className="mt-4 space-y-2">{localItems.map((item) => <div key={item.id} className="flex items-center gap-3 rounded-md border border-slate-200 p-2.5"><img src={item.cover} alt="" className="h-11 w-16 rounded object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-slate-700">{item.name}</p><p className="mt-1 text-[10px] text-slate-400">{item.size}</p></div><button type="button" onClick={() => { setLocalItems((current) => current.filter((video) => video.id !== item.id)); setSelectedIds((current) => current.filter((id) => id !== item.id)); }} title="删除" className="p-1.5 text-slate-400 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div>}
             </div>
@@ -298,7 +324,7 @@ export default function VideoResourcePickerModal({
         </div>
 
         <div className="flex shrink-0 items-center gap-3 border-t border-slate-200 bg-white px-5 py-4">
-          <div className="mr-auto min-w-0"><p className="text-xs text-slate-500">已选择 <b className="text-violet-700">{selectedIds.length}</b>{maxSelections ? ` / ${maxSelections}` : ""} 个视频</p>{sourceTab === "library" && uploadError && <p className="mt-1 truncate text-[10px] font-medium text-rose-600">{uploadError}</p>}</div>
+          <div className="mr-auto min-w-0"><p className="text-xs text-slate-500">已选择 <b className="text-violet-700">{selectedIds.length}</b>{maxSelections ? ` / ${maxSelections}` : ""} 个{allowImageSelection ? "文件" : "视频"}</p>{sourceTab === "library" && uploadError && <p className="mt-1 truncate text-[10px] font-medium text-rose-600">{uploadError}</p>}</div>
           <button type="button" onClick={onClose} className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">取消</button>
           <button type="button" disabled={selectedIds.length === 0} onClick={() => onConfirm(allItems.filter((item) => selectedIds.includes(item.id)))} className="rounded-md bg-violet-600 px-5 py-2 text-xs font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400">确认选择</button>
         </div>

@@ -66,7 +66,7 @@ interface SubjectGenerationConfig {
   cost: number;
 }
 
-interface SourceVideo {
+export interface SourceVideo {
   id: string;
   name: string;
   url: string;
@@ -165,6 +165,7 @@ interface VideoRemakeViewProps {
   assets: Asset[];
   activeSessionId: string | null;
   activeTask?: Task;
+  initialSource?: SourceVideo;
   onSessionChange: (sessionId: string) => void;
   onSyncTask: (task: Task, creditsCharge?: number) => void;
   onUploadVideos: (videos: Array<{ name: string; cover: string }>) => void;
@@ -512,6 +513,7 @@ export default function VideoRemakeView({
   assets,
   activeSessionId,
   activeTask,
+  initialSource,
   onSessionChange,
   onSyncTask,
   onUploadVideos,
@@ -519,11 +521,11 @@ export default function VideoRemakeView({
   const [sessionId] = useState(() => activeSessionId || `remake-${Date.now()}`);
   const initial = useMemo(() => getInitialState(sessionId, activeTask), [activeTask, sessionId]);
   const [step, setStep] = useState<Step>(initial.step);
-  const [source, setSource] = useState<SourceVideo | null>(initial.source);
+  const [source, setSource] = useState<SourceVideo | null>(initial.source || initialSource || null);
   const [language, setLanguage] = useState(initial.language);
   const [videoRatio, setVideoRatio] = useState<VideoRatio>(initial.videoRatio);
   const [resolution, setResolution] = useState<VideoResolution>(initial.resolution);
-  const [projectName, setProjectName] = useState(initial.projectName);
+  const [projectName, setProjectName] = useState(initial.source ? initial.projectName : initialSource?.name.replace(/\.[^.]+$/, "") || initial.projectName);
   const [subjects, setSubjects] = useState<RemakeSubject[]>(initial.subjects);
   const [shots, setShots] = useState<StoryboardShot[]>(initial.shots);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(initial.selectedSubjectId);
@@ -713,7 +715,7 @@ export default function VideoRemakeView({
     if (!source) return showToast("请先选择一个原视频");
     runOperation("analysis", "视频分析中", 0, () => {
       const nextSubjects = INITIAL_SUBJECTS.map((item) => ({ ...item, candidates: [], referenceImages: [] }));
-      const analyzedVideoName = "护肤精华真实测评视频";
+      const analyzedVideoName = source.name.replace(/\.[^.]+$/, "");
       setSubjects(nextSubjects);
       setProjectName(analyzedVideoName);
       setSelectedSubjectId(null);

@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
+import AnchoredPopover from "./overlays/AnchoredPopover";
 import {
   ArrowLeft,
   User,
@@ -200,7 +201,6 @@ const PUBLIC_TAG_GROUPS: Record<string, string[]> = {
 export default function ScriptDetailPage({
   script,
   onBack,
-  onTriggerTask,
   onUpdateScript,
   onDeleteScript
 }: ScriptDetailPageProps) {
@@ -358,6 +358,7 @@ export default function ScriptDetailPage({
 
   // UI States & Navigation Tabs
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
   const [activeBottomTab, setActiveBottomTab] = useState<"tasks" | "works">("tasks");
 
   // Sub-tab for 关联作品: 成片 | 素材 | 图片 | 音频
@@ -443,7 +444,6 @@ export default function ScriptDetailPage({
   // Other Modals
   const [showTasksModal, setShowTasksModal] = useState(false);
   const [showOpLogsModal, setShowOpLogsModal] = useState(false);
-  const [showCopyLogsModal, setShowCopyLogsModal] = useState(false);
 
   // Toast Notifications
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -463,12 +463,6 @@ export default function ScriptDetailPage({
     { id: "log-1", user: "鲁月园", action: "创建脚本", time: "2026-06-24 15:59:49" },
     { id: "log-2", user: "张三 (审核)", action: "修改状态为 [待审核]", time: "2026-06-25 09:12:00" },
     { id: "log-3", user: "李四 (编导)", action: "关联公共标签 [题材类型: 单人讲解展示产品]", time: "2026-06-26 14:30:15" }
-  ]);
-
-  // Copy Logs mock
-  const [copyLogs] = useState([
-    { id: "cp-1", user: "王五", time: "2026-07-01 10:20:11", purpose: "复刻短视频项目" },
-    { id: "cp-2", user: "赵六", time: "2026-07-05 16:44:02", purpose: "二创文案衍生" }
   ]);
 
   // Update Script Helper
@@ -759,31 +753,7 @@ export default function ScriptDetailPage({
               </div>
             </div>
 
-            {/* Action Buttons Row 1: AI & Generation */}
-            <div className="grid grid-cols-2 gap-2 text-xs font-bold">
-              <button
-                onClick={() => {
-                  if (onTriggerTask) {
-                    onTriggerTask("script_image", `${currentScript.title} - 生成图片`, [currentScript.title], 3);
-                  }
-                  showToast("已启动 AI 分镜生成图片流程！");
-                }}
-                className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white py-2 px-3 rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1 cursor-pointer text-xs"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>生成图片</span>
-              </button>
-
-              <button
-                onClick={() => showToast("已启动导出其他格式分镜档")}
-                className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white py-2 px-3 rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1 cursor-pointer text-xs"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>生成其他格式</span>
-              </button>
-            </div>
-
-            {/* Action Buttons Row 2: Share, Copy, Publish Task & More */}
+            {/* Share, Publish Task & More */}
             <div className="flex items-center gap-2 text-xs font-bold relative">
               {/* Share / Copy Link */}
               <button
@@ -796,14 +766,6 @@ export default function ScriptDetailPage({
                 title="分享链接"
               >
                 <Share2 className="w-4 h-4" />
-              </button>
-
-              {/* 复制脚本 */}
-              <button
-                onClick={() => copyToClipboard(currentScript.content, "脚本全文")}
-                className="flex-1 py-2 px-3 bg-white border border-purple-500 text-purple-600 hover:bg-purple-50 rounded-xl transition-colors cursor-pointer text-center whitespace-nowrap"
-              >
-                复制脚本
               </button>
 
               {/* 发布任务 (Task Collaboration Task Creation Modal matching TaskCollaborationView) */}
@@ -823,6 +785,7 @@ export default function ScriptDetailPage({
               {/* 更多操作 ∨ Dropdown Trigger */}
               <div className="relative">
                 <button
+                  ref={moreButtonRef}
                   onClick={() => setShowMoreMenu(!showMoreMenu)}
                   className="py-2 px-3 bg-white border border-purple-500 text-purple-600 hover:bg-purple-50 rounded-xl transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap"
                 >
@@ -832,8 +795,13 @@ export default function ScriptDetailPage({
 
                 {/* Dropdown Menu */}
                 {showMoreMenu && (
-                  <div
-                    className="absolute top-full right-0 mt-1 w-36 bg-white/95 backdrop-blur-md border border-slate-200 shadow-2xl rounded-2xl p-1.5 z-[90] animate-in fade-in zoom-in-95 duration-100 text-xs font-medium text-slate-700"
+                  <AnchoredPopover
+                    anchorRef={moreButtonRef}
+                    align="end"
+                    width={144}
+                    gap={4}
+                    onClose={() => setShowMoreMenu(false)}
+                    className="bg-white/95 backdrop-blur-md border border-slate-200 shadow-2xl rounded-2xl p-1.5 animate-in fade-in zoom-in-95 duration-100 text-xs font-medium text-slate-700"
                     onClick={() => setShowMoreMenu(false)}
                   >
                     <button
@@ -843,25 +811,10 @@ export default function ScriptDetailPage({
                       查看关联任务
                     </button>
                     <button
-                      onClick={() => setShowCopyLogsModal(true)}
-                      className="w-full text-left px-3 py-2 hover:bg-purple-50 hover:text-purple-600 rounded-xl transition-colors cursor-pointer block"
-                    >
-                      复制记录
-                    </button>
-                    <button
                       onClick={() => setShowOpLogsModal(true)}
                       className="w-full text-left px-3 py-2 hover:bg-purple-50 hover:text-purple-600 rounded-xl transition-colors cursor-pointer block"
                     >
                       操作记录
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditTitleInput(currentScript.title);
-                        setShowEditTitleModal(true);
-                      }}
-                      className="w-full text-left px-3 py-2 hover:bg-purple-50 hover:text-purple-600 rounded-xl transition-colors cursor-pointer block"
-                    >
-                      编辑
                     </button>
                     <button
                       onClick={() => {
@@ -874,7 +827,7 @@ export default function ScriptDetailPage({
                     >
                       删除
                     </button>
-                  </div>
+                  </AnchoredPopover>
                 )}
               </div>
             </div>
@@ -1198,7 +1151,7 @@ export default function ScriptDetailPage({
               {/* Row 1: 主类目 */}
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/50 pb-2.5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-bold text-slate-800 w-16 shrink-0">主类目:</span>
+                  <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">主类目：</span>
                   {["全部", "达人成片", "草本初色内衣", "短视频推广", "直播"].map((item) => (
                     <button
                       key={item}
@@ -1231,7 +1184,7 @@ export default function ScriptDetailPage({
               {/* Row 2: 一级分类 */}
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/50 pb-2.5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-bold text-slate-800 w-16 shrink-0">一级分类:</span>
+                  <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">一级分类：</span>
                   {[
                     "全部",
                     "女士内衣",
@@ -1406,16 +1359,17 @@ export default function ScriptDetailPage({
             </div>
 
             {/* 3. Advanced Search Bar */}
-            <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-200/80 flex flex-wrap items-center justify-between gap-3 text-xs">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="font-bold text-slate-800">高级搜索:</span>
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs text-slate-700">
+              <div className="flex flex-wrap items-center gap-3 flex-1">
+                <span className="text-slate-900 font-bold shrink-0">高级搜索：</span>
 
-                <div className="flex items-center gap-1.5">
-                  <span className="text-slate-600 font-medium">排序:</span>
+                {/* 排序 */}
+                <div className="flex items-center gap-1.5 border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white shadow-2xs">
+                  <span className="text-slate-900 font-bold shrink-0">排序：</span>
                   <select
                     value={workSortBy}
                     onChange={(e) => setWorkSortBy(e.target.value)}
-                    className="border border-slate-200 bg-white rounded-lg px-2.5 py-1 text-slate-700 focus:outline-none cursor-pointer"
+                    className="bg-transparent font-normal text-slate-700 focus:outline-none cursor-pointer"
                   >
                     <option>最新发布</option>
                     <option>最早发布</option>
@@ -1423,12 +1377,13 @@ export default function ScriptDetailPage({
                   </select>
                 </div>
 
-                <div className="flex items-center gap-1.5">
-                  <span className="text-slate-600 font-medium">广告平台标签:</span>
+                {/* 广告平台标签 */}
+                <div className="flex items-center gap-1.5 border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white shadow-2xs">
+                  <span className="text-slate-900 font-bold shrink-0">广告平台标签：</span>
                   <select
                     value={workAdPlatform}
                     onChange={(e) => setWorkAdPlatform(e.target.value)}
-                    className="border border-slate-200 bg-white rounded-lg px-2.5 py-1 text-slate-700 focus:outline-none cursor-pointer"
+                    className="bg-transparent font-normal text-slate-700 focus:outline-none cursor-pointer"
                   >
                     <option>不限广告平台标签</option>
                     <option>巨量引擎</option>
@@ -1437,12 +1392,13 @@ export default function ScriptDetailPage({
                   </select>
                 </div>
 
-                <div className="flex items-center gap-1.5">
-                  <span className="text-slate-600 font-medium">消耗:</span>
+                {/* 消耗 */}
+                <div className="flex items-center gap-1.5 border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white shadow-2xs">
+                  <span className="text-slate-900 font-bold shrink-0">消耗：</span>
                   <select
                     value={workCostRange}
                     onChange={(e) => setWorkCostRange(e.target.value)}
-                    className="border border-slate-200 bg-white rounded-lg px-2.5 py-1 text-slate-700 focus:outline-none cursor-pointer"
+                    className="bg-transparent font-normal text-slate-700 focus:outline-none cursor-pointer"
                   >
                     <option>不限</option>
                     <option>&gt; 1000元</option>
@@ -1450,12 +1406,13 @@ export default function ScriptDetailPage({
                   </select>
                 </div>
 
-                <div className="flex items-center gap-1.5">
-                  <span className="text-slate-600 font-medium">系统自动标签:</span>
+                {/* 系统自动标签 */}
+                <div className="flex items-center gap-1.5 border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white shadow-2xs">
+                  <span className="text-slate-900 font-bold shrink-0">系统自动标签：</span>
                   <select
                     value={workAutoTag}
                     onChange={(e) => setWorkAutoTag(e.target.value)}
-                    className="border border-slate-200 bg-white rounded-lg px-2.5 py-1 text-slate-700 focus:outline-none cursor-pointer"
+                    className="bg-transparent font-normal text-slate-700 focus:outline-none cursor-pointer"
                   >
                     <option>请选择系统自动标签</option>
                     <option>优质文案</option>
@@ -1464,10 +1421,10 @@ export default function ScriptDetailPage({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => showToast("已筛选相关作品数据")}
-                  className="border border-purple-600 text-purple-600 hover:bg-purple-50 font-bold px-4 py-1.5 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="border border-purple-600 text-purple-600 hover:bg-purple-50 font-bold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
                 >
                   <Filter className="w-3.5 h-3.5" />
                   <span>筛选</span>
@@ -1482,7 +1439,7 @@ export default function ScriptDetailPage({
                     setWorkFilterPersonalTag("全部");
                     showToast("已重置筛选条件");
                   }}
-                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-1.5 rounded-xl transition-colors cursor-pointer shadow-2xs"
+                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs"
                 >
                   重置
                 </button>
@@ -2862,38 +2819,6 @@ export default function ScriptDetailPage({
         </div>
       )}
 
-      {/* MODAL 11: Copy Logs Modal */}
-      {showCopyLogsModal && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 backdrop-blur-2xs animate-fade-in p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-4 bg-[#7C3AED] rounded-full" />
-                <h3 className="font-extrabold text-slate-900 text-sm">复制记录</h3>
-              </div>
-              <button onClick={() => setShowCopyLogsModal(false)} className="text-slate-400 hover:text-slate-600 p-1">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="p-6 space-y-3 max-h-80 overflow-y-auto text-xs">
-              {copyLogs.map((cp) => (
-                <div key={cp.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between">
-                  <div>
-                    <div className="font-bold text-slate-800">{cp.purpose}</div>
-                    <div className="text-slate-400 text-[11px] mt-0.5">使用者: {cp.user}</div>
-                  </div>
-                  <div className="text-slate-400 font-mono text-[11px]">{cp.time}</div>
-                </div>
-              ))}
-            </div>
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end">
-              <button onClick={() => setShowCopyLogsModal(false)} className="px-4 py-2 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-300">
-                关闭
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

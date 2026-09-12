@@ -763,7 +763,7 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
 
       {/* Filter Card 2: 高级搜索 Bar */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-3 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs text-slate-700">
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap flex-1">
           <span className="text-slate-900 font-bold shrink-0">高级搜索：</span>
 
           {/* 排序 */}
@@ -780,6 +780,41 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
             </select>
           </div>
 
+          {/* 脚本模板 */}
+          <select value={templateFilter} onChange={e => setTemplateFilter(e.target.value)} aria-label="脚本模板" className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-500 bg-white focus:outline-none focus:border-purple-400 cursor-pointer">
+            <option value="">请选择脚本模板</option>
+            <option value="t1">美妆爆款拆解模板</option>
+            <option value="t2">服饰种草口播模板</option>
+          </select>
+
+          {/* 作者 */}
+          <select value={authorFilter} onChange={e => setAuthorFilter(e.target.value)} aria-label="作者" className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-500 bg-white focus:outline-none focus:border-purple-400 cursor-pointer">
+            <option value="">作者</option>
+            <option value="致上编导">致上编导</option>
+            <option value="美妆内容部">美妆内容部</option>
+          </select>
+
+          {/* 作者搜索 */}
+          <input
+            type="text"
+            placeholder="请选择(支持输入搜索)"
+            value={authorSearch} onChange={e => setAuthorSearch(e.target.value)}
+            className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 bg-white focus:outline-none focus:border-purple-400 w-36"
+          />
+
+          {/* 上传时间 */}
+          <div className="flex items-center gap-1 text-slate-500 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg">
+            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+            <span>上传时间</span>
+            <span className="text-slate-300">|</span>
+            <input type="text" placeholder="开始日期" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-24 focus:outline-none text-center" />
+            <span>至</span>
+            <input type="text" placeholder="结束日期" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-24 focus:outline-none text-center" />
+          </div>
+        </div>
+
+        {/* Reset and export */}
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={handleResetFilters}
             className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs"
@@ -793,37 +828,6 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
           >
             导出
           </button>
-        </div>
-
-        {/* Secondary Dropdowns Line */}
-        <div className="flex items-center gap-2 flex-wrap text-xs">
-          <select value={templateFilter} onChange={e => setTemplateFilter(e.target.value)} aria-label="脚本模板" className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-500 bg-white focus:outline-none focus:border-purple-400 cursor-pointer">
-            <option value="">请选择脚本模板</option>
-            <option value="t1">美妆爆款拆解模板</option>
-            <option value="t2">服饰种草口播模板</option>
-          </select>
-
-          <select value={authorFilter} onChange={e => setAuthorFilter(e.target.value)} aria-label="作者" className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-500 bg-white focus:outline-none focus:border-purple-400 cursor-pointer">
-            <option value="">作者</option>
-            <option value="致上编导">致上编导</option>
-            <option value="美妆内容部">美妆内容部</option>
-          </select>
-
-          <input
-            type="text"
-            placeholder="请选择(支持输入搜索)"
-            value={authorSearch} onChange={e => setAuthorSearch(e.target.value)}
-            className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 bg-white focus:outline-none focus:border-purple-400 w-36"
-          />
-
-          <div className="flex items-center gap-1 text-slate-500 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg">
-            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-            <span>上传时间</span>
-            <span className="text-slate-300">|</span>
-            <input type="text" placeholder="开始日期" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-24 focus:outline-none text-center" />
-            <span>至</span>
-            <input type="text" placeholder="结束日期" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-24 focus:outline-none text-center" />
-          </div>
         </div>
       </div>
 

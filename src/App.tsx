@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useAdStore } from "./lib/useAdStore";
 import Sidebar from "./components/Sidebar";
 import RightQueue from "./components/TaskQueuePanel";
 import MaterialSelector from "./components/MaterialSelector";
@@ -10,6 +11,7 @@ import VideoWatermarkWorkspace from "./components/VideoWatermarkWorkspace";
 import VideoFaceSwapWorkspace from "./components/VideoFaceSwapWorkspace";
 import { useFaceSwapTasks } from "./lib/useFaceSwapTasks";
 import AiVideoView from "./components/AiVideoView";
+import { AI_VIDEO_MODE_LABELS, getAiVideoInputs, isAiVideoSceneMode, migrateQuickCreationVideoTask, validateAiVideoScene } from "./lib/aiVideo";
 import AssetsView from "./components/AssetsView";
 import InfiniteCanvasView from "./components/InfiniteCanvasView";
 import LiveManagementView from "./components/LiveManagementView";
@@ -19,22 +21,41 @@ import FinishedVideosView from "./components/FinishedVideosView";
 import AdDeliveryView from "./components/AdDeliveryView";
 import SameStyleVideoView from "./components/SameStyleVideoView";
 import AgentCreationView from "./components/AgentCreationView";
-import VideoRemakeView from "./components/VideoRemakeView";
-import TaskCollaborationView, { TaskItem } from "./components/TaskCollaborationView";
+import VideoRemakeView, { type SourceVideo } from "./components/VideoRemakeView";
+import TaskCollaborationView, {
+  TaskItem,
+} from "./components/TaskCollaborationView";
 import MessageCenterWorkspace from "./components/MessageCenterWorkspace";
 import AdminView from "./components/AdminView";
 import LoginView, { AppMode, PrototypeAccount } from "./components/LoginView";
 import LogoutConfirmDialog from "./components/LogoutConfirmDialog";
 
-import { 
-  INITIAL_GALLERY, 
-  INITIAL_ASSETS, 
-  INITIAL_TASKS, 
+import {
+  INITIAL_GALLERY,
+  INITIAL_ASSETS,
+  INITIAL_TASKS,
   INITIAL_TRANSACTIONS,
-  INITIAL_MESSAGES
+  INITIAL_MESSAGES,
 } from "./data";
-import { Asset, Task, CreditTransaction, GalleryItem, ActiveScreen, AppMessage, ResourceSearchIntent, AiVideoTaskSnapshot, EnhanceTaskOutput, EnhanceTaskSnapshot, WatermarkTaskOutput, WatermarkTaskSnapshot } from "./types";
-import { buildEnhanceOutputName, getEnhanceOutputDimensions } from "./lib/videoEnhance";
+import {
+  Asset,
+  Task,
+  CreditTransaction,
+  GalleryItem,
+  ActiveScreen,
+  AppMessage,
+  ResourceSearchIntent,
+  AiVideoTaskSnapshot,
+  EnhanceTaskOutput,
+  EnhanceTaskSnapshot,
+  WatermarkTaskOutput,
+  WatermarkTaskSnapshot,
+  QuickCreationTaskSnapshot,
+} from "./types";
+import {
+  buildEnhanceOutputName,
+  getEnhanceOutputDimensions,
+} from "./lib/videoEnhance";
 import { Sparkles, Layers, Sliders, ChevronRight, Play } from "lucide-react";
 
 const AUTH_STORAGE_KEY = "mengchang_prototype_session";
@@ -76,11 +97,15 @@ const readPersistedSession = (): PersistedSession | null => {
     const stored = window.localStorage.getItem(AUTH_STORAGE_KEY);
     if (!stored) return null;
     const parsed = JSON.parse(stored) as PersistedSession;
-    const account = PROTOTYPE_ACCOUNTS.find((item) => item.username === parsed.username);
+    const account = PROTOTYPE_ACCOUNTS.find(
+      (item) => item.username === parsed.username,
+    );
     if (!account) return null;
     return {
       username: account.username,
-      mode: account.allowedModes.includes(parsed.mode) ? parsed.mode : account.defaultMode,
+      mode: account.allowedModes.includes(parsed.mode)
+        ? parsed.mode
+        : account.defaultMode,
     };
   } catch {
     return null;
@@ -88,22 +113,53 @@ const readPersistedSession = (): PersistedSession | null => {
 };
 
 export default function App() {
+  useAdStore();
   const initialSession = readPersistedSession();
-  const [session, setSession] = useState<PersistedSession | null>(initialSession);
+  const [session, setSession] = useState<PersistedSession | null>(
+    initialSession,
+  );
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   // Navigation & UI States (supports back stack)
   const [screenHistory, setScreenHistory] = useState<ActiveScreen[]>(["home"]);
   const activeScreen = screenHistory[screenHistory.length - 1] || "home";
-  const [selectedTaskForCollaboration, setSelectedTaskForCollaboration] = useState<TaskItem | null>(null);
-  const [selectedTaskTabForCollaboration, setSelectedTaskTabForCollaboration] = useState<"to_me" | "my_published" | "all">("all");
-  const [resourceSearchIntent, setResourceSearchIntent] = useState<ResourceSearchIntent | null>(null);
-  const [activeAgentSessionId, setActiveAgentSessionId] = useState<string | null>(null);
-  const [activeRemakeSessionId, setActiveRemakeSessionId] = useState<string | null>(null);
-  const [activeAiVideoTaskId, setActiveAiVideoTaskId] = useState<string | null>(null);
-  const [activeWatermarkTaskId, setActiveWatermarkTaskId] = useState<string | null>(null);
-  const [activeSubtitleTaskId, setActiveSubtitleTaskId] = useState<string | null>(null);
-  const [activeEnhanceTaskId, setActiveEnhanceTaskId] = useState<string | null>(null);
-  const [activeFaceSwapTaskId, setActiveFaceSwapTaskId] = useState<string | null>(null);
+  const [selectedTaskForCollaboration, setSelectedTaskForCollaboration] =
+    useState<TaskItem | null>(null);
+  const [selectedTaskTabForCollaboration, setSelectedTaskTabForCollaboration] =
+    useState<"to_me" | "my_published" | "all">("all");
+  const [resourceSearchIntent, setResourceSearchIntent] =
+    useState<ResourceSearchIntent | null>(null);
+  const [activeAgentSessionId, setActiveAgentSessionId] = useState<
+    string | null
+  >(null);
+  const [activeRemakeSessionId, setActiveRemakeSessionId] = useState<
+    string | null
+  >(null);
+  const [remakeSourceRequest, setRemakeSourceRequest] = useState<{
+    sessionId: string;
+    source: SourceVideo;
+  } | null>(null);
+  const [activeAiVideoTaskId, setActiveAiVideoTaskId] = useState<string | null>(
+    null,
+  );
+  const [activeQuickCreationTaskId, setActiveQuickCreationTaskId] = useState<
+    string | null
+  >(null);
+  const [activeWatermarkTaskId, setActiveWatermarkTaskId] = useState<
+    string | null
+  >(null);
+  const [activeSubtitleTaskId, setActiveSubtitleTaskId] = useState<
+    string | null
+  >(null);
+  const [activeEnhanceTaskId, setActiveEnhanceTaskId] = useState<string | null>(
+    null,
+  );
+  const [activeFaceSwapTaskId, setActiveFaceSwapTaskId] = useState<
+    string | null
+  >(null);
+  const [resourceUploadRequest, setResourceUploadRequest] = useState<{
+    type: "图片" | "成片";
+    files: Array<{ name: string; type: string; url: string }>;
+  } | null>(null);
 
   const handleNavigate = (screen: ActiveScreen) => {
     setScreenHistory((prev) => {
@@ -130,6 +186,7 @@ export default function App() {
     }
     if (screen === "video_remake") {
       setActiveRemakeSessionId(null);
+      setRemakeSourceRequest(null);
     }
     if (screen === "ai_video") {
       setActiveAiVideoTaskId(null);
@@ -138,7 +195,9 @@ export default function App() {
   };
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [narrowViewport, setNarrowViewport] = useState(() => window.innerWidth < 768);
+  const [narrowViewport, setNarrowViewport] = useState(
+    () => window.innerWidth < 768,
+  );
   useEffect(() => {
     const query = window.matchMedia("(max-width: 767px)");
     const update = () => setNarrowViewport(query.matches);
@@ -148,15 +207,23 @@ export default function App() {
   const [isQueueOpen, setIsQueueOpen] = useState(false);
 
   // Mode switching state (用户端 vs 管理端)
-  const [appMode, setAppMode] = useState<AppMode>(initialSession?.mode ?? "user");
-  const [adminActiveScreen, setAdminActiveScreen] = useState<string>("content_management");
+  const [appMode, setAppMode] = useState<AppMode>(
+    initialSession?.mode ?? "user",
+  );
+  const [adminActiveScreen, setAdminActiveScreen] =
+    useState<string>("content_management");
 
   const currentAccount = session
-    ? PROTOTYPE_ACCOUNTS.find((account) => account.username === session.username) ?? null
+    ? (PROTOTYPE_ACCOUNTS.find(
+        (account) => account.username === session.username,
+      ) ?? null)
     : null;
 
   const handleLogin = (account: PrototypeAccount) => {
-    const nextSession = { username: account.username, mode: account.defaultMode };
+    const nextSession = {
+      username: account.username,
+      mode: account.defaultMode,
+    };
     window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextSession));
     setSession(nextSession);
     setAppMode(account.defaultMode);
@@ -184,12 +251,21 @@ export default function App() {
   };
 
   // App core states
-  const [credits, setCredits] = useState(10099.00);
-  const [extraRequestedCredits, setExtraRequestedCredits] = useState(10349.00);
-  const [transactions, setTransactions] = useState<CreditTransaction[]>(INITIAL_TRANSACTIONS);
+  const [credits, setCredits] = useState(10099.0);
+  const [extraRequestedCredits, setExtraRequestedCredits] = useState(10349.0);
+  const [transactions, setTransactions] =
+    useState<CreditTransaction[]>(INITIAL_TRANSACTIONS);
   const [assets, setAssets] = useState<Asset[]>(INITIAL_ASSETS);
-  const [galleryItems, setGalleryItems] = useState<GalleryItem[]>(INITIAL_GALLERY);
-  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
+  const [galleryItems, setGalleryItems] =
+    useState<GalleryItem[]>(INITIAL_GALLERY);
+  const [tasks, setTasks] = useState<Task[]>(() => INITIAL_TASKS.map(migrateQuickCreationVideoTask));
+  useEffect(() => {
+    // Also retain records already in memory during a prototype hot update.
+    setTasks((current) => {
+      const migrated = current.map(migrateQuickCreationVideoTask);
+      return migrated.some((task, index) => task !== current[index]) ? migrated : current;
+    });
+  }, []);
   const [messages, setMessages] = useState<AppMessage[]>(INITIAL_MESSAGES);
   const availableCredits = credits + extraRequestedCredits;
 
@@ -201,25 +277,50 @@ export default function App() {
     const extraDeduction = amount - monthlyDeduction;
     setCredits((current) => Math.max(0, current - monthlyDeduction));
     if (extraDeduction > 0) {
-      setExtraRequestedCredits((current) => Math.max(0, current - extraDeduction));
+      setExtraRequestedCredits((current) =>
+        Math.max(0, current - extraDeduction),
+      );
     }
     return true;
   };
 
-  const faceSwap = useFaceSwapTasks((amount, remark) => {
-    if (!deductAvailableCredits(amount)) return false;
-    setTransactions((current) => [{ id: `tx-face-${crypto.randomUUID()}`, type: "consume", tool: "视频换脸", amount: -amount, time: new Date().toISOString().replace("T", " ").slice(0, 19), remark }, ...current]);
-    return true;
-  }, (amount, remark) => {
-    setCredits((current) => current + amount);
-    setTransactions((current) => [{ id: `tx-face-refund-${crypto.randomUUID()}`, type: "refund", tool: "视频换脸", amount, time: new Date().toISOString().replace("T", " ").slice(0, 19), remark }, ...current]);
-  });
+  const faceSwap = useFaceSwapTasks(
+    (amount, remark) => {
+      if (!deductAvailableCredits(amount)) return false;
+      setTransactions((current) => [
+        {
+          id: `tx-face-${crypto.randomUUID()}`,
+          type: "consume",
+          tool: "视频换脸",
+          amount: -amount,
+          time: new Date().toISOString().replace("T", " ").slice(0, 19),
+          remark,
+        },
+        ...current,
+      ]);
+      return true;
+    },
+    (amount, remark) => {
+      setCredits((current) => current + amount);
+      setTransactions((current) => [
+        {
+          id: `tx-face-refund-${crypto.randomUUID()}`,
+          type: "refund",
+          tool: "视频换脸",
+          amount,
+          time: new Date().toISOString().replace("T", " ").slice(0, 19),
+          remark,
+        },
+        ...current,
+      ]);
+    },
+  );
 
   // Credit Application Workflow (Closed-Loop)
   const handleRequestCredits = (amount: number, reason: string) => {
     const now = new Date();
     const timeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-    
+
     const newMsg: AppMessage = {
       id: `msg_credits_app_${Date.now()}`,
       category: "审批待办",
@@ -250,8 +351,8 @@ export default function App() {
         { label: "申请积分", value: `${amount} 积分` },
         { label: "申请说明", value: reason },
         { label: "审核部长", value: "技术研发部 - 李部长" },
-        { label: "审批状态", value: "待审核" }
-      ]
+        { label: "审批状态", value: "待审核" },
+      ],
     };
 
     setMessages((prev) => [newMsg, ...prev]);
@@ -273,12 +374,14 @@ export default function App() {
             ...m,
             approvalStatus: "approved",
             details: (m.details || []).map((d) =>
-              d.label === "审批状态" ? { label: "审批状态", value: "已审核通过" } : d
-            )
+              d.label === "审批状态"
+                ? { label: "审批状态", value: "已审核通过" }
+                : d,
+            ),
           };
         }
         return m;
-      })
+      }),
     );
 
     // 2. Add credits to user
@@ -292,7 +395,7 @@ export default function App() {
       date: timeStr.slice(0, 10),
       time: timeStr.slice(11, 19),
       note: `额外积分申请审核通过 (+${amount} 积分)`,
-      balance: credits + amount
+      balance: credits + amount,
     };
     setTransactions((prev) => [newTx, ...prev]);
 
@@ -322,8 +425,8 @@ export default function App() {
         { label: "申请结果", value: "审核通过" },
         { label: "发放积分", value: `+${amount} 积分` },
         { label: "审核部长", value: "技术研发部 - 李部长" },
-        { label: "备注说明", value: "审核通过，已自动充值到当月剩余积分" }
-      ]
+        { label: "备注说明", value: "审核通过，已自动充值到当月剩余积分" },
+      ],
     };
 
     setMessages((prev) => [resultMsg, ...prev]);
@@ -346,12 +449,14 @@ export default function App() {
             approvalStatus: "rejected",
             rejectReason,
             details: (m.details || []).map((d) =>
-              d.label === "审批状态" ? { label: "审批状态", value: `已驳回 (原因: ${rejectReason})` } : d
-            )
+              d.label === "审批状态"
+                ? { label: "审批状态", value: `已驳回 (原因: ${rejectReason})` }
+                : d,
+            ),
           };
         }
         return m;
-      })
+      }),
     );
 
     // 2. Create result notification for applicant
@@ -381,8 +486,8 @@ export default function App() {
         { label: "申请结果", value: "审核拒绝" },
         { label: "申请积分", value: `${amount} 积分` },
         { label: "审核部长", value: "技术研发部 - 李部长" },
-        { label: "拒绝原因", value: rejectReason }
-      ]
+        { label: "拒绝原因", value: rejectReason },
+      ],
     };
 
     setMessages((prev) => [resultMsg, ...prev]);
@@ -390,24 +495,33 @@ export default function App() {
 
   const handleMarkMessageRead = (id: string) => {
     setMessages((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, status: "read", isRedDot: false } : m))
+      prev.map((m) =>
+        m.id === id ? { ...m, status: "read", isRedDot: false } : m,
+      ),
     );
   };
 
   const handleMarkAllMessagesRead = () => {
     setMessages((prev) =>
-      prev.map((m) => ({ ...m, status: "read", isRedDot: false }))
+      prev.map((m) => ({ ...m, status: "read", isRedDot: false })),
     );
   };
 
   // Material Selector Modal config
   const [selectorOpen, setSelectorOpen] = useState(false);
-  const [selectorCallback, setSelectorCallback] = useState<((selectedUrls: string[]) => void) | null>(null);
+  const [selectorCallback, setSelectorCallback] = useState<
+    ((selectedUrls: string[]) => void) | null
+  >(null);
+  const [selectorMaxSelections, setSelectorMaxSelections] = useState(5);
+  const [selectorAllowedTypes, setSelectorAllowedTypes] = useState<
+    Array<"image" | "video" | "audio" | "document" | "template">
+  >(["image", "video"]);
 
   // Preset states for 一键同款
   const [presetPrompt, setPresetPrompt] = useState<string>("");
   const [presetReferences, setPresetReferences] = useState<string[]>([]);
-  const [selectedSameStyleItem, setSelectedSameStyleItem] = useState<GalleryItem | null>(null);
+  const [selectedSameStyleItem, setSelectedSameStyleItem] =
+    useState<GalleryItem | null>(null);
 
   // Background ticker simulating GPU cloud rendering
   useEffect(() => {
@@ -422,7 +536,8 @@ export default function App() {
           }
           if (t.status === "generating") {
             updated = true;
-            const nextProgress = t.progress + Math.floor(Math.random() * 20 + 10);
+            const nextProgress =
+              t.progress + Math.floor(Math.random() * 20 + 10);
             if (nextProgress >= 100) {
               // Complete task!
               triggerTaskCompletedEffects(t);
@@ -446,7 +561,12 @@ export default function App() {
       setTasks((current) => {
         let changed = false;
         const next = current.map((task) => {
-          if (task.category !== "ai_video" || task.autoProgress !== false || !task.simulationStartedAt || !["queue", "generating"].includes(task.status)) {
+          if (
+            task.category !== "ai_video" ||
+            task.autoProgress !== false ||
+            !task.simulationStartedAt ||
+            !["queue", "generating"].includes(task.status)
+          ) {
             return task;
           }
 
@@ -456,40 +576,59 @@ export default function App() {
           }
 
           if (elapsed < 5000) {
-            const nextProgress = Math.min(96, Math.max(8, Math.round(((elapsed - 1200) / 3800) * 100)));
-            if (task.status !== "generating" || task.progress !== nextProgress) changed = true;
-            return { ...task, status: "generating" as const, progress: nextProgress };
+            const nextProgress = Math.min(
+              96,
+              Math.max(8, Math.round(((elapsed - 1200) / 3800) * 100)),
+            );
+            if (task.status !== "generating" || task.progress !== nextProgress)
+              changed = true;
+            return {
+              ...task,
+              status: "generating" as const,
+              progress: nextProgress,
+            };
           }
 
           const snapshot = task.aiVideoSnapshot;
-          const previewMedia = snapshot?.selectedLook
-            || snapshot?.character
-            || snapshot?.firstFrame
-            || snapshot?.references?.[0]
-            || snapshot?.sourceVideos?.[0]
-            || snapshot?.modelMedia
-            || snapshot?.clothingImages?.[0];
-          const videoUrl = "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4";
-          const outputSources = snapshot?.mode === "background" && snapshot.sourceVideos?.length
-            ? snapshot.sourceVideos
-            : [previewMedia];
+          const previewMedia =
+            snapshot?.selectedLook ||
+            snapshot?.character ||
+            snapshot?.firstFrame ||
+            snapshot?.references?.[0] ||
+            snapshot?.sourceVideos?.[0] ||
+            snapshot?.modelMedia ||
+            snapshot?.clothingImages?.[0] ||
+            snapshot?.productImage ||
+            snapshot?.solutionMaterial ||
+            snapshot?.painMaterial ||
+            snapshot?.usageVideo;
+          const videoUrl =
+            "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4";
+          const outputSources =
+            snapshot?.mode === "background" && snapshot.sourceVideos?.length
+              ? snapshot.sourceVideos
+              : [previewMedia];
           const aiVideoOutputs = outputSources.map((media, index) => {
-            const duration = snapshot?.mode === "background"
-              ? Math.min(media?.durationSeconds || snapshot.duration || 8, 8)
-              : snapshot?.duration || 8;
+            const duration =
+              snapshot?.mode === "background"
+                ? Math.min(media?.durationSeconds || snapshot.duration || 8, 8)
+                : snapshot?.duration || 8;
             const sourceName = media?.name?.replace(/\.[^.]+$/, "");
             return {
               id: `${task.id}-output-${index + 1}`,
-              name: snapshot?.mode === "background" && sourceName
-                ? `${sourceName}_换背景.mp4`
-                : `${task.name}.mp4`,
+              name:
+                snapshot?.mode === "background" && sourceName
+                  ? `${sourceName}_换背景.mp4`
+                  : `${task.name}.mp4`,
               videoUrl,
-              coverUrl: media?.coverUrl
-                || (media?.type === "image" ? media.url : "")
-                || "/assets/prototype/luxury-skincare-set.jpg",
+              coverUrl:
+                media?.coverUrl ||
+                (media?.type === "image" ? media.url : "") ||
+                "/assets/prototype/luxury-skincare-set.jpg",
               duration,
               size: `${(duration * 1.02 + 0.8 + index * 0.33).toFixed(2)}MB`,
-              sourceVideoId: snapshot?.mode === "background" ? media?.id : undefined
+              sourceVideoId:
+                snapshot?.mode === "background" ? media?.id : undefined,
             };
           });
           changed = true;
@@ -499,7 +638,7 @@ export default function App() {
             progress: 100,
             outputFiles: aiVideoOutputs.map((output) => output.videoUrl),
             aiVideoOutput: aiVideoOutputs[0],
-            aiVideoOutputs
+            aiVideoOutputs,
           };
         });
         return changed ? next : current;
@@ -509,19 +648,95 @@ export default function App() {
     return () => window.clearInterval(interval);
   }, []);
 
+  // Quick creation tasks use the same short prototype lifecycle without auto-publishing results.
   useEffect(() => {
-    const refundable = tasks.filter((task) => ["watermark", "subtitle", "enhance"].includes(task.category || "") && task.status === "failed" && (task.refundedCredits || 0) < task.creditsCost);
+    const interval = window.setInterval(() => {
+      const now = Date.now();
+      setTasks((current) => {
+        let changed = false;
+        const next = current.map((task) => {
+          if (
+            task.category !== "quick_creation" ||
+            !task.quickCreationSnapshot ||
+            !task.simulationStartedAt ||
+            !["queue", "generating"].includes(task.status)
+          )
+            return task;
+          const elapsed = now - task.simulationStartedAt;
+          if (elapsed < 1100) return task;
+          if (elapsed < 5000) {
+            const progress = Math.min(
+              96,
+              Math.max(8, Math.round(((elapsed - 1100) / 3900) * 100)),
+            );
+            if (task.status !== "generating" || task.progress !== progress)
+              changed = true;
+            return { ...task, status: "generating" as const, progress };
+          }
+          const snapshot = task.quickCreationSnapshot;
+          const imageOutputs = [
+            "/assets/prototype/luxury-skincare-set.jpg",
+            "/assets/prototype/skincare-product.jpg",
+            "/assets/prototype/luxury-skincare-set.jpg",
+            "/assets/prototype/skincare-product.jpg",
+          ];
+          const outputFiles =
+            snapshot.mode === "image"
+              ? imageOutputs.slice(
+                  0,
+                  snapshot.outputLabels?.length || snapshot.imageCount,
+                )
+              : [
+                  "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4",
+                ];
+          changed = true;
+          return {
+            ...task,
+            status: "completed" as const,
+            progress: 100,
+            outputFiles,
+          };
+        });
+        return changed ? next : current;
+      });
+    }, 160);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const refundable = tasks.filter(
+      (task) =>
+        ["watermark", "subtitle", "enhance", "ai_video"].includes(task.category || "") &&
+        task.status === "failed" &&
+        (task.refundedCredits || 0) < task.creditsCost,
+    );
     if (refundable.length === 0) return;
 
     const timestamp = new Date().toISOString().replace("T", " ").slice(0, 19);
-    const totalRefund = refundable.reduce((sum, task) => sum + task.creditsCost - (task.refundedCredits || 0), 0);
+    const totalRefund = refundable.reduce(
+      (sum, task) => sum + task.creditsCost - (task.refundedCredits || 0),
+      0,
+    );
     setCredits((current) => current + totalRefund);
-    setTasks((current) => current.map((task) => refundable.some((item) => item.id === task.id) ? { ...task, refundedCredits: task.creditsCost } : task));
+    setTasks((current) =>
+      current.map((task) =>
+        refundable.some((item) => item.id === task.id)
+          ? { ...task, refundedCredits: task.creditsCost }
+          : task,
+      ),
+    );
     setTransactions((current) => [
       ...refundable.map((task, index): CreditTransaction => ({
         id: `tx_video_process_failure_refund_${Date.now()}_${index}`,
         type: "refund",
-        tool: task.category === "subtitle" ? "字幕擦除" : task.category === "enhance" ? "画质增强" : "视频去水印",
+        tool:
+          task.category === "subtitle"
+            ? "字幕擦除"
+            : task.category === "ai_video"
+              ? "AI视频原料"
+            : task.category === "enhance"
+              ? "画质增强"
+              : "视频去水印",
         amount: task.creditsCost - (task.refundedCredits || 0),
         time: timestamp,
         remark: `处理失败，退回全部积分：${task.name}`,
@@ -537,20 +752,35 @@ export default function App() {
       setTasks((current) => {
         let changed = false;
         const next = current.map((task) => {
-          if (!["watermark", "subtitle"].includes(task.category || "") || task.autoProgress !== false || !task.simulationStartedAt || !["queue", "generating"].includes(task.status)) {
+          if (
+            !["watermark", "subtitle"].includes(task.category || "") ||
+            task.autoProgress !== false ||
+            !task.simulationStartedAt ||
+            !["queue", "generating"].includes(task.status)
+          ) {
             return task;
           }
 
           const elapsed = now - task.simulationStartedAt;
           if (elapsed < 1200) return task;
           if (elapsed < 6000) {
-            const nextProgress = Math.min(96, Math.max(6, Math.round(((elapsed - 1200) / 4800) * 100)));
-            if (task.status !== "generating" || task.progress !== nextProgress) changed = true;
-            return { ...task, status: "generating" as const, progress: nextProgress };
+            const nextProgress = Math.min(
+              96,
+              Math.max(6, Math.round(((elapsed - 1200) / 4800) * 100)),
+            );
+            if (task.status !== "generating" || task.progress !== nextProgress)
+              changed = true;
+            return {
+              ...task,
+              status: "generating" as const,
+              progress: nextProgress,
+            };
           }
 
           const isSubtitle = task.category === "subtitle";
-          const sourceVideo = isSubtitle ? task.subtitleSnapshot?.sourceVideo : task.watermarkSnapshot?.sourceVideo;
+          const sourceVideo = isSubtitle
+            ? task.subtitleSnapshot?.sourceVideo
+            : task.watermarkSnapshot?.sourceVideo;
           if (!sourceVideo) return task;
           const output: WatermarkTaskOutput = {
             name: `${sourceVideo.name.replace(/\.[^.]+$/, "")}_${isSubtitle ? "字幕擦除" : "去水印"}.mp4`,
@@ -566,7 +796,9 @@ export default function App() {
             status: "completed" as const,
             progress: 100,
             outputFiles: [output.videoUrl],
-            ...(isSubtitle ? { subtitleOutput: output } : { watermarkOutput: output }),
+            ...(isSubtitle
+              ? { subtitleOutput: output }
+              : { watermarkOutput: output }),
           };
         });
         return changed ? next : current;
@@ -583,22 +815,39 @@ export default function App() {
       setTasks((current) => {
         let changed = false;
         const next = current.map((task) => {
-          if (task.category !== "enhance" || task.autoProgress !== false || !task.simulationStartedAt || !["queue", "generating"].includes(task.status)) {
+          if (
+            task.category !== "enhance" ||
+            task.autoProgress !== false ||
+            !task.simulationStartedAt ||
+            !["queue", "generating"].includes(task.status)
+          ) {
             return task;
           }
 
           const elapsed = now - task.simulationStartedAt;
           if (elapsed < 1200) return task;
           if (elapsed < 8000) {
-            const nextProgress = Math.min(96, Math.max(5, Math.round(((elapsed - 1200) / 6800) * 100)));
-            if (task.status !== "generating" || task.progress !== nextProgress) changed = true;
-            return { ...task, status: "generating" as const, progress: nextProgress };
+            const nextProgress = Math.min(
+              96,
+              Math.max(5, Math.round(((elapsed - 1200) / 6800) * 100)),
+            );
+            if (task.status !== "generating" || task.progress !== nextProgress)
+              changed = true;
+            return {
+              ...task,
+              status: "generating" as const,
+              progress: nextProgress,
+            };
           }
 
           const snapshot = task.enhanceSnapshot;
           if (!snapshot) return task;
           const output: EnhanceTaskOutput = {
-            name: buildEnhanceOutputName(snapshot.sourceVideo.name, snapshot.outputResolution, snapshot.outputFps),
+            name: buildEnhanceOutputName(
+              snapshot.sourceVideo.name,
+              snapshot.outputResolution,
+              snapshot.outputFps,
+            ),
             videoUrl: snapshot.sourceVideo.url,
             coverUrl: snapshot.sourceVideo.coverUrl,
             size: snapshot.sourceVideo.size,
@@ -625,11 +874,13 @@ export default function App() {
   const triggerTaskCompletedEffects = (task: Task) => {
     // Generate beautiful assets dynamically upon completion
     const timestamp = new Date().toISOString().replace("T", " ").slice(0, 16);
-    
+
     if (task.type === "video_gen") {
-      const videoUrl = "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4";
-      const coverUrl = "https://images.unsplash.com/photo-1485462537746-965f33f7f6a7?w=600&auto=format&fit=crop&q=80";
-      
+      const videoUrl =
+        "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4";
+      const coverUrl =
+        "https://images.unsplash.com/photo-1485462537746-965f33f7f6a7?w=600&auto=format&fit=crop&q=80";
+
       const newAsset: Asset = {
         id: `gen_asset_${Date.now()}`,
         name: `AI视频生成成果_${timestamp.replace(":", "_")}.mp4`,
@@ -642,35 +893,38 @@ export default function App() {
         source: "ai_generation",
         creator: "徐振",
         publicTags: ["AI生成", "商品成片"],
-        coverUrl
+        coverUrl,
       };
 
       const newGalleryItem: GalleryItem = {
         id: `gen_g_${Date.now()}`,
         title: `生成视频: ${task.name.replace("AI 视频生成: ", "")}`,
         author: "MC电商至尊",
-        authorAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&h=80&fit=crop",
+        authorAvatar:
+          "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&h=80&fit=crop",
         type: "video",
         url: videoUrl,
         coverUrl,
         likes: 5,
         views: 18,
         category: "视频",
-        duration: "15s"
+        duration: "15s",
       };
 
       setAssets((prev) => [newAsset, ...prev]);
       setGalleryItems((prev) => [newGalleryItem, ...prev]);
-      
+
       setTimeout(() => {
-        setTasks((current) => 
-          current.map((ct) => ct.id === task.id ? { ...ct, outputFiles: [videoUrl] } : ct)
+        setTasks((current) =>
+          current.map((ct) =>
+            ct.id === task.id ? { ...ct, outputFiles: [videoUrl] } : ct,
+          ),
         );
       }, 100);
-
     } else if (task.type === "image_gen") {
-      const imageUrl = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80";
-      
+      const imageUrl =
+        "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80";
+
       const newAsset: Asset = {
         id: `gen_asset_${Date.now()}`,
         name: `AI商业图像绘制_${timestamp.replace(":", "_")}.png`,
@@ -682,27 +936,30 @@ export default function App() {
         resourceCategory: "图片",
         source: "ai_generation",
         creator: "徐振",
-        publicTags: ["AI生成", "商品场景图"]
+        publicTags: ["AI生成", "商品场景图"],
       };
 
       const newGalleryItem: GalleryItem = {
         id: `gen_g_${Date.now()}`,
         title: `生成图片: ${task.name.replace("AI 商业绘图: ", "")}`,
         author: "MC电商至尊",
-        authorAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&h=80&fit=crop",
+        authorAvatar:
+          "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&h=80&fit=crop",
         type: "image",
         url: imageUrl,
         likes: 2,
         views: 10,
-        category: "图片"
+        category: "图片",
       };
 
       setAssets((prev) => [newAsset, ...prev]);
       setGalleryItems((prev) => [newGalleryItem, ...prev]);
 
       setTimeout(() => {
-        setTasks((current) => 
-          current.map((ct) => ct.id === task.id ? { ...ct, outputFiles: [imageUrl] } : ct)
+        setTasks((current) =>
+          current.map((ct) =>
+            ct.id === task.id ? { ...ct, outputFiles: [imageUrl] } : ct,
+          ),
         );
       }, 100);
     }
@@ -714,7 +971,8 @@ export default function App() {
     name: string,
     inputFiles: string[],
     creditsCost: number,
-    source: "agent" | "tool" = "tool"
+    source: "agent" | "tool" = "tool",
+    quickCreationSnapshot?: QuickCreationTaskSnapshot,
   ) => {
     if (!deductAvailableCredits(creditsCost)) {
       alert("余额不足！请开通 VIP 订阅方案或在可用积分中心兑换卡密添加额度。");
@@ -734,28 +992,51 @@ export default function App() {
       createdAt: timestamp,
       creditsCost,
       source,
-      category: source === "agent" ? "agent" : (
-        type === "watermark" ? "watermark" :
-        type === "subtitle" ? "subtitle" :
-        type === "enhance" ? "enhance" :
-        type === "face_swap" ? "face_swap" :
-        type === "fission" ? "fission" :
-        type === "video_gen" ? "ai_video" :
-        "quick_creation"
-      )
+      quickCreationSnapshot,
+      autoProgress: quickCreationSnapshot ? false : undefined,
+      simulationStartedAt: quickCreationSnapshot ? Date.now() : undefined,
+      category: quickCreationSnapshot
+        ? "quick_creation"
+        : source === "agent"
+          ? "agent"
+          : type === "watermark"
+            ? "watermark"
+            : type === "subtitle"
+              ? "subtitle"
+              : type === "enhance"
+                ? "enhance"
+                : type === "face_swap"
+                  ? "face_swap"
+                  : type === "fission"
+                    ? "fission"
+                    : type === "video_gen"
+                      ? "ai_video"
+                      : "quick_creation",
     };
 
     setTasks((prev) => [newTask, ...prev]);
 
     // Add logging ledger record
-    const toolLabel = 
-        type === "watermark" ? "水印擦除" :
-      type === "subtitle" ? "字幕擦除" :
-      type === "enhance" ? "画质增强" :
-      type === "face_swap" ? "视频换脸" :
-      type === "fission" ? "爆款复刻" :
-      type === "video_gen" ? (source === "agent" ? "Agent创作" : "AI视频原料") :
-      source === "agent" ? "Agent创作" : "快速创作";
+    const toolLabel =
+      type === "watermark"
+        ? "水印擦除"
+        : type === "subtitle"
+          ? "字幕擦除"
+          : type === "enhance"
+            ? "画质增强"
+            : type === "face_swap"
+              ? "视频换脸"
+              : type === "fission"
+                ? "爆款复刻"
+                : type === "video_gen"
+                  ? quickCreationSnapshot
+                    ? "快速创作"
+                    : source === "agent"
+                      ? "Agent创作"
+                      : "AI视频原料"
+                  : source === "agent"
+                    ? "Agent创作"
+                    : "快速创作";
 
     const newTx: CreditTransaction = {
       id: "tx_" + Date.now(),
@@ -763,16 +1044,27 @@ export default function App() {
       tool: toolLabel,
       amount: -creditsCost,
       time: new Date().toISOString().replace("T", " ").slice(0, 19),
-      remark: `生成/处理: ${name}`
+      remark: `生成/处理: ${name}`,
     };
 
     setTransactions((prev) => [newTx, ...prev]);
 
     // Force open tasks queue to show progress - disabled to keep queue closed by default
     // setIsQueueOpen(true);
+    return id;
   };
 
-  const handleCreateAiVideoTask = (snapshot: AiVideoTaskSnapshot, creditsCost: number) => {
+  const handleCreateAiVideoTask = (
+    snapshot: AiVideoTaskSnapshot,
+    creditsCost: number,
+  ) => {
+    if (isAiVideoSceneMode(snapshot.mode)) {
+      const error = validateAiVideoScene(snapshot.mode, snapshot);
+      if (error) {
+        alert(error);
+        return null;
+      }
+    }
     if (!deductAvailableCredits(creditsCost)) {
       alert("余额不足！请前往个人中心申请或补充积分。");
       return null;
@@ -781,25 +1073,10 @@ export default function App() {
     const now = new Date();
     const id = `ai-video-${now.getTime()}`;
     const timestamp = now.toISOString().replace("T", " ").slice(0, 19);
-    const modeLabels: Record<AiVideoTaskSnapshot["mode"], string> = {
-      reference: "参考生视频",
-      first_last: "首尾帧生视频",
-      dubbing: "配音生视频",
-      background: "视频编辑-换背景",
-      outfit: "视频编辑-换装"
-    };
-    const inputFiles = [
-      ...(snapshot.references || []),
-      ...(snapshot.firstFrame ? [snapshot.firstFrame] : []),
-      ...(snapshot.lastFrame ? [snapshot.lastFrame] : []),
-      ...(snapshot.character ? [snapshot.character] : []),
-      ...(snapshot.sourceVideos || []),
-      ...(snapshot.clothingImages || []),
-      ...(snapshot.modelMedia ? [snapshot.modelMedia] : [])
-    ].map((item) => item.url);
+    const inputFiles = getAiVideoInputs(snapshot).map((item) => item.url);
     const task: Task = {
       id,
-      name: `AI视频原料_${modeLabels[snapshot.mode]}_${timestamp.slice(0, 10).replace(/-/g, "")}_${timestamp.slice(11, 19).replace(/:/g, "")}`,
+      name: `AI视频原料_${AI_VIDEO_MODE_LABELS[snapshot.mode]}_${timestamp.slice(0, 10).replace(/-/g, "")}_${timestamp.slice(11, 19).replace(/:/g, "")}`,
       type: "video_gen",
       status: "queue",
       progress: 0,
@@ -812,25 +1089,33 @@ export default function App() {
       cancellable: true,
       restartable: false,
       aiVideoSnapshot: snapshot,
-      simulationStartedAt: now.getTime()
+      simulationStartedAt: now.getTime(),
     };
 
     setTasks((current) => [task, ...current]);
-    setTransactions((current) => [{
-      id: `tx_ai_video_${now.getTime()}`,
-      type: "consume",
-      tool: "AI视频原料",
-      amount: -creditsCost,
-      time: timestamp,
-      remark: `生成视频：${task.name}`
-    }, ...current]);
+    setTransactions((current) => [
+      {
+        id: `tx_ai_video_${now.getTime()}`,
+        type: "consume",
+        tool: "AI视频原料",
+        amount: -creditsCost,
+        time: timestamp,
+        remark: `生成视频：${task.name}`,
+      },
+      ...current,
+    ]);
     return id;
   };
 
-  const handleCreateEraseTask = (type: "watermark" | "subtitle", snapshot: WatermarkTaskSnapshot) => {
+  const handleCreateEraseTask = (
+    type: "watermark" | "subtitle",
+    snapshot: WatermarkTaskSnapshot,
+  ) => {
     const creditsCost = 40;
     if (!deductAvailableCredits(creditsCost)) {
-      alert(`积分不足，无法开始${type === "subtitle" ? "字幕擦除" : "视频去水印"}。`);
+      alert(
+        `积分不足，无法开始${type === "subtitle" ? "字幕擦除" : "视频去水印"}。`,
+      );
       return null;
     }
 
@@ -853,26 +1138,36 @@ export default function App() {
       autoProgress: false,
       cancellable: true,
       restartable: false,
-      ...(type === "subtitle" ? { subtitleSnapshot: snapshot } : { watermarkSnapshot: snapshot }),
+      ...(type === "subtitle"
+        ? { subtitleSnapshot: snapshot }
+        : { watermarkSnapshot: snapshot }),
       simulationStartedAt: now.getTime(),
     };
 
     setTasks((current) => [task, ...current]);
-    setTransactions((current) => [{
-      id: `tx_${type}_${now.getTime()}`,
-      type: "consume",
-      tool: type === "subtitle" ? "字幕擦除" : "视频去水印",
-      amount: -creditsCost,
-      time: timestamp,
-      remark: `${type === "subtitle" ? "字幕擦除" : "视频去水印"}：${snapshot.sourceVideo.name}`,
-    }, ...current]);
+    setTransactions((current) => [
+      {
+        id: `tx_${type}_${now.getTime()}`,
+        type: "consume",
+        tool: type === "subtitle" ? "字幕擦除" : "视频去水印",
+        amount: -creditsCost,
+        time: timestamp,
+        remark: `${type === "subtitle" ? "字幕擦除" : "视频去水印"}：${snapshot.sourceVideo.name}`,
+      },
+      ...current,
+    ]);
     return id;
   };
 
-  const handleCreateWatermarkTask = (snapshot: WatermarkTaskSnapshot) => handleCreateEraseTask("watermark", snapshot);
-  const handleCreateSubtitleTask = (snapshot: WatermarkTaskSnapshot) => handleCreateEraseTask("subtitle", snapshot);
+  const handleCreateWatermarkTask = (snapshot: WatermarkTaskSnapshot) =>
+    handleCreateEraseTask("watermark", snapshot);
+  const handleCreateSubtitleTask = (snapshot: WatermarkTaskSnapshot) =>
+    handleCreateEraseTask("subtitle", snapshot);
 
-  const handleCreateEnhanceTask = (snapshot: EnhanceTaskSnapshot, creditsCost: number) => {
+  const handleCreateEnhanceTask = (
+    snapshot: EnhanceTaskSnapshot,
+    creditsCost: number,
+  ) => {
     if (!deductAvailableCredits(creditsCost)) {
       alert("积分不足，无法开始视频画质增强。");
       return null;
@@ -881,7 +1176,11 @@ export default function App() {
     const now = new Date();
     const id = `enhance-${now.getTime()}`;
     const timestamp = now.toISOString().replace("T", " ").slice(0, 19);
-    const outputName = buildEnhanceOutputName(snapshot.sourceVideo.name, snapshot.outputResolution, snapshot.outputFps);
+    const outputName = buildEnhanceOutputName(
+      snapshot.sourceVideo.name,
+      snapshot.outputResolution,
+      snapshot.outputFps,
+    );
     const task: Task = {
       id,
       name: outputName.replace(/\.mp4$/i, ""),
@@ -901,14 +1200,17 @@ export default function App() {
     };
 
     setTasks((current) => [task, ...current]);
-    setTransactions((current) => [{
-      id: `tx_enhance_${now.getTime()}`,
-      type: "consume",
-      tool: "画质增强",
-      amount: -creditsCost,
-      time: timestamp,
-      remark: `视频画质增强：${snapshot.sourceVideo.name}`,
-    }, ...current]);
+    setTransactions((current) => [
+      {
+        id: `tx_enhance_${now.getTime()}`,
+        type: "consume",
+        tool: "画质增强",
+        amount: -creditsCost,
+        time: timestamp,
+        remark: `视频画质增强：${snapshot.sourceVideo.name}`,
+      },
+      ...current,
+    ]);
     return id;
   };
 
@@ -920,14 +1222,17 @@ export default function App() {
 
     const now = new Date();
     const timestamp = now.toISOString().replace("T", " ").slice(0, 19);
-    setTransactions((current) => [{
-      id: `tx_ai_video_preview_${now.getTime()}`,
-      type: "consume",
-      tool: "AI视频原料",
-      amount: -creditsCost,
-      time: timestamp,
-      remark
-    }, ...current]);
+    setTransactions((current) => [
+      {
+        id: `tx_ai_video_preview_${now.getTime()}`,
+        type: "consume",
+        tool: "AI视频原料",
+        amount: -creditsCost,
+        time: timestamp,
+        remark,
+      },
+      ...current,
+    ]);
     return true;
   };
 
@@ -940,19 +1245,24 @@ export default function App() {
     setTasks((current) => {
       const exists = current.some((task) => task.id === nextTask.id);
       return exists
-        ? current.map((task) => task.id === nextTask.id ? { ...task, ...nextTask } : task)
+        ? current.map((task) =>
+            task.id === nextTask.id ? { ...task, ...nextTask } : task,
+          )
         : [nextTask, ...current];
     });
 
     if (creditsCharge > 0) {
-      setTransactions((current) => [{
-        id: `tx_agent_${Date.now()}`,
-        type: "consume",
-        tool: nextTask.category === "fission" ? "爆款复刻" : "Agent创作",
-        amount: -creditsCharge,
-        time: new Date().toISOString().replace("T", " ").slice(0, 19),
-        remark: `${nextTask.category === "fission" ? "爆款复刻" : "Agent生成"}：${nextTask.name}`
-      }, ...current]);
+      setTransactions((current) => [
+        {
+          id: `tx_agent_${Date.now()}`,
+          type: "consume",
+          tool: nextTask.category === "fission" ? "爆款复刻" : "Agent创作",
+          amount: -creditsCharge,
+          time: new Date().toISOString().replace("T", " ").slice(0, 19),
+          remark: `${nextTask.category === "fission" ? "爆款复刻" : "Agent生成"}：${nextTask.name}`,
+        },
+        ...current,
+      ]);
     }
   };
 
@@ -965,14 +1275,19 @@ export default function App() {
       tool: "系统赠送",
       amount,
       time: new Date().toISOString().replace("T", " ").slice(0, 19),
-      remark
+      remark,
     };
 
     setTransactions((prev) => [newTx, ...prev]);
   };
 
   // Asset manipulations
-  const handleUploadAsset = (file: { name: string; type: "image" | "video" | "audio"; url: string; size: string }) => {
+  const handleUploadAsset = (file: {
+    name: string;
+    type: "image" | "video" | "audio";
+    url: string;
+    size: string;
+  }) => {
     const timestamp = new Date().toISOString().replace("T", " ").slice(0, 16);
     const newAsset: Asset = {
       id: "asset_upload_" + Date.now(),
@@ -981,16 +1296,28 @@ export default function App() {
       url: file.url,
       size: file.size,
       createdAt: timestamp,
-      category: file.type === "image" ? "商品图片" : file.type === "audio" ? "音频素材" : "视频素材",
-      resourceCategory: file.type === "image" ? "图片" : file.type === "audio" ? "音频" : "素材",
+      category:
+        file.type === "image"
+          ? "商品图片"
+          : file.type === "audio"
+            ? "音频素材"
+            : "视频素材",
+      resourceCategory:
+        file.type === "image"
+          ? "图片"
+          : file.type === "audio"
+            ? "音频"
+            : "素材",
       source: "resource_library",
       creator: "徐振",
-      publicTags: ["个人上传"]
+      publicTags: ["个人上传"],
     };
     setAssets((prev) => [newAsset, ...prev]);
   };
 
-  const handleUploadAgentVideos = (videos: Array<{ name: string; cover: string }>) => {
+  const handleUploadAgentVideos = (
+    videos: Array<{ name: string; cover: string }>,
+  ) => {
     const timestamp = new Date().toISOString().replace("T", " ").slice(0, 16);
     const uploadedAssets: Asset[] = videos.map((video, index) => ({
       id: `agent_upload_${Date.now()}_${index}`,
@@ -1005,63 +1332,82 @@ export default function App() {
       source: "resource_library",
       creator: "徐振",
       publicTags: ["AI生成", "电商营销"],
-      status: "未审核"
+      status: "未审核",
     }));
     setAssets((current) => [...uploadedAssets, ...current]);
   };
 
-  const handleUploadEraseResult = (type: "watermark" | "subtitle", output: WatermarkTaskOutput) => {
+  const handleUploadEraseResult = (
+    type: "watermark" | "subtitle",
+    output: WatermarkTaskOutput,
+  ) => {
     const timestamp = new Date().toISOString().replace("T", " ").slice(0, 16);
     const label = type === "subtitle" ? "字幕擦除" : "视频去水印";
-    setAssets((current) => [{
-      id: `${type}_upload_${Date.now()}`,
-      name: output.name,
-      type: "video",
-      url: output.videoUrl,
-      coverUrl: output.coverUrl,
-      size: output.size,
-      createdAt: timestamp,
-      category: label,
-      resourceCategory: "成片",
-      source: "resource_library",
-      creator: "徐振",
-      publicTags: [label, "AI处理"],
-      status: "待审核",
-      fileInfo: {
+    setAssets((current) => [
+      {
+        id: `${type}_upload_${Date.now()}`,
+        name: output.name,
+        type: "video",
+        url: output.videoUrl,
+        coverUrl: output.coverUrl,
         size: output.size,
-        resolution: output.resolution,
-        duration: `${Math.floor(output.duration / 60).toString().padStart(2, "0")}:${Math.floor(output.duration % 60).toString().padStart(2, "0")}`,
-        format: "MP4",
+        createdAt: timestamp,
+        category: label,
+        resourceCategory: "成片",
+        source: "resource_library",
+        creator: "徐振",
+        publicTags: [label, "AI处理"],
+        status: "待审核",
+        fileInfo: {
+          size: output.size,
+          resolution: output.resolution,
+          duration: `${Math.floor(output.duration / 60)
+            .toString()
+            .padStart(2, "0")}:${Math.floor(output.duration % 60)
+            .toString()
+            .padStart(2, "0")}`,
+          format: "MP4",
+        },
       },
-    }, ...current]);
+      ...current,
+    ]);
   };
 
-  const handleUploadWatermarkResult = (output: WatermarkTaskOutput) => handleUploadEraseResult("watermark", output);
-  const handleUploadSubtitleResult = (output: WatermarkTaskOutput) => handleUploadEraseResult("subtitle", output);
+  const handleUploadWatermarkResult = (output: WatermarkTaskOutput) =>
+    handleUploadEraseResult("watermark", output);
+  const handleUploadSubtitleResult = (output: WatermarkTaskOutput) =>
+    handleUploadEraseResult("subtitle", output);
 
   const handleUploadEnhanceResult = (output: EnhanceTaskOutput) => {
     const timestamp = new Date().toISOString().replace("T", " ").slice(0, 16);
-    setAssets((current) => [{
-      id: `enhance_upload_${Date.now()}`,
-      name: output.name,
-      type: "video",
-      url: output.videoUrl,
-      coverUrl: output.coverUrl,
-      size: output.size,
-      createdAt: timestamp,
-      category: "画质增强",
-      resourceCategory: "成片",
-      source: "resource_library",
-      creator: "徐振",
-      publicTags: ["画质增强", "AI处理"],
-      status: "待审核",
-      fileInfo: {
+    setAssets((current) => [
+      {
+        id: `enhance_upload_${Date.now()}`,
+        name: output.name,
+        type: "video",
+        url: output.videoUrl,
+        coverUrl: output.coverUrl,
         size: output.size,
-        resolution: output.resolution,
-        duration: `${Math.floor(output.duration / 60).toString().padStart(2, "0")}:${Math.floor(output.duration % 60).toString().padStart(2, "0")}`,
-        format: "MP4",
+        createdAt: timestamp,
+        category: "画质增强",
+        resourceCategory: "成片",
+        source: "resource_library",
+        creator: "徐振",
+        publicTags: ["画质增强", "AI处理"],
+        status: "待审核",
+        fileInfo: {
+          size: output.size,
+          resolution: output.resolution,
+          duration: `${Math.floor(output.duration / 60)
+            .toString()
+            .padStart(2, "0")}:${Math.floor(output.duration % 60)
+            .toString()
+            .padStart(2, "0")}`,
+          format: "MP4",
+        },
       },
-    }, ...current]);
+      ...current,
+    ]);
   };
 
   const handleRemoveAsset = (id: string) => {
@@ -1069,45 +1415,78 @@ export default function App() {
   };
 
   const handleRenameAsset = (id: string, newName: string) => {
-    setAssets(assets.map((a) => a.id === id ? { ...a, name: newName } : a));
+    setAssets(assets.map((a) => (a.id === id ? { ...a, name: newName } : a)));
   };
 
   // Material picker trigger helper
-  const handleOpenMaterialSelector = (callback: (selectedUrls: string[]) => void) => {
+  const handleOpenMaterialSelector = (
+    callback: (selectedUrls: string[]) => void,
+    maxSelections = 5,
+    allowedTypes: Array<
+      "image" | "video" | "audio" | "document" | "template"
+    > = ["image", "video"],
+  ) => {
     setSelectorCallback(() => callback);
+    setSelectorMaxSelections(maxSelections);
+    setSelectorAllowedTypes(allowedTypes);
     setSelectorOpen(true);
   };
 
   const clearCompletedTasks = () => {
-    setTasks(tasks.filter((t) => t.status === "queue" || t.status === "generating"));
+    setTasks(
+      tasks.filter((t) => t.status === "queue" || t.status === "generating"),
+    );
   };
 
   const handleCancelGenerationTask = (taskId: string) => {
-    if (faceSwap.tasks.some((task) => task.id === taskId)) { faceSwap.cancel(taskId); return; }
+    if (faceSwap.tasks.some((task) => task.id === taskId)) {
+      faceSwap.cancel(taskId);
+      return;
+    }
     const target = tasks.find((task) => task.id === taskId);
     if (!target || !["queue", "generating"].includes(target.status)) return;
     if (target.category === "ai_video" && target.status !== "queue") return;
-    if (["watermark", "subtitle", "enhance"].includes(target.category || "") && target.status !== "queue") return;
+    if (
+      ["watermark", "subtitle", "enhance"].includes(target.category || "") &&
+      target.status !== "queue"
+    )
+      return;
 
     const cancelledAt = new Date().toISOString().replace("T", " ").slice(0, 19);
     const refund = target.status === "queue" ? target.creditsCost : 0;
-    setTasks((current) => current.map((task) => task.id === taskId ? {
-      ...task,
-      status: "cancelled",
-      cancelledAt,
-      refundedCredits: refund
-    } : task));
+    setTasks((current) =>
+      current.map((task) =>
+        task.id === taskId
+          ? {
+              ...task,
+              status: "cancelled",
+              cancelledAt,
+              refundedCredits: refund,
+            }
+          : task,
+      ),
+    );
 
     if (refund > 0) {
       setCredits((current) => current + refund);
-      setTransactions((current) => [{
-        id: `tx_cancel_refund_${Date.now()}`,
-        type: "refund",
-        tool: target.category === "watermark" ? "视频去水印" : target.category === "subtitle" ? "字幕擦除" : target.category === "enhance" ? "画质增强" : "AI任务取消",
-        amount: refund,
-        time: cancelledAt,
-        remark: `排队阶段取消，退回全部积分：${target.name}`
-      }, ...current]);
+      setTransactions((current) => [
+        {
+          id: `tx_cancel_refund_${Date.now()}`,
+          type: "refund",
+          tool:
+            target.category === "watermark"
+              ? "视频去水印"
+              : target.category === "subtitle"
+                ? "字幕擦除"
+                : target.category === "enhance"
+                  ? "画质增强"
+                  : "AI任务取消",
+          amount: refund,
+          time: cancelledAt,
+          remark: `排队阶段取消，退回全部积分：${target.name}`,
+        },
+        ...current,
+      ]);
     }
   };
 
@@ -1120,34 +1499,43 @@ export default function App() {
     }
 
     const restartedAt = new Date().toISOString().replace("T", " ").slice(0, 19);
-    setTasks((current) => current.map((task) => task.id === taskId ? {
-      ...task,
-      status: "queue",
-      progress: 0,
-      createdAt: restartedAt.slice(0, 16),
-      cancelledAt: undefined,
-      refundedCredits: undefined,
-      failureReason: undefined,
-      outputFiles: undefined,
-      aiVideoOutput: undefined,
-      aiVideoOutputs: undefined
-    } : task));
-    setTransactions((current) => [{
-      id: `tx_restart_${Date.now()}`,
-      type: "consume",
-      tool: "重新生成",
-      amount: -target.creditsCost,
-      time: restartedAt,
-      remark: `重新提交任务：${target.name}`
-    }, ...current]);
+    setTasks((current) =>
+      current.map((task) =>
+        task.id === taskId
+          ? {
+              ...task,
+              status: "queue",
+              progress: 0,
+              createdAt: restartedAt.slice(0, 16),
+              cancelledAt: undefined,
+              refundedCredits: undefined,
+              failureReason: undefined,
+              outputFiles: undefined,
+              aiVideoOutput: undefined,
+              aiVideoOutputs: undefined,
+            }
+          : task,
+      ),
+    );
+    setTransactions((current) => [
+      {
+        id: `tx_restart_${Date.now()}`,
+        type: "consume",
+        tool: "重新生成",
+        amount: -target.creditsCost,
+        time: restartedAt,
+        remark: `重新提交任务：${target.name}`,
+      },
+      ...current,
+    ]);
   };
 
   // Rendering screen router
   const renderMainView = () => {
     if (appMode === "admin") {
       return (
-        <AdminView 
-          adminActiveScreen={adminActiveScreen} 
+        <AdminView
+          adminActiveScreen={adminActiveScreen}
           onTriggerTask={handleAddTask}
           onOpenTaskQueue={() => setIsQueueOpen(true)}
           onLogout={() => setLogoutDialogOpen(true)}
@@ -1179,50 +1567,85 @@ export default function App() {
       case "quick_creation":
         return (
           <QuickCreationView
-            galleryItems={galleryItems}
+            uploadedVideos={assets.filter((asset) => asset.id.startsWith("face-published-") && asset.resourceCategory === "成片")}
+            onRemake={(source) => {
+              const sessionId = `remake-${crypto.randomUUID()}`;
+              setRemakeSourceRequest({ sessionId, source });
+              setActiveRemakeSessionId(sessionId);
+              handleNavigate("video_remake");
+            }}
+            assets={assets}
+            tasks={tasks}
+            activeTaskId={activeQuickCreationTaskId}
             setActiveScreen={handleNavigate}
-            onOpenMaterialSelector={handleOpenMaterialSelector}
             onAddTask={handleAddTask}
-            onAddCredits={handleAddCredits}
-            onUseSamePrompt={(type, prompt, refUrl, item) => {
-              if (item) {
-                setSelectedSameStyleItem(item);
-                handleNavigate("same_style_video");
-              } else if (type === "video") {
-                setPresetPrompt(prompt);
-                setPresetReferences(refUrl ? [refUrl] : []);
-                handleNavigate("ai_video");
-              } else {
-                handleNavigate("quick_creation");
-              }
+            onUploadToLibrary={(type, files) => {
+              setResourceUploadRequest({ type, files });
+              handleNavigate("resources");
             }}
           />
         );
       case "face_swap":
-        return <VideoFaceSwapWorkspace
-          assets={assets}
-          credits={availableCredits}
-          task={faceSwap.tasks.find((task) => task.id === activeFaceSwapTaskId) || null}
-          onBack={() => handleNavigate("quick_creation")}
-          onCreate={faceSwap.create}
-          onActiveTaskChange={setActiveFaceSwapTaskId}
-          onUpdate={faceSwap.update}
-          onSubmit={faceSwap.submit}
-          onCancel={faceSwap.cancel}
-          onPublish={(source, version, details) => {
-            setAssets((current) => [{ id: `face-published-${crypto.randomUUID()}`, name: details.names[0] || version.name, type: "video", url: version.videoUrl,
-              coverUrl: source.coverUrl, size: source.size, createdAt: new Date().toISOString().replace("T", " ").slice(0, 19),
-              category: details.primaryCategory, resourceCategory: details.partition, source: "resource_library", creator: "徐振", publicTags: ["视频换脸", `版本${version.number}`], status: "待审核",
-              fileInfo: { size: source.size, resolution: source.resolution, duration: `${Math.floor(source.duration / 60).toString().padStart(2, "0")}:${Math.floor(source.duration % 60).toString().padStart(2, "0")}`, format: source.name.split(".").at(-1)?.toUpperCase() || "MP4" },
-            }, ...current]);
-          }}
-        />;
+        return (
+          <VideoFaceSwapWorkspace
+            assets={assets}
+            credits={availableCredits}
+            task={
+              faceSwap.tasks.find((task) => task.id === activeFaceSwapTaskId) ||
+              null
+            }
+            onBack={() => handleNavigate("quick_creation")}
+            onCreate={faceSwap.create}
+            onActiveTaskChange={setActiveFaceSwapTaskId}
+            onUpdate={faceSwap.update}
+            onSubmit={faceSwap.submit}
+            onCancel={faceSwap.cancel}
+            onPublish={(source, version, details) => {
+              setAssets((current) => [
+                {
+                  id: `face-published-${crypto.randomUUID()}`,
+                  name: details.names[0] || version.name,
+                  type: "video",
+                  url: version.videoUrl,
+                  coverUrl: source.coverUrl,
+                  size: source.size,
+                  createdAt: new Date()
+                    .toISOString()
+                    .replace("T", " ")
+                    .slice(0, 19),
+                  category: details.primaryCategory,
+                  resourceCategory: details.partition,
+                  source: "resource_library",
+                  creator: "徐振",
+                  publicTags: ["视频换脸", `版本${version.number}`],
+                  status: "待审核",
+                  fileInfo: {
+                    size: source.size,
+                    resolution: source.resolution,
+                    duration: `${Math.floor(source.duration / 60)
+                      .toString()
+                      .padStart(2, "0")}:${Math.floor(source.duration % 60)
+                      .toString()
+                      .padStart(2, "0")}`,
+                    format:
+                      source.name.split(".").at(-1)?.toUpperCase() || "MP4",
+                  },
+                },
+                ...current,
+              ]);
+            }}
+          />
+        );
       case "enhance":
         return (
           <QualityEnhanceView
             assets={assets}
             credits={availableCredits}
-            task={activeEnhanceTaskId ? tasks.find((task) => task.id === activeEnhanceTaskId) || null : null}
+            task={
+              activeEnhanceTaskId
+                ? tasks.find((task) => task.id === activeEnhanceTaskId) || null
+                : null
+            }
             onBack={handleBack}
             onCreateTask={handleCreateEnhanceTask}
             onActiveTaskChange={setActiveEnhanceTaskId}
@@ -1235,7 +1658,12 @@ export default function App() {
           <VideoWatermarkWorkspace
             type="watermark"
             assets={assets}
-            task={activeWatermarkTaskId ? tasks.find((task) => task.id === activeWatermarkTaskId) || null : null}
+            task={
+              activeWatermarkTaskId
+                ? tasks.find((task) => task.id === activeWatermarkTaskId) ||
+                  null
+                : null
+            }
             onBack={handleBack}
             onCreateTask={handleCreateWatermarkTask}
             onActiveTaskChange={setActiveWatermarkTaskId}
@@ -1248,7 +1676,11 @@ export default function App() {
           <VideoWatermarkWorkspace
             type="subtitle"
             assets={assets}
-            task={activeSubtitleTaskId ? tasks.find((task) => task.id === activeSubtitleTaskId) || null : null}
+            task={
+              activeSubtitleTaskId
+                ? tasks.find((task) => task.id === activeSubtitleTaskId) || null
+                : null
+            }
             onBack={handleBack}
             onCreateTask={handleCreateSubtitleTask}
             onActiveTaskChange={setActiveSubtitleTaskId}
@@ -1277,9 +1709,7 @@ export default function App() {
           />
         );
       case "assets":
-        return (
-          <AssetsView />
-        );
+        return <AssetsView />;
       case "credits":
         return (
           <CreditsDashboard
@@ -1292,7 +1722,7 @@ export default function App() {
             onLogout={() => setLogoutDialogOpen(true)}
           />
         );
-      
+
       case "canvas":
         return (
           <InfiniteCanvasView
@@ -1310,7 +1740,9 @@ export default function App() {
             onNavigateToDelivery={() => handleNavigate("ad_delivery")}
             onNavigateToMaterials={() => handleNavigate("materials")}
             initialDetailTask={selectedTaskForCollaboration}
-            onClearInitialDetailTask={() => setSelectedTaskForCollaboration(null)}
+            onClearInitialDetailTask={() =>
+              setSelectedTaskForCollaboration(null)
+            }
             initialTab={selectedTaskTabForCollaboration}
           />
         );
@@ -1326,7 +1758,12 @@ export default function App() {
             onMarkMessageRead={handleMarkMessageRead}
             onMarkAllMessagesRead={handleMarkAllMessagesRead}
             onOpenResource={(resource) => {
-              setResourceSearchIntent({ type: resource.type, query: resource.name, openDetail: true, requestId: Date.now() });
+              setResourceSearchIntent({
+                type: resource.type,
+                query: resource.name,
+                openDetail: true,
+                requestId: Date.now(),
+              });
               handleNavigate("resources");
             }}
           />
@@ -1338,13 +1775,20 @@ export default function App() {
       case "scripts":
         return (
           <ResourcesView
-            uploadedVideos={assets.filter((asset) => asset.id.startsWith("face-published-"))}
+            uploadedVideos={assets.filter((asset) =>
+              asset.id.startsWith("face-published-"),
+            )}
             initialSearch={resourceSearchIntent}
             onClearInitialSearch={() => setResourceSearchIntent(null)}
             initialTab={
-              activeScreen === "materials" ? "materials" :
-              activeScreen === "scripts" ? "scripts" : "finished_videos"
+              activeScreen === "materials"
+                ? "materials"
+                : activeScreen === "scripts"
+                  ? "scripts"
+                  : "finished_videos"
             }
+            initialUpload={resourceUploadRequest}
+            onClearInitialUpload={() => setResourceUploadRequest(null)}
             onTriggerTask={(type, name, inputFiles, cost) => {
               handleAddTask(type, name, inputFiles, cost);
             }}
@@ -1359,9 +1803,7 @@ export default function App() {
         );
 
       case "ad_delivery":
-        return (
-          <AdDeliveryView />
-        );
+        return <AdDeliveryView />;
 
       case "same_style_video":
         return (
@@ -1377,12 +1819,16 @@ export default function App() {
             credits={availableCredits}
           />
         );
-      
+
       case "agent_creation":
         return (
           <AgentCreationView
             credits={availableCredits}
-            activeTask={activeAgentSessionId ? tasks.find((task) => task.id === activeAgentSessionId) : undefined}
+            activeTask={
+              activeAgentSessionId
+                ? tasks.find((task) => task.id === activeAgentSessionId)
+                : undefined
+            }
             onSyncTask={handleSyncAgentTask}
             onCancelTask={handleCancelGenerationTask}
             onOpenQueue={() => setIsQueueOpen(true)}
@@ -1391,7 +1837,7 @@ export default function App() {
             onBack={handleBack}
           />
         );
-      
+
       case "video_remake":
         return (
           <VideoRemakeView
@@ -1400,13 +1846,22 @@ export default function App() {
             credits={availableCredits}
             assets={assets}
             activeSessionId={activeRemakeSessionId}
-            activeTask={activeRemakeSessionId ? tasks.find((task) => task.remakeSessionId === activeRemakeSessionId || task.id === activeRemakeSessionId) : undefined}
+            initialSource={remakeSourceRequest?.sessionId === activeRemakeSessionId ? remakeSourceRequest.source : undefined}
+            activeTask={
+              activeRemakeSessionId
+                ? tasks.find(
+                    (task) =>
+                      task.remakeSessionId === activeRemakeSessionId ||
+                      task.id === activeRemakeSessionId,
+                  )
+                : undefined
+            }
             onSessionChange={setActiveRemakeSessionId}
             onSyncTask={handleSyncAgentTask}
             onUploadVideos={handleUploadAgentVideos}
           />
         );
-      
+
       default:
         return <div className="text-slate-100 p-6">Screen Coming soon...</div>;
     }
@@ -1418,12 +1873,13 @@ export default function App() {
 
   return (
     <div className="w-screen h-screen flex bg-slate-50 text-slate-800 overflow-hidden font-sans">
-      
       {/* 1. Left Navigation Sidebar */}
       <Sidebar
         activeScreen={activeScreen}
         setActiveScreen={handleSidebarNavigate}
-        collapsed={sidebarCollapsed || (activeScreen === "face_swap" && narrowViewport)}
+        collapsed={
+          sidebarCollapsed || (activeScreen === "face_swap" && narrowViewport)
+        }
         setCollapsed={setSidebarCollapsed}
         credits={availableCredits}
         openCreditsModal={() => handleNavigate("credits")}
@@ -1476,6 +1932,12 @@ export default function App() {
               setIsQueueOpen(false);
               return;
             }
+            if (task?.category === "quick_creation") {
+              setActiveQuickCreationTaskId(task.id);
+              setScreenHistory(["quick_creation"]);
+              setIsQueueOpen(false);
+              return;
+            }
             handleNavigate("resources");
           }}
         />
@@ -1493,7 +1955,8 @@ export default function App() {
               selectorCallback(urls);
             }
           }}
-          maxSelections={5}
+          maxSelections={selectorMaxSelections}
+          allowedTypes={selectorAllowedTypes}
         />
       )}
 
