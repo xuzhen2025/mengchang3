@@ -3,15 +3,22 @@ import { createRequire } from "node:module";
 import { mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
-const { chromium } = require("playwright");
+const { chromium, expect } = require("playwright/test");
 const browser = await chromium.launch({ headless: true, channel: "msedge" });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
-const root = new URL("../docs/previews/", import.meta.url);
+const root = new URL(process.env.PREVIEW_DIR || "../docs/previews/", import.meta.url);
 await mkdir(root, { recursive: true });
 const screenshot = (name) => page.screenshot({ path: fileURLToPath(new URL(`video-face-swap-${name}.png`, root)) });
 const waitText = (text) => page.getByText(text, { exact: true }).first().waitFor({ state: "visible", timeout: 15000 });
+const assertResultActions = async (visible) => {
+  for (const name of ["下载视频", "上传资源库"]) {
+    const button = page.getByTestId("face-result-panel").getByRole("button", { name, exact: true });
+    if (visible) await expect(button).toBeEnabled();
+    else await expect(button).toHaveCount(0);
+  }
+};
 const assertLayout = async () => {
   const layout = await page.getByTestId("face-swap-workspace").evaluate((workspace) => {
     const box = (selector) => {
@@ -26,6 +33,11 @@ const assertLayout = async () => {
       body: box('[data-testid="face-swap-body"]'), roles: box('[data-testid="face-roles-panel"]'), list: box('[data-testid="face-role-list"]'),
       source: box('[data-testid="face-source-panel"]'), result: box('[data-testid="face-result-panel"]'), footer: box("footer"), nav: box('nav[aria-label="换脸阶段"]'),
       videoAreas: [...workspace.querySelectorAll('[data-testid="face-source-panel"] > div:last-child, [data-testid="face-result-panel"] > div:last-child')].map((el) => el.getBoundingClientRect().height),
+      hasResult: Boolean(workspace.querySelector('[data-testid="face-result-panel"] video')),
+      resultActions: [...workspace.querySelectorAll('[data-testid="face-result-panel"] button')].map((button) => {
+        const bounds = button.getBoundingClientRect();
+        return { text: button.textContent, height: bounds.height, x: bounds.x, right: bounds.right, y: bounds.y, clipped: button.scrollWidth > button.clientWidth };
+      }),
     };
   });
   assert.equal(layout.pageOverflow, false);
@@ -35,6 +47,13 @@ const assertLayout = async () => {
   assert.ok(layout.source.bottom < layout.result.y);
   assert.ok(layout.result.bottom <= layout.footer.y);
   assert.ok(layout.videoAreas.every((height) => height >= (layout.width >= 768 ? 100 : 40)), JSON.stringify(layout));
+  assert.deepEqual(layout.resultActions.map((button) => button.text), layout.hasResult ? ["下载视频", "上传资源库"] : []);
+  if (layout.hasResult) {
+    assert.ok(layout.resultActions.every((button) => button.height === 36 && !button.clipped && button.right <= layout.result.right));
+    assert.equal(layout.resultActions[0].y, layout.resultActions[1].y);
+    assert.ok(layout.resultActions[0].right < layout.resultActions[1].x);
+    assert.ok(Math.abs(layout.resultActions[1].right - layout.result.right) < 1);
+  }
   if (layout.width >= 768) assert.ok(layout.roles.right < layout.source.x);
   return layout;
 };
@@ -90,7 +109,10 @@ try {
   await assertLayout();
   await page.getByRole("button", { name: "取消排队", exact: true }).click();
   await waitText("已取消");
+  await assertResultActions(false);
   await page.getByRole("button", { name: /开始换脸/ }).click();
+  await waitText("处理中");
+  await assertResultActions(false);
   await waitText("处理成功");
   await waitText("版本1");
   assert.equal(await page.getByTestId("face-group").count(), 2);
@@ -109,6 +131,10 @@ try {
   const seek = await page.getByTestId("face-compare-player").locator("video").evaluateAll((videos) => videos.map((video) => video.currentTime));
   assert.ok(seek.every((time) => Math.abs(time - 6) < 0.2));
   await page.getByRole("button", { name: /再次换脸/ }).click();
+  await waitText("排队中");
+  await assertResultActions(true);
+  await waitText("处理中");
+  await assertResultActions(true);
   await page.getByTitle("返回快速创作").click();
   await page.waitForTimeout(6500);
   await page.getByText("视频换脸", { exact: true }).click();
@@ -118,7 +144,7 @@ try {
   await versions.selectOption({ label: "版本1" });
   const selectedVersionId = await versions.inputValue();
   await page.waitForFunction(() => [...document.querySelectorAll('[data-testid="face-compare-player"] video')].every((video) => video.readyState >= 2));
-  const frameChecks = await page.getByTestId("face-compare-player").locator("video").evaluateAll((videos) => videos.map((video) => {
+  const captureFrames = () => page.getByTestId("face-compare-player").locator("video").evaluateAll((videos) => videos.map((video) => {
     const canvas = document.createElement("canvas"); canvas.width = 64; canvas.height = 36;
     const context = canvas.getContext("2d"); context.drawImage(video, 0, 0, 64, 36);
     const pixels = context.getImageData(0, 0, 64, 36).data;
@@ -126,7 +152,11 @@ try {
     for (let i = 0; i < pixels.length; i += 4) colors.add(`${pixels[i]},${pixels[i + 1]},${pixels[i + 2]}`);
     return { colors: colors.size, poster: video.poster, time: video.currentTime };
   }));
-  assert.ok(frameChecks.every((frame) => frame.colors > 100 && frame.poster === "" && frame.time < 0.1));
+  let frameChecks;
+  await expect.poll(async () => {
+    frameChecks = await captureFrames();
+    return frameChecks.every((frame) => frame.colors > 100 && frame.poster === "" && frame.time < 0.1);
+  }).toBe(true);
   await screenshot("results");
   for (const viewport of [{ width: 1280, height: 720 }, { width: 1920, height: 1080 }]) {
     await page.setViewportSize(viewport);
@@ -135,7 +165,7 @@ try {
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "下载完整视频", exact: true }).click();
+  await page.getByRole("button", { name: "下载视频", exact: true }).click();
   const downloaded = await downloadPromise;
   assert.equal(downloaded.suggestedFilename(), "梦畅_视频换脸演示_换脸_版本1.mp4");
   await page.getByRole("button", { name: "上传资源库", exact: true }).click();
@@ -210,6 +240,7 @@ try {
   const creditBeforeFailure = await page.getByText(/^\d+\.\d{2}$/).first().innerText();
   await page.getByRole("button", { name: /开始换脸/ }).click();
   await waitText("处理失败");
+  await assertResultActions(false);
   assert.equal(await page.getByText(/^\d+\.\d{2}$/).first().innerText(), creditBeforeFailure);
   assert.equal(await page.getByRole("combobox", { name: "换脸结果版本" }).count(), 0);
   await screenshot("failed");

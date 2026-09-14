@@ -2,6 +2,8 @@ import React, { useMemo, useRef, useState } from "react";
 import { Check, Search, Trash2, Upload, X } from "lucide-react";
 import AssetPagination from "./AssetPagination";
 import OverlayPortal from "./overlays/OverlayPortal";
+import { useResourceConfig } from "../lib/useResourceConfig";
+import { useTaggedResources, useTagFilterSync } from "../lib/useResourceTags";
 
 export interface ImageResourcePickerItem {
   id: string;
@@ -32,7 +34,7 @@ const filterClassName = "h-9 w-[130px] shrink-0 rounded-md border border-slate-2
 const uniqueValues = (values: string[]) => Array.from(new Set(values)).filter(Boolean);
 
 export default function ImageResourcePickerModal({
-  items,
+  items: sourceItems,
   initialSelectedIds,
   multiple = false,
   initialSourceTab = "library",
@@ -40,10 +42,12 @@ export default function ImageResourcePickerModal({
   onClose,
   onConfirm,
 }: ImageResourcePickerModalProps) {
+  const items = useTaggedResources("images", sourceItems);
   const [sourceTab, setSourceTab] = useState(initialSourceTab);
   const [primaryCategory, setPrimaryCategory] = useState("全部一级分类");
   const [secondaryCategory, setSecondaryCategory] = useState("全部二级分类");
   const [tag, setTag] = useState("全部标签");
+  useTagFilterSync("public", tag, (value) => setTag(value === "全部" ? "全部标签" : value));
   const [status, setStatus] = useState("全部状态");
   const [author, setAuthor] = useState("全部上传人");
   const [search, setSearch] = useState("");
@@ -57,11 +61,9 @@ export default function ImageResourcePickerModal({
   const uploadRef = useRef<HTMLInputElement | null>(null);
 
   const allItems = useMemo(() => [...items, ...localItems], [items, localItems]);
-  const primaryCategories = useMemo(() => uniqueValues(items.map((item) => item.primaryCategory)), [items]);
-  const secondaryCategories = useMemo(
-    () => uniqueValues(items.filter((item) => primaryCategory === "全部一级分类" || item.primaryCategory === primaryCategory).map((item) => item.secondaryCategory)),
-    [items, primaryCategory],
-  );
+  const { store: configStore } = useResourceConfig();
+  const primaryCategories = configStore.categories("images").map(n => n.name);
+  const secondaryCategories = uniqueValues(configStore.categories("images").filter(n => primaryCategory === "全部一级分类" || n.name === primaryCategory).flatMap(n => n.children.map(c => c.name)));
   const tags = useMemo(() => uniqueValues(items.flatMap((item) => item.tags)), [items]);
   const statuses = useMemo(() => uniqueValues(items.map((item) => item.status)), [items]);
   const authors = useMemo(() => uniqueValues(items.map((item) => item.author)), [items]);

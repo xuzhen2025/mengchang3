@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { useReportData } from "../lib/useReportData";
+import { REPORT_START, REPORT_TODAY, fmt, money, percent, selectReportFacts, reportRows, reportTotals, qualityReport } from "../lib/reportDemoData";
 import {
   HelpCircle,
   ChevronUp,
@@ -24,7 +26,7 @@ interface PlatformTagsViewProps {
 }
 
 // Color palette matching the reference donut chart
-const MATERIAL_TYPES = [
+const MATERIAL_TYPE_META = [
   {
     id: "first_release",
     name: "首发素材",
@@ -106,139 +108,6 @@ const MATERIAL_TYPES = [
 ];
 
 // Mock data rows for Detailed Table
-const INITIAL_TABLE_ROWS = [
-  {
-    account: "广州千川官方号-01 (8821941)",
-    entity: "广州某某网络科技有限公司",
-    team: "华南电商一队",
-    group: "直播二组",
-    user: "张伟",
-    cat1: "服饰鞋包",
-    cat2: "女装短袖",
-    totalMaterials: 1250,
-    firstRelease: 380,
-    firstReleaseRatio: "30.4%",
-    firstReleaseSpend: "¥112,000",
-    firstReleaseSpendRatio: "32.7%",
-    highQuality: 240,
-    highQualityRatio: "19.2%",
-    highQualitySpend: "¥145,000",
-    highQualitySpendRatio: "42.3%",
-    lowEfficiency: 280,
-    lowEfficiencyRatio: "22.4%",
-    lowQuality: 150,
-    lowQualityRatio: "12.0%",
-    homogeneitySevere: 120,
-    homogeneitySevereRatio: "9.6%",
-    homogeneityRisk: 80,
-    homogeneityRiskRatio: "6.4%",
-  },
-  {
-    account: "杭州巨量千川-旗舰02 (9120482)",
-    entity: "杭州电商服务有限公司",
-    team: "华东数码二队",
-    group: "信息流一组",
-    user: "李娜",
-    cat1: "3C数码",
-    cat2: "智能耳机",
-    totalMaterials: 980,
-    firstRelease: 290,
-    firstReleaseRatio: "29.6%",
-    firstReleaseSpend: "¥89,500",
-    firstReleaseSpendRatio: "31.0%",
-    highQuality: 195,
-    highQualityRatio: "19.9%",
-    highQualitySpend: "¥118,200",
-    highQualitySpendRatio: "41.0%",
-    lowEfficiency: 210,
-    lowEfficiencyRatio: "21.4%",
-    lowQuality: 115,
-    lowQualityRatio: "11.7%",
-    homogeneitySevere: 95,
-    homogeneitySevereRatio: "9.7%",
-    homogeneityRisk: 75,
-    homogeneityRiskRatio: "7.7%",
-  },
-  {
-    account: "上海巨量广告-品牌01 (7739102)",
-    entity: "上海传媒网络科技公司",
-    team: "华东美妆一队",
-    group: "品牌推广组",
-    user: "王强",
-    cat1: "美妆护肤",
-    cat2: "精华面霜",
-    totalMaterials: 1120,
-    firstRelease: 310,
-    firstReleaseRatio: "27.7%",
-    firstReleaseSpend: "¥95,000",
-    firstReleaseSpendRatio: "30.0%",
-    highQuality: 220,
-    highQualityRatio: "19.6%",
-    highQualitySpend: "¥102,000",
-    highQualitySpendRatio: "32.2%",
-    lowEfficiency: 245,
-    lowEfficiencyRatio: "21.9%",
-    lowQuality: 135,
-    lowQualityRatio: "12.1%",
-    homogeneitySevere: 110,
-    homogeneitySevereRatio: "9.8%",
-    homogeneityRisk: 100,
-    homogeneityRiskRatio: "8.9%",
-  },
-  {
-    account: "北京千川测试户-05 (6652011)",
-    entity: "北京互联网络有限公司",
-    team: "华北综合队",
-    group: "效果提升组",
-    user: "刘洋",
-    cat1: "食品饮料",
-    cat2: "休闲零食",
-    totalMaterials: 640,
-    firstRelease: 180,
-    firstReleaseRatio: "28.1%",
-    firstReleaseSpend: "¥32,300",
-    firstReleaseSpendRatio: "28.0%",
-    highQuality: 125,
-    highQualityRatio: "19.5%",
-    highQualitySpend: "¥38,000",
-    highQualitySpendRatio: "33.0%",
-    lowEfficiency: 135,
-    lowEfficiencyRatio: "21.1%",
-    lowQuality: 80,
-    lowQualityRatio: "12.5%",
-    homogeneitySevere: 75,
-    homogeneitySevereRatio: "11.7%",
-    homogeneityRisk: 45,
-    homogeneityRiskRatio: "7.0%",
-  },
-  {
-    account: "深圳千川高爆户-08 (5510293)",
-    entity: "深圳快消实业有限公司",
-    team: "华南电商二队",
-    group: "爆品孵化组",
-    user: "陈晨",
-    cat1: "家居百货",
-    cat2: "个人护理",
-    totalMaterials: 500,
-    firstRelease: 120,
-    firstReleaseRatio: "24.0%",
-    firstReleaseSpend: "¥14,000",
-    firstReleaseSpendRatio: "22.0%",
-    highQuality: 80,
-    highQualityRatio: "16.0%",
-    highQualitySpend: "¥12,000",
-    highQualitySpendRatio: "19.0%",
-    lowEfficiency: 70,
-    lowEfficiencyRatio: "14.0%",
-    lowQuality: 40,
-    lowQualityRatio: "8.0%",
-    homogeneitySevere: 80,
-    homogeneitySevereRatio: "16.0%",
-    homogeneityRisk: 110,
-    homogeneityRiskRatio: "22.0%",
-  },
-];
-
 export default function PlatformTagsView({ showToast }: PlatformTagsViewProps) {
   // Top level platforms: 巨量千川 | 巨量广告
   const [platform, setPlatform] = useState<"qianchuan" | "oceanengine">("qianchuan");
@@ -248,8 +117,8 @@ export default function PlatformTagsView({ showToast }: PlatformTagsViewProps) {
 
   // Filters
   const [category, setCategory] = useState("all");
-  const [startDate, setStartDate] = useState("2026-01-22");
-  const [endDate, setEndDate] = useState("2026-01-24");
+  const [startDate, setStartDate] = useState(REPORT_START);
+  const [endDate, setEndDate] = useState(REPORT_TODAY);
 
   // Collapse toggle for 占比分析
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -260,7 +129,26 @@ export default function PlatformTagsView({ showToast }: PlatformTagsViewProps) {
   // Active hover index on Pie Chart
   const [hoveredSlice, setHoveredSlice] = useState<number | null>(null);
 
+  const report = useReportData();
+  const [applied, setApplied] = useState({start: REPORT_START, end: REPORT_TODAY, category: "all"});
+  const selected = selectReportFacts(report.facts, platform === "qianchuan" ? "巨量千川" : "巨量广告", applied);
+  const total = qualityReport(selected);
+  const qualityKeys = ["firstRelease", "highQuality", "lowEfficiency", "lowQuality", "homogeneitySevere", "homogeneityRisk"];
+  const MATERIAL_TYPES = MATERIAL_TYPE_META.map((item, i) => ({...item,
+    count: total[qualityKeys[i]], countRatio: total[qualityKeys[i] + "Ratio"],
+    spend: reportTotals(selected.filter(row => row.qualityTags.includes(["首发素材", "优质素材", "低效素材", "低质素材", "同质化挤压严重", "同质化排队投放"][i]))).spend,
+    spendRatio: total[qualityKeys[i] + "SpendRatio"]
+  }));
+  const INITIAL_TABLE_ROWS = reportRows(selected, dimension === "summary" ? "account" : dimension).map(row => ({
+    ...row, ...qualityReport(row.facts), account: dimension === "account" || dimension === "summary" ? `${row.accountName} (${row.accountId})` : "--",
+    entity: row.facts[0].subject, user: dimension === "team" || dimension === "group" ? "--" : row.user,
+    group: dimension === "team" ? "--" : row.group,
+    cat1: new Set(row.facts.map(fact => fact.category)).size === 1 ? row.cat1 : "--",
+    cat2: new Set(row.facts.map(fact => fact.subcategory)).size === 1 ? row.cat2 : "--",
+  }));
   const handleQuery = () => {
+    if (!startDate || !endDate || startDate > endDate) { showToast?.("查询失败", "请选择有效的日期范围"); return; }
+    setApplied({start: startDate, end: endDate, category});
     if (showToast) {
       showToast("查询成功", `已加载【${platform === "qianchuan" ? "巨量千川" : "巨量广告"}】维度数据 (${startDate} 至 ${endDate})`);
     }
@@ -268,8 +156,9 @@ export default function PlatformTagsView({ showToast }: PlatformTagsViewProps) {
 
   const handleReset = () => {
     setCategory("all");
-    setStartDate("2026-01-22");
-    setEndDate("2026-01-24");
+    setApplied({start: REPORT_START, end: REPORT_TODAY, category: "all"});
+    setStartDate(REPORT_START);
+    setEndDate(REPORT_TODAY);
     if (showToast) {
       showToast("已重置", "已恢复默认筛选条件");
     }
@@ -280,7 +169,7 @@ export default function PlatformTagsView({ showToast }: PlatformTagsViewProps) {
   let cumulativeAngle = 0;
 
   const pieSlices = MATERIAL_TYPES.map((item, index) => {
-    const percentage = item.count / totalCount;
+    const percentage = totalCount ? item.count / totalCount : 0;
     const angle = percentage * 360;
     const startAngle = cumulativeAngle;
     const endAngle = cumulativeAngle + angle;
@@ -404,11 +293,7 @@ export default function PlatformTagsView({ showToast }: PlatformTagsViewProps) {
                   className="pl-3 pr-8 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-purple-500 shadow-2xs cursor-pointer"
                 >
                   <option value="all">请选择分类</option>
-                  <option value="clothing">服饰鞋包</option>
-                  <option value="beauty">美妆护肤</option>
-                  <option value="digital">3C数码</option>
-                  <option value="food">食品饮料</option>
-                  <option value="home">家居百货</option>
+                  {report.categories.map(item => <option key={item.id} value={item.name}>{item.name}</option>)}
                 </select>
               </div>
 
@@ -636,38 +521,38 @@ export default function PlatformTagsView({ showToast }: PlatformTagsViewProps) {
                 <td className="py-3 px-3.5 text-slate-400">--</td>
                 <td className="py-3 px-3.5 text-slate-400">--</td>
                 <td className="py-3 px-3.5 text-slate-400">--</td>
-                <td className="py-3 px-3.5 text-right font-black text-[#7C3AED]">4,490</td>
+                <td className="py-3 px-3.5 text-right font-black text-[#7C3AED]">{fmt(total.totalMaterials)}</td>
                 <td className="py-3 px-3.5 text-right font-bold">
-                  <div>1,280</div>
-                  <div className="text-[10px] text-slate-400 font-normal">28.5%</div>
+                  <div>{fmt(total.firstRelease)}</div>
+                  <div className="text-[10px] text-slate-400 font-normal">{total.firstReleaseRatio}</div>
                 </td>
                 <td className="py-3 px-3.5 text-right font-bold text-slate-900">
-                  <div>¥342,800</div>
-                  <div className="text-[10px] text-slate-400 font-normal">32.4%</div>
+                  <div>{total.firstReleaseSpend}</div>
+                  <div className="text-[10px] text-slate-400 font-normal">{total.firstReleaseSpendRatio}</div>
                 </td>
                 <td className="py-3 px-3.5 text-right font-bold text-emerald-600">
-                  <div>860</div>
-                  <div className="text-[10px] text-slate-400 font-normal">19.1%</div>
+                  <div>{fmt(total.highQuality)}</div>
+                  <div className="text-[10px] text-slate-400 font-normal">{total.highQualityRatio}</div>
                 </td>
                 <td className="py-3 px-3.5 text-right font-bold text-emerald-700">
-                  <div>¥415,200</div>
-                  <div className="text-[10px] text-slate-400 font-normal">39.2%</div>
+                  <div>{total.highQualitySpend}</div>
+                  <div className="text-[10px] text-slate-400 font-normal">{total.highQualitySpendRatio}</div>
                 </td>
                 <td className="py-3 px-3.5 text-right font-bold text-purple-700">
-                  <div>940</div>
-                  <div className="text-[10px] text-slate-400 font-normal">20.9%</div>
+                  <div>{fmt(total.lowEfficiency)}</div>
+                  <div className="text-[10px] text-slate-400 font-normal">{total.lowEfficiencyRatio}</div>
                 </td>
                 <td className="py-3 px-3.5 text-right font-bold text-amber-600">
-                  <div>520</div>
-                  <div className="text-[10px] text-slate-400 font-normal">11.6%</div>
+                  <div>{fmt(total.lowQuality)}</div>
+                  <div className="text-[10px] text-slate-400 font-normal">{total.lowQualityRatio}</div>
                 </td>
                 <td className="py-3 px-3.5 text-right font-bold text-pink-600">
-                  <div>480</div>
-                  <div className="text-[10px] text-slate-400 font-normal">10.7%</div>
+                  <div>{fmt(total.homogeneitySevere)}</div>
+                  <div className="text-[10px] text-slate-400 font-normal">{total.homogeneitySevereRatio}</div>
                 </td>
                 <td className="py-3 px-3.5 text-right font-bold text-emerald-600 pr-4">
-                  <div>410</div>
-                  <div className="text-[10px] text-slate-400 font-normal">9.2%</div>
+                  <div>{fmt(total.homogeneityRisk)}</div>
+                  <div className="text-[10px] text-slate-400 font-normal">{total.homogeneityRiskRatio}</div>
                 </td>
               </tr>
 

@@ -1,3 +1,5 @@
+import { useReportData } from "../lib/useReportData";
+import { REPORT_TODAY, financialReportRows } from "../lib/reportDemoData";
 import React, { useState } from "react";
 import {
   Calendar,
@@ -39,139 +41,24 @@ interface FinancialRow {
   remark: string;
 }
 
-const INITIAL_ROWS: FinancialRow[] = [
-  {
-    accountName: "青筒-元素-持之以恒",
-    accountId: "1862066464789898",
-    team: "未绑定部门",
-    group: "未绑定分组",
-    user: "未绑定账号",
-    cat1: "未绑定分类..",
-    cat2: "未绑定分类",
-    totalSpend: 92393.53,
-    nonGrantSpend: 90523.42,
-    grantSpend: 1870.11,
-    rebateSpend: 0,
-    sharedWalletSpend: 0,
-    totalDeposit: 1870.11,
-    totalTransferIn: 100000.00,
-    totalTransferOut: 0,
-    totalBalance: 88527.53,
-    grantBalance: 0,
-    nonGrantBalance: 88527.53,
-    standardSpend: 0,
-    globalSpend: 0,
-    remark: "-"
-  },
-  {
-    accountName: "书意-RICH-扶摇直上九万里",
-    accountId: "1839701482129801",
-    team: "未绑定部门",
-    group: "未绑定分组",
-    user: "未绑定账号",
-    cat1: "未绑定分类..",
-    cat2: "未绑定分类",
-    totalSpend: 68531.65,
-    nonGrantSpend: 68202.75,
-    grantSpend: 328.90,
-    rebateSpend: 0,
-    sharedWalletSpend: 0,
-    totalDeposit: 328.90,
-    totalTransferIn: 100000.00,
-    totalTransferOut: 0,
-    totalBalance: 140294.48,
-    grantBalance: 0,
-    nonGrantBalance: 140294.48,
-    standardSpend: 0,
-    globalSpend: 68351.04,
-    remark: "-"
-  },
-  {
-    accountName: "兰君-粤理-爆单888",
-    accountId: "1843476828396544",
-    team: "未绑定部门",
-    group: "未绑定分组",
-    user: "未绑定账号",
-    cat1: "未绑定分类..",
-    cat2: "未绑定分类",
-    totalSpend: 38148.62,
-    nonGrantSpend: 37734.20,
-    grantSpend: 414.42,
-    rebateSpend: 0,
-    sharedWalletSpend: 0,
-    totalDeposit: 414.42,
-    totalTransferIn: 52500.00,
-    totalTransferOut: 0,
-    totalBalance: 55533.17,
-    grantBalance: 0,
-    nonGrantBalance: 55533.17,
-    standardSpend: 0,
-    globalSpend: 0,
-    remark: "-"
-  },
-  {
-    accountName: "素棉-粤理-爆米花",
-    accountId: "1868511341739399",
-    team: "未绑定部门",
-    group: "未绑定分组",
-    user: "未绑定账号",
-    cat1: "未绑定分类..",
-    cat2: "未绑定分类",
-    totalSpend: 21948.51,
-    nonGrantSpend: 21948.51,
-    grantSpend: 0.00,
-    rebateSpend: 0,
-    sharedWalletSpend: 0,
-    totalDeposit: 0.00,
-    totalTransferIn: 0.00,
-    totalTransferOut: 0,
-    totalBalance: 38610.93,
-    grantBalance: 0,
-    nonGrantBalance: 38610.93,
-    standardSpend: 0,
-    globalSpend: 0,
-    remark: "-"
-  },
-  {
-    accountName: "初理-惠理-跑量",
-    accountId: "1851290312019482",
-    team: "A部门",
-    group: "核心一组",
-    user: "张伟",
-    cat1: "美妆护肤",
-    cat2: "洗面奶",
-    totalSpend: 102143.09,
-    nonGrantSpend: 100800.00,
-    grantSpend: 1343.09,
-    rebateSpend: 0,
-    sharedWalletSpend: 0,
-    totalDeposit: 974.73,
-    totalTransferIn: 314000.00,
-    totalTransferOut: 100000.00,
-    totalBalance: 1315202.11,
-    grantBalance: 70439.87,
-    nonGrantBalance: 1244762.24,
-    standardSpend: 0,
-    globalSpend: 35374.58,
-    remark: "-"
-  }
-];
-
 export default function AccountFinanceReportView({ showToast }: AccountFinanceReportViewProps) {
+  const report = useReportData();
   const [activePlatform, setActivePlatform] = useState<string>("巨量千川");
   const [accountQuery, setAccountQuery] = useState<string>("");
   const [selectedTeam, setSelectedTeam] = useState<string>("");
   const [selectedGroup, setSelectedGroup] = useState<string>("");
   const [selectedAccount, setSelectedAccount] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [queryDate, setQueryDate] = useState<string>("2026-07-29");
+  const [queryDate, setQueryDate] = useState<string>(REPORT_TODAY);
 
   const [showExportMenu, setShowExportMenu] = useState<boolean>(false);
   const [pageSize, setPageSize] = useState<number>(50);
   const [currentPage, setCurrentPage] = useState<number>(1);
 
+  React.useEffect(() => setCurrentPage(1), [activePlatform, accountQuery, selectedTeam, selectedGroup, selectedAccount, selectedCategory, queryDate, pageSize]);
+
   // Filtered rows
-  const filteredRows = INITIAL_ROWS.filter((r) => {
+  const filteredRows = financialReportRows(report.facts, activePlatform, queryDate).filter((r) => {
     if (accountQuery) {
       const matchName = r.accountName.toLowerCase().includes(accountQuery.toLowerCase());
       const matchId = r.accountId.includes(accountQuery);
@@ -205,7 +92,7 @@ export default function AccountFinanceReportView({ showToast }: AccountFinanceRe
     setSelectedGroup("");
     setSelectedAccount("");
     setSelectedCategory("");
-    setQueryDate("2026-07-29");
+    setQueryDate(REPORT_TODAY);
     if (showToast) {
       showToast("重置成功", "已清空查询与过滤筛选条件");
     }
@@ -256,23 +143,21 @@ export default function AccountFinanceReportView({ showToast }: AccountFinanceRe
           {/* 请选择部门 */}
           <select
             value={selectedTeam}
-            onChange={(e) => setSelectedTeam(e.target.value)}
+            onChange={(e) => { setSelectedTeam(e.target.value); setSelectedGroup(""); setSelectedAccount(""); setCurrentPage(1); }}
             className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-purple-500 shadow-2xs cursor-pointer min-w-[150px]"
           >
             <option value="">请选择部门</option>
-            <option value="A部门">A部门</option>
-            <option value="未绑定部门">未绑定部门</option>
+            {report.tree.map(t => t.teamName).map(name => <option key={name} value={name}>{name}</option>)}
           </select>
 
           {/* 请选择分组 */}
           <select
             value={selectedGroup}
-            onChange={(e) => setSelectedGroup(e.target.value)}
+            onChange={(e) => { setSelectedGroup(e.target.value); setSelectedAccount(""); setCurrentPage(1); }}
             className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-purple-500 shadow-2xs cursor-pointer min-w-[150px]"
           >
             <option value="">请选择分组</option>
-            <option value="核心一组">核心一组</option>
-            <option value="未绑定分组">未绑定分组</option>
+            {report.tree.filter(t => !selectedTeam || t.teamName === selectedTeam).flatMap(t => t.groups.map(g => g.groupName)).map(name => <option key={name} value={name}>{name}</option>)}
           </select>
 
           {/* 请选择账号 */}
@@ -282,8 +167,7 @@ export default function AccountFinanceReportView({ showToast }: AccountFinanceRe
             className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-purple-500 shadow-2xs cursor-pointer min-w-[150px]"
           >
             <option value="">请选择账号</option>
-            <option value="张伟">张伟</option>
-            <option value="未绑定账号">未绑定账号</option>
+            {report.tree.filter(t => !selectedTeam || t.teamName === selectedTeam).flatMap(t => t.groups.filter(g => !selectedGroup || g.groupName === selectedGroup).flatMap(g => g.accounts)).map(name => <option key={name} value={name}>{name}</option>)}
           </select>
 
           {/* 请选择分类 */}
@@ -293,8 +177,7 @@ export default function AccountFinanceReportView({ showToast }: AccountFinanceRe
             className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-purple-500 shadow-2xs cursor-pointer min-w-[150px]"
           >
             <option value="">请选择分类</option>
-            <option value="美妆护肤">美妆护肤</option>
-            <option value="未绑定分类..">未绑定分类..</option>
+            {report.categories.map(c => c.name).map(name => <option key={name} value={name}>{name}</option>)}
           </select>
         </div>
 
@@ -305,7 +188,7 @@ export default function AccountFinanceReportView({ showToast }: AccountFinanceRe
             <input
               type="date"
               value={queryDate}
-              onChange={(e) => setQueryDate(e.target.value)}
+              onChange={(e) => { setQueryDate(e.target.value); setCurrentPage(1); }}
               className="bg-transparent text-xs text-slate-700 font-medium outline-none w-28 cursor-pointer"
             />
           </div>
@@ -313,6 +196,7 @@ export default function AccountFinanceReportView({ showToast }: AccountFinanceRe
           {/* 查询 Button (Solid Purple #7C3AED) */}
           <button
             onClick={() => {
+              if (!queryDate) return showToast?.("查询失败", "请选择查询日期");
               if (showToast) showToast("查询完成", `已更新【${queryDate}】的数据流水报表`);
             }}
             className="px-5 py-1.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold rounded-lg transition-colors cursor-pointer shadow-2xs flex items-center gap-1"
@@ -489,7 +373,7 @@ export default function AccountFinanceReportView({ showToast }: AccountFinanceRe
             </tr>
 
             {/* Individual Financial Account Rows */}
-            {filteredRows.map((row, idx) => (
+            {filteredRows.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((row, idx) => (
               <tr key={idx} className="hover:bg-slate-50/80 transition-colors whitespace-nowrap">
                 {/* Account Name & ID (Sticky) */}
                 <td className="py-3.5 px-6 sticky left-0 bg-white hover:bg-slate-50 z-10 border-r border-slate-200/50">
@@ -534,7 +418,7 @@ export default function AccountFinanceReportView({ showToast }: AccountFinanceRe
         {/* Page Size Select */}
         <select
           value={pageSize}
-          onChange={(e) => setPageSize(Number(e.target.value))}
+          onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
           className="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-purple-500 cursor-pointer shadow-2xs"
         >
           <option value={10}>10条/页</option>
@@ -552,12 +436,10 @@ export default function AccountFinanceReportView({ showToast }: AccountFinanceRe
           >
             &lt;
           </button>
-          <button className="px-3 py-1 bg-[#7C3AED] text-white font-bold rounded-lg cursor-pointer">
-            1
-          </button>
+          <button className="px-3 py-1 bg-[#7C3AED] text-white font-bold rounded-lg cursor-pointer">{currentPage}</button>
           <button
-            disabled
-            className="px-2.5 py-1 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 font-bold cursor-pointer"
+            disabled={currentPage * pageSize >= filteredRows.length} onClick={() => setCurrentPage(p => p + 1)}
+              className="px-2.5 py-1 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 font-bold cursor-pointer"
           >
             &gt;
           </button>

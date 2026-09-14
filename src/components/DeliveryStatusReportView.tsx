@@ -1,3 +1,5 @@
+import { useReportData } from "../lib/useReportData";
+import { REPORT_START, REPORT_TODAY, REPORT_COLORS, selectReportFacts, reportRows, statusTotals } from "../lib/reportDemoData";
 import React, { useState } from "react";
 import {
   Calendar,
@@ -30,27 +32,16 @@ interface DeliveryStatusReportViewProps {
   showToast?: (title: string, desc: string) => void;
 }
 
-// Chart Trend Data (Matching dates in screenshots: 2025-03-31 to 2025-04-14)
-const CHART_DATA = [
-  { date: "2025-03-31", 未绑定: 0, "测试指定员工可见-部门": 0, 抖音投放: 0.05 },
-  { date: "2025-04-02", 未绑定: 0, "测试指定员工可见-部门": 0, 抖音投放: 0.05 },
-  { date: "2025-04-04", 未绑定: 0, "测试指定员工可见-部门": 0, 抖音投放: 0.05 },
-  { date: "2025-04-06", 未绑定: 0, "测试指定员工可见-部门": 0, 抖音投放: 0.05 },
-  { date: "2025-04-08", 未绑定: 0, "测试指定员工可见-部门": 0, 抖音投放: 0.05 },
-  { date: "2025-04-10", 未绑定: 0, "测试指定员工可见-部门": 0, 抖音投放: 0.05 },
-  { date: "2025-04-12", 未绑定: 0, "测试指定员工可见-部门": 0, 抖音投放: 0.05 },
-  { date: "2025-04-14", 未绑定: 0, "测试指定员工可见-部门": 0, 抖音投放: 0.05 }
-];
-
 export default function DeliveryStatusReportView({ showToast }: DeliveryStatusReportViewProps) {
+  const report = useReportData();
   // 1. Top dimension tabs (Matching red rectangle in screenshots)
   const [activeDimension, setActiveDimension] = useState<
     "team" | "group" | "personal" | "live_room" | "advertiser_detail"
   >("team");
 
   // 2. Date Range Filter
-  const [startDate, setStartDate] = useState<string>("2025-03-31");
-  const [endDate, setEndDate] = useState<string>("2025-04-14");
+  const [startDate, setStartDate] = useState<string>(REPORT_START);
+  const [endDate, setEndDate] = useState<string>(REPORT_TODAY);
 
   // 3. Platform Toggle (巨量广告 | 巨量千川)
   const [activePlatform, setActivePlatform] = useState<"巨量广告" | "巨量千川">("巨量广告");
@@ -62,93 +53,24 @@ export default function DeliveryStatusReportView({ showToast }: DeliveryStatusRe
   // 5. Active Status Filter button above line chart
   const [activeMetricFilter, setActiveMetricFilter] = useState<string>("搭建计划总数");
 
-  // Mock table data for Team / Group / Personal
-  const TEAM_ROWS = [
-    { name: "抖音投放", total: 8, delivering: 3, pending: 3, terminated: 1, finished: 1, deleted: 0 },
-    { name: "测试指定员工可见-部门", total: 6, delivering: 2, pending: 3, terminated: 1, finished: 0, deleted: 0 },
-    { name: "未绑定", total: 4, delivering: 0, pending: 2, terminated: 1, finished: 1, deleted: 0 }
-  ];
-
-  const GROUP_ROWS = [
-    { name: "核心一组", total: 10, delivering: 4, pending: 4, terminated: 1, finished: 1, deleted: 0 },
-    { name: "测试小组-02", total: 5, delivering: 1, pending: 2, terminated: 1, finished: 1, deleted: 0 },
-    { name: "未绑定分组", total: 3, delivering: 0, pending: 2, terminated: 1, finished: 0, deleted: 0 }
-  ];
-
-  const PERSONAL_ROWS = [
-    { name: "张伟 (zs_test)", total: 12, delivering: 5, pending: 4, terminated: 2, finished: 1, deleted: 0 },
-    { name: "李娜 (1129新增)", total: 4, delivering: 0, pending: 2, terminated: 1, finished: 1, deleted: 0 },
-    { name: "未绑定账号", total: 2, delivering: 0, pending: 2, terminated: 0, finished: 0, deleted: 0 }
-  ];
-
-  // Mock table data for Live Room Data
-  const LIVE_ROOM_ROWS = [
-    {
-      roomName: "直播间2",
-      total: 7,
-      delivering: 0,
-      ineffective: 0,
-      auditNew: 0,
-      auditEdit: 0,
-      auditFailed: 0,
-      paused: 7,
-      finished: 0,
-      deleted: 0
-    },
-    {
-      roomName: "未绑定",
-      total: 0,
-      delivering: 0,
-      ineffective: 0,
-      auditNew: 0,
-      auditEdit: 0,
-      auditFailed: 0,
-      paused: 0,
-      finished: 0,
-      deleted: 0
-    }
-  ];
-
-  // Mock table data for Advertiser Detail Data
-  const ADVERTISER_DETAIL_ROWS = [
-    {
-      accountName: "直播-铃蓓-牧唐-芜湖1 (1787869271614468)",
-      team: "测试指定员工",
-      group: "191",
-      user: "1129新增",
-      cat1: "未绑定",
-      cat2: "未绑定",
-      liveRoom: "/",
-      total: 0,
-      delivering: 0,
-      pending: 0,
-      terminated: 0,
-      finished: 0,
-      deleted: 0
-    },
-    {
-      accountName: "千川直播号-数码01 (1839701482129801)",
-      team: "抖音投放",
-      group: "核心二组",
-      user: "张伟",
-      cat1: "3C数码",
-      cat2: "蓝牙耳机",
-      liveRoom: "直播间2",
-      total: 7,
-      delivering: 2,
-      pending: 3,
-      terminated: 1,
-      finished: 1,
-      deleted: 0
-    }
-  ];
+  const selectedFacts = selectReportFacts(report.facts, activePlatform, { entity: selectedEntity, accountId: advertiserAccountId })
+    .filter(row => (!startDate || row.planCreatedAt >= startDate) && (!endDate || row.planCreatedAt <= endDate));
+  const buildRows = (dimension: string) => reportRows(selectedFacts, dimension).map(row => ({ ...row, ...statusTotals(row.facts) }));
+  const TEAM_ROWS = buildRows("team"), GROUP_ROWS = buildRows("group"), PERSONAL_ROWS = buildRows("personal");
+  const LIVE_ROOM_ROWS = buildRows("live_room"), ADVERTISER_DETAIL_ROWS = buildRows("account");
+  const totals = statusTotals(selectedFacts);
+  const chartGroups = buildRows(activeDimension);
+  const metricKey = ({ "搭建计划总数": "total", "投放中": "delivering", "审核不通过": "auditFailed", "低效计划": "ineffective", "未投放": "pending" } as const)[activeMetricFilter] || "total";
+  const CHART_DATA = [...new Set(selectedFacts.map(row => row.planCreatedAt))].sort().map(date => ({
+    date, ...Object.fromEntries(chartGroups.map(group => [group.id, statusTotals(group.facts.filter(row => row.planCreatedAt === date))[metricKey]])),
+  }));
 
   // Reset filters
   const handleReset = () => {
     setSelectedEntity("");
     setAdvertiserAccountId("");
-    setStartDate("2025-03-31");
-    setEndDate("2025-04-14");
+    setStartDate(REPORT_START);
+    setEndDate(REPORT_TODAY);
     if (showToast) showToast("重置成功", "已重置计划搭建时间及筛选参数");
   };
 
@@ -178,7 +100,7 @@ export default function DeliveryStatusReportView({ showToast }: DeliveryStatusRe
             <button
               key={tab.id}
               onClick={() => {
-                setActiveDimension(tab.id as any);
+                setActiveDimension(tab.id as any); setSelectedEntity("");
                 setSelectedEntity("");
                 if (showToast) showToast("切换分析维度", `已切换至【${tab.label}】分析模式`);
               }}
@@ -255,9 +177,7 @@ export default function DeliveryStatusReportView({ showToast }: DeliveryStatusRe
               className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-purple-500 shadow-2xs cursor-pointer min-w-[160px]"
             >
               <option value="">请选择部门</option>
-              <option value="抖音投放">抖音投放</option>
-              <option value="测试指定员工可见-部门">测试指定员工可见-部门</option>
-              <option value="未绑定">未绑定</option>
+              {report.tree.map(t => t.teamName).map(name => <option key={name} value={name}>{name}</option>)}
             </select>
           )}
 
@@ -268,9 +188,7 @@ export default function DeliveryStatusReportView({ showToast }: DeliveryStatusRe
               className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-purple-500 shadow-2xs cursor-pointer min-w-[160px]"
             >
               <option value="">请选择分组</option>
-              <option value="核心一组">核心一组</option>
-              <option value="测试小组-02">测试小组-02</option>
-              <option value="未绑定分组">未绑定分组</option>
+              {report.tree.flatMap(t => t.groups.map(g => g.groupName)).map(name => <option key={name} value={name}>{name}</option>)}
             </select>
           )}
 
@@ -281,9 +199,7 @@ export default function DeliveryStatusReportView({ showToast }: DeliveryStatusRe
               className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-purple-500 shadow-2xs cursor-pointer min-w-[160px]"
             >
               <option value="">请选择个人</option>
-              <option value="张伟">张伟</option>
-              <option value="李娜">李娜</option>
-              <option value="未绑定账号">未绑定账号</option>
+              {report.org.members.map(m => m.name).map(name => <option key={name} value={name}>{name}</option>)}
             </select>
           )}
 
@@ -302,8 +218,7 @@ export default function DeliveryStatusReportView({ showToast }: DeliveryStatusRe
                 className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-purple-500 shadow-2xs cursor-pointer min-w-[150px]"
               >
                 <option value="">请选择</option>
-                <option value="测试指定员工">测试指定员工</option>
-                <option value="抖音投放">抖音投放</option>
+              {report.tree.map(t => t.teamName).map(name => <option key={name} value={name}>{name}</option>)}
               </select>
             </div>
           )}
@@ -350,18 +265,13 @@ export default function DeliveryStatusReportView({ showToast }: DeliveryStatusRe
 
           {/* Chart Legend (Matching screenshot colored circles) */}
           <div className="flex items-center gap-5 text-xs text-slate-600 font-medium">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full border-2 border-blue-500 bg-white inline-block" />
-              <span>未绑定</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full border-2 border-emerald-500 bg-white inline-block" />
-              <span>测试指定员工可见-部门</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full border-2 border-amber-500 bg-white inline-block" />
-              <span>抖音投放</span>
-            </div>
+            {chartGroups.map((group, index) => (
+              <div key={group.id} className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full border-2 border-blue-500 bg-white inline-block" style={{ borderColor: REPORT_COLORS[index % REPORT_COLORS.length] }} />
+                <span>{activeDimension === "live_room" ? group.roomName : group.name}</span>
+              </div>
+            ))}
+
           </div>
         </div>
 
@@ -371,13 +281,11 @@ export default function DeliveryStatusReportView({ showToast }: DeliveryStatusRe
             <LineChart data={CHART_DATA} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
               <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={{ stroke: "#e2e8f0" }} />
-              <YAxis domain={[0, 1]} ticks={[0, 0.2, 0.4, 0.6, 0.8, 1]} tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
+              <YAxis domain={[0, "auto"]} allowDecimals={false} tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
               <Tooltip
                 contentStyle={{ backgroundColor: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0", fontSize: "12px" }}
               />
-              <Line type="monotone" dataKey="未绑定" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3, fill: "#3b82f6" }} />
-              <Line type="monotone" dataKey="测试指定员工可见-部门" stroke="#10b981" strokeWidth={2} dot={{ r: 3, fill: "#10b981" }} />
-              <Line type="monotone" dataKey="抖音投放" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3, fill: "#f59e0b" }} />
+              {chartGroups.map((group, index) => <Line key={group.id} name={activeDimension === "live_room" ? group.roomName : group.name} type="monotone" dataKey={group.id} stroke={REPORT_COLORS[index % REPORT_COLORS.length]} strokeWidth={2} dot={{ r: 3, fill: REPORT_COLORS[index % REPORT_COLORS.length] }} />)}
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -487,26 +395,26 @@ export default function DeliveryStatusReportView({ showToast }: DeliveryStatusRe
 
                 {(activeDimension === "team" || activeDimension === "group" || activeDimension === "personal") && (
                   <>
-                    <td className="py-3 px-4 text-center text-slate-900 font-bold">18</td>
-                    <td className="py-3 px-4 text-center text-emerald-600 font-bold">5</td>
-                    <td className="py-3 px-4 text-center text-slate-700">8</td>
-                    <td className="py-3 px-4 text-center text-slate-700">3</td>
-                    <td className="py-3 px-4 text-center text-slate-700">2</td>
-                    <td className="py-3 px-4 text-center text-slate-400">0</td>
+                    <td className="py-3 px-4 text-center text-slate-900 font-bold">{totals.total}</td>
+                    <td className="py-3 px-4 text-center text-emerald-600 font-bold">{totals.delivering}</td>
+                    <td className="py-3 px-4 text-center text-slate-700">{totals.pending}</td>
+                    <td className="py-3 px-4 text-center text-slate-700">{totals.terminated}</td>
+                    <td className="py-3 px-4 text-center text-slate-700">{totals.finished}</td>
+                    <td className="py-3 px-4 text-center text-slate-400">{totals.deleted}</td>
                   </>
                 )}
 
                 {activeDimension === "live_room" && (
                   <>
-                    <td className="py-3 px-4 text-center text-slate-900 font-bold">7</td>
-                    <td className="py-3 px-4 text-center text-slate-700">0</td>
-                    <td className="py-3 px-4 text-center text-slate-700">0</td>
-                    <td className="py-3 px-4 text-center text-slate-700">0</td>
-                    <td className="py-3 px-4 text-center text-slate-700">0</td>
-                    <td className="py-3 px-4 text-center text-slate-700">0</td>
-                    <td className="py-3 px-4 text-center text-amber-600 font-bold">7</td>
-                    <td className="py-3 px-4 text-center text-slate-700">0</td>
-                    <td className="py-3 px-4 text-center text-slate-400">0</td>
+                    <td className="py-3 px-4 text-center text-slate-900 font-bold">{totals.total}</td>
+                    <td className="py-3 px-4 text-center text-slate-700">{totals.delivering}</td>
+                    <td className="py-3 px-4 text-center text-slate-700">{totals.ineffective}</td>
+                    <td className="py-3 px-4 text-center text-slate-700">{totals.auditNew}</td>
+                    <td className="py-3 px-4 text-center text-slate-700">{totals.auditEdit}</td>
+                    <td className="py-3 px-4 text-center text-slate-700">{totals.auditFailed}</td>
+                    <td className="py-3 px-4 text-center text-amber-600 font-bold">{totals.paused}</td>
+                    <td className="py-3 px-4 text-center text-slate-700">{totals.finished}</td>
+                    <td className="py-3 px-4 text-center text-slate-400">{totals.deleted}</td>
                   </>
                 )}
 
@@ -518,12 +426,12 @@ export default function DeliveryStatusReportView({ showToast }: DeliveryStatusRe
                     <td className="py-3 px-4 text-slate-400">-</td>
                     <td className="py-3 px-4 text-slate-400">-</td>
                     <td className="py-3 px-4 text-slate-400">/</td>
-                    <td className="py-3 px-4 text-center text-slate-900 font-bold">7</td>
-                    <td className="py-3 px-4 text-center text-slate-700">2</td>
-                    <td className="py-3 px-4 text-center text-slate-700">3</td>
-                    <td className="py-3 px-4 text-center text-slate-700">1</td>
-                    <td className="py-3 px-4 text-center text-slate-700">1</td>
-                    <td className="py-3 px-4 text-center text-slate-400">0</td>
+                    <td className="py-3 px-4 text-center text-slate-900 font-bold">{totals.total}</td>
+                    <td className="py-3 px-4 text-center text-slate-700">{totals.delivering}</td>
+                    <td className="py-3 px-4 text-center text-slate-700">{totals.pending}</td>
+                    <td className="py-3 px-4 text-center text-slate-700">{totals.terminated}</td>
+                    <td className="py-3 px-4 text-center text-slate-700">{totals.finished}</td>
+                    <td className="py-3 px-4 text-center text-slate-400">{totals.deleted}</td>
                   </>
                 )}
               </tr>

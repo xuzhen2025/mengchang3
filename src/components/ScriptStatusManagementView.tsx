@@ -1,15 +1,11 @@
 import React, { useState } from "react";
+import { useResourceConfig } from "../lib/useResourceConfig";
+import type { ResourceStatusItem } from "../lib/resourceConfig";
+import OverlayPortal from "./overlays/OverlayPortal";
+import AnchoredPopover from "./overlays/AnchoredPopover";
 import { Plus, X, AlertCircle, ChevronDown, Check } from "lucide-react";
 
-export interface ScriptStatusItem {
-  id: string;
-  name: string;
-  textColor: string;
-  bgColor: string;
-  weight: number;
-  notifyEnabled: boolean;
-  isDefault: boolean;
-}
+export type ScriptStatusItem = ResourceStatusItem;
 
 // 预设颜色选项
 const PRESET_COLORS = [
@@ -24,66 +20,26 @@ const PRESET_COLORS = [
 ];
 
 export default function ScriptStatusManagementView() {
+  const { store } = useResourceConfig();
   // 1. 顶部全局功能配置
-  const [globalEnabled, setGlobalEnabled] = useState<boolean>(true);
+  const [globalEnabled, setGlobalEnabled] = useState(() => store.getSettings("script").enabled);
 
   // Toast 提示
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
   const showToast = (msg: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
     setToastMsg(msg);
-    setTimeout(() => {
-      setToastMsg(null);
-    }, 2500);
+    toastTimer.current = setTimeout(() => setToastMsg(null), 3000);
   };
 
   // 2. 状态列表数据 (完全比对截图1、2、3、4)
-  const [statusList, setStatusList] = useState<ScriptStatusItem[]>([
-    {
-      id: "ss-1",
-      name: "已分配",
-      textColor: "#FFFFFF",
-      bgColor: "#EA580C", // 橙红色
-      weight: 0,
-      notifyEnabled: true,
-      isDefault: false,
-    },
-    {
-      id: "ss-2",
-      name: "审核不通过",
-      textColor: "#FFFFFF",
-      bgColor: "#9333EA", // 紫色
-      weight: 1,
-      notifyEnabled: false,
-      isDefault: false,
-    },
-    {
-      id: "ss-3",
-      name: "审核通过",
-      textColor: "#FFFFFF",
-      bgColor: "#EA580C",
-      weight: 1,
-      notifyEnabled: false,
-      isDefault: false,
-    },
-    {
-      id: "ss-4",
-      name: "1",
-      textColor: "#FFFFFF",
-      bgColor: "#EA580C",
-      weight: 3,
-      notifyEnabled: false,
-      isDefault: true,
-    },
-    {
-      id: "ss-5",
-      name: "2",
-      textColor: "#FFFFFF",
-      bgColor: "#EA580C",
-      weight: 5,
-      notifyEnabled: false,
-      isDefault: false,
-    },
-  ]);
+  const statusList = store.getStatusCatalog("script");
+  const setStatusList = (update: React.SetStateAction<ResourceStatusItem[]>) => {
+    try { store.setStatusCatalog("script", update); return true; }
+    catch (error) { showToast((error as Error).message); return false; }
+  };
 
   // 3. 模态框状态
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -106,6 +62,7 @@ export default function ScriptStatusManagementView() {
 
   // 保存顶部全局设置
   const handleSaveGlobalConfig = () => {
+    store.setSettings("script", { enabled: globalEnabled, partitions: ["脚本"] });
     showToast("状态功能配置保存成功！");
   };
 
@@ -126,6 +83,7 @@ export default function ScriptStatusManagementView() {
 
     const newWeight = formWeight === "" ? 0 : Number(formWeight);
     const newItem: ScriptStatusItem = {
+      partitions: ["脚本"],
       id: `ss-${Date.now()}`,
       name: formName.trim(),
       textColor: "#FFFFFF",
@@ -135,7 +93,7 @@ export default function ScriptStatusManagementView() {
       isDefault: statusList.length === 0,
     };
 
-    setStatusList((prev) => [...prev, newItem]);
+    if (!setStatusList((prev) => [...prev, newItem])) return;
     setIsAddModalOpen(false);
     showToast(`创建脚本状态 [${newItem.name}] 成功！`);
   };
@@ -157,7 +115,7 @@ export default function ScriptStatusManagementView() {
     }
 
     const newWeight = formWeight === "" ? 0 : Number(formWeight);
-    setStatusList((prev) =>
+    if (!setStatusList((prev) =>
       prev.map((item) =>
         item.id === editingItem.id
           ? {
@@ -167,7 +125,7 @@ export default function ScriptStatusManagementView() {
             }
           : item
       )
-    );
+    )) return;
 
     setEditingItem(null);
     showToast(`脚本状态 [${formName.trim()}] 更新成功！`);
@@ -177,23 +135,18 @@ export default function ScriptStatusManagementView() {
   const handleOpenDeleteModal = (item: ScriptStatusItem) => {
     setDeletingItem(item);
     setReplaceOtherStatus(false);
-    const otherItems = statusList.filter((s) => s.id !== item.id);
+    const otherItems = store.replacementStatuses("script", item.id);
     setReplacementStatusId(otherItems.length > 0 ? otherItems[0].id : "");
   };
 
   // 确认删除状态
   const handleConfirmDelete = () => {
     if (!deletingItem) return;
-
-    if (replaceOtherStatus && replacementStatusId) {
-      const replacement = statusList.find((s) => s.id === replacementStatusId);
-      showToast(`已将脚本关联状态替换为 [${replacement?.name}] 并删除状态`);
-    } else {
-      showToast(`脚本状态 [${deletingItem.name}] 已删除`);
-    }
-
-    setStatusList((prev) => prev.filter((item) => item.id !== deletingItem.id));
-    setDeletingItem(null);
+    try {
+      store.deleteStatus("script", deletingItem.id, replaceOtherStatus ? replacementStatusId : undefined);
+      setDeletingItem(null);
+      showToast(replaceOtherStatus ? "状态已删除，关联资源已替换为所选状态" : "状态已删除");
+    } catch (error) { showToast((error as Error).message); }
   };
 
   // 设为默认值
@@ -240,9 +193,9 @@ export default function ScriptStatusManagementView() {
     <div className="flex-1 p-6 space-y-6 animate-fade-in w-full relative min-h-0 overflow-y-auto">
       {/* Toast 提示框 */}
       {toastMsg && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[120] bg-slate-900/90 text-white px-5 py-2.5 rounded-2xl shadow-2xl backdrop-blur-md border border-slate-700/80 text-xs font-bold flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
+        <OverlayPortal layer="toast" role="status" className="fixed top-6 left-1/2 -translate-x-1/2 z-[120] bg-slate-900/90 text-white px-5 py-2.5 rounded-2xl shadow-2xl backdrop-blur-md border border-slate-700/80 text-xs font-bold flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
           <span>{toastMsg}</span>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* 顶部：状态功能开关 */}
@@ -459,8 +412,8 @@ export default function ScriptStatusManagementView() {
 
       {/* ==================== 模态框 1：新增状态 ==================== */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <OverlayPortal layer="dialog" role="dialog" aria-modal="true" className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-200 overflow-y-auto max-h-[calc(100dvh-32px)] animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -527,13 +480,13 @@ export default function ScriptStatusManagementView() {
               </div>
             </form>
           </div>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* ==================== 模态框 2：编辑状态 ==================== */}
       {editingItem && (
-        <div className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <OverlayPortal layer="dialog" role="dialog" aria-modal="true" className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-200 overflow-y-auto max-h-[calc(100dvh-32px)] animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -599,13 +552,13 @@ export default function ScriptStatusManagementView() {
               </div>
             </form>
           </div>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* ==================== 模态框 3：删除状态 ==================== */}
       {deletingItem && (
-        <div className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <OverlayPortal layer="dialog" role="dialog" aria-modal="true" className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-200 overflow-y-auto max-h-[calc(100dvh-32px)] animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -651,8 +604,7 @@ export default function ScriptStatusManagementView() {
                       onChange={(e) => setReplacementStatusId(e.target.value)}
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-hidden focus:border-[#7C3AED]"
                     >
-                      {statusList
-                        .filter((s) => s.id !== deletingItem.id)
+                      {store.replacementStatuses("script", deletingItem.id)
                         .map((s) => (
                           <option key={s.id} value={s.id}>
                             {s.name}
@@ -682,7 +634,7 @@ export default function ScriptStatusManagementView() {
               </div>
             </div>
           </div>
-        </div>
+        </OverlayPortal>
       )}
     </div>
   );
@@ -701,13 +653,14 @@ function ColorPickerPopover({
   onClose: () => void;
 }) {
   const [customHex, setCustomHex] = useState(currentColor);
+  const anchorRef = React.useRef<HTMLSpanElement>(null);
 
   return (
     <>
       {/* 透明 BackDrop 用于点击外部关闭 */}
-      <div className="fixed inset-0 z-[110]" onClick={onClose} />
+      <span ref={anchorRef} className="absolute top-full left-0 right-0 h-px pointer-events-none" />
 
-      <div className="absolute top-12 left-0 z-[115] bg-white rounded-xl border border-slate-200 shadow-xl p-3 w-56 space-y-3 animate-in fade-in zoom-in-95 duration-100">
+      <AnchoredPopover anchorRef={anchorRef} onClose={onClose} width={240} maxHeight={380} gap={6} className="bg-white rounded-lg border border-slate-200 shadow-xl p-3 space-y-3 text-left">
         <div className="text-[11px] font-bold text-slate-500">预设调色板</div>
         <div className="grid grid-cols-4 gap-2">
           {PRESET_COLORS.map((c) => (
@@ -754,7 +707,7 @@ function ColorPickerPopover({
             </button>
           </div>
         </div>
-      </div>
+      </AnchoredPopover>
     </>
   );
 }

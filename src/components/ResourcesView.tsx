@@ -354,6 +354,7 @@ export default function ResourcesView({
           <UploadFinishedVideoModal
             isOpen={true}
             isPage={true}
+            initialPartition={uploadPageView}
             initialFiles={
               initialUpload?.type === "成片" ? initialUpload.files : []
             }

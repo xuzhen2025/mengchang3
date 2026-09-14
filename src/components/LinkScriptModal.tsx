@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { X, Search, ChevronDown, Calendar } from "lucide-react";
 import OverlayPortal from "./overlays/OverlayPortal";
+import { useTaggedResources } from "../lib/useResourceTags";
 
 export interface ScriptResourceItem {
   id: string;
@@ -177,7 +178,7 @@ function LinkScriptModalContent({
   customScripts,
   zIndexClass = "z-[300]"
 }: LinkScriptModalProps) {
-  const scriptList = customScripts || DEFAULT_SCRIPT_LIST;
+  const scriptList = useTaggedResources("scripts", customScripts || DEFAULT_SCRIPT_LIST);
 
   // Selected State
   const [selectedIds, setSelectedIds] = useState<string[]>(() => {

@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import FinishedVideoDetailModal from "./FinishedVideoDetailModal";
-import { PublicTagFilter } from "./PublicTagFilter";
+import { PublicTagFilter, PersonalTagFilter } from "./PublicTagFilter";
+import { ResourceCategoryFilters, ResourceStatusFilter, ResourceStatusBadge } from "./ResourceConfigControls";
 import { Pagination } from "./Pagination";
 import { Asset, ResourceSearchIntent } from "../types";
 import { FinishedVideo } from "../data/finishedVideos";
 import { useFinishedVideos } from "../lib/useFinishedVideos";
+import { useResourceConfig } from "../lib/useResourceConfig";
 import ResourceSearchCondition from "./ResourceSearchCondition";
 import ResourceFilterPresets from "./ResourceFilterPresets";
 import { VIDEO_PRESET_DEFAULTS } from "../lib/resourceFilterPresets";
@@ -69,9 +71,7 @@ const AD_ACCOUNTS_MOCK = [
 ];
 
 // Categories from Screenshot
-const MAIN_CATEGORIES = ["全部", "达人成片", "草本初色内衣", "短视频推广", "直播"];
 
-const STATUS_OPTIONS = ["全部", "待审核", "审核通过", "审核驳回", "已修改", "二次修改", "已上机", "已搭", "放弃"];
 
 const SORT_OPTIONS = [
   "最新发布",
@@ -138,7 +138,6 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
   const [activeTab, setActiveTab] = useState<"all" | "secondary" | "performance">("all");
   
   // Screenshot Filter States
-  const [mainCat, setMainCat] = useState("全部");
   const [selectedPreset, setSelectedPreset] = useState("");
   const [searchQuery, setSearchQuery] = useState(initialSearch?.query || "");
   React.useEffect(() => { setSearchQuery(initialSearch?.query || ""); }, [initialSearch?.requestId, initialSearch?.query]);
@@ -147,14 +146,10 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
   
   const [secondarySearch, setSecondarySearch] = useState("");
   const [secondaryCat, setSecondaryCat] = useState("全部");
-  const primaryCategories = React.useMemo(() => ["全部", ...new Set(videos.map(video => parseVideoCategory(video.category).primary).filter(Boolean))], [videos]);
-  const secondaryCategories = React.useMemo(() => ["全部", ...getVideoSecondaryCategories(
-    videos.filter(video => primaryCat === "全部" || parseVideoCategory(video.category).primary === primaryCat)
-  )], [videos, primaryCat]);
-  React.useEffect(() => {
-    if (!primaryCategories.includes(primaryCat)) setPrimaryCat("全部");
-    if (!secondaryCategories.includes(secondaryCat)) setSecondaryCat("全部");
-  }, [primaryCategories, secondaryCategories, primaryCat, secondaryCat]);
+  const { store: configStore } = useResourceConfig();
+  const primaryCategories = ["全部", ...configStore.categories("finished").map(n => n.name)];
+  const secondaryCategories = ["全部", ...new Set(configStore.categories("finished").filter(n => primaryCat === "全部" || n.name === primaryCat).flatMap(n => n.children.map(c => c.name)))];
+  const STATUS_OPTIONS = ["全部", ...configStore.statuses("finished").map(s => s.name)];
   const [statusVal, setStatusVal] = useState("全部");
   
   const [publicTagSearch, setPublicTagSearch] = useState("");
@@ -162,7 +157,7 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
   const [selectedPublicTag, setSelectedPublicTag] = useState("全部");
   
   const [personalTagSearch, setPersonalTagSearch] = useState("");
-  const [personalTagFilter, setPersonalTagFilter] = useState<"all" | "none" | "has">("all");
+  const [personalTagFilter, setPersonalTagFilter] = useState("all");
 
   // Advanced Search States
   const [sortBy, setSortBy] = useState("最新发布");
@@ -181,6 +176,7 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
   const [selectedVideoIds, setSelectedVideoIds] = useState<string[]>([]);
   const [isSelectionActive, setIsSelectionActive] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  React.useEffect(() => { setCurrentPage(1); }, [personalTagFilter, personalTagSearch]);
   const [pageSize, setPageSize] = useState(20);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [hoveredVideoId, setHoveredVideoId] = useState<string | null>(null);
@@ -196,8 +192,7 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
   React.useEffect(() => {
     const tag = initialSearch?.tag;
     if (!tag) return;
-    if (MAIN_CATEGORIES.includes(tag)) setMainCat(tag);
-    else if (primaryCategories.includes(tag)) setPrimaryCat(tag);
+    if (primaryCategories.includes(tag)) setPrimaryCat(tag);
     else if (secondaryCategories.includes(tag)) setSecondaryCat(tag);
     else if (STATUS_OPTIONS.includes(tag)) setStatusVal(tag);
     else if (AD_PLATFORM_TAG_OPTIONS.includes(tag)) setAdPlatformTag(tag);
@@ -254,10 +249,9 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
     }
   }, []);
 
-  const presetFilters = { searchQuery, mainCat, primaryCat, secondarySearch, secondaryCat, statusVal, publicTagSearch, publicTagKeyword, selectedPublicTag, personalTagSearch, personalTagFilter, sortBy, adPlatformTag, costRange, systemAutoTag, authorType, authorInput, timeType, startDate, endDate };
+  const presetFilters = { searchQuery, primaryCat, secondarySearch, secondaryCat, statusVal, publicTagSearch, publicTagKeyword, selectedPublicTag, personalTagSearch, personalTagFilter, sortBy, adPlatformTag, costRange, systemAutoTag, authorType, authorInput, timeType, startDate, endDate };
   const applyPresetFilters = (next: typeof VIDEO_PRESET_DEFAULTS) => {
     setSearchQuery(next.searchQuery);
-    setMainCat(next.mainCat);
     setPrimaryCat(next.primaryCat);
     setSecondarySearch(next.secondarySearch);
     setSecondaryCat(next.secondaryCat);
@@ -266,7 +260,7 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
     setPublicTagKeyword(next.publicTagKeyword);
     setSelectedPublicTag(next.selectedPublicTag);
     setPersonalTagSearch(next.personalTagSearch);
-    setPersonalTagFilter(next.personalTagFilter as "all" | "none" | "has");
+    setPersonalTagFilter(next.personalTagFilter);
     setSortBy(next.sortBy);
     setAdPlatformTag(next.adPlatformTag);
     setCostRange(next.costRange);
@@ -284,7 +278,6 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
 
   // Reset Filters
   const handleResetFilters = () => {
-    setMainCat("全部");
     setSelectedPreset("");
     setPrimaryCat("全部");
     setSecondarySearch("");
@@ -318,9 +311,6 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
       .some((value) => String(value).toLowerCase().includes(homeSearch));
     if (!matchesHomeSearch) return false;
 
-    // Main category
-    const matchesMain = mainCat === "全部" ? true : (v.tags?.includes(mainCat) || v.title.includes(mainCat));
-    
     const category = parseVideoCategory(v.category);
     const matchesPrimary = primaryCat === "全部" || category.primary === primaryCat;
     
@@ -329,7 +319,7 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
     const matchesSecondaryCat = secondaryCat === "全部" || category.secondary === secondaryCat;
     
     // Status
-    const matchesStatus = statusVal === "全部" ? true : (v.status === statusVal || (statusVal === "已上机" && v.status === "已投放"));
+    const matchesStatus = !configStore.statusEnabled("finished") || statusVal === "全部" || v.status === statusVal;
     
     // Public tag
     const matchesPublicSearch = !publicTagSearch ? true : v.tags?.some(t => t.toLowerCase().includes(publicTagSearch.toLowerCase()));
@@ -337,7 +327,8 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
 
     // Personal tag
     const matchesPersonalSearch = !personalTagSearch || v.personalTags?.some(tag => tag.includes(personalTagSearch));
-    const matchesPersonalFilter = personalTagFilter === "all" || (personalTagFilter === "none" ? !v.personalTags?.length : Boolean(v.personalTags?.length));
+    const matchesPersonalFilter = personalTagFilter === "all" || (personalTagFilter === "none" ? !v.personalTags?.length
+      : personalTagFilter === "has" ? Boolean(v.personalTags?.length) : v.personalTags?.includes(personalTagFilter));
 
     // Author
     const matchesAuthor = !authorInput ? true : v.author.toLowerCase().includes(authorInput.toLowerCase());
@@ -359,7 +350,7 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
       return true;
     })();
 
-    return matchesMain && matchesPrimary && matchesSecondarySearch && matchesSecondaryCat && matchesStatus && matchesPublicSearch && matchesPublicTagSelect && matchesPersonalSearch && matchesPersonalFilter && matchesAuthor && matchesAdPlatformTag && matchesCostRange;
+    return matchesPrimary && matchesSecondarySearch && matchesSecondaryCat && matchesStatus && matchesPublicSearch && matchesPublicTagSelect && matchesPersonalSearch && matchesPersonalFilter && matchesAuthor && matchesAdPlatformTag && matchesCostRange;
   }).sort((a, b) => {
     if (sortBy === "最新发布") return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     if (sortBy === "最早发布") return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
@@ -748,27 +739,8 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
           {/* ===== FILTER CARD (EXACT REPLICA OF ATTACHED SCREENSHOT) ===== */}
           <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-3.5 text-xs text-slate-700">
         
-        {/* ROW 1: 主类目 + 右侧预设/保存 */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-          <div className="flex items-start md:items-center gap-2 flex-1 flex-wrap">
-            <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">主 类 目：</span>
-            <div className="flex flex-wrap items-center gap-3">
-              {MAIN_CATEGORIES.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setMainCat(cat)}
-                  className={`transition-colors cursor-pointer text-xs ${
-                    mainCat === cat 
-                      ? "text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded" 
-                      : "text-slate-600 hover:text-purple-600 font-normal"
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-
+        {/* ROW 1: 常用筛选预设 */}
+        <div className="flex items-center justify-end gap-2">
           <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
             <ResourceFilterPresets scope="finished" defaults={VIDEO_PRESET_DEFAULTS} value={presetFilters}
               selectedName={selectedPreset} onSelectName={setSelectedPreset} onApply={applyPresetFilters}
@@ -780,83 +752,14 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
         </div>
 
         {/* ROW 2: 一级分类 */}
-        <div className="flex items-start gap-2 border-t border-slate-100 pt-3">
-          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2 mt-0.5">一级分类：</span>
-          <div className="flex-1 flex flex-wrap items-center gap-x-3.5 gap-y-2">
-            {(primaryMore ? primaryCategories : primaryCategories.slice(0, 12)).map(cat => (
-              <button
-                key={cat}
-                onClick={() => { setPrimaryCat(cat); setSecondaryCat("全部"); setSecondarySearch(""); }}
-                className={`transition-colors cursor-pointer text-xs ${
-                  primaryCat === cat 
-                    ? "text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded" 
-                    : "text-slate-600 hover:text-purple-600 font-normal"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-
-          <button
-            onClick={() => setPrimaryMore(!primaryMore)}
-            className="text-purple-600 text-xs font-semibold flex items-center gap-0.5 shrink-0 ml-2 cursor-pointer hover:underline"
-          >
-            <span>{primaryMore ? "收起" : "更多"}</span>
-            {primaryMore ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
-        </div>
+          <ResourceCategoryFilters scope="finished" primary={primaryCat} secondary={secondaryCat} search={secondarySearch}
+            onPrimary={setPrimaryCat} onSecondary={setSecondaryCat} onSearch={setSecondarySearch} />
 
         {/* ROW 3: 二级分类 */}
-        <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
-          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">二级分类：</span>
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="relative border border-slate-200 rounded-lg px-2.5 py-1 flex items-center gap-1.5 bg-white w-32 focus-within:border-purple-400">
-              <Search className="w-3.5 h-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="搜索分类"
-                value={secondarySearch}
-                onChange={(e) => setSecondarySearch(e.target.value)}
-                className="text-xs focus:outline-none w-full placeholder:text-slate-400 font-normal"
-              />
-            </div>
 
-            {secondaryCategories.filter(sec => sec === "全部" || sec.toLowerCase().includes(secondarySearch.trim().toLowerCase())).map(sec => (
-              <button
-                key={sec}
-                onClick={() => setSecondaryCat(sec)}
-                className={`transition-colors cursor-pointer text-xs ${
-                  secondaryCat === sec 
-                    ? "text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded" 
-                    : "text-slate-600 hover:text-purple-600 font-normal"
-                }`}
-              >
-                {sec}
-              </button>
-            ))}
-          </div>
-        </div>
 
         {/* ROW 4: 状 态 */}
-        <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
-          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">状 态：</span>
-          <div className="flex items-center gap-2 flex-wrap">
-            {STATUS_OPTIONS.map(st => (
-              <button
-                key={st}
-                onClick={() => setStatusVal(st)}
-                className={`transition-all cursor-pointer text-xs px-2.5 py-1 rounded-lg ${
-                  statusVal === st 
-                    ? "text-purple-700 bg-purple-100/80 font-bold border border-purple-200 shadow-2xs" 
-                    : "text-slate-600 hover:text-purple-600 hover:bg-slate-50 font-normal"
-                }`}
-              >
-                {st}
-              </button>
-            ))}
-          </div>
-        </div>
+        <ResourceStatusFilter scope="finished" value={statusVal} onChange={setStatusVal} />
 
         {/* ROW 5: 公共标签 */}
         <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
@@ -872,56 +775,12 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
         {/* ROW 6: 个人标签 */}
         <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
           <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">个人标签：</span>
-          <div className="flex items-center gap-2 flex-wrap flex-1">
-            <div className="relative border border-slate-200 rounded-lg px-2.5 py-1 flex items-center gap-1.5 bg-white w-32 focus-within:border-purple-400">
-              <Search className="w-3.5 h-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="搜索标签"
-                value={personalTagSearch}
-                onChange={(e) => setPersonalTagSearch(e.target.value)}
-                className="text-xs focus:outline-none w-full placeholder:text-slate-400"
-              />
-            </div>
-
-            <div className="flex items-center gap-1 border border-slate-200 rounded-lg p-0.5 bg-white">
-              <button
-                onClick={() => setPersonalTagFilter("all")}
-                className={`px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                  personalTagFilter === "all" ? "bg-purple-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                全部
-              </button>
-              <button
-                onClick={() => setPersonalTagFilter("none")}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                  personalTagFilter === "none" ? "bg-purple-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                无个人标签
-              </button>
-              <button
-                onClick={() => setPersonalTagFilter("has")}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                  personalTagFilter === "has" ? "bg-purple-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                有个人标签
-              </button>
-            </div>
-
-            <button
-              onClick={() => {
-                setPersonalTagSearch("");
-                setPersonalTagFilter("all");
-              }}
-              className="text-slate-500 hover:text-purple-600 text-xs flex items-center gap-1 cursor-pointer ml-3"
-            >
-              <span>重置个人标签</span>
-              <Edit3 className="w-3 h-3 text-slate-400" />
-            </button>
-          </div>
+          <PersonalTagFilter
+            searchKeyword={personalTagSearch}
+            onSearchKeywordChange={setPersonalTagSearch}
+            selectedTag={({ all: "全部", none: "无个人标签", has: "有个人标签" }[personalTagFilter] || personalTagFilter)}
+            onSelectTag={(tag) => setPersonalTagFilter({ "全部": "all", "无个人标签": "none", "有个人标签": "has" }[tag] || tag)}
+          />
         </div>
 
       </div>
@@ -1242,11 +1101,7 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
                   <td className="p-3 font-mono font-bold text-orange-600">¥{video.cost.toLocaleString()}</td>
                   <td className="p-3 font-mono font-bold text-purple-600">{video.roi ? `${video.roi.toFixed(2)}x` : "-"}</td>
                   <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      video.syncStatus === "synced" ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-slate-100 text-slate-500"
-                    }`}>
-                      {video.syncStatus === "synced" ? "已同步" : "未同步"}
-                    </span>
+                    <ResourceStatusBadge scope="finished" status={video.status} />
                   </td>
                   <td className="p-3 text-slate-400 font-mono text-[10px]">{video.createdAt}</td>
                   <td className="p-3 text-right">
@@ -1617,9 +1472,7 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
                   </span>
 
                   {/* Top Right Tag: Status */}
-                  <span className={`absolute top-0 right-0 text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-bl-lg z-10 shadow-xs ${getStatusBadgeStyle(video.status)}`}>
-                    {video.status || "待审核"}
-                  </span>
+                  <ResourceStatusBadge scope="finished" status={video.status} className="absolute top-0 right-0 text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-bl-lg z-10 shadow-xs" />
 
                   {/* ID Overlay (top left below tag) */}
                   <div className="absolute top-6 left-1.5 z-10 bg-black/50 backdrop-blur-xs text-white/90 text-[10px] font-mono px-1.5 py-0.2 rounded">

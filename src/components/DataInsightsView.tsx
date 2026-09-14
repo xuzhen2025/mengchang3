@@ -1,3 +1,8 @@
+import { usePlatformReportData } from "../lib/usePlatformReportData";
+import { useReportData } from "../lib/useReportData";
+import { REPORT_START, REPORT_TODAY, selectReportFacts } from "../lib/reportDemoData";
+import { insightProfile } from "../lib/reportInsights";
+import { leaderMembers, taskReportDate } from "../lib/reportPlatformData";
 import React, { useState } from "react";
 import {
   Calendar,
@@ -32,118 +37,6 @@ const RADAR_AXES = [
   { key: "diligence", label: "勤奋度", fullMark: 100 },
   { key: "creativity", label: "创造力", fullMark: 100 }
 ];
-
-// Mock Personal Data Series
-const PERSONAL_PROFILES: Record<
-  string,
-  {
-    name: string;
-    radar: Record<string, number>; // values 0-100
-    dataAnalysis: Record<string, { valA: number | string; valB: number | string }>;
-    taskAnalysis: Record<string, { valA: number | string; valB: number | string }>;
-  }
-> = {
-  "致上运营": {
-    name: "致上运营",
-    radar: {
-      spend: 35,
-      contribution: 82,
-      diversity: 40,
-      viralRate: 45,
-      diligence: 88,
-      creativity: 85
-    },
-    dataAnalysis: {
-      "成片消耗": { valA: "¥0", valB: "¥0" },
-      "成交金额": { valA: "¥0", valB: "¥0" },
-      "ROI": { valA: 0, valB: 0 },
-      "上传作品（成片）": { valA: 0, valB: 44 },
-      "上传作品（素材）": { valA: 0, valB: 0 },
-      "上传作品（第三方）": { valA: 0, valB: 0 },
-      "上传作品（图片）": { valA: 0, valB: 0 },
-      "上传作品（文案）": { valA: 0, valB: 0 },
-      "上传作品（音视频）": { valA: 0, valB: 0 },
-      "上传作品（脚本）": { valA: 0, valB: 5 },
-      "下载作品数": { valA: 0, valB: 4 },
-      "推送他人作品数": { valA: 0, valB: 214 },
-      "复制他人作品到剪映数": { valA: 0, valB: 2 },
-      "作品被多少人下载": { valA: 0, valB: 5 },
-      "作品被多少人复制到剪映": { valA: 0, valB: 2 },
-      "作品被多少人推送": { valA: 0, valB: 32 }
-    },
-    taskAnalysis: {
-      "发布任务数": { valA: 0, valB: 1 },
-      "被指派任务数": { valA: 0, valB: 0 },
-      "发布的任务（已达标）": { valA: 0, valB: 0 },
-      "发布的任务（待完成）": { valA: 0, valB: 1 },
-      "发布的任务（下单数）": { valA: 0, valB: 3 },
-      "发布的任务（出片数）": { valA: 0, valB: 0 },
-      "被指派的任务（已达标）": { valA: 0, valB: 0 },
-      "被指派的任务（待完成）": { valA: 0, valB: 0 },
-      "被指派的任务（下单数）": { valA: 0, valB: 0 },
-      "被指派的任务（出片数）": { valA: 0, valB: 0 }
-    }
-  },
-  "抖音1": {
-    name: "抖音1",
-    radar: {
-      spend: 48,
-      contribution: 42,
-      diversity: 50,
-      viralRate: 38,
-      diligence: 45,
-      creativity: 30
-    },
-    dataAnalysis: {
-      "成片消耗": { valA: "¥0", valB: "¥0" },
-      "成交金额": { valA: "¥0", valB: "¥0" },
-      "ROI": { valA: 0, valB: 0 },
-      "上传作品（成片）": { valA: 12, valB: 28 },
-      "上传作品（素材）": { valA: 0, valB: 0 },
-      "上传作品（第三方）": { valA: 0, valB: 0 },
-      "上传作品（图片）": { valA: 0, valB: 0 },
-      "上传作品（文案）": { valA: 0, valB: 0 },
-      "上传作品（音视频）": { valA: 0, valB: 0 },
-      "上传作品（脚本）": { valA: 2, valB: 3 },
-      "下载作品数": { valA: 1, valB: 3 },
-      "推送他人作品数": { valA: 45, valB: 120 },
-      "复制他人作品到剪映数": { valA: 1, valB: 1 },
-      "作品被多少人下载": { valA: 2, valB: 3 },
-      "作品被多少人复制到剪映": { valA: 1, valB: 1 },
-      "作品被多少人推送": { valA: 10, valB: 22 }
-    },
-    taskAnalysis: {
-      "发布任务数": { valA: 0, valB: 1 },
-      "被指派任务数": { valA: 0, valB: 0 },
-      "发布的任务（已达标）": { valA: 0, valB: 0 },
-      "发布的任务（待完成）": { valA: 0, valB: 1 },
-      "发布的任务（下单数）": { valA: 0, valB: 2 },
-      "发布的任务（出片数）": { valA: 0, valB: 0 },
-      "被指派的任务（已达标）": { valA: 0, valB: 0 },
-      "被指派的任务（待完成）": { valA: 0, valB: 0 },
-      "被指派的任务（下单数）": { valA: 0, valB: 0 },
-      "被指派的任务（出片数）": { valA: 0, valB: 0 }
-    }
-  }
-};
-
-// Mock Group Profiles
-const GROUP_PROFILES: Record<
-  string,
-  {
-    name: string;
-    radar: Record<string, number>;
-  }
-> = {
-  "抖音1组": {
-    name: "抖音1组",
-    radar: { spend: 32, contribution: 80, diversity: 42, viralRate: 48, diligence: 86, creativity: 82 }
-  },
-  "默认分组": {
-    name: "默认分组",
-    radar: { spend: 40, contribution: 38, diversity: 45, viralRate: 35, diligence: 42, creativity: 30 }
-  }
-};
 
 // Helper SVG Radar Component
 function SVGInteractiveRadarChart({
@@ -180,7 +73,7 @@ function SVGInteractiveRadarChart({
   const buildPolygonPath = (data: Record<string, number>) => {
     return RADAR_AXES.map((axis, i) => {
       const val = (data[axis.key] || 0) / 100;
-      const { x, y } = getCoordinates(i, Math.max(0.05, Math.min(1, val)));
+      const { x, y } = getCoordinates(i, Math.max(0, Math.min(1, val)));
       return `${i === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
     }).join(" ") + " Z";
   };
@@ -301,20 +194,24 @@ function SVGInteractiveRadarChart({
 }
 
 export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
+  const report = usePlatformReportData();
+  const adReport = useReportData();
+  const leaders = [...new Set(report.org.depts.filter(node => node.levelType !== "company" && report.org.members.some(member => member.name === node.manager)).map(node => node.manager))];
+  const groupNames = report.tree.flatMap(dept => dept.groups.filter(group => group.groupName !== "未归属分组").map(group => group.groupName));
   // 1. Top Tab Selection: "personal" (个人数据洞察) | "group" (小组数据洞察)
   const [activeTab, setActiveTab] = useState<"personal" | "group">("personal");
 
   // 2. Target Dropdowns State
-  const [targetA, setTargetA] = useState<string>("致上运营");
-  const [targetB, setTargetB] = useState<string>("抖音1");
+  const [targetA, setTargetA] = useState<string>("徐振");
+  const [targetB, setTargetB] = useState<string>("王剪辑");
 
   // Group Dropdowns State
-  const [groupTargetA, setGroupTargetA] = useState<string>("抖音1组");
-  const [groupTargetB, setGroupTargetB] = useState<string>("默认分组");
+  const [groupTargetA, setGroupTargetA] = useState<string>(groupNames[0] || "");
+  const [groupTargetB, setGroupTargetB] = useState<string>(groupNames[1] || "");
 
   // 3. Date Range State
-  const [startDate, setStartDate] = useState<string>("2025-03-31");
-  const [endDate, setEndDate] = useState<string>("2025-04-15");
+  const [startDate, setStartDate] = useState<string>(REPORT_START);
+  const [endDate, setEndDate] = useState<string>(REPORT_TODAY);
 
   // 4. Modals and Dropdowns
   const [showExportMenu, setShowExportMenu] = useState<boolean>(false);
@@ -324,28 +221,23 @@ export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
   const [leadershipA, setLeadershipA] = useState<string>("致上运营");
   const [leadershipB, setLeadershipB] = useState<string>("抖音1");
 
-  // Get Current Data based on selections
-  const currentProfileA =
-    activeTab === "personal"
-      ? PERSONAL_PROFILES[targetA] || PERSONAL_PROFILES["致上运营"]
-      : GROUP_PROFILES[groupTargetA] || GROUP_PROFILES["抖音1组"];
-
-  const currentProfileB =
-    activeTab === "personal"
-      ? PERSONAL_PROFILES[targetB] || PERSONAL_PROFILES["抖音1"]
-      : GROUP_PROFILES[groupTargetB] || GROUP_PROFILES["默认分组"];
-
-  // Data Analysis Metrics (16 items)
+  const resources = report.resources.filter(row => row.date >= startDate && row.date <= endDate);
+  const activities = report.activities.filter(row => row.date >= startDate && row.date <= endDate);
+  const tasks = report.tasks.filter(task => taskReportDate(task, "create_date") >= startDate && taskReportDate(task, "create_date") <= endDate);
+  const facts = selectReportFacts(adReport.facts, "巨量千川", { start: startDate, end: endDate });
+  const profile = (name: string, people: string[]) => insightProfile(name, people, resources, activities, tasks, facts);
+  const groupMembers = (name: string) => report.tree.flatMap(dept => dept.groups.filter(group => group.groupName === name).flatMap(group => group.accounts));
+  const currentProfileA = activeTab === "personal" ? profile(targetA, [targetA]) : profile(groupTargetA, groupMembers(groupTargetA));
+  const currentProfileB = activeTab === "personal" ? profile(targetB, [targetB]) : profile(groupTargetB, groupMembers(groupTargetB));
+  // Data Analysis Metrics (14 items)
   const dataAnalysisList = [
     "成片消耗",
     "成交金额",
     "ROI",
     "上传作品（成片）",
     "上传作品（素材）",
-    "上传作品（第三方）",
     "上传作品（图片）",
-    "上传作品（文案）",
-    "上传作品（音视频）",
+    "上传作品（音频）",
     "上传作品（脚本）",
     "下载作品数",
     "推送他人作品数",
@@ -423,18 +315,7 @@ export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
                     onChange={(e) => setTargetA(e.target.value)}
                     className="px-3 py-1.5 bg-white/20 backdrop-blur-md border border-white/30 text-white rounded-xl text-xs font-bold outline-none cursor-pointer focus:bg-white/30"
                   >
-                    <option value="致上运营" className="text-slate-800">
-                      致上运营
-                    </option>
-                    <option value="抖音1" className="text-slate-800">
-                      抖音1
-                    </option>
-                    <option value="莫钦全" className="text-slate-800">
-                      莫钦全
-                    </option>
-                    <option value="张艺剪" className="text-slate-800">
-                      张艺剪
-                    </option>
+                    {report.org.members.map(member => member.name).map(name => <option key={name} value={name} className="text-slate-800">{name}</option>)}
                   </select>
 
                   {/* VS Badge */}
@@ -448,15 +329,7 @@ export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
                     onChange={(e) => setTargetB(e.target.value)}
                     className="px-3 py-1.5 bg-white/20 backdrop-blur-md border border-white/30 text-white rounded-xl text-xs font-bold outline-none cursor-pointer focus:bg-white/30"
                   >
-                    <option value="抖音1" className="text-slate-800">
-                      抖音1
-                    </option>
-                    <option value="致上运营" className="text-slate-800">
-                      致上运营
-                    </option>
-                    <option value="莫钦全" className="text-slate-800">
-                      莫钦全
-                    </option>
+                    {report.org.members.map(member => member.name).map(name => <option key={name} value={name} className="text-slate-800">{name}</option>)}
                   </select>
                 </>
               ) : (
@@ -467,15 +340,7 @@ export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
                     onChange={(e) => setGroupTargetA(e.target.value)}
                     className="px-3 py-1.5 bg-white/20 backdrop-blur-md border border-white/30 text-white rounded-xl text-xs font-bold outline-none cursor-pointer focus:bg-white/30"
                   >
-                    <option value="抖音1组" className="text-slate-800">
-                      抖音1组
-                    </option>
-                    <option value="默认分组" className="text-slate-800">
-                      默认分组
-                    </option>
-                    <option value="爆款剪辑组" className="text-slate-800">
-                      爆款剪辑组
-                    </option>
+                    {groupNames.map(name => <option key={name} value={name} className="text-slate-800">{name}</option>)}
                   </select>
 
                   {/* VS Badge */}
@@ -489,12 +354,7 @@ export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
                     onChange={(e) => setGroupTargetB(e.target.value)}
                     className="px-3 py-1.5 bg-white/20 backdrop-blur-md border border-white/30 text-white rounded-xl text-xs font-bold outline-none cursor-pointer focus:bg-white/30"
                   >
-                    <option value="默认分组" className="text-slate-800">
-                      默认分组
-                    </option>
-                    <option value="抖音1组" className="text-slate-800">
-                      抖音1组
-                    </option>
+                    {groupNames.map(name => <option key={name} value={name} className="text-slate-800">{name}</option>)}
                   </select>
                 </>
               )}
@@ -598,8 +458,8 @@ export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
 
         <div className="space-y-4 max-w-2xl mx-auto">
           {dataAnalysisList.map((metricKey) => {
-            const rawDataA = PERSONAL_PROFILES[targetA]?.dataAnalysis?.[metricKey]?.valA ?? 0;
-            const rawDataB = PERSONAL_PROFILES[targetA]?.dataAnalysis?.[metricKey]?.valB ?? 0;
+            const rawDataA = currentProfileA.dataAnalysis[metricKey] ?? 0;
+            const rawDataB = currentProfileB.dataAnalysis[metricKey] ?? 0;
 
             const numA = parseVal(rawDataA);
             const numB = parseVal(rawDataB);
@@ -624,12 +484,12 @@ export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
                   <div
                     className="bg-[#3B82F6] h-full transition-all duration-500"
                     style={{ width: `${pctA}%` }}
-                    title={`${targetA}: ${rawDataA}`}
+                    title={`${currentProfileA.name}: ${rawDataA}`}
                   />
                   <div
                     className="bg-[#8B5CF6] h-full transition-all duration-500"
                     style={{ width: `${pctB}%` }}
-                    title={`${targetB}: ${rawDataB}`}
+                    title={`${currentProfileB.name}: ${rawDataB}`}
                   />
                 </div>
               </div>
@@ -644,8 +504,8 @@ export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
 
         <div className="space-y-4 max-w-2xl mx-auto">
           {taskAnalysisList.map((metricKey) => {
-            const rawDataA = PERSONAL_PROFILES[targetA]?.taskAnalysis?.[metricKey]?.valA ?? 0;
-            const rawDataB = PERSONAL_PROFILES[targetA]?.taskAnalysis?.[metricKey]?.valB ?? 0;
+            const rawDataA = currentProfileA.taskAnalysis[metricKey] ?? 0;
+            const rawDataB = currentProfileB.taskAnalysis[metricKey] ?? 0;
 
             const numA = parseVal(rawDataA);
             const numB = parseVal(rawDataB);
@@ -670,12 +530,12 @@ export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
                   <div
                     className="bg-[#3B82F6] h-full transition-all duration-500"
                     style={{ width: `${pctA}%` }}
-                    title={`${targetA}: ${rawDataA}`}
+                    title={`${currentProfileA.name}: ${rawDataA}`}
                   />
                   <div
                     className="bg-[#8B5CF6] h-full transition-all duration-500"
                     style={{ width: `${pctB}%` }}
-                    title={`${targetB}: ${rawDataB}`}
+                    title={`${currentProfileB.name}: ${rawDataB}`}
                   />
                 </div>
               </div>
@@ -684,7 +544,7 @@ export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
         </div>
       </div>
 
-      {/* ================= 5. "领导力洞察（徒弟数据）" Modal Matches Screenshot 5 ================= */}
+      {/* ================= 5. "领导力洞察" Modal Matches Screenshot 5 ================= */}
       {showLeadershipModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-2xs flex items-center justify-center z-50 p-4 animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden p-6 space-y-6">
@@ -692,7 +552,7 @@ export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <Award className="w-5 h-5 text-[#7C3AED]" />
-                <span>领导力洞察（徒弟数据）</span>
+                <span>领导力洞察</span>
               </h3>
               <button
                 onClick={() => setShowLeadershipModal(false)}
@@ -710,10 +570,8 @@ export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
                 onChange={(e) => setLeadershipA(e.target.value)}
                 className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-700 focus:outline-none focus:border-purple-500 cursor-pointer"
               >
-                <option value="致上运营">致上运营</option>
-                <option value="抖音1">抖音1</option>
-                <option value="莫钦全">莫钦全</option>
-              </select>
+                {leaders.map(name => <option key={name} value={name} className="text-slate-800">{name}</option>)}
+                  </select>
 
               <span className="font-black text-[#7C3AED] italic text-sm">PK</span>
 
@@ -722,48 +580,22 @@ export default function DataInsightsView({ showToast }: DataInsightsViewProps) {
                 onChange={(e) => setLeadershipB(e.target.value)}
                 className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-700 focus:outline-none focus:border-purple-500 cursor-pointer"
               >
-                <option value="抖音1">抖音1</option>
-                <option value="致上运营">致上运营</option>
-                <option value="莫钦全">莫钦全</option>
-              </select>
+                {leaders.map(name => <option key={name} value={name} className="text-slate-800">{name}</option>)}
+                  </select>
               <div className="w-3.5 h-3.5 bg-[#8B5CF6] rounded-xs shrink-0" />
             </div>
 
             {/* Radar Chart */}
             <div className="flex justify-center">
               <SVGInteractiveRadarChart
-                dataA={PERSONAL_PROFILES[leadershipA]?.radar || PERSONAL_PROFILES["致上运营"].radar}
-                dataB={PERSONAL_PROFILES[leadershipB]?.radar || PERSONAL_PROFILES["抖音1"].radar}
+                dataA={profile(leadershipA, leaderMembers(report.org, leadershipA)).radar}
+                dataB={profile(leadershipB, leaderMembers(report.org, leadershipB)).radar}
                 nameA={leadershipA}
                 nameB={leadershipB}
                 size={340}
               />
             </div>
 
-            {/* Leadership Breakdown Summary Cards */}
-            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100 text-xs">
-              <div className="bg-purple-50/50 p-3 rounded-xl border border-purple-100 space-y-1">
-                <div className="text-slate-500 font-medium">徒弟总消耗产出</div>
-                <div className="text-base font-black text-slate-900">¥128,500</div>
-                <div className="text-[11px] text-emerald-600 font-bold">人均月产出 +32.4%</div>
-              </div>
-
-              <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 space-y-1">
-                <div className="text-slate-500 font-medium">徒弟爆款转化率</div>
-                <div className="text-base font-black text-slate-900">28.6%</div>
-                <div className="text-[11px] text-blue-600 font-bold">导师带教评级：A+</div>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex justify-end pt-2">
-              <button
-                onClick={() => setShowLeadershipModal(false)}
-                className="px-5 py-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold rounded-xl transition-colors cursor-pointer shadow-2xs"
-              >
-                关闭
-              </button>
-            </div>
           </div>
         </div>
       )}

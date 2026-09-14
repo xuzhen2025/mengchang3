@@ -2,6 +2,9 @@ import React, { useMemo, useRef, useState } from "react";
 import { AlertCircle, Check, Search, Trash2, Upload, X } from "lucide-react";
 import AssetPagination from "./AssetPagination";
 import OverlayPortal from "./overlays/OverlayPortal";
+import { useResourceConfig } from "../lib/useResourceConfig";
+import { ResourceStatusBadge } from "./ResourceConfigControls";
+import { useScopedTaggedResources, useTaggedResources, useTagFilterSync } from "../lib/useResourceTags";
 
 export type VideoResourceSection = "成片" | "素材" | "图片";
 
@@ -59,7 +62,7 @@ const filterClassName = "h-9 w-[130px] shrink-0 rounded-md border border-slate-2
 const uniqueValues = (values: string[]) => Array.from(new Set(values)).filter(Boolean);
 
 export default function VideoResourcePickerModal({
-  items,
+  items: sourceItems,
   initialSelectedIds,
   initialSection = "成片",
   initialSourceTab = "library",
@@ -68,15 +71,18 @@ export default function VideoResourcePickerModal({
   maxSelections,
   maxFileSizeMB = 1000,
   allowImageSelection = false,
-  imageItems = [],
+  imageItems: sourceImageItems = [],
   onClose,
   onConfirm,
 }: VideoResourcePickerModalProps) {
+  const items = useScopedTaggedResources<VideoResourcePickerItem>(sourceItems, (item) => item.section === "成片" ? "finished" : item.section === "图片" ? "images" : "materials");
+  const imageItems = useTaggedResources("images", sourceImageItems);
   const [sourceTab, setSourceTab] = useState<"library" | "local">(allowLocalUpload ? initialSourceTab : "library");
   const [section, setSection] = useState<VideoResourceSection | "全部">(allowImageSelection ? initialSection : showAllSection ? "全部" : initialSection);
   const [primaryCategory, setPrimaryCategory] = useState("全部一级分类");
   const [secondaryCategory, setSecondaryCategory] = useState("全部二级分类");
   const [tag, setTag] = useState("全部标签");
+  useTagFilterSync("public", tag, (value) => setTag(value === "全部" ? "全部标签" : value));
   const [status, setStatus] = useState("全部状态");
   const [author, setAuthor] = useState("全部上传人");
   const [search, setSearch] = useState("");
@@ -97,13 +103,14 @@ export default function VideoResourcePickerModal({
     () => [...items, ...(allowImageSelection ? selectableImageItems : [])].filter((item) => section === "全部" || item.section === section),
     [allowImageSelection, items, section, selectableImageItems],
   );
-  const primaryCategories = useMemo(() => uniqueValues(sectionItems.map((item) => item.primaryCategory)), [sectionItems]);
-  const secondaryCategories = useMemo(
-    () => uniqueValues(sectionItems.filter((item) => primaryCategory === "全部一级分类" || item.primaryCategory === primaryCategory).map((item) => item.secondaryCategory)),
-    [primaryCategory, sectionItems],
-  );
+  const { store: configStore } = useResourceConfig();
+  const scopes = section === "全部" ? ["finished", "materials"] : [section === "成片" ? "finished" : section === "素材" ? "materials" : "images"];
+  const categoryNodes = scopes.flatMap(scope => configStore.categories(scope));
+  const primaryCategories = uniqueValues(categoryNodes.map(n => n.name));
+  const secondaryCategories = uniqueValues(categoryNodes.filter(n => primaryCategory === "全部一级分类" || n.name === primaryCategory).flatMap(n => n.children.map(c => c.name)));
   const tags = useMemo(() => uniqueValues(sectionItems.flatMap((item) => item.tags)), [sectionItems]);
-  const statuses = useMemo(() => uniqueValues(sectionItems.map((item) => item.status)), [sectionItems]);
+  const statusEnabled = section === "图片" || scopes.some(scope => configStore.statusEnabled(scope));
+  const statuses = section === "图片" ? uniqueValues(sectionItems.map(item => item.status)) : uniqueValues(scopes.filter(scope => configStore.statusEnabled(scope)).flatMap(scope => configStore.statuses(scope).map(s => s.name)));
   const authors = useMemo(() => uniqueValues(sectionItems.map((item) => item.author)), [sectionItems]);
 
   const filteredItems = useMemo(() => {
@@ -112,12 +119,12 @@ export default function VideoResourcePickerModal({
       (primaryCategory === "全部一级分类" || item.primaryCategory === primaryCategory) &&
       (secondaryCategory === "全部二级分类" || item.secondaryCategory === secondaryCategory) &&
       (tag === "全部标签" || item.tags.includes(tag)) &&
-      (status === "全部状态" || item.status === status) &&
+      (!statusEnabled || status === "全部状态" || item.status === status) &&
       (author === "全部上传人" || item.author === author) &&
       (!onlyMine || item.author === "徐振") &&
       (!query || `${item.name}${item.id}`.toLowerCase().includes(query)),
     );
-  }, [author, onlyMine, primaryCategory, search, secondaryCategory, sectionItems, status, tag]);
+  }, [author, onlyMine, primaryCategory, search, secondaryCategory, sectionItems, status, tag, statusEnabled]);
 
   const currentPage = Math.min(page, Math.max(1, Math.ceil(filteredItems.length / pageSize)));
   const pagedItems = filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -254,10 +261,10 @@ export default function VideoResourcePickerModal({
               <option>全部标签</option>
               {tags.map((item) => <option key={item}>{item}</option>)}
             </select>
-            <select value={status} onChange={(event) => { setStatus(event.target.value); resetPage(); }} className={filterClassName}>
+            {statusEnabled && <select value={status} onChange={(event) => { setStatus(event.target.value); resetPage(); }} className={filterClassName}>
               <option>全部状态</option>
               {statuses.map((item) => <option key={item}>{item}</option>)}
-            </select>
+            </select>}
             <select value={author} onChange={(event) => { setAuthor(event.target.value); resetPage(); }} className={`${filterClassName} whitespace-nowrap`}>
               <option>全部上传人</option>
               {authors.map((item) => <option key={item}>{item}</option>)}

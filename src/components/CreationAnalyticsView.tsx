@@ -1,3 +1,7 @@
+import { usePlatformReportData } from "../lib/usePlatformReportData";
+import { REPORT_START, REPORT_TODAY, REPORT_COLORS } from "../lib/reportDemoData";
+import { groupedResources, organizationKey, organizationSelected } from "../lib/reportPlatformData";
+import { grouped, ratio } from "../lib/analyticsData";
 import React, { useState } from "react";
 import {
   Calendar,
@@ -22,7 +26,7 @@ interface CreationAnalyticsViewProps {
 
 // 1. Types
 type TopTab = "team" | "group" | "personal";
-type MediaType = "all" | "finished" | "material" | "third_party" | "image" | "audio";
+type MediaType = "all" | "finished" | "material" | "image" | "audio";
 type ChartTab = "trend" | "proportion";
 type ActionType = "upload" | "download" | "copy_capcut";
 
@@ -42,208 +46,9 @@ interface DetailedRow {
   viralCount: number;
 }
 
-// 2. Mock Data
-const INITIAL_DETAILED_DATA: DetailedRow[] = [
-  {
-    id: "1",
-    dateRange: "2025-04-06-2025-04-21",
-    team: "默认部门",
-    group: "默认分组",
-    name: "致上致上致上",
-    uploaderCount: 1,
-    uploadCount: 47,
-    downloadCount: 120,
-    downloadedPersonCount: 22,
-    pushedPersonCount: 8,
-    copiedCapcutCount: 12,
-    usageRate: 59.57,
-    viralCount: 0
-  },
-  {
-    id: "2",
-    dateRange: "2025-04-06-2025-04-21",
-    team: "B部门",
-    group: "抖音3组, 移动+",
-    name: "汤小真",
-    uploaderCount: 1,
-    uploadCount: 6,
-    downloadCount: 1,
-    downloadedPersonCount: 0,
-    pushedPersonCount: 1,
-    copiedCapcutCount: 1,
-    usageRate: 33.33,
-    viralCount: 0
-  },
-  {
-    id: "3",
-    dateRange: "2025-04-06-2025-04-21",
-    team: "Ian部门1",
-    group: "Ian分组1",
-    name: "Ian不同分组3",
-    uploaderCount: 1,
-    uploadCount: 3,
-    downloadCount: 0,
-    downloadedPersonCount: 0,
-    pushedPersonCount: 0,
-    copiedCapcutCount: 0,
-    usageRate: 0,
-    viralCount: 0
-  },
-  {
-    id: "4",
-    dateRange: "2025-04-06-2025-04-21",
-    team: "Ian部门1",
-    group: "7-3分组2",
-    name: "Ian同组5",
-    uploaderCount: 1,
-    uploadCount: 3,
-    downloadCount: 0,
-    downloadedPersonCount: 0,
-    pushedPersonCount: 0,
-    copiedCapcutCount: 0,
-    usageRate: 0,
-    viralCount: 0
-  },
-  {
-    id: "5",
-    dateRange: "2025-04-06-2025-04-21",
-    team: "7-20部门2",
-    group: "7-20分组3",
-    name: "zcl8",
-    uploaderCount: 1,
-    uploadCount: 3,
-    downloadCount: 0,
-    downloadedPersonCount: 0,
-    pushedPersonCount: 0,
-    copiedCapcutCount: 0,
-    usageRate: 0,
-    viralCount: 0
-  },
-  {
-    id: "6",
-    dateRange: "2025-04-06-2025-04-21",
-    team: "Ian部门1",
-    group: "Ian分组1",
-    name: "Ian同组",
-    uploaderCount: 0,
-    uploadCount: 0,
-    downloadCount: 0,
-    downloadedPersonCount: 0,
-    pushedPersonCount: 0,
-    copiedCapcutCount: 0,
-    usageRate: 0,
-    viralCount: 0
-  },
-  {
-    id: "7",
-    dateRange: "2025-04-06-2025-04-21",
-    team: "默认部门",
-    group: "默认分组",
-    name: "陈嘉",
-    uploaderCount: 0,
-    uploadCount: 0,
-    downloadCount: 0,
-    downloadedPersonCount: 0,
-    pushedPersonCount: 0,
-    copiedCapcutCount: 0,
-    usageRate: 0,
-    viralCount: 0
-  },
-  {
-    id: "8",
-    dateRange: "2025-04-06-2025-04-21",
-    team: "抖音",
-    group: "抖音2组移动",
-    name: "抖音1",
-    uploaderCount: 0,
-    uploadCount: 0,
-    downloadCount: 0,
-    downloadedPersonCount: 0,
-    pushedPersonCount: 0,
-    copiedCapcutCount: 0,
-    usageRate: 0,
-    viralCount: 0
-  },
-  {
-    id: "9",
-    dateRange: "2025-04-06-2025-04-21",
-    team: "默认部门",
-    group: "默认分组",
-    name: "报表数据测试",
-    uploaderCount: 0,
-    uploadCount: 0,
-    downloadCount: 0,
-    downloadedPersonCount: 0,
-    pushedPersonCount: 0,
-    copiedCapcutCount: 0,
-    usageRate: 0,
-    viralCount: 0
-  }
-];
-
-// Tree Data structure for Filter Dropdowns
-const MOCK_TREE = [
-  {
-    teamName: "达人测试",
-    groups: [
-      {
-        groupName: "测试F3",
-        accounts: ["F1", "F2", "F3ontop", "品如", "珊珊"]
-      },
-      {
-        groupName: "测试F2",
-        accounts: ["Acc_1", "Acc_2"]
-      }
-    ]
-  },
-  {
-    teamName: "小真测试部门",
-    groups: [
-      {
-        groupName: "移动测试组",
-        accounts: ["小真A", "小真B"]
-      }
-    ]
-  },
-  {
-    teamName: "项目1",
-    groups: [
-      {
-        groupName: "电商爆款组",
-        accounts: ["项一主号", "项一备用"]
-      }
-    ]
-  },
-  {
-    teamName: "RooooongZ部门",
-    groups: [
-      {
-        groupName: "全量组",
-        accounts: ["RongAccount_01"]
-      }
-    ]
-  },
-  {
-    teamName: "xx素颜霜",
-    groups: [
-      {
-        groupName: "美妆主组",
-        accounts: ["美妆达人01"]
-      }
-    ]
-  },
-  {
-    teamName: "抖音投放",
-    groups: [
-      {
-        groupName: "抖音1组",
-        accounts: ["抖音1"]
-      }
-    ]
-  }
-];
-
 export default function CreationAnalyticsView({ showToast }: CreationAnalyticsViewProps) {
+  const report = usePlatformReportData();
+  const MOCK_TREE = report.tree;
   // 1. Navigation States
   const [topTab, setTopTab] = useState<TopTab>("team");
   const [mediaType, setMediaType] = useState<MediaType>("all");
@@ -253,13 +58,13 @@ export default function CreationAnalyticsView({ showToast }: CreationAnalyticsVi
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
-  const [hoveredTeam, setHoveredTeam] = useState<string | null>("达人测试");
-  const [hoveredGroup, setHoveredGroup] = useState<string | null>("测试F3");
+  const [hoveredTeam, setHoveredTeam] = useState<string | null>(report.tree[0]?.teamName || null);
+  const [hoveredGroup, setHoveredGroup] = useState<string | null>(report.tree[0]?.groups[0]?.groupName || null);
 
   // 3. Time Controls
   const [timeAggregation, setTimeAggregation] = useState<string>("summary"); // "summary" | "daily" | "weekly" | "monthly"
-  const [startDate, setStartDate] = useState<string>("2025-04-06");
-  const [endDate, setEndDate] = useState<string>("2025-04-21");
+  const [startDate, setStartDate] = useState<string>(REPORT_START);
+  const [endDate, setEndDate] = useState<string>(REPORT_TODAY);
 
   // 4. Chart Card States
   const [chartTab, setChartTab] = useState<ChartTab>("trend");
@@ -272,6 +77,7 @@ export default function CreationAnalyticsView({ showToast }: CreationAnalyticsVi
   const [showExportMenu, setShowExportMenu] = useState<boolean>(false);
   const [sortField, setSortField] = useState<string>("uploadCount");
   const [sortAsc, setSortAsc] = useState<boolean>(false);
+  const handleSort = (field: string) => { setSortAsc(sortField === field ? !sortAsc : false); setSortField(field); };
 
   // Toggle selection helpers
   const toggleSelection = (list: string[], setList: (val: string[]) => void, item: string) => {
@@ -296,81 +102,34 @@ export default function CreationAnalyticsView({ showToast }: CreationAnalyticsVi
     }
   };
 
-  // Chart Mock Points Data for Stacked Area
-  const CHART_DATES = [
-    "2025-04-06",
-    "2025-04-08",
-    "2025-04-10",
-    "2025-04-12",
-    "2025-04-14",
-    "2025-04-16",
-    "2025-04-18",
-    "2025-04-20"
-  ];
+  const scope = ({ finished: "finished", material: "materials", image: "images", audio: "audio" } as const)[mediaType];
+  const selectedResources = report.resources.filter(row => (mediaType === "all" ? row.scope !== "scripts" : row.scope === scope) &&
+    row.date >= (startDate || REPORT_START) && row.date <= (endDate || REPORT_TODAY) &&
+    organizationSelected(row, topTab, selectedTeams, selectedGroups, selectedAccounts));
+  const selectedEvents = report.activities.filter(event => event.date >= (startDate || REPORT_START) && event.date <= (endDate || REPORT_TODAY));
+  const INITIAL_DETAILED_DATA = groupedResources(selectedResources, topTab, timeAggregation, startDate, endDate, selectedEvents)
+    .sort((a, b) => (sortAsc ? 1 : -1) * ((Number(a[sortField]) || 0) - (Number(b[sortField]) || 0)));
+  const metric = (rows: typeof selectedResources) => actionType === "upload" ? rows.length :
+    selectedEvents.filter(event => rows.some(row => row.id === event.resourceId) && event.action === actionType).length;
+  const chartGroups = grouped(selectedResources, row => organizationKey(row, topTab)).sort((a, b) => metric(b[1]) - metric(a[1]))
+    .slice(0, topCount === "all" ? undefined : Number(topCount.replace("top", "")));
+  const TEAMS_LEGEND = chartGroups.map(([key, rows], index) => ({ key, name: topTab === "team" ? rows[0].department : topTab === "group" ? rows[0].group : rows[0].person, color: REPORT_COLORS[index % REPORT_COLORS.length] }));
+  const periods = [...new Set((actionType === "upload" ? selectedResources.map(row => row.date) : selectedEvents.filter(event => event.action === actionType && selectedResources.some(row => row.id === event.resourceId)).map(event => event.date)).map(date => date.slice(0, 7)))].sort();
+  const chartTotal = chartGroups.reduce((sum, [, rows]) => sum + metric(rows), 0);
+  const chartValuesByDate = (chartTab === "proportion" ? chartGroups.map(([key, rows]) => ({
+    date: TEAMS_LEGEND.find(item => item.key === key)!.name, values: chartGroups.map(([id]) => id === key ? Math.round(ratio(metric(rows), chartTotal) * 10000) / 100 : 0),
+  })) : periods.map(date => ({
+    date, values: chartGroups.map(([, rows]) => actionType === "upload" ? rows.filter(row => row.date.startsWith(date)).length :
+      selectedEvents.filter(event => event.date.startsWith(date) && event.action === actionType && rows.some(row => row.id === event.resourceId)).length),
+  })));
+  const CHART_DATES = chartValuesByDate.map(row => row.date);
+  const chartWidth = 900, chartHeight = 220, paddingX = 40, paddingY = 30;
+  const chartMax = chartTab === "proportion" ? 100 : Math.max(1, ...chartValuesByDate.map(row => row.values.reduce((sum, value) => sum + value, 0)));
+  const getX = (index: number) => paddingX + index * (chartWidth - paddingX * 2) / Math.max(1, CHART_DATES.length - 1);
+  const getY = (value: number) => chartHeight - paddingY - value / chartMax * (chartHeight - paddingY * 2);
+  const stackedPath = chartValuesByDate.map((row, index) => `${index ? "L" : "M"} ${getX(index)} ${getY(row.values.reduce((sum, value) => sum + value, 0))}`).join(" ");
+  const stackedAreaPath = chartValuesByDate.length ? `${stackedPath} L ${getX(CHART_DATES.length - 1)} ${chartHeight - paddingY} L ${getX(0)} ${chartHeight - paddingY} Z` : "";
 
-  // SVG Chart Dimensions
-  const chartWidth = 900;
-  const chartHeight = 220;
-  const paddingX = 40;
-  const paddingY = 30;
-
-  // Legend Teams/Groups/Persons
-  const TEAMS_LEGEND = topTab === "personal"
-    ? [
-        { name: "小真A", color: "#6366F1" },
-        { name: "项一主号", color: "#10B981" },
-        { name: "RongAccount_01", color: "#F59E0B" },
-        { name: "美妆达人01", color: "#EF4444" },
-        { name: "抖音1", color: "#06B6D4" }
-      ]
-    : topTab === "group"
-    ? [
-        { name: "默认分组", color: "#6366F1" },
-        { name: "移动测试组", color: "#10B981" },
-        { name: "电商爆款组", color: "#F59E0B" },
-        { name: "全量组", color: "#EF4444" },
-        { name: "美妆主组", color: "#06B6D4" }
-      ]
-    : [
-        { name: "默认部门", color: "#6366F1" },
-        { name: "B部门", color: "#10B981" },
-        { name: "Ian部门1", color: "#F59E0B" },
-        { name: "7-20部门2", color: "#EF4444" },
-        { name: "A部门", color: "#06B6D4" }
-      ];
-
-  // Y values for stacked area peak on 04-17 / 04-18
-  const chartValuesByDate = [
-    { date: "2025-04-06", default: 0, bTeam: 0, ian1: 0, team720: 0, teamA: 0 },
-    { date: "2025-04-08", default: 1, bTeam: 3, ian1: 0, team720: 0, teamA: 0 },
-    { date: "2025-04-10", default: 2, bTeam: 0, ian1: 0, team720: 0, teamA: 0 },
-    { date: "2025-04-12", default: 1, bTeam: 0, ian1: 0, team720: 0, teamA: 0 },
-    { date: "2025-04-14", default: 0, bTeam: 0, ian1: 0, team720: 0, teamA: 0 },
-    { date: "2025-04-16", default: 6, bTeam: 0, ian1: 0, team720: 0, teamA: 0 },
-    { date: "2025-04-18", default: 26, bTeam: 0, ian1: 6, team720: 3, teamA: 0 },
-    { date: "2025-04-20", default: 1, bTeam: 0, ian1: 0, team720: 0, teamA: 0 }
-  ];
-
-  // X coordinate calculation
-  const getX = (index: number) => {
-    return paddingX + (index * (chartWidth - paddingX * 2)) / (CHART_DATES.length - 1);
-  };
-
-  // Y coordinate calculation (Max Y = 30)
-  const getY = (val: number) => {
-    const maxY = 30;
-    return chartHeight - paddingY - (val / maxY) * (chartHeight - paddingY * 2);
-  };
-
-  // Build polygon path for Stacked Area
-  const stackedPath = chartValuesByDate
-    .map((item, i) => {
-      const total = item.default + item.bTeam + item.ian1 + item.team720 + item.teamA;
-      return `${i === 0 ? "M" : "L"} ${getX(i).toFixed(2)} ${getY(total).toFixed(2)}`;
-    })
-    .join(" ");
-
-  const stackedAreaPath = `${stackedPath} L ${getX(CHART_DATES.length - 1).toFixed(2)} ${chartHeight - paddingY} L ${getX(0).toFixed(2)} ${chartHeight - paddingY} Z`;
 
   return (
     <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs p-6 space-y-6 animate-fade-in">
@@ -414,7 +173,6 @@ export default function CreationAnalyticsView({ showToast }: CreationAnalyticsVi
                 { key: "all", label: "全部" },
                 { key: "finished", label: "成片" },
                 { key: "material", label: "素材" },
-                { key: "third_party", label: "第三方" },
                 { key: "image", label: "图片" },
                 { key: "audio", label: "音频" }
               ] as const
@@ -711,7 +469,7 @@ export default function CreationAnalyticsView({ showToast }: CreationAnalyticsVi
             <div className="relative bg-slate-50/40 rounded-xl border border-slate-100 p-2 overflow-x-auto">
               <svg width="100%" height={chartHeight} viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="overflow-visible">
                 {/* Horizontal Grid Lines */}
-                {[0, 5, 10, 15, 20, 25, 30].map((val) => (
+                {Array.from({ length: 6 }, (_, i) => Math.round(chartMax * i / 5)).map((val) => (
                   <g key={val}>
                     <line
                       x1={paddingX}
@@ -761,7 +519,7 @@ export default function CreationAnalyticsView({ showToast }: CreationAnalyticsVi
 
                 {/* Data Points */}
                 {chartValuesByDate.map((item, i) => {
-                  const total = item.default + item.bTeam + item.ian1 + item.team720 + item.teamA;
+                  const total = item.values.reduce((sum, value) => sum + value, 0);
                   const cx = getX(i);
                   const cy = getY(total);
 
@@ -781,7 +539,7 @@ export default function CreationAnalyticsView({ showToast }: CreationAnalyticsVi
               </svg>
 
               {/* Hover Tooltip Box (Matches Screenshot 1 Box on 2025-04-06) */}
-              {hoveredChartPointIndex !== null && (
+              {hoveredChartPointIndex !== null && chartValuesByDate[hoveredChartPointIndex] && (
                 <div
                   className="absolute bg-white/95 backdrop-blur-md border border-slate-200 rounded-lg p-2.5 shadow-xl text-[11px] space-y-1 z-20 pointer-events-none"
                   style={{
@@ -792,18 +550,9 @@ export default function CreationAnalyticsView({ showToast }: CreationAnalyticsVi
                   <div className="font-mono text-slate-400 pb-1 border-b border-slate-100">
                     {CHART_DATES[hoveredChartPointIndex]}
                   </div>
-                  {TEAMS_LEGEND.map((t) => {
+                  {TEAMS_LEGEND.map((t, index) => {
                     const item = chartValuesByDate[hoveredChartPointIndex];
-                    const val =
-                      t.name === "默认部门"
-                        ? item.default
-                        : t.name === "B部门"
-                        ? item.bTeam
-                        : t.name === "Ian部门1"
-                        ? item.ian1
-                        : t.name === "7-20部门2"
-                        ? item.team720
-                        : item.teamA;
+                    const val = item.values[index] || 0;
 
                     return (
                       <div key={t.name} className="flex items-center justify-between gap-4 font-medium">
@@ -811,7 +560,7 @@ export default function CreationAnalyticsView({ showToast }: CreationAnalyticsVi
                           <span className="w-2 h-2 rounded-full" style={{ backgroundColor: t.color }} />
                           <span className="text-slate-600">{t.name}</span>
                         </div>
-                        <span className="font-mono font-bold text-slate-800">{val}</span>
+                        <span className="font-mono font-bold text-slate-800">{val}{chartTab === "proportion" ? "%" : ""}</span>
                       </div>
                     );
                   })}
@@ -899,7 +648,7 @@ export default function CreationAnalyticsView({ showToast }: CreationAnalyticsVi
                 )}
                 {topTab === "team" && <th className="py-3 px-4">部门名称</th>}
 
-                <th className="py-3 px-4 text-center">
+                <th onClick={() => handleSort("uploaderCount")} className="py-3 px-4 text-center">
                   <div className="flex items-center justify-center gap-1">
                     <span>上传人数</span>
                     <HelpCircle className="w-3 h-3 text-slate-400" />
@@ -907,42 +656,42 @@ export default function CreationAnalyticsView({ showToast }: CreationAnalyticsVi
                   </div>
                 </th>
 
-                <th className="py-3 px-4 text-center">
+                <th onClick={() => handleSort("uploadCount")} className="py-3 px-4 text-center">
                   <div className="flex items-center justify-center gap-1">
                     <span>上传次数</span>
                     <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer" />
                   </div>
                 </th>
 
-                <th className="py-3 px-4 text-center">
+                <th onClick={() => handleSort("downloadCount")} className="py-3 px-4 text-center">
                   <div className="flex items-center justify-center gap-1">
                     <span>下载次数</span>
                     <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer" />
                   </div>
                 </th>
 
-                <th className="py-3 px-4 text-center">
+                <th onClick={() => handleSort("downloadedPersonCount")} className="py-3 px-4 text-center">
                   <div className="flex items-center justify-center gap-1">
                     <span>被下载人数</span>
                     <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer" />
                   </div>
                 </th>
 
-                <th className="py-3 px-4 text-center">
+                <th onClick={() => handleSort("pushedPersonCount")} className="py-3 px-4 text-center">
                   <div className="flex items-center justify-center gap-1">
                     <span>被推送人数</span>
                     <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer" />
                   </div>
                 </th>
 
-                <th className="py-3 px-4 text-center">
+                <th onClick={() => handleSort("copiedCapcutCount")} className="py-3 px-4 text-center">
                   <div className="flex items-center justify-center gap-1">
                     <span>被复制剪映人数</span>
                     <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer" />
                   </div>
                 </th>
 
-                <th className="py-3 px-4 text-center">
+                <th onClick={() => handleSort("usageRate")} className="py-3 px-4 text-center">
                   <div className="flex items-center justify-center gap-1">
                     <span>作品被使用率</span>
                     <HelpCircle className="w-3 h-3 text-slate-400" />
@@ -950,7 +699,7 @@ export default function CreationAnalyticsView({ showToast }: CreationAnalyticsVi
                   </div>
                 </th>
 
-                <th className="py-3 px-4 text-center">
+                <th onClick={() => handleSort("viralCount")} className="py-3 px-4 text-center">
                   <div className="flex items-center justify-center gap-1">
                     <span>爆款视频数</span>
                     <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer" />
@@ -967,12 +716,12 @@ export default function CreationAnalyticsView({ showToast }: CreationAnalyticsVi
                     <>
                       <td className="py-3 px-4 font-bold text-[#7C3AED] whitespace-nowrap">{row.name}</td>
                       <td className="py-3 px-4 text-slate-600 font-medium whitespace-nowrap">{row.team}</td>
-                      <td className="py-3 px-4 text-slate-500 font-medium whitespace-nowrap">{row.group || "默认分组"}</td>
+                      <td className="py-3 px-4 text-slate-500 font-medium whitespace-nowrap">{row.group || "未归属分组"}</td>
                     </>
                   )}
                   {topTab === "group" && (
                     <>
-                      <td className="py-3 px-4 font-bold text-[#7C3AED] whitespace-nowrap">{row.group || "默认分组"}</td>
+                      <td className="py-3 px-4 font-bold text-[#7C3AED] whitespace-nowrap">{row.group || "未归属分组"}</td>
                       <td className="py-3 px-4 text-slate-600 font-medium whitespace-nowrap">{row.team}</td>
                     </>
                   )}

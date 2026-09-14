@@ -1,3 +1,9 @@
+import { usePlatformReportData } from "../lib/usePlatformReportData";
+import { REPORT_START, REPORT_TODAY, REPORT_COLORS } from "../lib/reportDemoData";
+import { organizationKey, organizationSelected, taskOrganization, taskReportDate } from "../lib/reportPlatformData";
+import { taskTotals, fileStatusTotals } from "../lib/platformAnalytics";
+import { grouped, ratio } from "../lib/analyticsData";
+import type { TaskItem } from "./TaskCollaborationView";
 import React, { useState } from "react";
 import {
   Calendar,
@@ -31,6 +37,7 @@ type MetricType = "task_count" | "order_count" | "video_count";
 
 interface TaskRow {
   id: string;
+  tasks: TaskItem[];
   team: string;
   group?: string;
   name?: string;
@@ -46,175 +53,9 @@ interface TaskRow {
   };
 }
 
-// Initial Mock Data
-const INITIAL_TASK_ROWS: TaskRow[] = [
-  {
-    id: "1",
-    team: "B部门",
-    group: "抖音3组, 移动+改名",
-    name: "汤小真",
-    taskCount: 2,
-    achievedCount: 2,
-    pendingCount: 0,
-    orderCount: 4,
-    videoCount: 4,
-    opsDetails: {
-      orderQty: 4,
-      videoQty: 4,
-      statusBreakdown: [
-        { status: "已上机", percent: "25%", count: 1 },
-        { status: "待审核", percent: "75%", count: 3 }
-      ]
-    }
-  },
-  {
-    id: "2",
-    team: "电商运营部",
-    group: "爆款运营组",
-    name: "致上运营",
-    taskCount: 1,
-    achievedCount: 0,
-    pendingCount: 1,
-    orderCount: 3,
-    videoCount: 0,
-    opsDetails: {
-      orderQty: 3,
-      videoQty: 0,
-      statusBreakdown: [
-        { status: "待派单", percent: "66.7%", count: 2 },
-        { status: "制作中", percent: "33.3%", count: 1 }
-      ]
-    }
-  },
-  {
-    id: "3",
-    team: "A部门",
-    group: "爆款一组",
-    name: "莫钦全",
-    taskCount: 0,
-    achievedCount: 0,
-    pendingCount: 0,
-    orderCount: 0,
-    videoCount: 0,
-    opsDetails: {
-      orderQty: 0,
-      videoQty: 0,
-      statusBreakdown: []
-    }
-  },
-  {
-    id: "4",
-    team: "lan部门1",
-    group: "lan分组1",
-    name: "lan同组",
-    taskCount: 0,
-    achievedCount: 0,
-    pendingCount: 0,
-    orderCount: 0,
-    videoCount: 0,
-    opsDetails: {
-      orderQty: 0,
-      videoQty: 0,
-      statusBreakdown: []
-    }
-  },
-  {
-    id: "5",
-    team: "lan部门1",
-    group: "lan分组1",
-    name: "lan不同分组3",
-    taskCount: 0,
-    achievedCount: 0,
-    pendingCount: 0,
-    orderCount: 0,
-    videoCount: 0,
-    opsDetails: {
-      orderQty: 0,
-      videoQty: 0,
-      statusBreakdown: []
-    }
-  },
-  {
-    id: "6",
-    team: "默认部门",
-    group: "默认分组",
-    name: "陈嘉",
-    taskCount: 0,
-    achievedCount: 0,
-    pendingCount: 0,
-    orderCount: 0,
-    videoCount: 0,
-    opsDetails: {
-      orderQty: 0,
-      videoQty: 0,
-      statusBreakdown: []
-    }
-  }
-];
-
-// Tree Structure for Cascading Filter Dropdown
-const MOCK_TREE = [
-  {
-    teamName: "达人测试",
-    groups: [
-      {
-        groupName: "测试F3",
-        accounts: ["F1", "F2", "F3ontop", "品如", "珊珊"]
-      },
-      {
-        groupName: "测试F2",
-        accounts: ["Acc_1", "Acc_2"]
-      }
-    ]
-  },
-  {
-    teamName: "小真测试部门",
-    groups: [
-      {
-        groupName: "移动测试组",
-        accounts: ["小真A", "小真B"]
-      }
-    ]
-  },
-  {
-    teamName: "项目1",
-    groups: [
-      {
-        groupName: "电商爆款组",
-        accounts: ["项一主号", "项一备用"]
-      }
-    ]
-  },
-  {
-    teamName: "RooooongZ部门",
-    groups: [
-      {
-        groupName: "全量组",
-        accounts: ["RongAccount_01"]
-      }
-    ]
-  },
-  {
-    teamName: "xx素颜霜",
-    groups: [
-      {
-        groupName: "美妆主组",
-        accounts: ["美妆达人01"]
-      }
-    ]
-  },
-  {
-    teamName: "抖音投放",
-    groups: [
-      {
-        groupName: "抖音1组",
-        accounts: ["抖音1"]
-      }
-    ]
-  }
-];
-
 export default function TaskAnalyticsView({ showToast }: TaskAnalyticsViewProps) {
+  const report = usePlatformReportData();
+  const MOCK_TREE = report.tree;
   // 1. Navigation States
   const [topTab, setTopTab] = useState<TopTab>("team");
   const [roleType, setRoleType] = useState<RoleType>("published");
@@ -225,13 +66,13 @@ export default function TaskAnalyticsView({ showToast }: TaskAnalyticsViewProps)
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
-  const [hoveredTeam, setHoveredTeam] = useState<string | null>("达人测试");
-  const [hoveredGroup, setHoveredGroup] = useState<string | null>("测试F3");
+  const [hoveredTeam, setHoveredTeam] = useState<string | null>(report.tree[0]?.teamName || null);
+  const [hoveredGroup, setHoveredGroup] = useState<string | null>(report.tree[0]?.groups[0]?.groupName || null);
 
   // 3. Date & Time Controls
   const [dateType, setDateType] = useState<string>("order_date"); // "order_date" | "complete_date" | "create_date"
-  const [startDate, setStartDate] = useState<string>("2025-04-06");
-  const [endDate, setEndDate] = useState<string>("2025-04-21");
+  const [startDate, setStartDate] = useState<string>(REPORT_START);
+  const [endDate, setEndDate] = useState<string>(REPORT_TODAY);
 
   // 4. Chart Card States
   const [chartTab, setChartTab] = useState<ChartTab>("trend");
@@ -267,80 +108,34 @@ export default function TaskAnalyticsView({ showToast }: TaskAnalyticsViewProps)
     }
   };
 
-  // SVG Chart Definitions
-  const CHART_DATES = [
-    "2025-04-06",
-    "2025-04-08",
-    "2025-04-10",
-    "2025-04-12",
-    "2025-04-14",
-    "2025-04-16",
-    "2025-04-18",
-    "2025-04-20"
-  ];
+  const selectedTasks = report.tasks.filter(task => {
+    const date = taskReportDate(task, dateType);
+    return date && date >= (startDate || REPORT_START) && date <= (endDate || REPORT_TODAY) &&
+      (statusType === "all" || (statusType === "achieved" ? task.status === "completed" : task.status !== "completed")) &&
+      organizationSelected(taskOrganization(task, roleType, report.org), topTab, selectedTeams, selectedGroups, selectedAccounts);
+  });
+  const INITIAL_TASK_ROWS: TaskRow[] = grouped(selectedTasks, task => organizationKey(taskOrganization(task, roleType, report.org), topTab)).map(([id, tasks]) => {
+    const org = taskOrganization(tasks[0], roleType, report.org), totals = taskTotals(tasks), statuses = fileStatusTotals(tasks);
+    return { id, tasks, team: org.department, group: org.group, name: org.person,
+      taskCount: totals.tasks, achievedCount: totals.completed, pendingCount: totals.pending, orderCount: totals.orders, videoCount: totals.delivered,
+      opsDetails: { orderQty: totals.orders, videoQty: totals.delivered, statusBreakdown: statuses.map(row => ({ status: row.label, count: row.value, percent: (ratio(row.value, totals.delivered) * 100).toFixed(1) + "%" })) } };
+  });
+  const valueOf = (tasks: TaskItem[]) => { const totals = taskTotals(tasks); return metricType === "task_count" ? totals.tasks : metricType === "order_count" ? totals.orders : totals.delivered; };
+  const chartRows = [...INITIAL_TASK_ROWS].sort((a, b) => valueOf(b.tasks) - valueOf(a.tasks)).slice(0, topCount === "all" ? undefined : Number(topCount.replace("top", "")));
+  const TEAMS_LEGEND = chartRows.map((row, index) => ({ name: topTab === "team" ? row.team : topTab === "group" ? row.group : row.name, color: REPORT_COLORS[index % REPORT_COLORS.length] }));
+  const periods = [...new Set(selectedTasks.map(task => taskReportDate(task, dateType).slice(0, 7)))].sort();
+  const chartTotal = chartRows.reduce((sum, row) => sum + valueOf(row.tasks), 0);
+  const chartPoints = chartTab === "status_dist" ? [
+    { date: "已达标", values: chartRows.map(row => valueOf(row.tasks.filter(task => task.status === "completed"))) },
+    { date: "待完成", values: chartRows.map(row => valueOf(row.tasks.filter(task => task.status !== "completed"))) },
+  ] : chartTab === "proportion" ? chartRows.map((row, i) => ({ date: TEAMS_LEGEND[i].name, values: chartRows.map(item => item.id === row.id ? Math.round(ratio(valueOf(row.tasks), chartTotal) * 10000) / 100 : 0) })) :
+    periods.map(date => ({ date, values: chartRows.map(row => valueOf(row.tasks.filter(task => taskReportDate(task, dateType).startsWith(date)))) }));
+  const chartWidth = 900, chartHeight = 220, paddingX = 40, paddingY = 30;
+  const chartMax = chartTab === "proportion" ? 100 : Math.max(1, ...chartPoints.flatMap(row => row.values));
+  const getX = (index: number) => paddingX + index * (chartWidth - paddingX * 2) / Math.max(1, chartPoints.length - 1);
+  const getY = (value: number) => chartHeight - paddingY - value / chartMax * (chartHeight - paddingY * 2);
+  const chartPaths = chartRows.map((_, index) => chartPoints.map((row, i) => `${i ? "L" : "M"} ${getX(i)} ${getY(row.values[index] || 0)}`).join(" "));
 
-  const chartWidth = 900;
-  const chartHeight = 220;
-  const paddingX = 40;
-  const paddingY = 30;
-
-  const TEAMS_LEGEND = topTab === "personal"
-    ? [
-        { name: "汤小真", color: "#6366F1" },
-        { name: "致上运营", color: "#10B981" },
-        { name: "莫钦全", color: "#F59E0B" },
-        { name: "lan同组", color: "#EF4444" },
-        { name: "陈嘉", color: "#06B6D4" }
-      ]
-    : topTab === "group"
-    ? [
-        { name: "抖音3组", color: "#6366F1" },
-        { name: "默认分组", color: "#10B981" },
-        { name: "爆款一组", color: "#F59E0B" },
-        { name: "lan分组1", color: "#EF4444" },
-        { name: "抖音1组", color: "#06B6D4" }
-      ]
-    : [
-        { name: "B部门", color: "#6366F1" },
-        { name: "默认部门", color: "#10B981" },
-        { name: "A部门", color: "#F59E0B" },
-        { name: "C部门", color: "#EF4444" },
-        { name: "抖音投放", color: "#06B6D4" }
-      ];
-
-  // Values matching Screenshot 1 Peak (B部门=2, 默认部门=1 on 2025-04-07)
-  const chartPoints = [
-    { date: "2025-04-06", bTeam: 0, defaultTeam: 0, aTeam: 0, cTeam: 0, douyin: 0 },
-    { date: "2025-04-07", bTeam: 2, defaultTeam: 1, aTeam: 0, cTeam: 0, douyin: 0 },
-    { date: "2025-04-08", bTeam: 0, defaultTeam: 0, aTeam: 0, cTeam: 0, douyin: 0 },
-    { date: "2025-04-10", bTeam: 0, defaultTeam: 0, aTeam: 0, cTeam: 0, douyin: 0 },
-    { date: "2025-04-12", bTeam: 0, defaultTeam: 0, aTeam: 0, cTeam: 0, douyin: 0 },
-    { date: "2025-04-14", bTeam: 0, defaultTeam: 0, aTeam: 0, cTeam: 0, douyin: 0 },
-    { date: "2025-04-16", bTeam: 0, defaultTeam: 0, aTeam: 0, cTeam: 0, douyin: 0 },
-    { date: "2025-04-18", bTeam: 0, defaultTeam: 0, aTeam: 0, cTeam: 0, douyin: 0 },
-    { date: "2025-04-20", bTeam: 0, defaultTeam: 0, aTeam: 0, cTeam: 0, douyin: 0 }
-  ];
-
-  const getX = (index: number) => {
-    return paddingX + (index * (chartWidth - paddingX * 2)) / (chartPoints.length - 1);
-  };
-
-  const getY = (val: number) => {
-    const maxY = 2.5; // Max Y axis in Screenshot 1 is 2
-    return chartHeight - paddingY - (val / maxY) * (chartHeight - paddingY * 2);
-  };
-
-  // Stacked Path Construction
-  const bTeamPath = chartPoints
-    .map((pt, i) => `${i === 0 ? "M" : "L"} ${getX(i).toFixed(2)} ${getY(pt.bTeam).toFixed(2)}`)
-    .join(" ");
-
-  const defaultTeamPath = chartPoints
-    .map((pt, i) => `${i === 0 ? "M" : "L"} ${getX(i).toFixed(2)} ${getY(pt.defaultTeam).toFixed(2)}`)
-    .join(" ");
-
-  const areaBPath = `${bTeamPath} L ${getX(chartPoints.length - 1)} ${chartHeight - paddingY} L ${getX(0)} ${chartHeight - paddingY} Z`;
-  const areaDefaultPath = `${defaultTeamPath} L ${getX(chartPoints.length - 1)} ${chartHeight - paddingY} L ${getX(0)} ${chartHeight - paddingY} Z`;
 
   return (
     <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs p-6 space-y-6 animate-fade-in">
@@ -705,7 +500,7 @@ export default function TaskAnalyticsView({ showToast }: TaskAnalyticsViewProps)
             <div className="relative bg-slate-50/40 rounded-xl border border-slate-100 p-2 overflow-x-auto">
               <svg width="100%" height={chartHeight} viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="overflow-visible">
                 {/* Horizontal Grid Lines */}
-                {[0, 0.5, 1, 1.5, 2].map((val) => (
+                {Array.from({ length: 5 }, (_, i) => Math.round(chartMax * i / 4)).map((val) => (
                   <g key={val}>
                     <line
                       x1={paddingX}
@@ -751,21 +546,11 @@ export default function TaskAnalyticsView({ showToast }: TaskAnalyticsViewProps)
                   </linearGradient>
                 </defs>
 
-                {/* B Team Stacked Area */}
-                <path d={areaBPath} fill="url(#indigoGradient)" />
-                <path d={bTeamPath} fill="none" stroke="#6366F1" strokeWidth={2} />
-
-                {/* Default Team Area */}
-                <path d={areaDefaultPath} fill="url(#emeraldGradient)" />
-                <path d={defaultTeamPath} fill="none" stroke="#10B981" strokeWidth={2} />
-
-                {/* Points */}
-                {chartPoints.map((pt, i) => (
-                  <g key={i} className="cursor-pointer" onMouseEnter={() => setHoveredChartPointIndex(i)}>
-                    <circle cx={getX(i)} cy={getY(pt.bTeam)} r={4} fill="#6366F1" stroke="#ffffff" strokeWidth={1.5} />
-                    {pt.defaultTeam > 0 && (
-                      <circle cx={getX(i)} cy={getY(pt.defaultTeam)} r={4} fill="#10B981" stroke="#ffffff" strokeWidth={1.5} />
-                    )}
+                {chartPaths.map((path, index) => (
+                  <g key={index}>
+                    <path d={path ? `${path} L ${getX(chartPoints.length - 1)} ${chartHeight - paddingY} L ${getX(0)} ${chartHeight - paddingY} Z` : ""} fill={TEAMS_LEGEND[index].color} fillOpacity={0.12} />
+                    <path d={path} fill="none" stroke={TEAMS_LEGEND[index].color} strokeWidth={2} />
+                    {chartPoints.map((point, i) => <circle key={i} cx={getX(i)} cy={getY(point.values[index] || 0)} r={4} fill={TEAMS_LEGEND[index].color} stroke="#ffffff" strokeWidth={1.5}><title>{point.date}: {TEAMS_LEGEND[index].name} {point.values[index] || 0}</title></circle>)}
                   </g>
                 ))}
               </svg>
@@ -895,12 +680,12 @@ export default function TaskAnalyticsView({ showToast }: TaskAnalyticsViewProps)
                     <>
                       <td className="py-3 px-4 font-bold text-[#7C3AED] whitespace-nowrap">{row.name}</td>
                       <td className="py-3 px-4 text-slate-600 font-medium whitespace-nowrap">{row.team}</td>
-                      <td className="py-3 px-4 text-slate-500 font-medium whitespace-nowrap">{row.group || "默认分组"}</td>
+                      <td className="py-3 px-4 text-slate-500 font-medium whitespace-nowrap">{row.group || "未归属分组"}</td>
                     </>
                   )}
                   {topTab === "group" && (
                     <>
-                      <td className="py-3 px-4 font-bold text-[#7C3AED] whitespace-nowrap">{row.group || "默认分组"}</td>
+                      <td className="py-3 px-4 font-bold text-[#7C3AED] whitespace-nowrap">{row.group || "未归属分组"}</td>
                       <td className="py-3 px-4 text-slate-600 font-medium whitespace-nowrap">{row.team}</td>
                     </>
                   )}
@@ -1067,26 +852,16 @@ export default function TaskAnalyticsView({ showToast }: TaskAnalyticsViewProps)
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
-                  <tr className="hover:bg-slate-50">
-                    <td className="py-2.5 px-3 font-mono text-slate-800">TSK_20250410_01</td>
-                    <td className="py-2.5 px-3 font-bold text-[#7C3AED]">美妆爆款对比视频批量制作</td>
-                    <td className="py-2.5 px-3 text-center font-mono">20</td>
-                    <td className="py-2.5 px-3 text-center font-mono font-bold text-emerald-600">20</td>
-                    <td className="py-2.5 px-3 text-center">
-                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 font-bold rounded">已达标</span>
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-slate-400 font-mono">2025-04-07 10:15</td>
-                  </tr>
-                  <tr className="hover:bg-slate-50">
-                    <td className="py-2.5 px-3 font-mono text-slate-800">TSK_20250415_02</td>
-                    <td className="py-2.5 px-3 font-bold text-[#7C3AED]">痛点拆解口播卡点视频</td>
-                    <td className="py-2.5 px-3 text-center font-mono">15</td>
-                    <td className="py-2.5 px-3 text-center font-mono font-bold text-blue-600">8</td>
-                    <td className="py-2.5 px-3 text-center">
-                      <span className="px-2 py-0.5 bg-blue-50 text-blue-600 font-bold rounded">待完成</span>
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-slate-400 font-mono">2025-04-12 16:30</td>
-                  </tr>
+                  {activeDetailDrawerRow.tasks.map(task => (
+                    <tr key={task.id} className="hover:bg-slate-50">
+                      <td className="py-2.5 px-3 font-mono text-slate-800">{task.id}</td>
+                      <td className="py-2.5 px-3 font-bold text-[#7C3AED]">{task.product || task.remark || task.id}</td>
+                      <td className="py-2.5 px-3 text-center font-mono">{task.orderCount}</td>
+                      <td className="py-2.5 px-3 text-center font-mono font-bold text-emerald-600">{task.completedCount}</td>
+                      <td className="py-2.5 px-3 text-center"><span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 font-bold rounded">{task.status === "completed" ? "已达标" : "待完成"}</span></td>
+                      <td className="py-2.5 px-3 text-right text-slate-400 font-mono">{taskReportDate(task, dateType)}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

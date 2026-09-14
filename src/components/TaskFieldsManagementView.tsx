@@ -1,68 +1,33 @@
 import React, { useState } from "react";
+import { useTaskFields } from "../lib/useTaskFields";
+import type { TaskFieldItem } from "../lib/taskFieldConfig";
+import OverlayPortal from "./overlays/OverlayPortal";
 import { Plus, X, Trash2, GripVertical } from "lucide-react";
 
-export interface TaskFieldItem {
-  id: string;
-  name: string;
-  type: string; // "单选" | "多选" | "文本" | "链接" | "数字" | "时间"
-  isRequired: boolean;
-  options: string[]; // 仅当单选/多选时有效
-}
+export type { TaskFieldItem } from "../lib/taskFieldConfig";
 
 export default function TaskFieldsManagementView() {
+  const { fields, settings, store } = useTaskFields();
   // 1. 顶部配置
-  const [globalEnabled, setGlobalEnabled] = useState<boolean>(true);
-  const [assignTarget, setAssignTarget] = useState<"all" | "team" | "group">("all");
+  const [globalEnabled, setGlobalEnabled] = useState(settings.enabled);
+  const [assignTarget, setAssignTarget] = useState(settings.assignTarget);
 
   // Toast 提示
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
   const showToast = (msg: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
     setToastMsg(msg);
-    setTimeout(() => {
-      setToastMsg(null);
-    }, 2500);
+    toastTimer.current = setTimeout(() => setToastMsg(null), 3000);
   };
 
   // 2. 字段列表数据（与截图完全一致）
-  const [fieldsList, setFieldsList] = useState<TaskFieldItem[]>([
-    {
-      id: "tf-1",
-      name: "脚本类型",
-      type: "多选",
-      isRequired: true,
-      options: [
-        "剧情（原创）",
-        "剧情（1:1）",
-        "剧情（微创新）",
-        "实拍卡点",
-        "纯混剪",
-        "VLOG",
-        "超长口播",
-        "长剧情",
-      ],
-    },
-    {
-      id: "tf-2",
-      name: "产品",
-      type: "多选",
-      isRequired: true,
-      options: ["产品b", "产品a", "V"],
-    },
-    {
-      id: "tf-3",
-      name: "需要使用素材",
-      type: "文本",
-      isRequired: false,
-      options: [],
-    },
-    {
-      id: "tf-4",
-      name: "对标视频",
-      type: "链接",
-      isRequired: false,
-      options: [],
-    },
-  ]);
+  const fieldsList = fields;
+  const setFieldsList = (update: React.SetStateAction<TaskFieldItem[]>) => {
+    try { store.setFields(update); return true; }
+    catch (error) { showToast((error as Error).message); return false; }
+  };
 
   // 3. 模态框状态
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -80,6 +45,7 @@ export default function TaskFieldsManagementView() {
 
   // 保存顶部任务指派配置
   const handleSaveConfig = () => {
+    store.setSettings({ enabled: globalEnabled, assignTarget });
     showToast("任务功能配置与指派规则保存成功！");
   };
 
@@ -111,7 +77,7 @@ export default function TaskFieldsManagementView() {
           : [],
     };
 
-    setFieldsList((prev) => [...prev, newItem]);
+    if (!setFieldsList((prev) => [...prev, newItem])) return;
     setIsAddModalOpen(false);
     showToast(`新增任务字段 [${newItem.name}] 成功！`);
   };
@@ -134,7 +100,7 @@ export default function TaskFieldsManagementView() {
       return;
     }
 
-    setFieldsList((prev) =>
+    if (!setFieldsList((prev) =>
       prev.map((f) =>
         f.id === editingItem.id
           ? {
@@ -149,7 +115,7 @@ export default function TaskFieldsManagementView() {
             }
           : f
       )
-    );
+    )) return;
 
     setEditingItem(null);
     showToast(`任务字段 [${formName.trim()}] 更新成功！`);
@@ -222,9 +188,9 @@ export default function TaskFieldsManagementView() {
     <div className="flex-1 p-6 space-y-6 animate-fade-in w-full relative min-h-0 overflow-y-auto">
       {/* Toast 提示 */}
       {toastMsg && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[120] bg-slate-900/90 text-white px-5 py-2.5 rounded-2xl shadow-2xl backdrop-blur-md border border-slate-700/80 text-xs font-bold flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
+        <OverlayPortal layer="toast" role="status" className="fixed top-6 left-1/2 -translate-x-1/2 z-[120] bg-slate-900/90 text-white px-5 py-2.5 rounded-2xl shadow-2xl backdrop-blur-md border border-slate-700/80 text-xs font-bold flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
           <span>{toastMsg}</span>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* 1. 顶部：任务功能开关 + 能指派任务给谁 */}
@@ -392,8 +358,8 @@ export default function TaskFieldsManagementView() {
 
       {/* ==================== 模态框 1：新增字段 ==================== */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <OverlayPortal layer="dialog" role="dialog" aria-modal="true" className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-200 overflow-y-auto max-h-[calc(100dvh-32px)] animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -534,13 +500,13 @@ export default function TaskFieldsManagementView() {
               </div>
             </form>
           </div>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* ==================== 模态框 2：编辑字段 (完全匹配截图4) ==================== */}
       {editingItem && (
-        <div className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <OverlayPortal layer="dialog" role="dialog" aria-modal="true" className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-200 overflow-y-auto max-h-[calc(100dvh-32px)] animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -678,13 +644,13 @@ export default function TaskFieldsManagementView() {
               </div>
             </form>
           </div>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* ==================== 模态框 3：删除字段 (完全匹配截图5) ==================== */}
       {deletingItem && (
-        <div className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <OverlayPortal layer="dialog" role="dialog" aria-modal="true" className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-slate-200 overflow-y-auto max-h-[calc(100dvh-32px)] animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -728,7 +694,7 @@ export default function TaskFieldsManagementView() {
               </div>
             </div>
           </div>
-        </div>
+        </OverlayPortal>
       )}
     </div>
   );

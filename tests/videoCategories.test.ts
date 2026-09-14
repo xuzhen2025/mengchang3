@@ -22,7 +22,7 @@ test("secondary options deduplicate assigned categories and ignore missing assig
 
 test("all current viral examples have a secondary category available in the resource editor", () => {
   const viral = INITIAL_FINISHED.filter(video => isViralVideo(video, { period: "monthly", thresholdWan: 10 }, "2026-09"));
-  assert.equal(viral.length, 12);
+  assert.equal(viral.length, 14);
   assert.equal(getVideoSecondaryCategories(viral).length, 11);
   for (const video of viral) {
     const { primary, secondary } = parseVideoCategory(video.category);

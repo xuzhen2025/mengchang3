@@ -1,3 +1,7 @@
+import { DEMO_SHOPS, SHOP_ORDERS, shopTotals, shopDate } from "../lib/tiktokAnalytics";
+import { REPORT_TODAY, shiftDate, money } from "../lib/reportDemoData";
+import { grouped } from "../lib/analyticsData";
+import { periodKey } from "../lib/reportPlatformData";
 import React, { useState } from "react";
 import {
   Calendar,
@@ -29,24 +33,9 @@ interface ShopItem {
   authorizedAt: string;
 }
 
-const INITIAL_SHOPS: ShopItem[] = [
-  {
-    id: "shop_1",
-    name: "SANDBOX7397710...",
-    code: "USLCHNEAYD",
-    type: "本地",
-    region: "美国",
-    authorizedAt: "2025-04-10"
-  },
-  {
-    id: "shop_2",
-    name: "GLOBAL_STORE_UK_01",
-    code: "UK88291045",
-    type: "跨境",
-    region: "非美国",
-    authorizedAt: "2025-04-02"
-  }
-];
+const INITIAL_SHOPS: ShopItem[] = DEMO_SHOPS.filter(shop => shop.authorized).map(shop => ({
+  id: shop.id, name: shop.name, code: shop.code, type: shop.region === "us" ? "本地" : "跨境", region: shop.region === "us" ? "美国" : "非美国", authorizedAt: "2026-06-01",
+}));
 
 export default function TikTokShopView({ showToast }: TikTokShopViewProps) {
   // 1. Expansion state for shops area
@@ -63,11 +52,11 @@ export default function TikTokShopView({ showToast }: TikTokShopViewProps) {
   const [activeMoreOpsId, setActiveMoreOpsId] = useState<string | null>(null);
 
   // 4. Filters & Selection in Data Overview
-  const [selectedShopFilter, setSelectedShopFilter] = useState<string>("SANDBOX7397710...");
+  const [selectedShopFilter, setSelectedShopFilter] = useState<string>(INITIAL_SHOPS[0]?.name || "");
   const [timeGranularity, setTimeGranularity] = useState<"day" | "week" | "month">("day");
   const [timeZone, setTimeZone] = useState<string>("GMT-8");
-  const [startDate, setStartDate] = useState<string>("2025-04-15");
-  const [endDate, setEndDate] = useState<string>("2025-04-15");
+  const [startDate, setStartDate] = useState<string>(shiftDate(REPORT_TODAY, -29));
+  const [endDate, setEndDate] = useState<string>(REPORT_TODAY);
 
   // 5. Bottom Table Tabs: "店铺数据" | "订单数据"
   const [bottomTab, setBottomTab] = useState<"shop_data" | "order_data">("shop_data");
@@ -110,23 +99,26 @@ export default function TikTokShopView({ showToast }: TikTokShopViewProps) {
     }
   };
 
-  // Metric overview cards definition
-  const OVERVIEW_METRICS = [
-    { title: "Statements-Processing", val: "$0", label: "较上一周期", diff: "--" },
-    { title: "Statements-Paid", val: "$0", label: "较上一周期", diff: "--" },
-    { title: "Statements-Failed", val: "$0", label: "较上一周期", diff: "--" },
-    { title: "Payouts-Paid", val: "$0", label: "较上一周期", diff: "--" },
-    { title: "Payouts-Processing", val: "$0", label: "较上一周期", diff: "--" },
-    { title: "Payouts-Failed", val: "$0", label: "较上一周期", diff: "--" },
-    { title: "总订单数", val: "0", label: "较上一周期", diff: "--" },
-    { title: "总订单金额", val: "$0", label: "较上一周期", diff: "--" },
-    { title: "未支付订单数", val: "0", label: "较上一周期", diff: "--" },
-    { title: "未支付订单金额", val: "$0", label: "较上一周期", diff: "--" },
-    { title: "取消订单数", val: "0", label: "较上一周期", diff: "--" },
-    { title: "取消订单金额", val: "$0", label: "较上一周期", diff: "--" },
-    { title: "退货退款订单数", val: "0", label: "较上一周期", diff: "--" },
-    { title: "退货退款订单金额", val: "$0", label: "较上一周期", diff: "--" }
+  const zone = ({ "GMT-8": "Etc/GMT+8", "GMT+8": "Etc/GMT-8", "GMT+0": "UTC" } as const)[timeZone] || "UTC";
+  const selectedShops = shops.filter(shop => !selectedShopFilter || shop.name === selectedShopFilter);
+  const scopedOrders = SHOP_ORDERS.filter(order => selectedShops.some(shop => shop.id === order.shopId));
+  const selectedOrders = scopedOrders.filter(order => { const date = shopDate(order.timestamp, zone); return date >= startDate && date <= endDate; });
+  const totals = shopTotals(selectedOrders);
+  const span = Math.max(1, Math.round((Date.parse(endDate) - Date.parse(startDate)) / 86400000) + 1);
+  const previous = shopTotals(scopedOrders.filter(order => { const date = shopDate(order.timestamp, zone); return date >= shiftDate(startDate, -span) && date < startDate; }));
+  const metricDefinitions = [
+    ["Statements-Processing", "statementProcessing"], ["Statements-Paid", "statementPaid"], ["Statements-Failed", "statementFailed"],
+    ["Payouts-Paid", "payoutPaid"], ["Payouts-Processing", "payoutProcessing"], ["Payouts-Failed", "payoutFailed"],
+    ["总订单数", "orders"], ["总订单金额", "amount"], ["未支付订单数", "unpaid"], ["未支付订单金额", "unpaidAmount"],
+    ["取消订单数", "cancelled"], ["取消订单金额", "cancelledAmount"], ["退货退款订单数", "refunded"], ["退货退款订单金额", "refund"],
   ];
+  const OVERVIEW_METRICS = metricDefinitions.map(([title, key]) => ({ title,
+    val: title.endsWith("数") ? totals[key].toLocaleString() : money(totals[key], "USD"), label: "较上一周期",
+    diff: previous[key] ? ((totals[key] - previous[key]) / previous[key] * 100).toFixed(1) + "%" : "--",
+  }));
+  const shopRows = selectedShops.flatMap(shop => grouped(selectedOrders.filter(order => order.shopId === shop.id), order => periodKey(shopDate(order.timestamp, zone), timeGranularity)).sort(([a], [b]) => a.localeCompare(b))
+    .map(([period, orders]) => ({ ...shop, rowId: shop.id + period, name: shop.name + " / " + period, totals: shopTotals(orders) })));
+
 
   return (
     <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden space-y-6 p-6">
@@ -430,20 +422,20 @@ export default function TikTokShopView({ showToast }: TikTokShopViewProps) {
               </thead>
 
               <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
-                {shops.map((shop) => (
-                  <tr key={shop.id} className="hover:bg-slate-50 transition-colors">
+                {shopRows.map((shop) => (
+                  <tr key={shop.rowId} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3 px-4 border-r border-slate-100 font-bold text-slate-800">
                       {shop.name}
                     </td>
                     <td className="py-3 px-4 border-r border-slate-100 font-mono text-slate-500">
                       {shop.code}
                     </td>
-                    <td className="py-3 px-4 border-r border-slate-100 text-right font-mono">$0.00</td>
-                    <td className="py-3 px-4 border-r border-slate-100 text-right font-mono">$0.00</td>
-                    <td className="py-3 px-4 border-r border-slate-100 text-right font-mono">$0.00</td>
-                    <td className="py-3 px-4 border-r border-slate-100 text-right font-mono">$0.00</td>
-                    <td className="py-3 px-4 border-r border-slate-100 text-right font-mono">$0.00</td>
-                    <td className="py-3 px-4 text-right font-mono">$0.00</td>
+                    <td className="py-3 px-4 border-r border-slate-100 text-right font-mono">{money(shop.totals.statementProcessing, "USD")}</td>
+                    <td className="py-3 px-4 border-r border-slate-100 text-right font-mono">{money(shop.totals.statementPaid, "USD")}</td>
+                    <td className="py-3 px-4 border-r border-slate-100 text-right font-mono">{money(shop.totals.statementFailed, "USD")}</td>
+                    <td className="py-3 px-4 border-r border-slate-100 text-right font-mono">{money(shop.totals.payoutPaid, "USD")}</td>
+                    <td className="py-3 px-4 border-r border-slate-100 text-right font-mono">{money(shop.totals.payoutProcessing, "USD")}</td>
+                    <td className="py-3 px-4 text-right font-mono">{money(shop.totals.payoutFailed, "USD")}</td>
                   </tr>
                 ))}
               </tbody>
@@ -462,18 +454,20 @@ export default function TikTokShopView({ showToast }: TikTokShopViewProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-                <tr className="hover:bg-slate-50">
-                  <td className="py-3 px-4 font-mono text-slate-800">TK_ORD_57829104</td>
-                  <td className="py-3 px-4 font-bold text-[#7C3AED]">SANDBOX7397710...</td>
-                  <td className="py-3 px-4 text-right font-bold text-emerald-600">$45.90</td>
+                {selectedOrders.map(order => (
+<tr key={order.id} className="hover:bg-slate-50">
+                  <td className="py-3 px-4 font-mono text-slate-800">{order.id}</td>
+                  <td className="py-3 px-4 font-bold text-[#7C3AED]">{shops.find(shop => shop.id === order.shopId)?.name}</td>
+                  <td className="py-3 px-4 text-right font-bold text-emerald-600">{money(order.amount / 100, "USD")}</td>
                   <td className="py-3 px-4 text-center">
-                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 font-bold rounded">已支付</span>
+                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 font-bold rounded">{["未支付", "已取消"].includes(order.status) ? order.status : order.status === "已退款" ? "已退款" : "已支付"}</span>
                   </td>
                   <td className="py-3 px-4 text-center">
-                    <span className="px-2 py-0.5 bg-blue-50 text-blue-600 font-bold rounded">出库中</span>
+                    <span className="px-2 py-0.5 bg-blue-50 text-blue-600 font-bold rounded">{order.status}</span>
                   </td>
-                  <td className="py-3 px-4 text-right text-slate-400">2025-04-15 14:22</td>
+                  <td className="py-3 px-4 text-right text-slate-400">{shopDate(order.timestamp, zone)}</td>
                 </tr>
+                ))}
               </tbody>
             </table>
           )}

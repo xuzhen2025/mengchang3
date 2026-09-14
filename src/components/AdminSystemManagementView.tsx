@@ -52,6 +52,7 @@ import {
   Star
 } from "lucide-react";
 import { DeptNode, AccountMember, INITIAL_DEPTS, INITIAL_MEMBERS } from "../data/adminAccounts";
+import { ORGANIZATION_CHANGE, readReportOrganization } from "../lib/analyticsOrganization";
 import AssetPagination from "./AssetPagination";
 import { useViralVideoRule } from "../lib/useViralVideoRule";
 import { isValidViralVideoRule, saveViralVideoRule, type ViralVideoRule } from "../lib/viralVideoRule";
@@ -943,21 +944,17 @@ export default function AdminSystemManagementView() {
   });
 
   const [members, setMembers] = useState<AccountMember[]>(() => {
-    const saved = localStorage.getItem("cloud_video_members");
-    if (!saved) return INITIAL_MEMBERS;
-    try {
-      return JSON.parse(saved);
-    } catch {
-      return INITIAL_MEMBERS;
-    }
+    return readReportOrganization().members;
   });
 
   React.useEffect(() => {
     localStorage.setItem("cloud_video_depts", JSON.stringify(depts));
+    window.dispatchEvent(new Event(ORGANIZATION_CHANGE));
   }, [depts]);
 
   React.useEffect(() => {
     localStorage.setItem("cloud_video_members", JSON.stringify(members));
+    window.dispatchEvent(new Event(ORGANIZATION_CHANGE));
   }, [members]);
 
   // Dept Modal
@@ -1930,7 +1927,6 @@ export default function AdminSystemManagementView() {
 
   // 3. 功能开关管理
   const [featureSwitches, setFeatureSwitches] = useState({
-    mainCategory: false, // 主类目开关
     categorySearch: true, // 分类搜索开关
     imageDownloadLog: true, // 图片下载，操作记录开关
     textDownloadLog: true, // 文案下载，操作记录开关
@@ -3978,7 +3974,6 @@ export default function AdminSystemManagementView() {
 
               <div className="pt-1 space-y-3.5 max-w-xl text-xs font-bold text-slate-700">
                 {[
-                  { key: "mainCategory", label: "主类目开关" },
                   { key: "categorySearch", label: "分类搜索开关" },
                   { key: "imageDownloadLog", label: "图片下载，操作记录开关" },
                   { key: "textDownloadLog", label: "文案下载，操作记录开关" },

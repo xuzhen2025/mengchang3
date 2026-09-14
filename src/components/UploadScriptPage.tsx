@@ -1,5 +1,8 @@
 import React, { useRef, useState } from "react";
+import { useTagCatalog, useTagGroupSelection, useTagSelection } from "../lib/useResourceTags";
 import CategoryCascader from "./CategoryCascader";
+import { resourceConfigStore } from "../lib/resourceConfig";
+import { publishResources, type ResourcePublishDetails } from "../lib/resourceUploads";
 import DynamicScriptTemplateForm, { DynamicScriptTemplateFormHandle } from "./DynamicScriptTemplateForm";
 import {
   ArrowLeft,
@@ -15,15 +18,10 @@ import {
 
 interface UploadScriptPageProps {
   onClose: () => void;
-  onPublishSuccess?: (msg: string) => void;
+  onPublishSuccess?: (msg: string, details?: ResourcePublishDetails) => void;
 }
 
-const TAG_GROUPS_DATA: Record<string, string[]> = {
-  "电商痛点": ["价格昂贵", "穿戴繁琐", "臃肿显胖", "闷热不透气", "掉档跑偏"],
-  "产品亮点": ["极致无痕", "高弹透气", "轻盈裸感", "德绒蓄热", "防勾抗起球"],
-  "剪辑风格": ["硬广直投", "剧情反转", "口播种草", "高光切片", "混剪卡点"],
-  "人群画像": ["年轻职场", "宝妈群体", "学生党", "大码人群", "精致高净值"]
-};
+
 
 export default function UploadScriptPage({
   onClose,
@@ -33,9 +31,9 @@ export default function UploadScriptPage({
   const [presetTemplate, setPresetTemplate] = useState("");
 
   // Section 1: Classification & Basic Info
-  const [primaryCategory, setPrimaryCategory] = useState("基础：对标翻拍");
-  const [secondaryCategory, setSecondaryCategory] = useState("8835内衣");
-  const [scriptTitle, setScriptTitle] = useState("粉色的发顺丰");
+  const [primaryCategory, setPrimaryCategory] = useState(() => resourceConfigStore.categories("scripts")[0]?.name || "");
+  const [secondaryCategory, setSecondaryCategory] = useState(() => resourceConfigStore.categories("scripts")[0]?.children[0]?.name || "");
+  const [scriptTitle, setScriptTitle] = useState("");
   const [associatedTask, setAssociatedTask] = useState("");
   const [showTaskDropdown, setShowTaskDropdown] = useState(false);
 
@@ -43,15 +41,16 @@ export default function UploadScriptPage({
   const [publicTagSearch, setPublicTagSearch] = useState("");
   const [publicGroupSearch, setPublicGroupSearch] = useState("");
   const [publicSubSearch, setPublicSubSearch] = useState("");
-  const [selectedPublicGroupKey, setSelectedPublicGroupKey] = useState("电商痛点");
-  const [addedPublicTags, setAddedPublicTags] = useState<string[]>([]);
+  const { publicGroups: PUBLIC_TAG_GROUPS, personalGroups: PERSONAL_TAG_GROUPS } = useTagCatalog();
+  const [selectedPublicGroupKey, setSelectedPublicGroupKey] = useTagGroupSelection(PUBLIC_TAG_GROUPS);
+  const [addedPublicTags, setAddedPublicTags] = useTagSelection("public");
 
   // Section 1: Personal Tag 3-Column Panel
   const [personalTagSearch, setPersonalTagSearch] = useState("");
   const [personalGroupSearch, setPersonalGroupSearch] = useState("");
   const [personalSubSearch, setPersonalSubSearch] = useState("");
-  const [selectedPersonalGroupKey, setSelectedPersonalGroupKey] = useState("电商痛点");
-  const [addedPersonalTags, setAddedPersonalTags] = useState<string[]>([]);
+  const [selectedPersonalGroupKey, setSelectedPersonalGroupKey] = useTagGroupSelection(PERSONAL_TAG_GROUPS);
+  const [addedPersonalTags, setAddedPersonalTags] = useTagSelection("personal");
 
   const scriptTemplateFormRef = useRef<DynamicScriptTemplateFormHandle | null>(null);
 
@@ -63,15 +62,25 @@ export default function UploadScriptPage({
   const [reminderMessage, setReminderMessage] = useState("");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [categoryError, setCategoryError] = useState("");
 
   const handlePublish = (keepConfig = false) => {
+    if (isSubmitting) return;
+    if (!resourceConfigStore.categoryValid("scripts", primaryCategory, secondaryCategory)) { setCategoryError("请选择当前可用的一级分类和二级分类"); return; }
+    setCategoryError("");
     if (!scriptTemplateFormRef.current?.validate()) return;
+    const content = JSON.stringify(scriptTemplateFormRef.current?.getSnapshot(), null, 2);
     setIsSubmitting(true);
     setTimeout(() => {
       setIsSubmitting(false);
+      if (!resourceConfigStore.categoryValid("scripts", primaryCategory, secondaryCategory)) { setCategoryError("分类已变更，请重新选择"); return; }
+      const published = publishResources({ partition: "脚本", primaryCategory, secondaryCategory,
+        publicTags: addedPublicTags, personalTags: addedPersonalTags, content,
+        files: [{ name: scriptTitle.trim() || "未命名脚本", url: URL.createObjectURL(new Blob([content], { type: "application/json" })) }],
+      });
       onClose();
       if (onPublishSuccess) {
-        onPublishSuccess(keepConfig ? "✅ 已发布脚本，相同配置可继续上传" : "✅ 已成功上传【脚本】资源");
+        onPublishSuccess(keepConfig ? "✅ 已发布脚本，相同配置可继续上传" : "✅ 已成功上传【脚本】资源", published);
       }
     }, 600);
   };
@@ -79,6 +88,7 @@ export default function UploadScriptPage({
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[#F5F6FA] w-full h-full overflow-hidden animate-in fade-in duration-150 text-xs font-sans text-slate-700">
       
+      {categoryError && <div role="alert" className="px-6 py-2 text-rose-600 bg-rose-50 shrink-0">{categoryError}</div>}
       {/* Top Header */}
       <div className="px-6 py-3.5 bg-white border-b border-slate-200/80 flex items-center justify-between shrink-0 shadow-2xs">
         <div className="flex items-center gap-3">
@@ -137,6 +147,7 @@ export default function UploadScriptPage({
             </label>
             <div className="flex-1">
               <CategoryCascader
+                scope="scripts"
                 primaryCategory={primaryCategory}
                 secondaryCategory={secondaryCategory}
                 onSelect={(p, s) => {
@@ -250,7 +261,7 @@ export default function UploadScriptPage({
                   className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:outline-none shrink-0"
                 />
                 <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-                  {Object.keys(TAG_GROUPS_DATA)
+                    {Object.keys(PUBLIC_TAG_GROUPS)
                     .filter((g) => g.includes(publicGroupSearch.trim()))
                     .map((group) => (
                       <div
@@ -282,7 +293,7 @@ export default function UploadScriptPage({
                   className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:outline-none shrink-0"
                 />
                 <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 pt-1">
-                  {(TAG_GROUPS_DATA[selectedPublicGroupKey] || [])
+                    {(PUBLIC_TAG_GROUPS[selectedPublicGroupKey] || [])
                     .filter((sub) => sub.includes(publicSubSearch.trim()))
                     .map((subTag) => {
                       const isChecked = addedPublicTags.includes(subTag);
@@ -402,7 +413,7 @@ export default function UploadScriptPage({
                   className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:outline-none shrink-0"
                 />
                 <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-                  {Object.keys(TAG_GROUPS_DATA)
+                    {Object.keys(PERSONAL_TAG_GROUPS)
                     .filter((g) => g.includes(personalGroupSearch.trim()))
                     .map((group) => (
                       <div
@@ -434,7 +445,7 @@ export default function UploadScriptPage({
                   className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:outline-none shrink-0"
                 />
                 <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 pt-1">
-                  {(TAG_GROUPS_DATA[selectedPersonalGroupKey] || [])
+                    {(PERSONAL_TAG_GROUPS[selectedPersonalGroupKey] || [])
                     .filter((sub) => sub.includes(personalSubSearch.trim()))
                     .map((subTag) => {
                       const isChecked = addedPersonalTags.includes(subTag);

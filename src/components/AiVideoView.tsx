@@ -702,7 +702,7 @@ export default function AiVideoView({
           key={`${uploadSelection.task.id}-${uploadSelection.outputs.map((output) => output.id).join("-")}`}
           isOpen
           isPage
-          initialFiles={uploadSelection.outputs.map((output) => ({ name: output.name, type: "video/mp4" }))}
+          initialFiles={uploadSelection.outputs.map((output) => ({ name: output.name, type: "video/mp4", url: output.videoUrl }))}
           onClose={() => setUploadSelection(null)}
           onPublishSuccess={(message) => {
             onUploadVideos(uploadSelection.outputs.map((output) => ({ name: output.name, cover: output.coverUrl })));

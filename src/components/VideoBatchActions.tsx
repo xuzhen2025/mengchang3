@@ -8,6 +8,7 @@ import VideoResourcePickerModal, { VideoResourcePickerItem } from "./VideoResour
 import { RELATED_VIDEO_OPTIONS } from "../data/videoResourceOptions";
 import { downloadResourceFiles, toRelatedVideo } from "../lib/resourceBatch";
 import type { DownloadResource, VideoBatchChange, VideoResourceMetadata } from "../lib/resourceBatch";
+import { useResourceConfig } from "../lib/useResourceConfig";
 
 interface BatchVideo extends DownloadResource, VideoResourceMetadata {
   coverUrl: string; duration: string; size: string; author: string;
@@ -21,6 +22,7 @@ export default function VideoBatchActions({ videos, selectedIds, isMaterialMode 
   showToast: (message: string) => void;
 }) {
   const [action, setAction] = useState("");
+  const { store } = useResourceConfig();
   const [targetIds, setTargetIds] = useState<string[]>([]);
   const [status, setStatus] = useState("");
   const [downloading, setDownloading] = useState(false);
@@ -82,12 +84,12 @@ export default function VideoBatchActions({ videos, selectedIds, isMaterialMode 
       {downloading ? <LoaderCircle className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
       {downloading ? "下载中" : "下载"}
     </button>
-    <ResourceActionMenu label="修改" disabled={downloading} options={["修改状态", "修改分类", "批量关联脚本", "批量关联视频"]} onSelect={start} />
+    <ResourceActionMenu label="修改" disabled={downloading} options={[...(store.statusEnabled(isMaterialMode ? "materials" : "finished") ? ["修改状态"] : []), "修改分类", "批量关联脚本", "批量关联视频"]} onSelect={start} />
     <ResourceActionMenu label="添加标签" disabled={downloading} options={["添加公共标签", "添加个人标签"]} onSelect={start} />
     {(action === "添加公共标签" || action === "添加个人标签") && <ResourceTagModal
       kind={action === "添加公共标签" ? "public" : "personal"} title={action} requireSelection
       onClose={close} onConfirm={tags => apply({ kind: action === "添加公共标签" ? "publicTags" : "personalTags", tags })} showToast={showToast} />}
-    {action === "修改分类" && <ResourceCategoryModal onClose={close} onConfirm={value => apply({ kind: "category", value })} />}
+    {action === "修改分类" && <ResourceCategoryModal scope={isMaterialMode ? "materials" : "finished"} onClose={close} onConfirm={value => apply({ kind: "category", value })} />}
     {action === "修改状态" && <ResourceEditDialog title={action} onClose={close} disabled={!status} onConfirm={() => apply({ kind: "status", value: status })}>
       <div className="flex items-center gap-4"><span className="text-xs font-bold text-slate-700">视频状态</span>
         <VideoStatusSelect value={status} onChange={setStatus} isMaterialMode={isMaterialMode} placeholder />

@@ -1,4 +1,7 @@
 import React, { useState } from "react";
+import { useResourceConfig } from "../lib/useResourceConfig";
+import CategoryCascader from "./CategoryCascader";
+import { useTagCatalog, useTagGroupSelection, useTagSelection } from "../lib/useResourceTags";
 import AssetPagination from "./AssetPagination";
 import LinkScriptModal from "./LinkScriptModal";
 import OverlayPortal from "./overlays/OverlayPortal";
@@ -21,7 +24,9 @@ import {
   Folder,
 } from "lucide-react";
 
-export interface VideoPublishDetails {
+import { publishResources, type ResourcePublishDetails } from "../lib/resourceUploads";
+
+export interface VideoPublishDetails extends ResourcePublishDetails {
   partition: "成片" | "素材";
   primaryCategory: string;
   secondaryCategory: string;
@@ -33,6 +38,7 @@ interface UploadFinishedVideoModalProps {
   onClose: () => void;
   onPublishSuccess?: (msg: string, details?: VideoPublishDetails) => void;
   initialTaskCode?: string;
+  initialPartition?: "成片" | "素材";
   isPage?: boolean;
   initialFiles?: Array<{ name: string; type?: string; url?: string }>;
   stayOpenOnPublish?: boolean;
@@ -40,74 +46,7 @@ interface UploadFinishedVideoModalProps {
 }
 
 // Hierarchical Category Data (一级分类 -> 二级分类)
-const HIERARCHICAL_CATEGORIES: Record<
-  "成片" | "素材",
-  Array<{ primary: string; secondaries: string[] }>
-> = {
-  成片: [
-    {
-      primary: "爆款素材",
-      secondaries: ["服饰内衣", "美妆护肤", "日用百货", "数码家电", "食品饮料"],
-    },
-    {
-      primary: "内衣",
-      secondaries: [
-        "无钢圈文胸",
-        "蕾丝抹胸",
-        "运动内衣",
-        "聚拢内衣",
-        "大码舒适",
-      ],
-    },
-    {
-      primary: "内裤",
-      secondaries: ["纯棉三角", "无痕平角", "高腰收腹", "冰丝抑菌"],
-    },
-    {
-      primary: "吊带",
-      secondaries: ["背心打底", "真丝外穿", "带胸垫吊带", "蕾丝边吊带"],
-    },
-    {
-      primary: "裤袜",
-      secondaries: ["光腿神器", "防勾丝袜", "连体保暖", "加压瘦腿"],
-    },
-    {
-      primary: "保暖衣",
-      secondaries: ["德绒打底", "羊绒双面", "超薄隐形", "加绒加厚"],
-    },
-    {
-      primary: "明星素材",
-      secondaries: ["明星代言", "同款切片", "综艺现场", "街拍Vlog"],
-    },
-    {
-      primary: "通用",
-      secondaries: ["通用B-roll", "品牌宣传", "痛点引出", "结尾促销"],
-    },
-  ],
-  素材: [
-    { primary: "通用", secondaries: ["背景音乐", "特写痛点", "转场特效"] },
-    {
-      primary: "内衣",
-      secondaries: ["面料拉伸", "透气实测", "上身效果", "细节缝线"],
-    },
-    { primary: "内裤", secondaries: ["弹性拉伸", "吸水排汗", "平铺展示"] },
-    { primary: "吊带", secondaries: ["外穿穿搭", "肩带细节", "垂坠感实拍"] },
-    { primary: "保暖衣", secondaries: ["蓄热升温", "轻薄拉伸", "细节走线"] },
-    { primary: "裤袜", secondaries: ["防刮划实测", "不掉裆对比", "高弹拉伸"] },
-    { primary: "合作达人", secondaries: ["开箱试穿", "口播推荐", "生活Vlog"] },
-    {
-      primary: "梦畅*焕丽女王剧情",
-      secondaries: ["职场反转", "闺蜜种草", "家庭日常"],
-    },
-    { primary: "外包剧情", secondaries: ["街头采访", "情景短剧", "反转搞笑"] },
-    { primary: "直播切片", secondaries: ["爆单讲解", "主播试穿", "限时福利"] },
-    { primary: "明星素材", secondaries: ["红毯高光", "访谈剪辑", "街拍短片"] },
-    {
-      primary: "项目部外包剧情",
-      secondaries: ["定制情景", "品牌故事", "口碑裂变"],
-    },
-  ],
-};
+
 
 // Mock Task Collaboration Items for Task Picker Modal
 const MOCK_COLLAB_TASKS = [
@@ -188,12 +127,7 @@ const MOCK_SCRIPTS_LIST = [
 ];
 
 // Mock Tag Groups & Sub-Tags for Personal & Public Tags
-const TAG_GROUPS_DATA: Record<string, string[]> = {
-  电商痛点: ["价格昂贵", "穿戴繁琐", "臃肿显胖", "闷热不透气", "掉档跑偏"],
-  产品亮点: ["极致无痕", "高弹透气", "轻盈裸感", "德绒蓄热", "防勾抗起球"],
-  剪辑风格: ["硬广直投", "剧情反转", "口播种草", "高光切片", "混剪卡点"],
-  人群画像: ["年轻职场", "宝妈群体", "学生党", "大码人群", "精致高净值"],
-};
+
 
 // Preset Template Model
 interface PresetTemplate {
@@ -212,16 +146,16 @@ const INITIAL_PRESET_TEMPLATES: PresetTemplate[] = [
     id: "default-1",
     name: "默认电商成片模板",
     partition: "成片",
-    primaryCategory: "爆款素材",
-    secondaryCategory: "服饰内衣",
+    primaryCategory: "女士内衣",
+    secondaryCategory: "无钢圈",
     nameType: "filename",
   },
   {
     id: "default-2",
     name: "混剪二创视频模板",
     partition: "素材",
-    primaryCategory: "通用",
-    secondaryCategory: "特写痛点",
+    primaryCategory: "彩妆护肤",
+    secondaryCategory: "护肤试用片",
     nameType: "prefix",
     prefixName: "二创卡点_",
   },
@@ -232,6 +166,7 @@ export default function UploadFinishedVideoModal({
   onClose,
   onPublishSuccess,
   initialTaskCode = "",
+  initialPartition = "成片",
   isPage = false,
   initialFiles = [],
   stayOpenOnPublish = false,
@@ -243,16 +178,20 @@ export default function UploadFinishedVideoModal({
   const [rotation, setRotation] = useState<"none" | "90" | "-90" | "180">(
     "none",
   );
-  const [partition, setPartition] = useState<"成片" | "素材">("成片");
+  const { store: configStore } = useResourceConfig();
+  const categoryOptions = (type: "成片" | "素材") => configStore.categories(type === "成片" ? "finished" : "materials").map(n => ({ primary: n.name, secondaries: n.children.map(c => c.name) }));
+  const [partition, setPartition] = useState<"成片" | "素材">(initialPartition);
+  const productionDateLabel = partition === "素材" ? "拍摄时间" : "剪辑时间";
+  const initialCategory = categoryOptions(initialPartition)[0] || { primary: "", secondaries: [] };
 
   // Hierarchical Category State (一级 + 二级)
   const [selectedPrimaryCat, setSelectedPrimaryCat] =
-    useState<string>("爆款素材");
+    useState<string>(initialCategory.primary);
   const [selectedSecondaryCat, setSelectedSecondaryCat] =
-    useState<string>("服饰内衣");
+    useState<string>(initialCategory.secondaries[0] || "");
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [hoveredPrimaryCat, setHoveredPrimaryCat] =
-    useState<string>("爆款素材");
+    useState<string>(initialCategory.primary);
 
   const [nameType, setNameType] = useState<"filename" | "custom" | "prefix">(
     "filename",
@@ -361,22 +300,16 @@ export default function UploadFinishedVideoModal({
   const [publicSearchText, setPublicSearchText] = useState("");
   const [publicGroupSearch, setPublicGroupSearch] = useState("");
   const [publicSubSearch, setPublicSubSearch] = useState("");
-  const [selectedPublicGroupKey, setSelectedPublicGroupKey] =
-    useState("电商痛点");
-  const [addedPublicTags, setAddedPublicTags] = useState<string[]>([
-    "极致无痕",
-    "硬广直投",
-  ]);
+  const { publicGroups: PUBLIC_TAG_GROUPS, personalGroups: PERSONAL_TAG_GROUPS } = useTagCatalog();
+  const [selectedPublicGroupKey, setSelectedPublicGroupKey] = useTagGroupSelection(PUBLIC_TAG_GROUPS);
+  const [addedPublicTags, setAddedPublicTags] = useTagSelection("public");
 
   // Personal Tag 3-Column States
   const [personalSearchText, setPersonalSearchText] = useState("");
   const [personalGroupSearch, setPersonalGroupSearch] = useState("");
   const [personalSubSearch, setPersonalSubSearch] = useState("");
-  const [selectedPersonalGroupKey, setSelectedPersonalGroupKey] =
-    useState("电商痛点");
-  const [addedPersonalTags, setAddedPersonalTags] = useState<string[]>([
-    "年轻职场",
-  ]);
+  const [selectedPersonalGroupKey, setSelectedPersonalGroupKey] = useTagGroupSelection(PERSONAL_TAG_GROUPS);
+  const [addedPersonalTags, setAddedPersonalTags] = useTagSelection("personal");
 
   // Date and other info
   const [editDate, setEditDate] = useState<string>(
@@ -416,12 +349,21 @@ export default function UploadFinishedVideoModal({
   };
 
   const handlePublish = (modeText: string = "发布") => {
+    if (uploadedFiles.length === 0 || isSubmitting) return;
+    if (!configStore.categoryValid(partition === "成片" ? "finished" : "materials", selectedPrimaryCat, selectedSecondaryCat)) { setTemplateToast("请选择当前可用的一级分类和二级分类"); return; }
     setIsSubmitting(true);
     setTimeout(() => {
       setIsSubmitting(false);
+      if (!configStore.categoryValid(partition === "成片" ? "finished" : "materials", selectedPrimaryCat, selectedSecondaryCat)) { setTemplateToast("分类已变更，请重新选择"); return; }
+      const names = uploadedFiles.map((file) => nameType === "custom" ? customName : nameType === "prefix" ? `${prefixName}${file.name}` : file.name);
+      const published = publishResources({ partition, primaryCategory: selectedPrimaryCat, secondaryCategory: selectedSecondaryCat,
+        publicTags: addedPublicTags, personalTags: addedPersonalTags,
+        files: uploadedFiles.map((file, index) => ({ name: names[index], size: file.size, url: initialFiles.find((initial) => initial.name === file.name)?.url || URL.createObjectURL(file) })),
+      });
       if (!stayOpenOnPublish) onClose();
       if (onPublishSuccess) {
         onPublishSuccess(`视频已成功${modeText}至资源库`, {
+          ...published,
           partition,
           primaryCategory: selectedPrimaryCat,
           secondaryCategory: selectedSecondaryCat,
@@ -439,7 +381,7 @@ export default function UploadFinishedVideoModal({
 
   // Get current available categories for current partition
   const currentCategoryGroups =
-    HIERARCHICAL_CATEGORIES[partition] || HIERARCHICAL_CATEGORIES["成片"];
+    categoryOptions(partition);
   const activePrimaryObj =
     currentCategoryGroups.find((c) => c.primary === selectedPrimaryCat) ||
     currentCategoryGroups[0];
@@ -680,7 +622,7 @@ export default function UploadFinishedVideoModal({
                         checked={partition === p}
                         onChange={() => {
                           setPartition(p);
-                          const firstPrim = HIERARCHICAL_CATEGORIES[p][0];
+                          const firstPrim = categoryOptions(p)[0] || { primary: "", secondaries: [] };
                           setSelectedPrimaryCat(firstPrim.primary);
                           setSelectedSecondaryCat(
                             firstPrim.secondaries[0] || "",
@@ -696,138 +638,8 @@ export default function UploadFinishedVideoModal({
 
               {/* 2. 视频分类 (下拉框：左侧选择一级分类，右侧选择二级分类) */}
               <div className="flex items-start gap-6 pl-3">
-                <span className="w-24 text-slate-700 font-bold text-right shrink-0 pt-2">
-                  <span className="text-rose-500 mr-0.5">*</span>视频分类
-                </span>
-                <div className="flex-1 relative">
-                  {/* Dropdown Trigger */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
-                      setHoveredPrimaryCat(
-                        selectedPrimaryCat ||
-                          currentCategoryGroups[0]?.primary ||
-                          "",
-                      );
-                    }}
-                    className="w-full bg-white border border-slate-200/90 hover:border-purple-300 rounded-lg px-3 py-2 text-xs text-slate-700 flex items-center justify-between focus:outline-none focus:border-purple-500 cursor-pointer shadow-2xs font-medium transition-colors"
-                  >
-                    <span
-                      className={
-                        selectedPrimaryCat && selectedSecondaryCat
-                          ? "text-slate-800 font-semibold"
-                          : "text-slate-400"
-                      }
-                    >
-                      {selectedPrimaryCat && selectedSecondaryCat
-                        ? `${selectedPrimaryCat} / ${selectedSecondaryCat}`
-                        : "请选择视频分类"}
-                    </span>
-                    <ChevronDown
-                      className={`w-4 h-4 text-slate-400 transition-transform ${isCategoryDropdownOpen ? "rotate-180 text-purple-600" : ""}`}
-                    />
-                  </button>
-
-                  {/* Two-Column Cascading Dropdown Popover */}
-                  {isCategoryDropdownOpen && (
-                    <>
-                      {/* Backdrop to close when clicking outside */}
-                      <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setIsCategoryDropdownOpen(false)}
-                      />
-
-                      {/* Cascading Menu */}
-                      <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white border border-slate-200/90 shadow-xl rounded-xl overflow-hidden flex h-64 animate-in fade-in zoom-in-95 duration-100">
-                        {/* Left Column: 一级分类 */}
-                        <div className="w-1/2 border-r border-slate-100 bg-slate-50/60 overflow-y-auto p-1.5 space-y-0.5">
-                          <div className="px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200/50 mb-1">
-                            一级分类
-                          </div>
-                          {currentCategoryGroups.map((group) => {
-                            const isHovered =
-                              (hoveredPrimaryCat || selectedPrimaryCat) ===
-                              group.primary;
-                            return (
-                              <div
-                                key={group.primary}
-                                onMouseEnter={() =>
-                                  setHoveredPrimaryCat(group.primary)
-                                }
-                                onClick={() =>
-                                  setHoveredPrimaryCat(group.primary)
-                                }
-                                className={`px-3 py-2 rounded-lg text-xs font-medium cursor-pointer flex items-center justify-between transition-colors ${
-                                  isHovered
-                                    ? "bg-purple-100/80 text-purple-700 font-bold"
-                                    : "text-slate-700 hover:bg-slate-100"
-                                }`}
-                              >
-                                <span>{group.primary}</span>
-                                <ChevronRight
-                                  className={`w-3.5 h-3.5 ${isHovered ? "text-purple-600" : "text-slate-300"}`}
-                                />
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        {/* Right Column: 二级分类 */}
-                        <div className="w-1/2 overflow-y-auto p-1.5 space-y-0.5 bg-white">
-                          <div className="px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 mb-1">
-                            二级分类
-                          </div>
-                          {(() => {
-                            const activeGroupObj =
-                              currentCategoryGroups.find(
-                                (c) =>
-                                  c.primary ===
-                                  (hoveredPrimaryCat || selectedPrimaryCat),
-                              ) || currentCategoryGroups[0];
-                            if (
-                              !activeGroupObj ||
-                              !activeGroupObj.secondaries.length
-                            ) {
-                              return (
-                                <div className="p-3 text-slate-400 text-xs">
-                                  暂无二级分类
-                                </div>
-                              );
-                            }
-                            return activeGroupObj.secondaries.map((sec) => {
-                              const isSelected =
-                                selectedPrimaryCat === activeGroupObj.primary &&
-                                selectedSecondaryCat === sec;
-                              return (
-                                <div
-                                  key={sec}
-                                  onClick={() => {
-                                    setSelectedPrimaryCat(
-                                      activeGroupObj.primary,
-                                    );
-                                    setSelectedSecondaryCat(sec);
-                                    setIsCategoryDropdownOpen(false);
-                                  }}
-                                  className={`px-3 py-2 rounded-lg text-xs font-medium cursor-pointer flex items-center justify-between transition-colors ${
-                                    isSelected
-                                      ? "bg-purple-50 text-purple-700 font-bold"
-                                      : "text-slate-700 hover:bg-purple-50/50 hover:text-purple-600"
-                                  }`}
-                                >
-                                  <span>{sec}</span>
-                                  {isSelected && (
-                                    <Check className="w-3.5 h-3.5 text-purple-600" />
-                                  )}
-                                </div>
-                              );
-                            });
-                          })()}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
+                <span className="w-24 text-slate-700 font-bold text-right shrink-0 pt-2"><span className="text-rose-500 mr-0.5">*</span>视频分类</span>
+                <div className="flex-1"><CategoryCascader scope={partition === "成片" ? "finished" : "materials"} primaryCategory={selectedPrimaryCat} secondaryCategory={selectedSecondaryCat} onSelect={(primary, secondary) => { setSelectedPrimaryCat(primary); setSelectedSecondaryCat(secondary); }} /></div>
               </div>
 
               {/* 3. 视频名称 */}
@@ -1058,7 +870,7 @@ export default function UploadFinishedVideoModal({
                       className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:outline-none shrink-0"
                     />
                     <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-                      {Object.keys(TAG_GROUPS_DATA)
+                    {Object.keys(PUBLIC_TAG_GROUPS)
                         .filter((g) => g.includes(publicGroupSearch.trim()))
                         .map((group) => (
                           <div
@@ -1092,7 +904,7 @@ export default function UploadFinishedVideoModal({
                       className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:outline-none shrink-0"
                     />
                     <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 pt-1">
-                      {(TAG_GROUPS_DATA[selectedPublicGroupKey] || [])
+                    {(PUBLIC_TAG_GROUPS[selectedPublicGroupKey] || [])
                         .filter((sub) => sub.includes(publicSubSearch.trim()))
                         .map((subTag) => {
                           const isChecked = addedPublicTags.includes(subTag);
@@ -1223,7 +1035,7 @@ export default function UploadFinishedVideoModal({
                       className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:outline-none shrink-0"
                     />
                     <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-                      {Object.keys(TAG_GROUPS_DATA)
+                    {Object.keys(PERSONAL_TAG_GROUPS)
                         .filter((g) => g.includes(personalGroupSearch.trim()))
                         .map((group) => (
                           <div
@@ -1257,7 +1069,7 @@ export default function UploadFinishedVideoModal({
                       className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:outline-none shrink-0"
                     />
                     <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 pt-1">
-                      {(TAG_GROUPS_DATA[selectedPersonalGroupKey] || [])
+                    {(PERSONAL_TAG_GROUPS[selectedPersonalGroupKey] || [])
                         .filter((sub) => sub.includes(personalSubSearch.trim()))
                         .map((subTag) => {
                           const isChecked = addedPersonalTags.includes(subTag);
@@ -1346,16 +1158,17 @@ export default function UploadFinishedVideoModal({
                 <div className="w-1.5 h-3.5 bg-purple-600 rounded-full" />
                 <h4 className="font-bold text-slate-900 text-xs">时间设置</h4>
                 <span className="text-[11px] text-slate-400 font-normal">
-                  剪辑时间、授权有效期
+                  {productionDateLabel}、授权有效期
                 </span>
               </div>
 
               <div className="flex items-center gap-6 pl-3">
                 <span className="w-24 text-slate-700 font-bold text-right shrink-0">
-                  剪辑时间
+                  {productionDateLabel}
                 </span>
                 <input
                   type="date"
+                  aria-label={productionDateLabel}
                   value={editDate}
                   onChange={(e) => setEditDate(e.target.value)}
                   className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-purple-500 cursor-pointer"

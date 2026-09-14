@@ -58,6 +58,10 @@ import {
 } from "./lib/videoEnhance";
 import { Sparkles, Layers, Sliders, ChevronRight, Play } from "lucide-react";
 
+import { useScopedTaggedResources } from "./lib/useResourceTags";
+import { resourceTagStore } from "./lib/resourceTags";
+import { useUploadedResources, resourceScope } from "./lib/resourceUploads";
+
 const AUTH_STORAGE_KEY = "mengchang_prototype_session";
 
 const PROTOTYPE_ACCOUNTS: PrototypeAccount[] = [
@@ -255,7 +259,10 @@ export default function App() {
   const [extraRequestedCredits, setExtraRequestedCredits] = useState(10349.0);
   const [transactions, setTransactions] =
     useState<CreditTransaction[]>(INITIAL_TRANSACTIONS);
-  const [assets, setAssets] = useState<Asset[]>(INITIAL_ASSETS);
+  const [baseAssets, setAssets] = useState<Asset[]>(INITIAL_ASSETS);
+  const uploadedResources = useUploadedResources();
+  const assets = useScopedTaggedResources<Asset>([...uploadedResources, ...baseAssets.filter((asset) => !uploadedResources.some((upload) => upload.url === asset.url && upload.name === asset.name))], resourceScope);
+  useEffect(() => { resourceTagStore.setOwner(session?.username || "chaojiguanliyuan"); }, [session?.username]);
   const [galleryItems, setGalleryItems] =
     useState<GalleryItem[]>(INITIAL_GALLERY);
   const [tasks, setTasks] = useState<Task[]>(() => INITIAL_TASKS.map(migrateQuickCreationVideoTask));
@@ -1775,9 +1782,7 @@ export default function App() {
       case "scripts":
         return (
           <ResourcesView
-            uploadedVideos={assets.filter((asset) =>
-              asset.id.startsWith("face-published-"),
-            )}
+            uploadedVideos={assets.filter((asset) => asset.id.startsWith("face-published-") && !uploadedResources.some((item) => item.url === asset.url))}
             initialSearch={resourceSearchIntent}
             onClearInitialSearch={() => setResourceSearchIntent(null)}
             initialTab={

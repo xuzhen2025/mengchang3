@@ -1,4 +1,6 @@
 import type { VideoResourceMetadata } from "../lib/resourceBatch";
+import { resourceTagStore } from "../lib/resourceTags";
+import { resourceConfigStore } from "../lib/resourceConfig";
 
 interface UsedMaterial {
   id: string;
@@ -48,6 +50,7 @@ export interface FinishedVideo extends VideoResourceMetadata {
 
 export const INITIAL_FINISHED: FinishedVideo[] = [
   {
+        personalTags: ["本周主推"],
     id: "fv1",
     numericId: "110332274",
     title: "0730-8835-鲁月园-复古耳环动态奢感视频.mp4",
@@ -75,7 +78,7 @@ export const INITIAL_FINISHED: FinishedVideo[] = [
     category: "女士内衣",
     typeLabel: "混剪",
     subtitle: "不管咱胖不胖",
-    tags: ["达人成片", "腾讯广告", "8015-摄影/编导（基础）"],
+    tags: ["商品展示","高端质感","达人成片"],
     status: "待审核",
     version: "v2.0 爆款优化版",
     secondaryCount: 5,
@@ -87,6 +90,7 @@ export const INITIAL_FINISHED: FinishedVideo[] = [
     ]
   },
   {
+        personalTags: ["待二创","美妆项目"],
     id: "fv2",
     numericId: "110332275",
     title: "0730-8836-水光针去黄测评-爆款对比.mp4",
@@ -112,7 +116,7 @@ export const INITIAL_FINISHED: FinishedVideo[] = [
     category: "草本初色内衣",
     typeLabel: "AI画质提升",
     subtitle: "透气无痕聚拢体验",
-    tags: ["快手投手", "草本剪辑"],
+    tags: ["实测对比","美妆护肤","千川投流"],
     status: "审核通过",
     version: "v1.0 剪辑初稿",
     secondaryCount: 1,
@@ -123,6 +127,7 @@ export const INITIAL_FINISHED: FinishedVideo[] = [
     ]
   },
   {
+        personalTags: ["本周主推","服饰项目"],
     id: "fv3",
     numericId: "110332276",
     title: "0730-8837-防晒冰丝T恤冷感微距分镜.mp4",
@@ -150,7 +155,7 @@ export const INITIAL_FINISHED: FinishedVideo[] = [
     category: "女士睡衣",
     typeLabel: "高质感原创",
     subtitle: "瞬间冰感降温",
-    tags: ["短视频推广", "达人姓名"],
+    tags: ["防晒","清凉冰丝","材质特写"],
     status: "已上机",
     version: "v1.5 迭代分镜版",
     secondaryCount: 3,
@@ -186,7 +191,7 @@ export const INITIAL_FINISHED: FinishedVideo[] = [
     category: "塑身裤",
     typeLabel: "切片重构",
     subtitle: "真实防粘不粘底",
-    tags: ["直播", "8018-沈阳分组"],
+    tags: ["口播种草","家庭生活","使用过程"],
     status: "审核驳回",
     version: "v1.0 测试版",
     secondaryCount: 0,
@@ -223,7 +228,7 @@ export const INITIAL_FINISHED: FinishedVideo[] = [
     category: "女士内裤 / 高弹透气",
     typeLabel: "混剪",
     subtitle: "收腹高腰无痕提臀",
-    tags: ["AD优质素材", "首发素材"],
+    tags: ["高弹透气","模特出镜","服饰内衣"],
     status: "已搭",
     version: "v3.0 爆款冲榜版",
     secondaryCount: 8,
@@ -233,6 +238,7 @@ export const INITIAL_FINISHED: FinishedVideo[] = [
     ]
   },
   {
+        personalTags: ["服饰项目"],
     id: "fv6",
     numericId: "110332279",
     title: "0730-8840-极简美肤衣无感贴合对比镜头.mp4",
@@ -260,7 +266,7 @@ export const INITIAL_FINISHED: FinishedVideo[] = [
     category: "4199美肤衣",
     typeLabel: "AI画质",
     subtitle: "隐形无痕 贴肤如丝",
-    tags: ["美肤衣", "爆款视频"],
+    tags: ["美肤衣","轻盈裸感","效果对比"],
     status: "审核通过",
     version: "v2.1 优化音轨版",
     secondaryCount: 4,
@@ -270,6 +276,7 @@ export const INITIAL_FINISHED: FinishedVideo[] = [
     ]
   },
   {
+        personalTags: ["秋季上新"],
     id: "fv7",
     numericId: "110332280",
     title: "0730-8841-保暖内衣发热纤维实验展示.mp4",
@@ -296,7 +303,7 @@ export const INITIAL_FINISHED: FinishedVideo[] = [
     category: "保暖内衣",
     typeLabel: "高质感原创",
     subtitle: "德绒发热 37度恒温",
-    tags: ["秋冬新品", "千川投流"],
+    tags: ["秋冬新品","德绒蓄热","实测对比"],
     status: "已上机",
     version: "v1.0 官方正片",
     secondaryCount: 6,
@@ -332,7 +339,7 @@ export const INITIAL_FINISHED: FinishedVideo[] = [
     category: "秒缇8024前扣内衣",
     typeLabel: "混剪",
     subtitle: "前扣一秒穿脱 聚拢不空杯",
-    tags: ["秒缇前扣", "抖音卡片"],
+    tags: ["秒缇前扣","使用过程","细节展示"],
     status: "审核通过",
     version: "v1.2 修改试看",
     secondaryCount: 2,
@@ -368,7 +375,7 @@ export const INITIAL_FINISHED: FinishedVideo[] = [
     category: "男士内裤",
     typeLabel: "剪辑",
     subtitle: "干爽不闷热 告别黏腻",
-    tags: ["男士爆款", "快手挂车"],
+    tags: ["男士内衣","高弹透气","实测对比"],
     status: "已搭",
     version: "v2.0 精剪混剪",
     secondaryCount: 3,
@@ -405,7 +412,7 @@ export const INITIAL_FINISHED: FinishedVideo[] = [
     category: "少女内衣",
     typeLabel: "AI画质提升",
     subtitle: "天然有机棉 保护成长期",
-    tags: ["少女系列", "安全舒适"],
+    tags: ["少女系列","安全舒适","材质特写"],
     status: "待审核",
     version: "v1.0 试跑版",
     secondaryCount: 1,
@@ -441,7 +448,7 @@ export const INITIAL_FINISHED: FinishedVideo[] = [
     category: "8811纯棉 / 情侣套盒",
     typeLabel: "高质感原创",
     subtitle: "居家触感 亲肤软糯",
-    tags: ["情侣家居", "S级爆款"],
+    tags: ["情侣家居","家庭生活","模特出镜"],
     status: "已上机",
     version: "v3.2 全量终版",
     secondaryCount: 10,
@@ -477,7 +484,7 @@ export const INITIAL_FINISHED: FinishedVideo[] = [
     category: "草本8018",
     typeLabel: "混剪",
     subtitle: "提背直腰 塑造开肩美姿",
-    tags: ["体态矫正", "草本塑身"],
+    tags: ["体态矫正","前后对比","服饰内衣"],
     status: "已搭",
     version: "v2.0 优化对比版",
     secondaryCount: 4,
@@ -487,6 +494,7 @@ export const INITIAL_FINISHED: FinishedVideo[] = [
     ]
   },
   {
+        personalTags: ["美妆项目"],
     id: "fv13", numericId: "110332286", title: "0909-精华液轻盈质地与瓶身展示.mp4",
     videoUrl: "./assets/viral-gallery/serum.mp4", coverUrl: "./assets/viral-gallery/serum.jpg",
     duration: "12s", resolution: "360x640", size: "0.18 MB", creator: "ai", aiModel: "视频 VD 1.0",
@@ -577,3 +585,16 @@ export const INITIAL_FINISHED: FinishedVideo[] = [
     category: "鞋履服饰 / 运动鞋履", typeLabel: "商品展示", tags: ["运动鞋履", "材质特写"], status: "已搭",
   }
 ];
+INITIAL_FINISHED.push(...[
+  { id: "fv-analytics-1", title: "0912-植萃修护精华居家实测.mp4", author: "徐振", source: "fv13", downloads: 18, cuts: 4, cost: 126380 },
+  { id: "fv-analytics-2", title: "0911-身体护理成分卖点特写.mp4", author: "徐振", source: "fv16", downloads: 9, cuts: 2, cost: 28450 },
+  { id: "fv-analytics-3", title: "0912-通勤女装换季穿搭对比.mp4", author: "王剪辑", source: "fv21", downloads: 23, cuts: 6, cost: 158640 },
+  { id: "fv-analytics-4", title: "0910-运动鞋轻量材质实拍.mp4", author: "王剪辑", source: "fv22", downloads: 7, cuts: 1, cost: 19860 },
+].map((sample, index): FinishedVideo => ({
+  ...INITIAL_FINISHED.find(row => row.id === sample.source)!, id: sample.id, numericId: String(110332400 + index),
+  title: sample.title, author: sample.author, createdAt: `2026-09-${12 - index} 14:20`,
+  downloads: sample.downloads, cuts: sample.cuts, shares: 4 + index, likes: 1240 + index * 385, comments: 45 + index * 12,
+  cost: sample.cost, todayCost: 0, monthlyCosts: { "2026-09": sample.cost }, status: "审核通过",
+})));
+resourceTagStore.register("finished", INITIAL_FINISHED);
+resourceConfigStore.register("finished", INITIAL_FINISHED);

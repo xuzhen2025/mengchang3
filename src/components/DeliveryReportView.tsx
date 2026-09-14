@@ -1,3 +1,5 @@
+import { useReportData } from "../lib/useReportData";
+import { REPORT_START, REPORT_TODAY, selectReportFacts, reportRows } from "../lib/reportDemoData";
 import React, { useState } from "react";
 import {
   Calendar,
@@ -16,36 +18,9 @@ interface DeliveryReportViewProps {
   showToast?: (title: string, desc: string) => void;
 }
 
-// 1. Mock Data for Platform & Dimensions
-const TEAM_DATA = [
-  { name: "达人测试部门", spend: 285400.00, roi: 3.85, totalGmv: 1098790.00, dealAmount: 1020000.00, coupon: 78790.00, conv: 9240, cvr: 4.82, cpa: 30.88, imp: 5120000, cpm: 55.74, clicks: 191980, ctr: 3.75, cpc: 1.48, views: 4320000 },
-  { name: "小真测试部门", spend: 196200.50, roi: 3.42, totalGmv: 671000.00, dealAmount: 630000.00, coupon: 41000.00, conv: 6150, cvr: 4.25, cpa: 31.90, imp: 3820000, cpm: 51.36, clicks: 144700, ctr: 3.78, cpc: 1.35, views: 3100000 },
-  { name: "项目1-爆款电商", spend: 342100.80, roi: 4.12, totalGmv: 1409450.00, dealAmount: 1320000.00, coupon: 89450.00, conv: 11400, cvr: 5.10, cpa: 30.01, imp: 6450000, cpm: 53.03, clicks: 223500, ctr: 3.46, cpc: 1.53, views: 5600000 },
-  { name: "RooooongZ部门", spend: 142000.00, roi: 2.95, totalGmv: 418900.00, dealAmount: 390000.00, coupon: 28900.00, conv: 4120, cvr: 3.85, cpa: 34.46, imp: 2950000, cpm: 48.13, clicks: 107000, ctr: 3.63, cpc: 1.32, views: 2450000 },
-  { name: "xx素颜霜项目", spend: 220500.00, roi: 3.68, totalGmv: 811440.00, dealAmount: 760000.00, coupon: 51440.00, conv: 7350, cvr: 4.50, cpa: 30.00, imp: 4100000, cpm: 53.78, clicks: 163330, ctr: 3.98, cpc: 1.35, views: 3680000 },
-  { name: "抖音投放一组", spend: 189000.20, roi: 3.52, totalGmv: 665280.00, dealAmount: 620000.00, coupon: 45280.00, conv: 5980, cvr: 4.15, cpa: 31.60, imp: 3600000, cpm: 52.50, clicks: 144000, ctr: 4.00, cpc: 1.31, views: 3150000 },
-];
-
-const GROUP_DATA = [
-  { teamName: "C部门", groupName: "管理员组", spend: 142000.00, roi: 3.92, totalGmv: 556640.00, dealAmount: 520000.00, coupon: 36640.00, conv: 4680, cvr: 4.60, cpa: 30.34, imp: 2600000, cpm: 54.61, clicks: 101700, ctr: 3.91, cpc: 1.39, views: 2200000 },
-  { teamName: "C部门", groupName: "分组一", spend: 98500.00, roi: 3.45, totalGmv: 339825.00, dealAmount: 315000.00, coupon: 24825.00, conv: 3120, cvr: 4.10, cpa: 31.57, imp: 1950000, cpm: 50.51, clicks: 76100, ctr: 3.90, cpc: 1.29, views: 1650000 },
-  { teamName: "A部门", groupName: "核心爆品组", spend: 215000.50, roi: 4.05, totalGmv: 870750.00, dealAmount: 820000.00, coupon: 50750.00, conv: 7100, cvr: 4.80, cpa: 30.28, imp: 3900000, cpm: 55.12, clicks: 147900, ctr: 3.79, cpc: 1.45, views: 3380000 },
-  { teamName: "外部部门", groupName: "渠道合作组", spend: 86400.00, roi: 2.88, totalGmv: 248832.00, dealAmount: 230000.00, coupon: 18832.00, conv: 2540, cvr: 3.50, cpa: 34.01, imp: 1680000, cpm: 51.42, clicks: 72580, ctr: 4.32, cpc: 1.19, views: 1420000 },
-];
-
-const INDIVIDUAL_DATA = [
-  { teamName: "C部门", groupName: "管理员组", account: "zs_test", spend: 89000.00, roi: 4.15, totalGmv: 369350.00, dealAmount: 345000.00, coupon: 24350.00, conv: 2980, cvr: 4.85, cpa: 29.86, imp: 1620000, cpm: 54.93, clicks: 61440, ctr: 3.79, cpc: 1.44, views: 1380000 },
-  { teamName: "C部门", groupName: "管理员组", account: "0424账户", spend: 53000.00, roi: 3.53, totalGmv: 187090.00, dealAmount: 175000.00, coupon: 12090.00, conv: 1700, cvr: 4.22, cpa: 31.17, imp: 980000, cpm: 54.08, clicks: 40260, ctr: 4.10, cpc: 1.31, views: 820000 },
-  { teamName: "xx素颜霜", groupName: "核心组", account: "美妆主投01", spend: 112000.00, roi: 3.82, totalGmv: 427840.00, dealAmount: 400000.00, coupon: 27840.00, conv: 3650, cvr: 4.45, cpa: 30.68, imp: 2100000, cpm: 53.33, clicks: 82000, ctr: 3.90, cpc: 1.36, views: 1850000 },
-];
-
-const DETAIL_DATA = [
-  { name: "JL_巨量广告_美妆爆款01 (计划ID: 18294021)", spend: 34200.00, roi: 4.25, totalGmv: 145350.00, dealAmount: 138000.00, coupon: 7350.00, conv: 1180, cvr: 4.90, cpa: 28.98, imp: 650000, cpm: 52.61, clicks: 24080, ctr: 3.70, cpc: 1.42, views: 560000 },
-  { name: "JL_巨量千川_直达小店直播 (计划ID: 18294028)", spend: 52100.50, roi: 3.88, totalGmv: 202149.90, dealAmount: 190000.00, coupon: 12149.90, conv: 1680, cvr: 4.40, cpa: 31.01, imp: 980000, cpm: 53.16, clicks: 38180, ctr: 3.89, cpc: 1.36, views: 820000 },
-  { name: "CL_磁力智投_快手种草引流 (计划ID: 18294035)", spend: 21800.00, roi: 3.12, totalGmv: 68016.00, dealAmount: 64000.00, coupon: 4016.00, conv: 690, cvr: 3.85, cpa: 31.59, imp: 430000, cpm: 50.69, clicks: 17920, ctr: 4.16, cpc: 1.21, views: 360000 },
-];
-
 export default function DeliveryReportView({ showToast }: DeliveryReportViewProps) {
+  const report = useReportData();
+  const [applied, setApplied] = useState({ start: REPORT_START, end: REPORT_TODAY, uploadStart: "", uploadEnd: "", category: "", entities: [] as string[] });
   // 1. Top Platform Sub-Tabs (巨量广告 | 巨量千川 | 磁力智投 | 磁力金牛 | 百度营销 | 小红书)
   const [platformTab, setPlatformTab] = useState<string>("巨量广告");
 
@@ -58,8 +33,8 @@ export default function DeliveryReportView({ showToast }: DeliveryReportViewProp
   // 4. Date Ranges
   const [uploadStartDate, setUploadStartDate] = useState<string>("");
   const [uploadEndDate, setUploadEndDate] = useState<string>("");
-  const [deliveryStartDate, setDeliveryStartDate] = useState<string>("2025-03-30");
-  const [deliveryEndDate, setDeliveryEndDate] = useState<string>("2025-04-14");
+  const [deliveryStartDate, setDeliveryStartDate] = useState<string>(REPORT_START);
+  const [deliveryEndDate, setDeliveryEndDate] = useState<string>(REPORT_TODAY);
 
   // 5. Dropdown Popover States
   const [isEntityOpen, setIsEntityOpen] = useState<boolean>(false);
@@ -85,7 +60,12 @@ export default function DeliveryReportView({ showToast }: DeliveryReportViewProp
   const [pageSize, setPageSize] = useState<number>(50);
   const [currentPage, setCurrentPage] = useState<number>(1);
 
+  React.useEffect(() => setCurrentPage(1), [platformTab, dimensionTab, applied, pageSize]);
+
   const handleQuery = () => {
+    if ((deliveryStartDate && deliveryEndDate && deliveryStartDate > deliveryEndDate) || (uploadStartDate && uploadEndDate && uploadStartDate > uploadEndDate)) return showToast?.("日期有误", "开始日期不能晚于结束日期");
+    setApplied({ start: deliveryStartDate || REPORT_START, end: deliveryEndDate || REPORT_TODAY, uploadStart: uploadStartDate, uploadEnd: uploadEndDate, category: selectedCategory, entities: selectedTeams });
+    setCurrentPage(1);
     setHasQueried(true);
     if (showToast) {
       showToast("查询成功", `已为您更新【${platformTab} - ${getDimensionLabel(dimensionTab)}】最新投放数据`);
@@ -119,32 +99,9 @@ export default function DeliveryReportView({ showToast }: DeliveryReportViewProp
     }
   };
 
-  // Raw dataset based on active dimension tab
-  const getRawData = (): any[] => {
-    switch (dimensionTab) {
-      case "team":
-        return TEAM_DATA;
-      case "group":
-        return GROUP_DATA;
-      case "individual":
-        return INDIVIDUAL_DATA;
-      case "detail":
-      case "daily":
-      case "monthly":
-        return DETAIL_DATA;
-      default:
-        return TEAM_DATA;
-    }
-  };
-
-  // Filtered and Sorted rows
-  let rows: any[] = getRawData();
-  if (selectedTeams.length > 0) {
-    rows = rows.filter((r: any) => {
-      const name = r.name || r.teamName || r.account || "";
-      return selectedTeams.some((st) => name.includes(st));
-    });
-  }
+  const selectedFacts = selectReportFacts(report.facts, platformTab, applied).filter(row =>
+    !applied.entities.length || applied.entities.some(entity => [row.department, row.group, row.person, `${row.department}-${row.group}`].includes(entity)));
+  let rows: any[] = reportRows(selectedFacts, dimensionTab);
 
   // Calculate totals
   const totalSpend = rows.reduce((acc, r: any) => acc + (r.spend || 0), 0);
@@ -229,6 +186,8 @@ export default function DeliveryReportView({ showToast }: DeliveryReportViewProp
                 onClick={() => {
                   setDimensionTab(item.id as any);
                   setSelectedTeams([]);
+                  setApplied(value => ({ ...value, entities: [] }));
+                  setCurrentPage(1);
                 }}
                 className={`text-xs font-bold cursor-pointer transition-colors ${
                   dimensionTab === item.id ? "text-[#7C3AED]" : "text-slate-600 hover:text-slate-900"
@@ -342,14 +301,7 @@ export default function DeliveryReportView({ showToast }: DeliveryReportViewProp
                   {/* Mode A: Single-Level Checkbox List (When dimension is 'team', Screenshot 2) */}
                   {dimensionTab === "team" && (
                     <div className="w-56 max-h-64 overflow-y-auto divide-y divide-slate-50">
-                      {[
-                        "达人测试",
-                        "小真测试部门",
-                        "项目1",
-                        "RooooongZ部门",
-                        "xx素颜霜",
-                        "抖音投放"
-                      ].map((tName) => (
+                      {report.tree.map(t => t.teamName).map((tName) => (
                         <label
                           key={tName}
                           onClick={() => toggleTeamSelect(tName)}
@@ -371,7 +323,7 @@ export default function DeliveryReportView({ showToast }: DeliveryReportViewProp
                   {dimensionTab === "group" && (
                     <div className="flex">
                       <div className="w-48 max-h-64 overflow-y-auto border-r border-slate-100">
-                        {["A部门", "C部门", "外部部门", "测试指定员工可见-部门", "B部门", "CHAO的部门二"].map((gt) => (
+                        {report.tree.map(t => t.teamName).map((gt) => (
                           <div
                             key={gt}
                             onMouseEnter={() => setHoveredTeam(gt)}
@@ -388,7 +340,7 @@ export default function DeliveryReportView({ showToast }: DeliveryReportViewProp
                       {/* Level 2 Groups */}
                       {hoveredTeam && (
                         <div className="w-44 max-h-64 overflow-y-auto bg-slate-50/30 p-2 space-y-1">
-                          {["管理员", "分组一"].map((grp) => (
+                          {(report.tree.find(t => t.teamName === hoveredTeam)?.groups.map(g => g.groupName) || []).map((grp) => (
                             <label
                               key={grp}
                               onClick={() => toggleTeamSelect(`${hoveredTeam}-${grp}`)}
@@ -413,7 +365,7 @@ export default function DeliveryReportView({ showToast }: DeliveryReportViewProp
                     <div className="flex">
                       {/* Level 1 Teams */}
                       <div className="w-44 max-h-64 overflow-y-auto border-r border-slate-100">
-                        {["xx素颜霜", "抖音投放", "A部门", "C部门", "外部部门", "测试指定员工"].map((t) => (
+                        {report.tree.map(t => t.teamName).map((t) => (
                           <div
                             key={t}
                             onMouseEnter={() => setHoveredTeam(t)}
@@ -430,7 +382,7 @@ export default function DeliveryReportView({ showToast }: DeliveryReportViewProp
                       {/* Level 2 Groups */}
                       {hoveredTeam && (
                         <div className="w-40 max-h-64 overflow-y-auto border-r border-slate-100 bg-slate-50/20">
-                          {["管理员", "分组一"].map((g) => (
+                          {(report.tree.find(t => t.teamName === hoveredTeam)?.groups.map(g => g.groupName) || []).map((g) => (
                             <div
                               key={g}
                               onMouseEnter={() => setHoveredGroup(g)}
@@ -448,7 +400,7 @@ export default function DeliveryReportView({ showToast }: DeliveryReportViewProp
                       {/* Level 3 Accounts */}
                       {hoveredGroup && (
                         <div className="w-36 max-h-64 overflow-y-auto p-2 bg-slate-50/50 space-y-1">
-                          {["zs_test", "0424"].map((acc) => (
+                          {(report.tree.find(t => t.teamName === hoveredTeam)?.groups.find(g => g.groupName === hoveredGroup)?.accounts || []).map((acc) => (
                             <label
                               key={acc}
                               onClick={() => toggleTeamSelect(acc)}
@@ -479,10 +431,7 @@ export default function DeliveryReportView({ showToast }: DeliveryReportViewProp
                 className="pl-3 pr-8 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-purple-500 shadow-2xs cursor-pointer min-w-[150px]"
               >
                 <option value="">请选择分类</option>
-                <option value="cat1">美妆护肤品类</option>
-                <option value="cat2">3C数码科技</option>
-                <option value="cat3">服饰鞋包拉新</option>
-                <option value="cat4">家居生活百货</option>
+                {report.categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
               </select>
             </div>
 
@@ -701,7 +650,7 @@ export default function DeliveryReportView({ showToast }: DeliveryReportViewProp
                   </tr>
 
                   {/* Individual Data Rows */}
-                  {rows.map((row: any, idx) => (
+                  {rows.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((row: any, idx) => (
                     <tr key={idx} className="hover:bg-slate-50/80 transition-colors whitespace-nowrap">
                       <td className="py-3 px-6 font-bold text-[#7C3AED]">
                         {row.name || row.groupName || row.account || "测试条目"}
@@ -767,7 +716,7 @@ export default function DeliveryReportView({ showToast }: DeliveryReportViewProp
           <div className="relative">
             <select
               value={pageSize}
-              onChange={(e) => setPageSize(Number(e.target.value))}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
               className="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-purple-500 cursor-pointer shadow-2xs"
             >
               <option value={10}>10条/页</option>
@@ -786,11 +735,9 @@ export default function DeliveryReportView({ showToast }: DeliveryReportViewProp
             >
               &lt;
             </button>
-            <button className="px-3 py-1 bg-[#7C3AED] text-white font-bold rounded-lg cursor-pointer">
-              1
-            </button>
+            <button className="px-3 py-1 bg-[#7C3AED] text-white font-bold rounded-lg cursor-pointer">{currentPage}</button>
             <button
-              disabled
+              disabled={currentPage * pageSize >= rows.length} onClick={() => setCurrentPage(p => p + 1)}
               className="px-2.5 py-1 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 font-bold cursor-pointer"
             >
               &gt;

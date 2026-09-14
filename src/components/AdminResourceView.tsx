@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useScopedTaggedResources, useTagCatalog, useTagFilterSync } from "../lib/useResourceTags";
 import { Search, ChevronDown, Play, Eye, Trash2, X, Sparkles, Film, Volume2, FileText, Headphones, Check, RotateCcw } from "lucide-react";
 import { Pagination } from "./Pagination";
 import FinishedVideoDetailModal, { FinishedVideo } from "./FinishedVideoDetailModal";
@@ -32,7 +33,7 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     name: "水印视频_1 (1)",
     cover: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80",
     videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4",
-    tags: ["有对比"],
+    tags: ["实测对比"],
     category: "成片同步一级/成片同步二级",
     company: "梦畅网络",
     uploadTime: "2025-05-24 16:50:18",
@@ -46,7 +47,7 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     name: "草本初色内衣爆款口播切片_V2",
     cover: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=500&auto=format&fit=crop&q=80",
     videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-vegetables-cooking-in-a-pan-40502-large.mp4",
-    tags: ["强推荐", "爆款短视频"],
+    tags: ["好物推荐", "短视频推广"],
     category: "女士内衣/无钢圈抹胸",
     company: "梦畅网络",
     uploadTime: "2025-05-24 14:22:05",
@@ -60,7 +61,7 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     name: "高颜清爽防晒霜实验室测评实拍",
     cover: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&auto=format&fit=crop&q=80",
     videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4",
-    tags: ["有对比", "成分党"],
+    tags: ["实测对比", "成分党"],
     category: "美妆护肤/防晒隔离",
     company: "致上互娱",
     uploadTime: "2025-05-23 18:10:42",
@@ -74,7 +75,7 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     name: "智能降噪耳机开箱高清音轨素材",
     cover: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&auto=format&fit=crop&q=80",
     videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-vegetables-cooking-in-a-pan-40502-large.mp4",
-    tags: ["硬核科技"],
+    tags: ["数码好物"],
     category: "3C数码/蓝牙耳机",
     company: "云享文化",
     uploadTime: "2025-05-22 11:05:30",
@@ -88,7 +89,7 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     name: "法式古法金耳环-光泽特写Raw原片",
     cover: "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=500&auto=format&fit=crop&q=80",
     videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4",
-    tags: ["高奢质感"],
+    tags: ["高端质感"],
     category: "服饰首饰/古法金项链",
     company: "梦畅网络",
     uploadTime: "2025-05-21 09:15:00",
@@ -101,7 +102,7 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     id: "RES-006",
     name: "夏日清凉系列高清图库包_01",
     cover: "https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=500&auto=format&fit=crop&q=80",
-    tags: ["高清壁纸", "展示图"],
+    tags: ["白底图", "商品展示"],
     category: "服装鞋帽/夏装走秀",
     company: "梦畅网络",
     uploadTime: "2025-05-20 15:40:12",
@@ -125,7 +126,7 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     id: "RES-008",
     name: "欢快轻柔电商背景音旁白",
     cover: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80",
-    tags: ["BGM背景音"],
+    tags: ["纯音乐"],
     category: "音频分类/欢快商用",
     company: "云享文化",
     uploadTime: "2025-05-18 10:00:00",
@@ -138,7 +139,7 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     id: "RES-009",
     name: "痛点突破黄金3秒开场文案",
     cover: "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=500&auto=format&fit=crop&q=80",
-    tags: ["高转化"],
+    tags: ["千川投流"],
     category: "脚本同步一级/通用电商",
     company: "致上互娱",
     uploadTime: "2025-05-19 16:20:00",
@@ -151,7 +152,7 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     id: "RES-010",
     name: "草本内衣无钢圈口播拆解脚本",
     cover: "https://images.unsplash.com/photo-1516762689617-e1cffcef479d?w=500&auto=format&fit=crop&q=80",
-    tags: ["爆款口播"],
+    tags: ["口播种草"],
     category: "女士内衣/无钢圈",
     company: "梦畅网络",
     uploadTime: "2025-05-17 14:10:00",
@@ -166,7 +167,7 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     id: "RES-TRASH-001",
     name: "夏日清凉彩妆新品海报展示图_01",
     cover: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&auto=format&fit=crop&q=80",
-    tags: ["宣发海报", "高清壁纸"],
+    tags: ["宣发海报", "白底图"],
     category: "美妆护肤/彩妆口红",
     company: "致上互娱",
     uploadTime: "2025-06-18 15:08:03",
@@ -182,7 +183,7 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     id: "RES-TRASH-002",
     name: "夏日轻快节奏促销旁白音频_02",
     cover: "",
-    tags: ["轻快欢快", "大促BGM"],
+    tags: ["轻快节奏", "促销口播"],
     category: "音频分类/欢快商用",
     company: "致上互娱",
     uploadTime: "2025-06-12 13:44:22",
@@ -199,7 +200,7 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     id: "RES-TRASH-003",
     name: "防晒霜爆款种草解说音轨_V1",
     cover: "",
-    tags: ["种草口播", "爆款配乐"],
+    tags: ["口播种草", "轻快节奏"],
     category: "音频分类/解说旁白",
     company: "致上互娱",
     uploadTime: "2025-06-11 17:53:02",
@@ -217,7 +218,7 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     name: "夏日冰爽爆款广告成片_V3_已移入回收站",
     cover: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80",
     videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4",
-    tags: ["爆款短视频", "对比实测"],
+    tags: ["短视频推广", "实测对比"],
     category: "美妆护肤/防晒隔离",
     company: "梦畅网络",
     uploadTime: "2025-06-10 11:20:00",
@@ -235,7 +236,7 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     name: "高清特写原片片段_02_草稿废弃",
     cover: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&auto=format&fit=crop&q=80",
     videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-vegetables-cooking-in-a-pan-40502-large.mp4",
-    tags: ["对比实测", "高端质感"],
+    tags: ["实测对比", "高端质感"],
     category: "服饰首饰/古法金",
     company: "云享文化",
     uploadTime: "2025-06-09 16:15:30",
@@ -252,7 +253,7 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
     id: "RES-TRASH-006",
     name: "无痕内衣痛点爆破口播脚本_草稿",
     cover: "",
-    tags: ["黄金3秒Hook", "高转化"],
+    tags: ["痛点解说", "千川投流"],
     category: "脚本分类/电商口播",
     company: "致上互娱",
     uploadTime: "2025-06-08 09:30:15",
@@ -268,7 +269,8 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
 ];
 
 export default function AdminResourceView() {
-  const [resources, setResources] = useState<AdminResourceItem[]>(INITIAL_ADMIN_RESOURCES);
+  const [baseResources, setResources] = useState<AdminResourceItem[]>(INITIAL_ADMIN_RESOURCES);
+  const resources = useScopedTaggedResources<AdminResourceItem>(baseResources, (item) => ({ 成片: "finished", 素材: "materials", 图片: "images", 音频: "audio", 脚本: "scripts" }[item.originalTabType || (item.tabType === "回收站" ? "成片" : item.tabType)]));
   const [activeTab, setActiveTab] = useState<string>("成片");
   
   // 筛选字段
@@ -417,7 +419,9 @@ export default function AdminResourceView() {
 
   const tabs = ["成片", "素材", "图片", "音频", "脚本", "回收站"];
   const companies = ["全部公司", "致上互娱", "梦畅网络", "云享文化", "星耀传媒", "致上电商"];
-  const tagsList = ["全部标签", "有对比", "强推荐", "爆款短视频", "硬核科技", "高转化", "种草口播", "成分党", "夏日新品", "爆款配乐"];
+  const { publicGroups } = useTagCatalog();
+  const tagsList = ["全部标签", ...Object.values(publicGroups).flat()];
+  useTagFilterSync("public", selectedTag, (tag) => setSelectedTag(tag === "全部" ? "全部标签" : tag));
 
   // 过滤后的数据
   const filteredResources = resources.filter((item) => {
@@ -668,7 +672,6 @@ export default function AdminResourceView() {
         categoryTag: "精选爆款",
         content: previewItem.scriptContent || "【开场白】：无痕舒适，专为高品质打造。\n【痛点解法】：亲肤无钢圈，秒提拉升。",
         status: "审核通过",
-        mainCategory: "短视频脚本",
         primaryCategory: previewItem.category.split("/")[0] || "通用分类",
         secondaryCategory: previewItem.category.split("/")[1] || "未分类",
         classTag: "电商卖货",

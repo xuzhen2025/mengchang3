@@ -1,21 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useResourceConfig } from "../lib/useResourceConfig";
+import AnchoredPopover from "./overlays/AnchoredPopover";
 import { ChevronDown, ChevronUp, ChevronRight, Check } from "lucide-react";
 
-export const CATEGORY_HIERARCHY: Record<string, string[]> = {
-  "爆款素材": ["服饰内衣", "美妆护肤", "日用百货", "数码家电", "食品饮料"],
-  "内衣": ["文胸", "内裤", "保暖", "家居服"],
-  "内裤": ["男士内裤", "女士内裤", "无痕内裤"],
-  "吊带": ["打底吊带", "蕾丝吊带", "美背吊带"],
-  "裤袜": ["丝袜", "打底裤", "光腿神器"],
-  "保暖衣": ["德绒保暖", "羊绒保暖", "自发热"],
-  "基础：对标翻拍": ["8835内衣", "6017内衣", "8020内衣", "0969内裤"],
-  "进阶：二创衍生": ["8022超薄", "保暖系列", "无痕吊带", "功能内衣"],
-  "原创": ["MF品牌", "爆款短视频", "直播切片"],
-  "品牌宣传": ["品牌TVC", "形象宣传", "文化故事"],
-  "电商带货": ["硬广直投", "口播种草", "痛点对比"]
-};
+
 
 interface CategoryCascaderProps {
+  scope?: string;
   primaryCategory: string;
   secondaryCategory: string;
   onSelect: (primary: string, secondary: string) => void;
@@ -24,6 +15,7 @@ interface CategoryCascaderProps {
 }
 
 export default function CategoryCascader({
+  scope = "finished",
   primaryCategory,
   secondaryCategory,
   onSelect,
@@ -35,25 +27,15 @@ export default function CategoryCascader({
   const [searchQuery, setSearchQuery] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const categoryMap = customCategoryMap || CATEGORY_HIERARCHY;
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+  const { store, revision } = useResourceConfig();
+  const categoryMap = React.useMemo(() => customCategoryMap || store.categoryMap(scope), [scope, revision, customCategoryMap]);
 
   // Update active primary if primaryCategory changes externally
   useEffect(() => {
     if (primaryCategory && categoryMap[primaryCategory]) {
       setActivePrimary(primaryCategory);
+    } else {
+      setActivePrimary(Object.keys(categoryMap)[0] || "");
     }
   }, [primaryCategory, categoryMap]);
 
@@ -98,6 +80,8 @@ export default function CategoryCascader({
             if (!isOpen) setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
+          onClick={event => { event.stopPropagation(); setIsOpen(true); }}
+          role="combobox" aria-label="资源分类" aria-expanded={isOpen} aria-autocomplete="list"
           placeholder={placeholder}
           className="w-full bg-transparent text-xs text-slate-800 font-medium focus:outline-none placeholder-slate-400"
         />
@@ -110,7 +94,7 @@ export default function CategoryCascader({
 
       {/* Cascading Dropdown Popover */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1.5 w-full max-w-xl bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden grid grid-cols-2 divide-x divide-slate-100 animate-in fade-in duration-100">
+        <AnchoredPopover anchorRef={containerRef} onClose={() => { setIsOpen(false); setSearchQuery(""); }} matchAnchorWidth width={400} maxHeight={300} className="bg-white border border-slate-200 rounded-lg shadow-2xl grid grid-cols-2 divide-x divide-slate-100">
           {/* Left Column: 一级分类 */}
           <div className="flex flex-col max-h-64">
             <div className="px-4 py-2 text-[11px] font-bold text-slate-400 bg-slate-50/80 border-b border-slate-100 uppercase tracking-wider shrink-0">
@@ -125,9 +109,11 @@ export default function CategoryCascader({
                   return (
                     <div
                       key={pKey}
+                      onMouseEnter={() => setActivePrimary(pKey)}
                       onClick={(e) => {
                         e.stopPropagation();
                         setActivePrimary(pKey);
+                        if (!categoryMap[pKey].length) { onSelect(pKey, ""); setIsOpen(false); setSearchQuery(""); }
                       }}
                       className={`px-4 py-2.5 flex items-center justify-between text-xs cursor-pointer select-none transition-colors ${
                         isSelected
@@ -182,7 +168,7 @@ export default function CategoryCascader({
               )}
             </div>
           </div>
-        </div>
+        </AnchoredPopover>
       )}
     </div>
   );

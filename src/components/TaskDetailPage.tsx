@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { legacyTaskFields } from "../lib/taskFieldConfig";
+import { useScopedTaggedResources, useTagSelection } from "../lib/useResourceTags";
 import { PublicTagFilter } from "./PublicTagFilter";
 import LinkScriptModal from "./LinkScriptModal";
 import UploadFinishedVideoModal from "./UploadFinishedVideoModal";
@@ -67,7 +69,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>("全部");
   
   const [publicTagSearch, setPublicTagSearch] = useState<string>("");
-  const [selectedPublicTags, setSelectedPublicTags] = useState<string[]>([]);
+  const [selectedPublicTags, setSelectedPublicTags] = useTagSelection("public");
   
   const [personalTagSearch, setPersonalTagSearch] = useState<string>("");
   const [personalTagFilter, setPersonalTagFilter] = useState<string>("全部");
@@ -112,9 +114,11 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
     }));
   });
 
-  const taskWorks = task.status === "completed" && task.completionSnapshot?.length
-    ? task.completionSnapshot
-    : task.associatedWorks || [];
+  const rawTaskWorks = task.status === "completed" && task.completionSnapshot?.length
+      ? task.completionSnapshot
+      : task.associatedWorks || [];
+  const linkedTaskWorks = useScopedTaggedResources<(typeof rawTaskWorks)[number]>(rawTaskWorks, (work) => ({ video: "finished", 成片: "finished", image: "images", 图片: "images", audio: "audio", 音频: "audio", text: "scripts", 素材: "materials" }[work.type]));
+  const taskWorks = task.status === "completed" ? rawTaskWorks : linkedTaskWorks;
   const getWorkTab = (type: string): "成片" | "素材" | "脚本" | "图片" | "音频" => {
     if (type === "video" || type === "成片") return "成片";
     if (type === "text" || type === "脚本") return "脚本";
@@ -193,6 +197,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
         <UploadFinishedVideoModal
           isOpen={true}
           isPage={true}
+          initialPartition={uploadPageView}
           onClose={() => setUploadPageView(null)}
           onPublishSuccess={(msg) => {
             onShowToast(msg);
@@ -377,6 +382,13 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
         </div>
 
         {/* 出片进度 & 上传按钮 */}
+        {(task.customFields || legacyTaskFields(task)).fields.map(field => {
+          const value = (task.customFields || legacyTaskFields(task)).values[field.id];
+          return <div key={field.id} className="flex items-stretch text-xs border-b border-slate-200" data-task-field-value={field.id}>
+            <div className="w-24 bg-slate-50/80 px-4 py-3.5 font-semibold text-slate-500 shrink-0 border-r border-slate-200/80">{field.name}</div>
+            <div className="px-4 py-3.5 text-slate-700 whitespace-pre-wrap break-words grow">{Array.isArray(value) ? value.join("、") || "未填写" : value || "未填写"}</div>
+          </div>;
+        })}
         <div className="flex items-stretch text-xs">
           <div className="w-24 bg-slate-50/80 px-4 py-3.5 flex items-center font-semibold text-slate-500 shrink-0 border-r border-slate-200/80">
             出片进度

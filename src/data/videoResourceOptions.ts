@@ -18,19 +18,9 @@ export const CATEGORY_TREE = [
   { name: "鞋履服饰", subs: ["通勤女装", "运动鞋履"] },
 ];
 
-export const PERSONAL_TAG_GROUPS: Record<string, string[]> = {
-  "Zs测试一": ["Zs1", "Zs2", "Zs3"],
-  "Zs测试二": ["A1", "A2", "测试标签"]
-};
 
-export const PUBLIC_TAG_GROUPS: Record<string, string[]> = {
-  "模特": ["张三", "里斯", "溜溜", "王五", "娃娃", "事事", "琪琪", "久久", "苏逸飞", "沈知许"],
-  "场景": ["室内展厅", "户外公园", "直播间", "办公室", "家庭生活", "街拍"],
-  "合作达人": ["美妆小达人", "生活测评官", "种草狂魔", "时尚指南"],
-  "脚本类型": ["纯混剪", "痛点剧本", "口播测评", "拆箱体验"],
-  "创新点": ["视觉冲击", "强勾子", "对比反转", "开箱震撼"],
-  "编导姓名": ["张编", "王编", "李编", "刘编"]
-};
+
+
 
 export interface AssociatedScript {
   id: string;

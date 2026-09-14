@@ -1,4 +1,5 @@
 import { INITIAL_AD_ACCOUNTS, INITIAL_AD_GROUPS } from "../data/adAccounts";
+import { readReportOrganization } from "./analyticsOrganization";
 
 export const AD_STORE_KEY = "mengchang-ad-workflow-v2";
 export const AD_CHANGE_EVENT = "mengchang-ad-workflow-change";
@@ -153,8 +154,26 @@ export function advanceAdRecords(records: AdPushRecord[], accounts: AdAccount[],
   });
 }
 export function readAdStore(): AdStore {
-  try { const parsed = JSON.parse(localStorage.getItem(AD_STORE_KEY) || "null"); if (parsed && Array.isArray(parsed.accounts) && Array.isArray(parsed.records)) return parsed; } catch { /* Start only this prototype's store when missing or unreadable. */ }
-  return createAdStore();
+  let store: AdStore;
+  try { const parsed = JSON.parse(localStorage.getItem(AD_STORE_KEY) || "null"); store = parsed && Array.isArray(parsed.accounts) && Array.isArray(parsed.records) ? parsed : createAdStore(); }
+  catch { return createAdStore(); }
+  try {
+    if (!localStorage.getItem("mengchang-report-account-bindings-v1")) {
+      const org = readReportOrganization();
+      const candidates = org.members.filter(member => member.status === "normal" && org.depts.some(dept => dept.id === member.deptId && dept.levelType === "group"));
+      store = { ...store, accounts: store.accounts.map((account, index) => {
+        if (!account.user && !account.group) return account;
+        const valid = org.members.find(member => member.name === account.user);
+        const member = valid || candidates[index % Math.max(1, candidates.length)];
+        if (!member) return account;
+        const group = org.depts.find(dept => dept.id === member.deptId && dept.levelType === "group");
+        return { ...account, user: member.name, group: group?.name || "" };
+      }) };
+      localStorage.setItem(AD_STORE_KEY, JSON.stringify(store));
+      localStorage.setItem("mengchang-report-account-bindings-v1", "1");
+    }
+  } catch { /* Preserve the loaded store when storage is unavailable. */ }
+  return store;
 }
 export function updateAdStore(update: (store: AdStore) => AdStore): AdStore {
   const next = update(readAdStore());

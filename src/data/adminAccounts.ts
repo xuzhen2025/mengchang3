@@ -34,6 +34,19 @@ export interface AccountMember {
   remark?: string;
 }
 
+export const ANALYTICS_DEMO_MEMBERS: AccountMember[] = [
+  ["mem_demo_1", "刘小青", "dept_1_1", "role_dept_head", "分组负责人"],
+  ["mem_demo_2", "王剪辑", "dept_1_1", "role_editor", "视频剪辑师"],
+  ["mem_demo_3", "赵千川", "dept_1_2", "role_pitcher", "广告投手"],
+  ["mem_demo_4", "周雅", "dept_1_2", "role_editor", "视频剪辑师"],
+  ["mem_demo_5", "孙剧本", "dept_3_1", "role_editor", "编导"],
+  ["mem_demo_6", "徐振", "dept_3_1", "role_editor", "视频剪辑师"],
+].map(([id, name, deptId, roleId, roleName], index) => ({
+  id, name, deptId, roleIds: [roleId], roleName, employeeNo: `ZS-${String(9 + index).padStart(3, "0")}`,
+  phone: "", email: "", dataScope: "self", status: "normal", createdAt: "2026-05-08",
+  lastActiveAt: "2026-09-14 09:20", logCount: 14 + index * 3, remark: "",
+}));
+
 export const INITIAL_DEPTS: DeptNode[] = [
   {
     id: "dept_root",
@@ -306,5 +319,6 @@ export const INITIAL_MEMBERS: AccountMember[] = [
     lastActiveAt: "尚未登录",
     logCount: 0,
     remark: "新邀请剪辑师，等待激活"
-  }
+  },
+  ...ANALYTICS_DEMO_MEMBERS
 ];

@@ -91,6 +91,36 @@ test("snapshots exclude selection, pagination, and unknown data while filling mi
   assert.equal("selectedIds" in snapshot, false);
 });
 
+test("legacy main-category conditions are discarded without losing other preset fields", () => {
+  const schemas: Record<string, string>[] = [VIDEO_PRESET_DEFAULTS, SCRIPT_PRESET_DEFAULTS, IMAGE_PRESET_DEFAULTS, AUDIO_PRESET_DEFAULTS];
+  for (const schema of schemas) {
+    const retained = Object.fromEntries(Object.keys(schema).map(key => [key, `retained-${key}`]));
+    const legacy = { ...retained, mainCat: "old-video", selectedMainCat: "old-script", selectedMainCategory: "old-audio" };
+    const seeds = [{ name: "Legacy", filters: legacy }];
+    const stored = JSON.stringify({ version: 1, presets: [{ id: "legacy", ...seeds[0] }] });
+    assert.deepEqual(normalizePresetFilters(legacy, schema), retained);
+    for (const presets of [readFilterPresets(stored, schema), readFilterPresets(null, schema, seeds)]) {
+      assert.equal(presets[0].name, "Legacy");
+      assert.deepEqual(presets[0].filters, retained);
+      const saved = saveFilterPreset(presets, "Copy", presets[0].filters, "copy");
+      assert.equal(saved.status, "saved");
+      if (saved.status === "saved") {
+        assert.deepEqual(readFilterPresets(JSON.stringify({ version: 1, presets: saved.presets }), schema), saved.presets);
+        for (const preset of saved.presets) assert.deepEqual(preset.filters, retained);
+      }
+    }
+  }
+});
+
+test("a legacy preset with only a main category now applies the unfiltered defaults", () => {
+  for (const schema of [VIDEO_PRESET_DEFAULTS, SCRIPT_PRESET_DEFAULTS, AUDIO_PRESET_DEFAULTS]) {
+    const raw = JSON.stringify({ version: 1, presets: [{
+      id: "old", name: "Old", filters: { mainCat: "restrictive", selectedMainCat: "restrictive", selectedMainCategory: "restrictive" },
+    }] });
+    assert.deepEqual(readFilterPresets(raw, schema)[0].filters, schema);
+  }
+});
+
 test("corrupt storage is reported instead of silently replacing existing data", () => {
   for (const raw of ["broken-json", "null", "{}", '{"version":2,"presets":[]}', JSON.stringify({ version: 1, presets: [original[0], original[0]] })]) {
     assert.throws(() => readFilterPresets(raw, defaults));

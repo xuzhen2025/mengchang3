@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from "react";
+import TaskCustomFields from "./TaskCustomFields";
+import OverlayPortal from "./overlays/OverlayPortal";
+import { useTaskFields } from "../lib/useTaskFields";
+import { legacyTaskFields, snapshotTaskFields, taskFieldErrors, TaskFieldSnapshot, TaskFieldValues } from "../lib/taskFieldConfig";
 import LinkScriptModal from "./LinkScriptModal";
 import { TaskDetailPage } from "./TaskDetailPage";
 import { TASK_BINDINGS_KEY, TaskResourceBinding } from "./PersonalResourceCenterV2";
@@ -76,6 +80,7 @@ export interface AssociatedScriptItem {
 }
 
 export interface TaskItem {
+  customFields?: TaskFieldSnapshot;
   id: string;
   publisher: string;
   publishDate: string;
@@ -690,6 +695,25 @@ const HIERARCHY_DATA: HierarchyTeam[] = [
   }
 ];
 
+let visitTasks: TaskItem[] | undefined;
+const visitTaskListeners = new Set<() => void>();
+export function getTaskRecords() {
+  if (!visitTasks) visitTasks = INITIAL_TASKS.map(task => ({ ...task, customFields: legacyTaskFields(task) }));
+  return visitTasks;
+}
+export function addTaskRecord(task: TaskItem) {
+  visitTasks = [structuredClone(task), ...getTaskRecords().filter(item => item.id !== task.id)];
+  visitTaskListeners.forEach(listener => listener());
+}
+export function useTaskRecords() {
+  const records = React.useSyncExternalStore(listener => { visitTaskListeners.add(listener); return () => { visitTaskListeners.delete(listener); }; }, getTaskRecords);
+  const setRecords = (update: React.SetStateAction<TaskItem[]>) => {
+    visitTasks = typeof update === "function" ? update(visitTasks!) : update;
+    visitTaskListeners.forEach(listener => listener());
+  };
+  return [records, setRecords] as const;
+}
+
 export default function TaskCollaborationView({
   onNavigateToDelivery,
   onNavigateToMaterials,
@@ -697,14 +721,8 @@ export default function TaskCollaborationView({
   onClearInitialDetailTask,
   initialTab = "all"
 }: TaskCollaborationViewProps) {
-  const [tasks, setTasks] = useState<TaskItem[]>(() => {
-    try {
-      const snapshots = JSON.parse(window.localStorage.getItem("cloud_video_task_completion_snapshots_v1") || "{}") as Record<string, Partial<TaskItem>>;
-      return INITIAL_TASKS.map((task) => snapshots[task.id] ? { ...task, ...snapshots[task.id] } : task);
-    } catch {
-      return INITIAL_TASKS;
-    }
-  });
+  const [tasks, setTasks] = useTaskRecords();
+  const { fields: configuredFields, settings: taskSettings } = useTaskFields();
 
   useEffect(() => {
     const syncBindings = () => {
@@ -1695,6 +1713,8 @@ export default function TaskCollaborationView({
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [customValues, setCustomValues] = useState<TaskFieldValues>({});
+  const formFields = editingTask ? (editingTask.customFields || legacyTaskFields(editingTask)).fields : configuredFields;
 
   // Cascader Dropdown State for "指派给"
   const [isDeptDropdownOpen, setIsDeptDropdownOpen] = useState(false);
@@ -1716,14 +1736,6 @@ export default function TaskCollaborationView({
       completedBy: currentUser
     };
     setTasks((prev) => prev.map((item) => item.id === task.id ? completedTask : item));
-    try {
-      const key = "cloud_video_task_completion_snapshots_v1";
-      const existing = JSON.parse(window.localStorage.getItem(key) || "{}") as Record<string, Partial<TaskItem>>;
-      existing[task.id] = completedTask;
-      window.localStorage.setItem(key, JSON.stringify(existing));
-    } catch {
-      // The in-memory snapshot still demonstrates the completed-state flow.
-    }
     setDetailModalTask(completedTask);
     showToast(`任务 ${task.id} 已确认完成，历史快照已保留`);
   };
@@ -1854,6 +1866,8 @@ export default function TaskCollaborationView({
 
   // Handle Open Create Modal
   const handleOpenCreateModal = () => {
+    if (!taskSettings.enabled) { showToast("任务功能已关闭"); return; }
+    setCustomValues({});
     setEditingTask(null);
     setCopySourceTask(null);
     setFormState({
@@ -1881,6 +1895,7 @@ export default function TaskCollaborationView({
       return;
     }
     setCopySourceTask(null);
+    setCustomValues(structuredClone((task.customFields || legacyTaskFields(task)).values));
     setEditingTask(task);
     setFormState({
       assigneePath: task.assigneeDeptPath || `${task.assignee}`,
@@ -1902,6 +1917,14 @@ export default function TaskCollaborationView({
 
   // Handle Copy Task
   const handleCopyTask = (task: TaskItem) => {
+    if (!taskSettings.enabled) { showToast("任务功能已关闭"); return; }
+    const originalValues = (task.customFields || legacyTaskFields(task)).values;
+    setCustomValues(Object.fromEntries(configuredFields.map(field => {
+      const old = originalValues[field.id];
+      const valid = field.type === "多选" ? (Array.isArray(old) ? old : old ? [old] : []).filter(v => field.options.includes(v))
+        : field.type === "单选" ? (typeof old === "string" && field.options.includes(old) ? old : "") : typeof old === "string" ? old : "";
+      return [field.id, valid];
+    })));
     setEditingTask(null);
     setCopySourceTask(task);
     setFormState({
@@ -1941,22 +1964,34 @@ export default function TaskCollaborationView({
   // Handle Submit Form
   const handleSubmitForm = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!taskSettings.enabled) { showToast("任务功能已关闭"); return; }
 
     // Validation
     const errors: Record<string, string> = {};
     if (!formState.assigneePath) errors.assigneePath = "请选择指派目标";
     if (!formState.orderCount) errors.orderCount = "请填写下单数量";
     if (!formState.deadlineDate) errors.deadlineDate = "请选择出片日期";
-    if (!formState.product) errors.product = "请填写必填项";
+    Object.assign(errors, taskFieldErrors(formFields, customValues));
 
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
+      const form = e.currentTarget as HTMLFormElement;
+      requestAnimationFrame(() => {
+        const first = form.querySelector<HTMLElement>('[aria-invalid="true"], .border-rose-500');
+        first?.scrollIntoView({ block: "center", behavior: "smooth" }); first?.focus();
+      });
       return;
     }
 
     const assigneeName = formState.assigneePath.split("/").pop()?.trim() || "受派人";
 
     const parsedOrderCount = typeof formState.orderCount === "number" ? formState.orderCount : Number(formState.orderCount) || 1;
+    const customFields = snapshotTaskFields(formFields, customValues);
+    const legacyValue = (key: "product" | "scriptType") => {
+      const field = formFields.find(f => f.legacyKey === key);
+      const value = field ? customValues[field.id] : "";
+      return Array.isArray(value) ? value.join("、") : value || "";
+    };
 
     if (editingTask) {
       // Edit existing
@@ -1976,8 +2011,9 @@ export default function TaskCollaborationView({
                 specifiedPerson: formState.specifiedPerson,
                 publicDate: formState.publicDate,
                 remark: formState.remark,
-                product: formState.product,
-                scriptType: formState.scriptType
+                product: legacyValue("product"),
+                scriptType: legacyValue("scriptType"),
+                customFields,
               }
             : t
         )
@@ -2007,8 +2043,9 @@ export default function TaskCollaborationView({
           : copySourceTask?.associatedScript
             ? [{ ...copySourceTask.associatedScript }]
             : undefined,
-        product: formState.product,
-        scriptType: formState.scriptType,
+        product: legacyValue("product"),
+        scriptType: legacyValue("scriptType"),
+        customFields,
         visibilityType: formState.visibilityType,
         visibilityRange: formState.visibilityRange,
         specifiedTeam: formState.specifiedTeam,
@@ -3344,7 +3381,7 @@ export default function TaskCollaborationView({
 
       {/* ================= MODAL: 新增任务 / 编辑任务 ================= */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 font-sans animate-fade-in">
+<OverlayPortal layer="dialog" role="dialog" aria-modal="true" className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 font-sans animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden text-slate-800 flex flex-col max-h-[90vh]">
             {/* Header: | 新增任务 */}
             <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
@@ -3694,51 +3731,11 @@ export default function TaskCollaborationView({
                 </div>
               </div>
 
-              {/* 7. * 产品 */}
-              <div className="flex items-start gap-3">
-                <label className="w-24 text-right pr-1 pt-2 text-xs font-medium text-slate-700 shrink-0 flex items-center justify-end">
-                  <span className="text-rose-500 mr-1">*</span>产品
-                </label>
-                <div className="flex-1 min-w-0">
-                  <select
-                    value={formState.product}
-                    onChange={(e) => {
-                      setFormState({ ...formState, product: e.target.value });
-                      if (formErrors.product) setFormErrors({ ...formErrors, product: "" });
-                    }}
-                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg focus:bg-white focus:outline-none font-medium text-slate-800 cursor-pointer transition-colors ${
-                      formErrors.product ? "border-rose-500 ring-1 ring-rose-500" : "border-slate-200 focus:border-purple-500"
-                    }`}
-                  >
-                    <option value="">请选择</option>
-                    {PRODUCTS_LIST.map((p) => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                  {formErrors.product && (
-                    <p className="text-rose-500 text-[11px] font-medium mt-1">{formErrors.product}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* 8. 脚本类型 */}
-              <div className="flex items-start gap-3">
-                <label className="w-24 text-right pr-1 pt-2 text-xs font-medium text-slate-700 shrink-0">
-                  脚本类型
-                </label>
-                <div className="flex-1 min-w-0">
-                  <select
-                    value={formState.scriptType}
-                    onChange={(e) => setFormState({ ...formState, scriptType: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:border-purple-500 font-medium text-slate-800 cursor-pointer"
-                  >
-                    <option value="">请选择</option>
-                    {SCRIPT_TYPES.map((st) => (
-                      <option key={st} value={st}>{st}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              <TaskCustomFields fields={formFields} values={customValues} errors={formErrors}
+                onChange={(id, value) => {
+                  setCustomValues(previous => ({ ...previous, [id]: value }));
+                  setFormErrors(previous => ({ ...previous, [id]: "" }));
+                }} />
 
               {/* Modal Footer */}
               <div className="flex justify-end gap-2 border-t border-slate-100 pt-4 mt-2">
@@ -3758,7 +3755,7 @@ export default function TaskCollaborationView({
               </div>
             </form>
           </div>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* ================= MODAL: 关联作品 (资源库选择弹框) ================= */}

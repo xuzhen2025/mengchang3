@@ -1,5 +1,11 @@
 import React, { useState } from "react";
-import { PublicTagFilter } from "./PublicTagFilter";
+import { useTaggedResources, useTagCatalog } from "../lib/useResourceTags";
+import { resourceTagStore } from "../lib/resourceTags";
+import { resourceConfigStore } from "../lib/resourceConfig";
+import { useResourceConfig, useConfigFilter } from "../lib/useResourceConfig";
+import { useUploadedResources, uploadedImage } from "../lib/resourceUploads";
+import { PublicTagFilter, PersonalTagFilter } from "./PublicTagFilter";
+import { ResourceCategoryFilters, ResourceStatusFilter, ResourceStatusBadge } from "./ResourceConfigControls";
 import ImageDetailView from "./ImageDetailView";
 import { Pagination } from "./Pagination";
 import { ResourceSearchIntent } from "../types";
@@ -60,7 +66,7 @@ interface ImageManagementViewProps {
   onClearSearch?: () => void;
 }
 
-const MOCK_IMAGES: ImageItem[] = [
+export const MOCK_IMAGES: ImageItem[] = [
   {
     id: "img-1",
     title: "防晒植物提取精华液展图.jpg",
@@ -126,7 +132,7 @@ const MOCK_IMAGES: ImageItem[] = [
     time: "2025-04-28",
     primaryCategory: "美妆护肤",
     secondaryCategory: "致上旗舰店",
-    publicTags: ["对比实测"],
+    publicTags: ["成分卖点","效果对比"],
     personalTag: "重点素材",
     size: "3.1 MB",
     resolution: "1080x1080"
@@ -160,7 +166,7 @@ const MOCK_IMAGES: ImageItem[] = [
     time: "2025-04-24",
     primaryCategory: "美妆护肤",
     secondaryCategory: "致上旗舰店",
-    publicTags: ["对比实测"],
+    publicTags: ["实测对比","美妆护肤"],
     personalTag: "精选主图",
     size: "2.9 MB",
     resolution: "1080x1440"
@@ -177,7 +183,7 @@ const MOCK_IMAGES: ImageItem[] = [
     time: "2025-04-20",
     primaryCategory: "宣发图库",
     secondaryCategory: "致上旗舰店",
-    publicTags: ["爆款短视频"],
+    publicTags: ["商品展示","清凉冰丝"],
     personalTag: "精选主图",
     size: "5.4 MB",
     resolution: "2000x2000"
@@ -200,8 +206,18 @@ const MOCK_IMAGES: ImageItem[] = [
     resolution: "1440x1920"
   }
 ];
+MOCK_IMAGES.push(...["植萃精华白底产品图.png","通勤风衣细节特写.jpg","透明收纳盒场景图.jpg"].map((title, index) => ({
+  ...MOCK_IMAGES[index % MOCK_IMAGES.length], id: "images-analytics-" + (index + 1), title,
+  author: ["徐振", "王剪辑", "周雅"][index], downloads: [8, 12, 5][index],
+  createdAt: `2026-09-${10 + index} 10:30`, time: `2026-09-${10 + index} 10:30`,
+})));
+
+resourceTagStore.register("images", MOCK_IMAGES);
+resourceConfigStore.register("images", MOCK_IMAGES);
 
 export default function ImageManagementView({ onTriggerTask, onDetailStateChange, initialSearch, onClearSearch }: ImageManagementViewProps) {
+  const uploaded = useUploadedResources();
+  const images = useTaggedResources<ImageItem>("images", [...uploaded.filter((item) => item.resourceCategory === "图片").map(uploadedImage), ...MOCK_IMAGES]);
   // Category & Filter States
   const [selectedPrimaryCat, setSelectedPrimaryCat] = useState("全部");
   const [secondarySearch, setSecondarySearch] = useState("");
@@ -237,7 +253,7 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
   React.useEffect(() => {
     if (!initialSearch?.openDetail || !initialSearch.query) return;
     const target = initialSearch.query.trim().toLowerCase();
-    const match = MOCK_IMAGES.find((item) => item.title.toLowerCase() === target || item.id.toLowerCase() === target);
+    const match = images.find((item) => item.title.toLowerCase() === target || item.id.toLowerCase() === target);
     if (match) setDetailItem(match);
   }, [initialSearch?.requestId]);
 
@@ -256,27 +272,12 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
   };
 
   // Primary categories from reference screenshot
-  const primaryCategories = [
-    "全部",
-    "美妆护肤",
-    "服饰内衣",
-    "3C数码",
-    "资质文件",
-    "宣发图库",
-    "家居日用",
-    "食品饮料"
-  ];
+  const { store: configStore } = useResourceConfig();
+  const primaryCategories = ["全部", ...configStore.categories("images").map(n => n.name)];
 
-  // Personal tag buttons from reference screenshot
-  const personalTagsList = [
-    "全部",
-    "精选主图",
-    "品牌资质",
-    "营销资料库",
-    "重点素材",
-    "3D渲染图",
-    "对比素材"
-  ];
+  const { personalGroups: PERSONAL_TAG_GROUPS } = useTagCatalog();
+  const personalTagsList = ["全部", "无个人标签", "有个人标签", ...Object.values(PERSONAL_TAG_GROUPS).flat()];
+  React.useEffect(() => { setCurrentPage(1); }, [selectedPersonalTag, personalTagSearch]);
 
   React.useEffect(() => {
     const tag = initialSearch?.tag;
@@ -289,7 +290,7 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
   }, [initialSearch?.requestId]);
 
   // Filtered list
-  const filteredImages = MOCK_IMAGES.filter(item => {
+  const filteredImages = images.filter(item => {
     const homeSearch = searchQuery.trim().toLowerCase();
     const matchesHomeSearch = !homeSearch || [item.title, item.subtitle, item.primaryCategory, item.secondaryCategory, item.personalTag, item.author, ...item.publicTags]
       .some((value) => value.toLowerCase().includes(homeSearch));
@@ -308,11 +309,11 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
       return false;
     }
     if (selectedPersonalTag !== "全部") {
-      if (selectedPersonalTag === "无个人标签" && item.personalTag === "有个人标签") return false;
-      if (selectedPersonalTag === "有个人标签" && item.personalTag === "无个人标签") return false;
-      if (selectedPersonalTag !== "无个人标签" && selectedPersonalTag !== "有个人标签" && item.personalTag !== selectedPersonalTag) return false;
+      if (selectedPersonalTag === "无个人标签" && item.personalTags.length > 0) return false;
+      if (selectedPersonalTag === "有个人标签" && item.personalTags.length === 0) return false;
+      if (selectedPersonalTag !== "无个人标签" && selectedPersonalTag !== "有个人标签" && !item.personalTags.includes(selectedPersonalTag)) return false;
     }
-    if (personalTagSearch && !item.personalTag.toLowerCase().includes(personalTagSearch.toLowerCase())) {
+    if (personalTagSearch && !item.personalTags.some((tag) => tag.toLowerCase().includes(personalTagSearch.toLowerCase()))) {
       return false;
     }
     if (authorFilter && !item.author.includes(authorFilter)) {
@@ -423,66 +424,11 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
         </div>
 
         {/* Row 2: 一级分类 */}
-        <div className="flex items-start gap-2 pt-1">
-          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2 mt-0.5">一级分类：</span>
-          <div className="flex-1 flex flex-wrap items-center gap-x-3.5 gap-y-2">
-            {primaryCategories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setSelectedPrimaryCat(cat)}
-                className={`transition-colors cursor-pointer text-xs ${
-                  selectedPrimaryCat === cat
-                    ? "text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded"
-                    : "text-slate-600 hover:text-purple-600 font-normal"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
+          <ResourceCategoryFilters scope="images" primary={selectedPrimaryCat} secondary={selectedSecondaryCat} search={secondarySearch}
+            onPrimary={setSelectedPrimaryCat} onSecondary={setSelectedSecondaryCat} onSearch={setSecondarySearch} />
 
         {/* Row 3: 二级分类 */}
-        <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
-          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">二级分类：</span>
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="relative border border-slate-200 rounded-lg px-2.5 py-1 flex items-center gap-1.5 bg-white w-32 focus-within:border-purple-400">
-              <Search className="w-3.5 h-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="搜索分类"
-                value={secondarySearch}
-                onChange={(e) => setSecondarySearch(e.target.value)}
-                className="text-xs focus:outline-none w-full placeholder:text-slate-400 font-normal"
-              />
-            </div>
 
-            <button
-              onClick={() => setSelectedSecondaryCat("全部")}
-              className={`transition-colors cursor-pointer text-xs ${
-                selectedSecondaryCat === "全部"
-                  ? "text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded"
-                  : "text-slate-600 hover:text-purple-600 font-normal"
-              }`}
-            >
-              全部
-            </button>
-
-            {["a店铺", "b店铺"].map(shop => (
-              <button
-                key={shop}
-                onClick={() => setSelectedSecondaryCat(selectedSecondaryCat === shop ? "全部" : shop)}
-                className={`transition-colors cursor-pointer text-xs ${
-                  selectedSecondaryCat === shop
-                    ? "text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded"
-                    : "text-slate-600 hover:text-purple-600 font-normal"
-                }`}
-              >
-                {shop}
-              </button>
-            ))}
-          </div>
-        </div>
 
         {/* Row 4: 公共标签 */}
         <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
@@ -496,63 +442,14 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
         </div>
 
         {/* Row 5: 个人标签 */}
-        <div className="flex items-start gap-2 border-t border-slate-100 pt-3">
-          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2 mt-1">个人标签：</span>
-          <div className="flex-1 flex flex-wrap items-center gap-2">
-            <div className="relative border border-slate-200 rounded-lg px-2.5 py-1 flex items-center gap-1.5 bg-white w-32 focus-within:border-purple-400 shrink-0">
-              <Search className="w-3.5 h-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="搜索标签"
-                value={personalTagSearch}
-                onChange={(e) => setPersonalTagSearch(e.target.value)}
-                className="text-xs focus:outline-none w-full placeholder:text-slate-400 font-normal"
-              />
-            </div>
-
-            {/* Selector group for [全部 | 无个人标签 | 有个人标签] */}
-            <div className="flex items-center gap-1 border border-slate-200 rounded-lg p-0.5 bg-white shrink-0">
-              {["全部", "无个人标签", "有个人标签"].map(ptag => (
-                <button
-                  key={ptag}
-                  onClick={() => setSelectedPersonalTag(ptag)}
-                  className={`px-3 py-1 rounded-md text-xs transition-all cursor-pointer ${
-                    selectedPersonalTag === ptag
-                      ? "bg-purple-600 text-white font-bold shadow-xs"
-                      : "text-slate-600 hover:bg-slate-50 font-medium"
-                  }`}
-                >
-                  {ptag}
-                </button>
-              ))}
-            </div>
-
-            {/* Extended Personal Tags list from reference image */}
-            {personalTagsList.slice(3).map(ptag => (
-              <button
-                key={ptag}
-                onClick={() => setSelectedPersonalTag(selectedPersonalTag === ptag ? "全部" : ptag)}
-                className={`transition-colors cursor-pointer text-xs px-2 py-0.5 rounded ${
-                  selectedPersonalTag === ptag
-                    ? "text-purple-600 font-bold bg-purple-100/70 border border-purple-200"
-                    : "text-slate-600 hover:text-purple-600 font-normal"
-                }`}
-              >
-                {ptag}
-              </button>
-            ))}
-
-            <button
-              onClick={() => {
-                setPersonalTagSearch("");
-                setSelectedPersonalTag("全部");
-              }}
-              className="text-slate-500 hover:text-purple-600 text-xs flex items-center gap-1 cursor-pointer ml-2 font-normal"
-            >
-              <span>重置个人标签</span>
-              <Edit2 className="w-3 h-3 text-slate-400" />
-            </button>
-          </div>
+        <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
+          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">个人标签：</span>
+          <PersonalTagFilter
+            searchKeyword={personalTagSearch}
+            onSearchKeywordChange={setPersonalTagSearch}
+            selectedTag={selectedPersonalTag}
+            onSelectTag={setSelectedPersonalTag}
+          />
         </div>
       </div>
 

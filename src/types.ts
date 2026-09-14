@@ -59,6 +59,7 @@ export interface Asset {
   resourceCategory?: "成片" | "素材" | "脚本" | "图片" | "音频";
   source?: "resource_library" | "task_collaboration" | "ai_generation";
   publicTags?: string[];
+  personalTags?: string[];
   coverUrl?: string;
   status?: string;
 

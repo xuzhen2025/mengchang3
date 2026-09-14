@@ -78,14 +78,14 @@ export function removeFilterPreset<T extends FilterValues>(presets: FilterPreset
 }
 
 export const VIDEO_PRESET_DEFAULTS = {
-  searchQuery: "", mainCat: "全部", primaryCat: "全部", secondarySearch: "", secondaryCat: "全部", statusVal: "全部",
+  searchQuery: "", primaryCat: "全部", secondarySearch: "", secondaryCat: "全部", statusVal: "全部",
   publicTagSearch: "", publicTagKeyword: "", selectedPublicTag: "全部", personalTagSearch: "", personalTagFilter: "all",
   sortBy: "最新发布", adPlatformTag: "不限广告平台标签", costRange: "不限", systemAutoTag: "请选择系统标签",
   authorType: "作者", authorInput: "", timeType: "上传时间", startDate: "", endDate: "",
 };
 
 export const SCRIPT_PRESET_DEFAULTS = {
-  searchQuery: "", selectedMainCat: "全部", selectedPrimaryCat: "全部", secondarySearch: "", selectedStatus: "全部",
+  searchQuery: "", selectedPrimaryCat: "全部", selectedSecondaryCat: "全部", secondarySearch: "", selectedStatus: "全部",
   publicTagSearch: "", publicTagKeyword: "", personalTagSearch: "", selectedPersonalTag: "全部", sortBy: "最新发布",
   templateFilter: "", authorFilter: "", authorSearch: "", startDate: "", endDate: "",
 };
@@ -97,7 +97,7 @@ export const IMAGE_PRESET_DEFAULTS = {
 };
 
 export const AUDIO_PRESET_DEFAULTS = {
-  searchQuery: "", selectedMainCategory: "全部", selectedPrimaryCategory: "全部", selectedSecondaryCategory: "全部",
+  searchQuery: "", selectedPrimaryCategory: "全部", selectedSecondaryCategory: "全部",
   selectedPublicTag: "全部", selectedPersonalTag: "全部", sortBy: "最新发布", searchCategoryKeyword: "",
   searchPublicTagKeyword: "", searchPersonalTagKeyword: "", searchAuthorKeyword: "", startDate: "", endDate: "",
 };

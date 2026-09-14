@@ -1,4 +1,8 @@
 import React, { useState } from "react";
+import { useTagCatalog } from "../lib/useResourceTags";
+import { resourceTagStore } from "../lib/resourceTags";
+import { useResourceConfig } from "../lib/useResourceConfig";
+import OverlayPortal from "./overlays/OverlayPortal";
 import {
   Plus,
   X,
@@ -58,257 +62,20 @@ export default function TagGroupManagementView() {
   };
 
   // 分类层级模拟数据（5个大分类：成片、素材、图片、脚本、音频）
-  const categoryTree: CategoryNode[] = [
-    {
-      id: "cat-成片",
-      name: "成片",
-      children: [
-        {
-          id: "cat-成片-个护",
-          name: "个护",
-          children: [
-            { id: "cat-成片-个护-1", name: "美妆-123456" },
-            { id: "cat-成片-个护-2", name: "护肤体验" },
-          ],
-        },
-        {
-          id: "cat-成片-个护2",
-          name: "个护2",
-          children: [{ id: "cat-成片-个护2-1", name: "美妆2" }],
-        },
-        {
-          id: "cat-成片-7.4-21",
-          name: "7.4—一级分类21",
-          children: [
-            { id: "cat-成片-7.4-21-1", name: "7.4二级分类2.1" },
-            { id: "cat-成片-7.4-21-2", name: "7.4二级分类2.2" },
-            { id: "cat-成片-7.4-21-3", name: "111222" },
-            { id: "cat-成片-7.4-21-4", name: "111222" },
-            { id: "cat-成片-7.4-21-5", name: "852" },
-            { id: "cat-成片-7.4-21-6", name: "9.4二级分类" },
-          ],
-        },
-        {
-          id: "cat-成片-7.4-22",
-          name: "7.4—一级分类22",
-          children: [
-            { id: "cat-成片-7.4-22-1", name: "sss" },
-            { id: "cat-成片-7.4-22-2", name: "7.4二级分类22.1" },
-            { id: "cat-成片-7.4-22-3", name: "9.4二级分类2" },
-          ],
-        },
-        {
-          id: "cat-成片-7.4-2",
-          name: "7.4—一级分类2",
-          children: [
-            { id: "cat-成片-7.4-2-1", name: "852" },
-            { id: "cat-成片-7.4-2-2", name: "9.4二级分类" },
-          ],
-        },
-      ],
-    },
-    {
-      id: "cat-素材",
-      name: "素材",
-      children: [
-        {
-          id: "cat-素材-7.4-2",
-          name: "7.4—一级分类2",
-          children: [{ id: "cat-素材-7.4-2-1", name: "9.4二级分类" }],
-        },
-        {
-          id: "cat-素材-7.4-22",
-          name: "7.4—一级分类22",
-          children: [{ id: "cat-素材-7.4-22-1", name: "9.4二级分类" }],
-        },
-        {
-          id: "cat-素材-7.4-23",
-          name: "7.4—一级分类23",
-          children: [{ id: "cat-素材-7.4-23-1", name: "sss3" }],
-        },
-      ],
-    },
-    {
-      id: "cat-图片",
-      name: "图片",
-      children: [
-        {
-          id: "cat-图片-1",
-          name: "常规图片",
-          children: [{ id: "cat-图片-1-1", name: "高清图" }],
-        },
-        {
-          id: "cat-图片-2",
-          name: "宣传海报",
-          children: [{ id: "cat-图片-2-1", name: "主图卡片" }],
-        },
-      ],
-    },
-    {
-      id: "cat-脚本",
-      name: "脚本",
-      children: [
-        {
-          id: "cat-脚本-1",
-          name: "镜头拆解",
-          children: [{ id: "cat-脚本-1-1", name: "分镜头大纲" }],
-        },
-        {
-          id: "cat-脚本-2",
-          name: "口播剧本",
-          children: [{ id: "cat-脚本-2-1", name: "带货台词" }],
-        },
-      ],
-    },
-    {
-      id: "cat-音频",
-      name: "音频",
-      children: [
-        {
-          id: "cat-音频-1",
-          name: "背景音乐",
-          children: [{ id: "cat-音频-1-1", name: "欢快BGM" }],
-        },
-        {
-          id: "cat-音频-2",
-          name: "人声配音",
-          children: [{ id: "cat-音频-2-1", name: "AI旁白" }],
-        },
-      ],
-    },
-  ];
+  const { store: configStore } = useResourceConfig();
+  const categoryTree: CategoryNode[] = Object.entries(configStore.getCategories()).map(([name, categories]) => ({
+    id: `cat-${name}`, name, children: categories.map((category) => ({ id: category.id, name: category.name, children: category.children })),
+  }));
 
   // 必填全路径列表
-  const allRequiredPaths = [
-    "成片/个护/美妆-123456",
-    "成片/个护2/美妆2",
-    "成片/7.4-一级分类21/7.4二级分类2.1",
-    "成片/7.4-一级分类21/9.4二级分类",
-    "成片/7.4-一级分类21/7.4二级分类2.2",
-    "成片/7.4-一级分类22/sss",
-    "成片/7.4-一级分类22/7.4二级分类22.1",
-    "成片/7.4-一级分类22/9.4二级分类2",
-    "素材/7.4-一级分类2/9.4二级分类",
-    "素材/7.4-一级分类22/9.4二级分类",
-    "素材/7.4-一级分类23/sss3",
-    "第三方/7.4-一级分类21/9.4二级分类",
-  ];
+  const allRequiredPaths = categoryTree.flatMap((root) => (root.children || []).flatMap((primary) => (primary.children || []).map((secondary) => `${root.name}/${primary.name}/${secondary.name}`)));
 
   // 默认标签组模拟数据（完全对齐截图列表）
-  const [tagGroups, setTagGroups] = useState<TagGroupItem[]>([
-    {
-      id: "tg-0",
-      name: "隐藏标签",
-      rule: "multi",
-      categories: ["成片", "素材", "第三方", "图片", "文案"],
-      requiredCategories: ["成片/7.4-一级分类21/9.4二级分类"],
-      hasAdminPermission: false,
-      badges: [
-        { label: "图", color: "bg-emerald-500" },
-        { label: "文", color: "bg-emerald-600" },
-        { label: "音", color: "bg-amber-500" },
-        { label: "脚", color: "bg-emerald-400" },
-      ],
-      subTags: [
-        { id: "st-01", name: "00000" },
-        { id: "st-02", name: "000" },
-        { id: "st-03", name: "111" },
-        { id: "st-04", name: "测试" },
-      ],
-    },
-    {
-      id: "tg-1",
-      name: "1",
-      rule: "multi",
-      categories: ["成片", "素材"],
-      requiredCategories: ["成片/个护/美妆-123456"],
-      hasAdminPermission: true,
-      badges: [
-        { label: "图", color: "bg-emerald-500" },
-        { label: "文", color: "bg-emerald-600" },
-        { label: "音", color: "bg-amber-500" },
-        { label: "脚", color: "bg-emerald-400" },
-      ],
-      subTags: [
-        { id: "st-11", name: "1:1主图" },
-        { id: "st-12", name: "1108标" },
-        { id: "st-13", name: "14" },
-        { id: "st-14", name: "15" },
-        { id: "st-15", name: "1小组" },
-        { id: "st-16", name: "11111111111" },
-        { id: "st-17", name: "111111" },
-        { id: "st-18", name: "12310" },
-        { id: "st-19", name: "111" },
-      ],
-    },
-    {
-      id: "tg-2",
-      name: "默认标签组",
-      rule: "multi",
-      categories: ["成片", "素材", "图片", "文案", "脚本"],
-      requiredCategories: [],
-      hasAdminPermission: false,
-      badges: [
-        { label: "图", color: "bg-emerald-500" },
-        { label: "文", color: "bg-emerald-600" },
-        { label: "音", color: "bg-amber-500" },
-        { label: "脚", color: "bg-emerald-400" },
-      ],
-      subTags: [
-        { id: "st-21", name: "132456465" },
-        { id: "st-22", name: "123456" },
-        { id: "st-23", name: "00000" },
-        { id: "st-24", name: "额呵呵红红火火" },
-        { id: "st-25", name: "122314631" },
-        { id: "st-26", name: "测试组1" },
-        { id: "st-27", name: "小红书P图" },
-        { id: "st-28", name: "明星网红" },
-      ],
-    },
-    {
-      id: "tg-3",
-      name: "2",
-      rule: "multi",
-      categories: ["成片", "素材"],
-      requiredCategories: [],
-      hasAdminPermission: false,
-      badges: [
-        { label: "图", color: "bg-emerald-500" },
-        { label: "文", color: "bg-emerald-600" },
-        { label: "音", color: "bg-amber-500" },
-        { label: "脚", color: "bg-emerald-400" },
-      ],
-      subTags: [
-        { id: "st-31", name: "22" },
-        { id: "st-32", name: "222" },
-        { id: "st-33", name: "2-3" },
-        { id: "st-34", name: "2-12多选1" },
-        { id: "st-35", name: "234131" },
-      ],
-    },
-    {
-      id: "tg-4",
-      name: "3",
-      rule: "single",
-      categories: ["成片"],
-      requiredCategories: [],
-      hasAdminPermission: false,
-      badges: [
-        { label: "图", color: "bg-emerald-500" },
-        { label: "文", color: "bg-emerald-600" },
-        { label: "音", color: "bg-amber-500" },
-        { label: "脚", color: "bg-emerald-400" },
-      ],
-      subTags: [
-        { id: "st-41", name: "3:4主图" },
-        { id: "st-42", name: "3" },
-        { id: "st-43", name: "333" },
-      ],
-    },
-  ]);
+  const { publicTagGroups: tagGroups } = useTagCatalog();
+  const setTagGroups = resourceTagStore.setPublicGroups;
 
   // 当前选中的标签组 ID
-  const [selectedTagGroupId, setSelectedTagGroupId] = useState<string>("tg-2");
+  const [selectedTagGroupId, setSelectedTagGroupId] = useState<string>("public-group-1");
   const currentGroup = tagGroups.find((g) => g.id === selectedTagGroupId) || tagGroups[0];
 
   // 左侧搜索标签组
@@ -345,6 +112,7 @@ export default function TagGroupManagementView() {
   // 模态框状态 3：新增子标签 (新增标签)
   const [isAddSubTagModalOpen, setIsAddSubTagModalOpen] = useState(false);
   const [formSubTagNamesText, setFormSubTagNamesText] = useState("");
+  const [editingSubTagId, setEditingSubTagId] = useState<string | null>(null);
   const [formStartDate, setFormStartDate] = useState("");
   const [formEndDate, setFormEndDate] = useState("");
   const [formAiDirection, setFormAiDirection] = useState("其他");
@@ -359,7 +127,7 @@ export default function TagGroupManagementView() {
 
   // 适用分类三列级联当前选中的大分类与一级分类
   const [activeTopCatId, setActiveTopCatId] = useState<string>("cat-成片");
-  const [activeSubCatId, setActiveSubCatId] = useState<string | null>("cat-成片-7.4-21");
+  const [activeSubCatId, setActiveSubCatId] = useState<string | null>(categoryTree[0]?.children?.[0]?.id || null);
 
   const currentTopCat = categoryTree.find((c) => c.id === activeTopCatId) || categoryTree[0];
   const currentSubCat = currentTopCat?.children?.find((c) => c.id === activeSubCatId) || currentTopCat?.children?.[0];
@@ -382,7 +150,7 @@ export default function TagGroupManagementView() {
     setFormRequiredCats([]);
     setFormHasAdminPermission(false);
     setActiveTopCatId("cat-成片");
-    setActiveSubCatId("cat-成片-7.4-21");
+    setActiveSubCatId(categoryTree[0]?.children?.[0]?.id || null);
     setIsGroupModalOpen(true);
   };
 
@@ -396,7 +164,7 @@ export default function TagGroupManagementView() {
     setFormRequiredCats([...group.requiredCategories]);
     setFormHasAdminPermission(group.hasAdminPermission);
     setActiveTopCatId("cat-成片");
-    setActiveSubCatId("cat-成片-7.4-21");
+    setActiveSubCatId(categoryTree[0]?.children?.[0]?.id || null);
     setIsGroupModalOpen(true);
   };
 
@@ -409,6 +177,7 @@ export default function TagGroupManagementView() {
     }
 
     if (groupModalMode === "add") {
+      if (tagGroups.some((group) => group.name === formGroupName.trim())) { showToast("已存在同名标签组"); return; }
       const newGroup: TagGroupItem = {
         id: `tg-${Date.now()}`,
         name: formGroupName.trim(),
@@ -429,6 +198,7 @@ export default function TagGroupManagementView() {
       setTopInputGroupName("");
       showToast(`新增标签组 [${newGroup.name}] 成功！`);
     } else {
+      if (tagGroups.some((group) => group.id !== editingGroupId && group.name === formGroupName.trim())) { showToast("已存在同名标签组"); return; }
       setTagGroups((prev) =>
         prev.map((g) =>
           g.id === editingGroupId
@@ -473,6 +243,8 @@ export default function TagGroupManagementView() {
 
   // 打开【新增标签】(子标签) 模态框
   const handleOpenAddSubTagModal = () => {
+    if (!currentGroup) { showToast("请先创建标签组"); return; }
+    setEditingSubTagId(null);
     setFormSubTagNamesText("");
     setFormStartDate("");
     setFormEndDate("");
@@ -505,6 +277,11 @@ export default function TagGroupManagementView() {
       .split("\n")
       .map((n) => n.trim())
       .filter((n) => n.length > 0);
+    if (!currentGroup) return;
+    if (editingSubTagId && names.length !== 1) { showToast("编辑时仅填写一个标签名称"); return; }
+    if (new Set(names).size !== names.length || names.some((name) => currentGroup.subTags.some((tag) => tag.name === name && tag.id !== editingSubTagId))) {
+      showToast("同一标签组内不能添加同名标签"); return;
+    }
 
     const newSubTags: SubTagItem[] = names.map((n, idx) => ({
       id: `st-${Date.now()}-${idx}`,
@@ -521,7 +298,9 @@ export default function TagGroupManagementView() {
         if (g.id === currentGroup?.id) {
           return {
             ...g,
-            subTags: [...g.subTags, ...newSubTags],
+            subTags: editingSubTagId
+              ? g.subTags.map((tag) => tag.id === editingSubTagId ? { ...newSubTags[0], id: tag.id } : tag)
+              : [...g.subTags, ...newSubTags],
           };
         }
         return g;
@@ -529,11 +308,12 @@ export default function TagGroupManagementView() {
     );
 
     setIsAddSubTagModalOpen(false);
-    showToast(`成功在 [${currentGroup?.name || ""}] 添加 ${newSubTags.length} 个子标签`);
+    showToast(editingSubTagId ? "标签已更新，关联资源同步生效" : `成功在 [${currentGroup.name}] 添加 ${newSubTags.length} 个子标签`);
   };
 
   // 删除单项子标签
   const handleDeleteSubTag = (subTagId: string, subTagName: string) => {
+    if (!window.confirm(`删除标签“${subTagName}”并解除资源关联？资源本身不会删除。`)) return;
     setTagGroups((prev) =>
       prev.map((g) => {
         if (g.id === currentGroup?.id) {
@@ -633,13 +413,13 @@ export default function TagGroupManagementView() {
   };
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-5 p-6 animate-fade-in w-full overflow-y-auto text-slate-800">
+    <div data-testid="public-tag-management" className="flex-1 min-h-0 flex flex-col lg:flex-row gap-5 p-6 animate-fade-in w-full overflow-y-auto text-slate-800">
       {/* Toast 提示通知 */}
       {toastMsg && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[200] bg-slate-900/90 text-white px-5 py-2.5 rounded-2xl shadow-2xl backdrop-blur-md border border-slate-700/80 text-xs font-bold flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
+        <OverlayPortal layer="toast" role="status" className="fixed top-6 left-1/2 -translate-x-1/2 z-[200] bg-slate-900/90 text-white px-5 py-2.5 rounded-2xl shadow-2xl backdrop-blur-md border border-slate-700/80 text-xs font-bold flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
           <Check className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMsg}</span>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* ========================================================================= */}
@@ -800,7 +580,8 @@ export default function TagGroupManagementView() {
             {!isSelectMode && (
               <button
                 type="button"
-                onClick={() => handleOpenEditGroupModal(currentGroup)}
+                disabled={!currentGroup}
+                onClick={() => currentGroup && handleOpenEditGroupModal(currentGroup)}
                 className="px-3.5 py-1.5 bg-white border border-slate-200/80 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
               >
                 修改标签组
@@ -885,6 +666,17 @@ export default function TagGroupManagementView() {
                     <span>{subTag.name}</span>
                     <button
                       type="button"
+                      title={`编辑标签 ${subTag.name}`}
+                      onClick={() => {
+                        setEditingSubTagId(subTag.id); setFormSubTagNamesText(subTag.name);
+                        setFormStartDate(subTag.startDate || ""); setFormEndDate(subTag.endDate || "");
+                        setFormAiDirection(subTag.aiDirection || "其他"); setFormDescription(subTag.description || "");
+                        setFormImagePreview(subTag.imageUrl || null); setFormImageFile(null); setIsAddSubTagModalOpen(true);
+                      }}
+                      className="rounded p-0.5 text-slate-400 hover:text-violet-600"
+                    ><Edit3 className="h-3.5 w-3.5" /></button>
+                    <button
+                      type="button"
                       onClick={() => handleDeleteSubTag(subTag.id, subTag.name)}
                       className="text-slate-400 hover:text-rose-600 transition-colors p-0.5 cursor-pointer rounded"
                       title="移除此标签"
@@ -903,7 +695,7 @@ export default function TagGroupManagementView() {
       {/* 模态框 1：新增/编辑标签组 (完全对齐截图 1 & 截图 2)                        */}
       {/* ========================================================================= */}
       {isGroupModalOpen && (
-        <div className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <OverlayPortal role="dialog" aria-modal="true" className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
@@ -1178,14 +970,14 @@ export default function TagGroupManagementView() {
               </div>
             </form>
           </div>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* ========================================================================= */}
       {/* 模态框 2：删除标签组 (完全对齐截图 3)                                     */}
       {/* ========================================================================= */}
       {deletingGroupId && (
-        <div className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <OverlayPortal role="dialog" aria-modal="true" className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
@@ -1227,14 +1019,14 @@ export default function TagGroupManagementView() {
               </div>
             </div>
           </div>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* ========================================================================= */}
       {/* 模态框 2.5：批量删除子标签确认                                             */}
       {/* ========================================================================= */}
       {isBatchDeleteModalOpen && (
-        <div className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <OverlayPortal role="dialog" aria-modal="true" className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
@@ -1278,20 +1070,20 @@ export default function TagGroupManagementView() {
               </div>
             </div>
           </div>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* ========================================================================= */}
       {/* 模态框 3：新增标签 (新增子标签，完全对齐截图 4)                             */}
       {/* ========================================================================= */}
       {isAddSubTagModalOpen && (
-        <div className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <OverlayPortal role="dialog" aria-modal="true" className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <span className="w-1 h-4 bg-[#7C3AED] rounded-full" />
-                <h3 className="text-sm font-bold text-slate-800">新增标签</h3>
+                <h3 className="text-sm font-bold text-slate-800">{editingSubTagId ? "编辑标签" : "新增标签"}</h3>
               </div>
               <button
                 type="button"
@@ -1432,7 +1224,7 @@ export default function TagGroupManagementView() {
               </div>
             </form>
           </div>
-        </div>
+        </OverlayPortal>
       )}
     </div>
   );

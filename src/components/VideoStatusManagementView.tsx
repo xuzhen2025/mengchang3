@@ -1,16 +1,11 @@
 import React, { useState } from "react";
+import { useResourceConfig } from "../lib/useResourceConfig";
+import type { ResourceStatusItem } from "../lib/resourceConfig";
+import OverlayPortal from "./overlays/OverlayPortal";
+import AnchoredPopover from "./overlays/AnchoredPopover";
 import { Plus, X, AlertCircle, ChevronDown, Check } from "lucide-react";
 
-export interface VideoStatusItem {
-  id: string;
-  name: string;
-  partitions: string[]; // ["成片", "素材"]
-  textColor: string;
-  bgColor: string;
-  weight: number;
-  notifyEnabled: boolean;
-  isDefault: boolean;
-}
+export type VideoStatusItem = ResourceStatusItem;
 
 const PARTITION_OPTIONS = ["成片", "素材"];
 
@@ -33,65 +28,27 @@ const PRESET_COLORS = [
 ];
 
 export default function VideoStatusManagementView() {
+  const { store } = useResourceConfig();
   // 1. 顶部全局功能配置
-  const [globalEnabled, setGlobalEnabled] = useState<boolean>(true);
-  const [globalPartitions, setGlobalPartitions] = useState<string[]>([
-    "成片",
-    "素材",
-  ]);
+  const [globalEnabled, setGlobalEnabled] = useState(() => store.getSettings("video").enabled);
+  const [globalPartitions, setGlobalPartitions] = useState(() => store.getSettings("video").partitions);
 
   // Toast 提示
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
   const showToast = (msg: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
     setToastMsg(msg);
-    setTimeout(() => {
-      setToastMsg(null);
-    }, 2500);
+    toastTimer.current = setTimeout(() => setToastMsg(null), 3000);
   };
 
   // 2. 状态列表数据 (完全比对截图2、3、4)
-  const [statusList, setStatusList] = useState<VideoStatusItem[]>([
-    {
-      id: "vs-1",
-      name: "审核不通过",
-      partitions: ["成片", "素材"],
-      textColor: "#FFFFFF",
-      bgColor: "#EA580C", // 橙红色
-      weight: 0,
-      notifyEnabled: true,
-      isDefault: false,
-    },
-    {
-      id: "vs-2",
-      name: "审核通过",
-      partitions: ["成片", "素材"],
-      textColor: "#FFFFFF",
-      bgColor: "#EA580C",
-      weight: 0,
-      notifyEnabled: false,
-      isDefault: true,
-    },
-    {
-      id: "vs-3",
-      name: "已上机",
-      partitions: ["成片", "素材"],
-      textColor: "#FFFFFF",
-      bgColor: "#2563EB", // 蓝色
-      weight: 0,
-      notifyEnabled: true,
-      isDefault: false,
-    },
-    {
-      id: "vs-4",
-      name: "7.4状态1",
-      partitions: ["成片", "素材"],
-      textColor: "#FFFFFF",
-      bgColor: "#9333EA", // 紫色
-      weight: 10,
-      notifyEnabled: true,
-      isDefault: false,
-    },
-  ]);
+  const statusList = store.getStatusCatalog("video");
+  const setStatusList = (update: React.SetStateAction<ResourceStatusItem[]>) => {
+    try { store.setStatusCatalog("video", update); return true; }
+    catch (error) { showToast((error as Error).message); return false; }
+  };
 
   // 3. 模态框状态
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -115,6 +72,7 @@ export default function VideoStatusManagementView() {
 
   // 保存顶部全局设置
   const handleSaveGlobalConfig = () => {
+    store.setSettings("video", { enabled: globalEnabled, partitions: globalPartitions });
     showToast("状态功能与显示分区配置保存成功！");
   };
 
@@ -159,7 +117,7 @@ export default function VideoStatusManagementView() {
 
     // 按权重降序排序放置
     const updated = [...statusList, newItem].sort((a, b) => b.weight - a.weight);
-    setStatusList(updated);
+    if (!setStatusList(updated)) return;
     setIsAddModalOpen(false);
     showToast(`新增状态【${newItem.name}】成功！`);
   };
@@ -198,7 +156,7 @@ export default function VideoStatusManagementView() {
       })
       .sort((a, b) => b.weight - a.weight);
 
-    setStatusList(updated);
+    if (!setStatusList(updated)) return;
     setEditingItem(null);
     showToast(`修改状态【${formName.trim()}】成功！`);
   };
@@ -208,34 +166,18 @@ export default function VideoStatusManagementView() {
     setDeletingItem(item);
     setReplaceOtherStatus(false);
     // 默认选取第一个其他可用的状态
-    const other = statusList.find((s) => s.id !== item.id);
+    const other = store.replacementStatuses("video", item.id)[0];
     setReplacementStatusId(other ? other.id : "");
   };
 
   // 确认删除
   const handleConfirmDelete = () => {
     if (!deletingItem) return;
-
-    if (deletingItem.isDefault) {
-      showToast("默认状态不可直接删除，请先将其他状态设为默认值");
-      return;
-    }
-
-    const name = deletingItem.name;
-    const filtered = statusList.filter((s) => s.id !== deletingItem.id);
-
-    // 如果选了替换状态
-    if (replaceOtherStatus && replacementStatusId) {
-      const target = statusList.find((s) => s.id === replacementStatusId);
-      if (target) {
-        showToast(`已删除【${name}】，并将其影响的视频状态替换为【${target.name}】`);
-      }
-    } else {
-      showToast(`已删除状态标签【${name}】`);
-    }
-
-    setStatusList(filtered);
-    setDeletingItem(null);
+    try {
+      store.deleteStatus("video", deletingItem.id, replaceOtherStatus ? replacementStatusId : undefined);
+      setDeletingItem(null);
+      showToast(replaceOtherStatus ? "状态已删除，关联资源已替换为所选状态" : "状态已删除");
+    } catch (error) { showToast((error as Error).message); }
   };
 
   // 设为默认值
@@ -294,10 +236,10 @@ export default function VideoStatusManagementView() {
     <div className="flex-1 p-6 space-y-6 bg-slate-50/50 min-h-0 overflow-y-auto">
       {/* Toast 提示框 */}
       {toastMsg && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[1000] bg-slate-900/90 text-white px-5 py-2.5 rounded-2xl shadow-2xl backdrop-blur-md border border-slate-700/80 text-xs font-bold flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
+        <OverlayPortal layer="toast" role="status" className="fixed top-5 left-1/2 -translate-x-1/2 z-[1000] bg-slate-900/90 text-white px-5 py-2.5 rounded-2xl shadow-2xl backdrop-blur-md border border-slate-700/80 text-xs font-bold flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
           <Check className="w-4 h-4 text-purple-400" />
           <span>{toastMsg}</span>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* 顶部控制栏 */}
@@ -570,8 +512,8 @@ export default function VideoStatusManagementView() {
       {/* 模态框 1：新增状态 (完全对齐截图2) */}
       {/* ============================================================ */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[999] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-[500px] overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200">
+        <OverlayPortal layer="dialog" role="dialog" aria-modal="true" className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[999] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-[500px] overflow-y-auto max-h-[calc(100dvh-32px)] border border-slate-100 animate-in zoom-in-95 duration-200">
             {/* 头部标题与关闭：| 新增状态 */}
             <div className="p-4 px-5 flex items-center justify-between border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -662,15 +604,15 @@ export default function VideoStatusManagementView() {
               </button>
             </div>
           </div>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* ============================================================ */}
       {/* 模态框 2：编辑状态 (完全对齐截图5) */}
       {/* ============================================================ */}
       {editingItem && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[999] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-[500px] overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200">
+        <OverlayPortal layer="dialog" role="dialog" aria-modal="true" className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[999] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-[500px] overflow-y-auto max-h-[calc(100dvh-32px)] border border-slate-100 animate-in zoom-in-95 duration-200">
             {/* 头部标题与关闭：| 编辑状态 */}
             <div className="p-4 px-5 flex items-center justify-between border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -761,15 +703,15 @@ export default function VideoStatusManagementView() {
               </button>
             </div>
           </div>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* ============================================================ */}
       {/* 模态框 3：删除状态 (完全对齐截图6) */}
       {/* ============================================================ */}
       {deletingItem && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[999] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-[480px] overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200">
+        <OverlayPortal layer="dialog" role="dialog" aria-modal="true" className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[999] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-[480px] overflow-y-auto max-h-[calc(100dvh-32px)] border border-slate-100 animate-in zoom-in-95 duration-200">
             {/* 头部标题与关闭：| 删除状态 */}
             <div className="p-4 px-5 flex items-center justify-between border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -816,8 +758,7 @@ export default function VideoStatusManagementView() {
                       onChange={(e) => setReplacementStatusId(e.target.value)}
                       className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 bg-white outline-none focus:border-[#7C3AED]"
                     >
-                      {statusList
-                        .filter((s) => s.id !== deletingItem.id)
+                      {store.replacementStatuses("video", deletingItem.id)
                         .map((s) => (
                           <option key={s.id} value={s.id}>
                             {s.name}
@@ -847,7 +788,7 @@ export default function VideoStatusManagementView() {
               </button>
             </div>
           </div>
-        </div>
+        </OverlayPortal>
       )}
     </div>
   );
@@ -863,13 +804,14 @@ function ColorPickerPopover({
   onClose: () => void;
 }) {
   const [customHex, setCustomHex] = useState(currentColor);
+  const anchorRef = React.useRef<HTMLSpanElement>(null);
 
   return (
     <>
       {/* 透明 BackDrop 用于点击外部关闭 */}
-      <div className="fixed inset-0 z-[110]" onClick={onClose} />
+      <span ref={anchorRef} className="absolute top-full left-0 right-0 h-px pointer-events-none" />
 
-      <div className="absolute top-12 left-1/2 -translate-x-1/2 z-[115] bg-white rounded-xl border border-slate-200 shadow-xl p-3 w-56 space-y-3 animate-in fade-in zoom-in-95 duration-100 text-left">
+      <AnchoredPopover anchorRef={anchorRef} onClose={onClose} width={240} maxHeight={380} gap={6} className="bg-white rounded-lg border border-slate-200 shadow-xl p-3 space-y-3 text-left">
         <div className="text-[11px] font-bold text-slate-500">预设调色板</div>
         <div className="grid grid-cols-4 gap-2">
           {PRESET_COLORS.map((c) => (
@@ -916,7 +858,7 @@ function ColorPickerPopover({
             </button>
           </div>
         </div>
-      </div>
+      </AnchoredPopover>
     </>
   );
 }

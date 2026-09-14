@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { useReportData } from "../lib/useReportData";
+import { REPORT_START, REPORT_TODAY, selectReportFacts, reportRows, reportTotals } from "../lib/reportDemoData";
 import {
   Calendar,
   ChevronDown,
@@ -15,37 +17,6 @@ interface TencentReportViewProps {
   showToast?: (title: string, desc: string) => void;
 }
 
-// Mock Datasets for Team, Group, and Individual views in Summary (汇总) and Detail (明细) modes
-const TEAM_SUMMARY = [
-  { name: "默认部门", spend: 128450.50, conv: 4210, cvr: 4.12, cpa: 30.50, imp: 2450000, clicks: 98200, ctr: 4.01, cpc: 1.31, views: 2100000, finish3s: 22.5 },
-  { name: "华南电商一队", spend: 96200.80, conv: 3120, cvr: 3.95, cpa: 30.83, imp: 1820000, clicks: 74620, ctr: 4.10, cpc: 1.29, views: 1560000, finish3s: 21.2 },
-  { name: "华东投放二队", spend: 84300.00, conv: 2680, cvr: 3.78, cpa: 31.45, imp: 1590000, clicks: 62010, ctr: 3.90, cpc: 1.36, views: 1320000, finish3s: 20.4 },
-  { name: "海外品牌推广组", spend: 52100.20, conv: 1540, cvr: 3.45, cpa: 33.83, imp: 1020000, clicks: 35700, ctr: 3.50, cpc: 1.46, views: 880000, finish3s: 18.5 },
-];
-
-const GROUP_SUMMARY = [
-  { name: "默认分组", spend: 68450.00, conv: 2150, cvr: 4.05, cpa: 31.83, imp: 1350000, clicks: 54000, ctr: 4.00, cpc: 1.26, views: 1150000, finish3s: 23.0 },
-  { name: "视频号攻坚组", spend: 142000.50, conv: 4850, cvr: 4.35, cpa: 29.27, imp: 2850000, clicks: 128250, ctr: 4.50, cpc: 1.10, views: 2450000, finish3s: 25.4 },
-  { name: "朋友圈高ROI组", spend: 115000.00, conv: 3900, cvr: 4.20, cpa: 29.48, imp: 2100000, clicks: 88200, ctr: 4.20, cpc: 1.30, views: 1800000, finish3s: 21.8 },
-  { name: "公众号搜一搜组", spend: 35600.00, conv: 1020, cvr: 3.30, cpa: 34.90, imp: 680000, clicks: 23800, ctr: 3.50, cpc: 1.49, views: 520000, finish3s: 17.2 },
-];
-
-const INDIVIDUAL_SUMMARY = [
-  { name: "张伟 (投手A)", spend: 112000.00, conv: 3820, cvr: 4.25, cpa: 29.31, imp: 2200000, clicks: 96800, ctr: 4.40, cpc: 1.15, views: 1950000, finish3s: 24.1 },
-  { name: "李娜 (投手B)", spend: 98500.50, conv: 3250, cvr: 4.02, cpa: 30.30, imp: 1900000, clicks: 77900, ctr: 4.10, cpc: 1.26, views: 1620000, finish3s: 22.0 },
-  { name: "王磊 (创意组长)", spend: 81200.00, conv: 2540, cvr: 3.75, cpa: 31.96, imp: 1540000, clicks: 58520, ctr: 3.80, cpc: 1.38, views: 1310000, finish3s: 19.8 },
-  { name: "赵敏 (高级优化师)", spend: 69300.00, conv: 2100, cvr: 3.60, cpa: 33.00, imp: 1320000, clicks: 47520, ctr: 3.60, cpc: 1.45, views: 1090000, finish3s: 18.9 },
-];
-
-// Detail Mode data (明细数据)
-const DETAIL_ROWS = [
-  { name: "TX_微信朋友圈_爆款二创01 (计划1029)", spend: 32450.50, conv: 1120, cvr: 4.25, cpa: 28.97, imp: 620000, clicks: 26350, ctr: 4.25, cpc: 1.23, views: 540000, finish3s: 24.5 },
-  { name: "TX_微信视频号_美妆推介03 (计划1034)", spend: 48900.00, conv: 1680, cvr: 4.52, cpa: 29.10, imp: 950000, clicks: 42750, ctr: 4.50, cpc: 1.14, views: 820000, finish3s: 26.2 },
-  { name: "TX_腾讯优量汇_信息流追投 (计划1058)", spend: 18300.20, conv: 520, cvr: 3.20, cpa: 35.19, imp: 410000, clicks: 13940, ctr: 3.40, cpc: 1.31, views: 330000, finish3s: 17.8 },
-  { name: "TX_公众号搜一搜_品牌词拉新 (计划1062)", spend: 12500.00, conv: 380, cvr: 3.45, cpa: 32.89, imp: 280000, clicks: 9800, ctr: 3.50, cpc: 1.27, views: 220000, finish3s: 19.1 },
-  { name: "TX_视频号原生_痛点抓手02 (计划1071)", spend: 28600.00, conv: 940, cvr: 4.10, cpa: 30.42, imp: 540000, clicks: 22680, ctr: 4.20, cpc: 1.26, views: 470000, finish3s: 23.0 },
-];
-
 export default function TencentReportView({ showToast }: TencentReportViewProps) {
   // 1. Top Tabs: 部门数据 | 分组数据 | 个人数据 (Reference Screenshot 1)
   const [topTab, setTopTab] = useState<"team" | "group" | "individual">("team");
@@ -56,8 +27,8 @@ export default function TencentReportView({ showToast }: TencentReportViewProps)
   // 3. Dropdown Filters
   const [selectedEntity, setSelectedEntity] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [startDate, setStartDate] = useState<string>("2022-04-27");
-  const [endDate, setEndDate] = useState<string>("2025-05-12");
+  const [startDate, setStartDate] = useState<string>(REPORT_START);
+  const [endDate, setEndDate] = useState<string>(REPORT_TODAY);
 
   // 4. Export Menu Dropdown state (Reference Screenshot 2 & 3)
   const [showExportMenu, setShowExportMenu] = useState<boolean>(false);
@@ -70,19 +41,11 @@ export default function TencentReportView({ showToast }: TencentReportViewProps)
   const [sortField, setSortField] = useState<string>("spend");
   const [sortAsc, setSortAsc] = useState<boolean>(false);
 
-  // Determine current active rows
-  const getRawRows = () => {
-    if (viewMode === "detail") return DETAIL_ROWS;
-    if (topTab === "team") return TEAM_SUMMARY;
-    if (topTab === "group") return GROUP_SUMMARY;
-    return INDIVIDUAL_SUMMARY;
-  };
-
-  // Filter & Sort rows
-  let currentRows = getRawRows().filter((row) => {
-    if (selectedEntity && !row.name.includes(selectedEntity)) return false;
-    return true;
-  });
+  const report = useReportData();
+  const [applied, setApplied] = useState({ start: REPORT_START, end: REPORT_TODAY, entity: "", category: "" });
+  const selected = selectReportFacts(report.facts, "腾讯ADQ", applied);
+  let currentRows = reportRows(selected, viewMode === "detail" ? "detail" : topTab);
+  const entityOptions = topTab === "team" ? report.tree.map(item => item.teamName) : topTab === "group" ? report.org.depts.filter(item => item.levelType === "group").map(item => item.name) : report.org.members.map(item => item.name);
 
   // Calculate Aggregated Totals Row (总计)
   const totalSpend = currentRows.reduce((acc, r) => acc + r.spend, 0);
@@ -95,7 +58,7 @@ export default function TencentReportView({ showToast }: TencentReportViewProps)
   const avgCpa = totalConv > 0 ? totalSpend / totalConv : 0;
   const avgCtr = totalImp > 0 ? (totalClicks / totalImp) * 100 : 0;
   const avgCpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
-  const avgFinish3s = currentRows.length > 0 ? currentRows.reduce((a, r) => a + r.finish3s, 0) / currentRows.length : 0;
+  const avgFinish3s = reportTotals(selected).finish3s;
 
   // Perform sorting
   currentRows = [...currentRows].sort((a: any, b: any) => {
@@ -107,7 +70,12 @@ export default function TencentReportView({ showToast }: TencentReportViewProps)
     return sortAsc ? valA - valB : valB - valA;
   });
 
+  React.useEffect(() => setCurrentPage(1), [topTab, viewMode, applied, pageSize]);
+
   const handleQuery = () => {
+    if (!startDate || !endDate || startDate > endDate) { showToast?.("查询失败", "请选择有效的日期范围"); return; }
+    setApplied({start: startDate, end: endDate, entity: selectedEntity, category: selectedCategory});
+    setCurrentPage(1);
     if (showToast) {
       showToast("查询完成", `已加载【${topTab === "team" ? "部门" : topTab === "group" ? "分组" : "个人"}】在 ${startDate} 至 ${endDate} 期间的${viewMode === "summary" ? "汇总" : "明细"}数据`);
     }
@@ -139,6 +107,7 @@ export default function TencentReportView({ showToast }: TencentReportViewProps)
             onClick={() => {
               setTopTab("team");
               setSelectedEntity("");
+              setApplied(previous => ({ ...previous, entity: "" }));
             }}
             className={`text-sm font-bold pb-3 relative cursor-pointer transition-all ${
               topTab === "team" ? "text-[#7C3AED]" : "text-slate-500 hover:text-slate-800"
@@ -154,6 +123,7 @@ export default function TencentReportView({ showToast }: TencentReportViewProps)
             onClick={() => {
               setTopTab("group");
               setSelectedEntity("");
+              setApplied(previous => ({ ...previous, entity: "" }));
             }}
             className={`text-sm font-bold pb-3 relative cursor-pointer transition-all ${
               topTab === "group" ? "text-[#7C3AED]" : "text-slate-500 hover:text-slate-800"
@@ -169,6 +139,7 @@ export default function TencentReportView({ showToast }: TencentReportViewProps)
             onClick={() => {
               setTopTab("individual");
               setSelectedEntity("");
+              setApplied(previous => ({ ...previous, entity: "" }));
             }}
             className={`text-sm font-bold pb-3 relative cursor-pointer transition-all ${
               topTab === "individual" ? "text-[#7C3AED]" : "text-slate-500 hover:text-slate-800"
@@ -222,30 +193,7 @@ export default function TencentReportView({ showToast }: TencentReportViewProps)
                     ? "请选择分组"
                     : "请选择个人"}
                 </option>
-                {topTab === "team" && (
-                  <>
-                    <option value="默认部门">默认部门</option>
-                    <option value="华南电商一队">华南电商一队</option>
-                    <option value="华东投放二队">华东投放二队</option>
-                    <option value="海外品牌推广组">海外品牌推广组</option>
-                  </>
-                )}
-                {topTab === "group" && (
-                  <>
-                    <option value="默认分组">默认分组</option>
-                    <option value="视频号攻坚组">视频号攻坚组</option>
-                    <option value="朋友圈高ROI组">朋友圈高ROI组</option>
-                    <option value="公众号搜一搜组">公众号搜一搜组</option>
-                  </>
-                )}
-                {topTab === "individual" && (
-                  <>
-                    <option value="张伟">张伟 (投手A)</option>
-                    <option value="李娜">李娜 (投手B)</option>
-                    <option value="王磊">王磊 (创意组长)</option>
-                    <option value="赵敏">赵敏 (高级优化师)</option>
-                  </>
-                )}
+                {entityOptions.map(name => <option key={name} value={name}>{name}</option>)}
               </select>
             </div>
 
@@ -257,9 +205,7 @@ export default function TencentReportView({ showToast }: TencentReportViewProps)
                 className="pl-3 pr-8 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-purple-500 shadow-2xs cursor-pointer min-w-[160px]"
               >
                 <option value="">请选择</option>
-                <option value="cat1">一级分类：核心投放渠道</option>
-                <option value="cat2">二级分类：微信朋友圈与视频号</option>
-                <option value="cat3">按转化类型：导购下单/留资</option>
+                {report.categories.map(category => <option key={category.id} value={category.name}>{category.name}</option>)}
               </select>
             </div>
 
@@ -476,7 +422,7 @@ export default function TencentReportView({ showToast }: TencentReportViewProps)
               </tr>
 
               {/* Data Rows */}
-              {currentRows.map((row, idx) => (
+              {currentRows.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((row, idx) => (
                 <tr
                   key={idx}
                   className="hover:bg-slate-50/80 transition-colors whitespace-nowrap"
@@ -528,7 +474,7 @@ export default function TencentReportView({ showToast }: TencentReportViewProps)
           <div className="relative">
             <select
               value={pageSize}
-              onChange={(e) => setPageSize(Number(e.target.value))}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
               className="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-purple-500 cursor-pointer shadow-2xs"
             >
               <option value={10}>10条/页</option>
@@ -547,11 +493,9 @@ export default function TencentReportView({ showToast }: TencentReportViewProps)
             >
               &lt;
             </button>
-            <button className="px-3 py-1 bg-[#7C3AED] text-white font-bold rounded-lg cursor-pointer">
-              1
-            </button>
+            <button className="px-3 py-1 bg-[#7C3AED] text-white font-bold rounded-lg cursor-pointer">{currentPage}</button>
             <button
-              disabled
+              disabled={currentPage * pageSize >= currentRows.length} onClick={() => setCurrentPage(p => p + 1)}
               className="px-2.5 py-1 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 font-bold cursor-pointer"
             >
               &gt;

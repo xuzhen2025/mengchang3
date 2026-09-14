@@ -147,9 +147,6 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
   const suppressLauncherClickRef = useRef(false);
 
   const activeCount = tasks.filter((task) => task.status === "queue" || task.status === "generating").length;
-  const queueCount = tasks.filter((task) => task.status === "queue").length;
-  const generatingCount = tasks.filter((task) => task.status === "generating").length;
-  const failedCount = tasks.filter((task) => task.status === "failed").length;
 
   const sortedTasks = useMemo(
     () => [...tasks].sort((left, right) => getTimestamp(right.createdAt) - getTimestamp(left.createdAt)),
@@ -332,7 +329,7 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
           {eraseDetailTask.status === "completed" && output && <div className="mt-4 space-y-3"><div><label className="mb-1.5 block text-[10px] font-semibold text-slate-500">输出文件名称</label><input value={eraseOutputName} onChange={(event) => setEraseOutputName(event.target.value)} className="h-9 w-full rounded-md border border-slate-200 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-violet-400" /></div><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => downloadEraseResult(eraseDetailTask)} className="flex h-9 items-center justify-center gap-1.5 rounded-md border border-slate-200 text-xs font-semibold text-slate-600 hover:border-violet-300 hover:text-violet-700"><Download className="h-3.5 w-3.5" />下载视频</button><button type="button" onClick={() => setEraseUploadTaskId(eraseDetailTask.id)} className="flex h-9 items-center justify-center gap-1.5 rounded-md bg-violet-600 text-xs font-semibold text-white hover:bg-violet-700"><Upload className="h-3.5 w-3.5" />上传资源库</button></div></div>}
         </div>
       </OverlayPortal>
-      {eraseUploadTask && eraseUploadOutput && <UploadFinishedVideoModal key={`${eraseUploadTask.id}-${eraseOutputName}`} isOpen initialFiles={[{ name: eraseOutputName || eraseUploadOutput.name, type: "video/mp4" }]} onClose={() => setEraseUploadTaskId(null)} onPublishSuccess={uploadProcessedResult} />}
+      {eraseUploadTask && eraseUploadOutput && <UploadFinishedVideoModal key={`${eraseUploadTask.id}-${eraseOutputName}`} isOpen initialFiles={[{ name: eraseOutputName || eraseUploadOutput.name, type: "video/mp4", url: eraseUploadOutput.videoUrl }]} onClose={() => setEraseUploadTaskId(null)} onPublishSuccess={uploadProcessedResult} />}
       {toast && <OverlayPortal layer="toast" className="fixed left-1/2 top-6 -translate-x-1/2 rounded-md bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xl">{toast}</OverlayPortal>}
     </>;
   }
@@ -347,11 +344,6 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
             <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">{tasks.length}</span>
           </div>
           <button onClick={() => setIsOpen(false)} title="收起任务队列" className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="h-4 w-4" /></button>
-        </div>
-        <div className="grid grid-cols-3 border-t border-slate-100 bg-slate-50 py-2.5 text-center text-[11px]">
-          <div className="border-r border-slate-200"><p className="text-slate-400">排队中</p><p className="mt-0.5 font-mono font-bold text-slate-700">{queueCount}</p></div>
-          <div className="border-r border-slate-200"><p className="text-slate-400">生成中</p><p className="mt-0.5 font-mono font-bold text-blue-700">{generatingCount}</p></div>
-          <div><p className="text-slate-400">生成失败</p><p className="mt-0.5 font-mono font-bold text-rose-600">{failedCount}</p></div>
         </div>
       </header>
 
@@ -438,7 +430,7 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
                       {isRemake && <button onClick={() => viewResult(task.id)} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><Eye className="h-3 w-3" />查看任务</button>}
                       {isAgent && <button onClick={() => viewResult(task.id)} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><Eye className="h-3 w-3" />{canRestart ? "继续创作" : "进入会话"}</button>}
                       {isAiVideo && <button onClick={(event) => { event.stopPropagation(); viewResult(task.id); }} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><Eye className="h-3 w-3" />{task.status === "failed" || task.status === "cancelled" ? "重新编辑" : "查看任务"}</button>}
-                      {isVideoProcess && <button onClick={(event) => { event.stopPropagation(); openEraseDetail(task); }} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><Eye className="h-3 w-3" />{task.status === "completed" ? "查看结果" : "查看任务"}</button>}
+                      {isVideoProcess && <button onClick={(event) => { event.stopPropagation(); openEraseDetail(task); }} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><Eye className="h-3 w-3" />查看结果</button>}
                       {!isRemake && !isAgent && !isAiVideo && !isVideoProcess && canRestart && <button onClick={() => restartTask(task.id)} className="flex items-center gap-1 rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"><RotateCcw className="h-3 w-3" />重新生成</button>}
                       {!isFaceSwap && !isRemake && !isAgent && !isAiVideo && !isVideoProcess && task.status === "completed" && <><button onClick={() => viewResult(task.id)} className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><Eye className="h-3 w-3" />查看结果</button><button className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"><Download className="h-3 w-3" />下载</button></>}
                     </div>

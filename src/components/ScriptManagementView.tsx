@@ -1,7 +1,18 @@
 import React, { useState } from "react";
-import { PublicTagFilter } from "./PublicTagFilter";
+import { useTaggedResources } from "../lib/useResourceTags";
+import { resourceTagStore } from "../lib/resourceTags";
+import { resourceConfigStore } from "../lib/resourceConfig";
+import { useResourceConfig, useConfigFilter } from "../lib/useResourceConfig";
+import { useUploadedResources, uploadedScript } from "../lib/resourceUploads";
+import { PublicTagFilter, PersonalTagFilter } from "./PublicTagFilter";
+import { ResourceCategoryFilters, ResourceStatusFilter, ResourceStatusBadge } from "./ResourceConfigControls";
 import ScriptDetailPage from "./ScriptDetailPage";
-import { TaskItem } from "./TaskCollaborationView";
+import { TaskItem, addTaskRecord, getTaskRecords, useTaskRecords } from "./TaskCollaborationView";
+import TaskCustomFields from "./TaskCustomFields";
+import { useTaskFields } from "../lib/useTaskFields";
+import { taskFieldErrors, TaskFieldValues } from "../lib/taskFieldConfig";
+import { createScriptTask } from "../lib/scriptTaskPublishing";
+import OverlayPortal from "./overlays/OverlayPortal";
 import { ResourceSearchIntent } from "../types";
 import ResourceSearchCondition from "./ResourceSearchCondition";
 import ResourceFilterPresets from "./ResourceFilterPresets";
@@ -97,8 +108,8 @@ interface ScriptItem {
   author: string;
   categoryTag: string; // e.g. "AI分镜拆解"
   content: string;
-  status: "待审核" | "审核通过" | "驳回-待修改";
-  mainCategory: string;
+  status: string;
+  statusId?: string;
   primaryCategory: string;
   secondaryCategory: string;
   classTag: string; // e.g. "演示分类 / 卸妆油 (仅内部)"
@@ -107,6 +118,8 @@ interface ScriptItem {
   tasks: ScriptTaskItem[];
   createdAt: string;
   scenesCount: number;
+  publicTags?: string[];
+  personalTags?: string[];
 }
 
 interface ScriptManagementViewProps {
@@ -117,12 +130,141 @@ interface ScriptManagementViewProps {
   onClearSearch?: () => void;
 }
 
+export const INITIAL_SCRIPTS: ScriptItem[] = [
+      {
+        personalTags: ["口播专项"],
+        publicTags: ["口播种草","美妆护肤"],
+        id: "S-10291",
+        title: "脚本 1 - 口播温和洁面破圈案",
+        author: "致上编导",
+        categoryTag: "AI分镜拆解",
+        content: "1: 哪怕是你一周染一次，也不会损伤你的头发，什么干枯毛躁，开叉打结都不会，就这样按一洗，洗出丰富的泡沫，使劲揉，使劲搓啊，它也不沾头皮...",
+        status: "待审核",
+        primaryCategory: "个人护理",
+        secondaryCategory: "洗发护发",
+        classTag: "个护家清 / 卸妆油",
+        descTag: "爆款洗发水口播",
+        tasksCount: 2,
+        tasks: [
+          {
+            id: "06131146256",
+            name: "脚本 1 - 口播温和洁面破圈案",
+            assignee: "张三 (剪辑组)",
+            department: "剪辑一组 / 视频后发 / 张三",
+            deadline: "2026-07-02",
+            status: "已完成",
+            updatedAt: "2026-08-04 14:20"
+          },
+          {
+            id: "06131146255",
+            name: "脚本 1 - 口播温和洁面破圈案",
+            assignee: "李四 (拍摄组)",
+            department: "拍摄一组 / 现场摄制 / 李四",
+            deadline: "2026-07-05",
+            status: "进行中",
+            updatedAt: "2026-08-04 10:15"
+          }
+        ],
+        createdAt: "2026-08-04 11:30",
+        scenesCount: 6
+      },
+      {
+        personalTags: ["美妆项目"],
+        publicTags: ["成分卖点","实测对比"],
+        id: "S-10292",
+        title: "脚本 2 - 植萃修护洗发水评测",
+        author: "致上编导",
+        categoryTag: "AI分镜拆解",
+        content: "1: 哪怕是你一周染一次，也不会损伤你的头发，什么干枯毛躁，开叉打结都不会，就这样按一洗，洗出丰富的泡沫，使劲揉，使劲搓啊，它也不沾头皮...",
+        status: "待审核",
+        primaryCategory: "个人护理",
+        secondaryCategory: "洗发护发",
+        classTag: "个护家清 / 洗发水",
+        descTag: "植萃成分拆解",
+        tasksCount: 0,
+        tasks: [],
+        createdAt: "2026-08-03 16:45",
+        scenesCount: 5
+      },
+      {
+        personalTags: [],
+        publicTags: ["使用过程","美妆护肤"],
+        id: "S-10293",
+        title: "脚本 3 - 卸妆油乳化深度实验",
+        author: "致上编导",
+        categoryTag: "AI分镜拆解",
+        content: "1: 哪怕是你一周染一次，也不会损伤你的头发，什么干枯毛躁，开叉打结都不会，就这样按一洗，洗出丰富的泡沫，使劲揉，使劲搓啊，它也不沾头皮...",
+        status: "审核通过",
+        primaryCategory: "美妆护肤",
+        secondaryCategory: "卸妆清洁",
+        classTag: "美妆护肤 / 卸妆油",
+        descTag: "标签描述",
+        tasksCount: 1,
+        tasks: [
+          { id: "T-803", name: "卸妆油实测1080P混剪", assignee: "王剪辑", status: "已完成", updatedAt: "2026-08-02 09:10" }
+        ],
+        createdAt: "2026-08-02 09:00",
+        scenesCount: 8
+      },
+      {
+        personalTags: ["待二创"],
+        publicTags: ["商品展示","成分卖点"],
+        id: "S-10294",
+        title: "脚本 4 - 4K光感亮肤精华高能开箱",
+        author: "美妆内容部",
+        categoryTag: "爆款复刻",
+        content: "1: 皮肤暗沉黄气重？看这条视频就够了！28天实测对比，透亮感直接拉满，质地丝滑清爽，上脸一抹即化...",
+        status: "驳回-待修改",
+        primaryCategory: "美妆护肤",
+        secondaryCategory: "面部精华",
+        classTag: "美妆护肤 / 精华素",
+        descTag: "高转化率文案",
+        tasksCount: 3,
+        tasks: [
+          { id: "T-804", name: "精华素A/B测试投放剪辑", assignee: "刘运营", status: "进行中", updatedAt: "2026-08-01 18:30" },
+          { id: "T-805", name: "千川广告高能前3秒提审", assignee: "陈主管", status: "已完成", updatedAt: "2026-08-01 15:00" },
+          { id: "T-806", name: "字幕配音智能合成", assignee: "AI系统", status: "已完成", updatedAt: "2026-08-01 12:10" }
+        ],
+        createdAt: "2026-08-01 11:20",
+        scenesCount: 7
+      },
+      {
+        personalTags: ["秋季上新"],
+        publicTags: ["通勤穿搭","秋冬新品"],
+        id: "S-10295",
+        title: "脚本 5 - 秋冬穿搭羊绒大衣氛围感种草",
+        author: "服饰组",
+        categoryTag: "原创策划",
+        content: "1: 穿对大衣真的太显贵了！今天给姐妹们推荐这款100%双面羊绒大衣，垂坠感极佳，版型遮肉修身...",
+        status: "审核通过",
+        primaryCategory: "童装/童鞋",
+        secondaryCategory: "女装外套",
+        classTag: "服饰内衣 / 羊绒大衣",
+        descTag: "秋冬新品种草",
+        tasksCount: 1,
+        tasks: [
+          { id: "T-807", name: "羊绒大衣街拍场景渲染", assignee: "周导", status: "进行中", updatedAt: "2026-07-31 16:00" }
+        ],
+        createdAt: "2026-07-31 14:10",
+        scenesCount: 9
+      }
+    ];
+INITIAL_SCRIPTS.push(...["植萃修护精华种草脚本","通勤风衣换季穿搭脚本","居家收纳痛点对比脚本"].map((title, index) => ({
+  ...INITIAL_SCRIPTS[index % INITIAL_SCRIPTS.length], id: "scripts-analytics-" + (index + 1), title,
+  author: ["徐振", "王剪辑", "周雅"][index],
+  createdAt: `2026-09-${10 + index} 10:30`, time: `2026-09-${10 + index} 10:30`,
+})));
+
+resourceTagStore.register("scripts", INITIAL_SCRIPTS);
+resourceConfigStore.register("scripts", INITIAL_SCRIPTS);
+
 export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDetail, onDetailStateChange, initialSearch, onClearSearch }: ScriptManagementViewProps) {
   // Main filter states
-  const [selectedMainCat, setSelectedMainCat] = useState("全部");
   const [selectedPrimaryCat, setSelectedPrimaryCat] = useState("全部");
+  const [selectedSecondaryCat, setSelectedSecondaryCat] = useState("全部");
   const [secondarySearch, setSecondarySearch] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("全部");
+  const { store: configStore } = useResourceConfig();
   const [publicTagSearch, setPublicTagSearch] = useState("");
   const [publicTagKeyword, setPublicTagKeyword] = useState("");
   const [personalTagSearch, setPersonalTagSearch] = useState("");
@@ -177,11 +319,16 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
     scriptType: "爆款拆解"
   });
   const [taskFormErrors, setTaskFormErrors] = useState<Record<string, string>>({});
+  const { fields: taskFields, settings: taskSettings } = useTaskFields();
+  const [taskCustomValues, setTaskCustomValues] = useState<TaskFieldValues>({});
+  const [taskRecords] = useTaskRecords();
   const [isDeptDropdownOpen, setIsDeptDropdownOpen] = useState(false);
   const [activeDeptIndex, setActiveDeptIndex] = useState<number | null>(0);
   const [activeSubGroupIndex, setActiveSubGroupIndex] = useState<number | null>(0);
 
   const openPublishTaskModal = (script: ScriptItem) => {
+    if (!taskSettings.enabled) { showToast("任务功能已关闭"); return; }
+    setTaskCustomValues({});
     setSelectedScriptForPublish(script);
     setTaskFormState({
       assigneePath: "剪辑一组 / 视频后发 / 张三",
@@ -216,6 +363,8 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
 
   const handleViewTaskDetail = (task: ScriptTaskItem) => {
     if (!selectedScriptForTasks) return;
+    const savedTask = getTaskRecords().find(item => item.id === task.id);
+    if (savedTask && onNavigateToTaskDetail) { setSelectedScriptForTasks(null); onNavigateToTaskDetail(savedTask); return; }
     const taskItem: TaskItem = {
       id: task.id || "06131146256",
       publisher: "徐振",
@@ -244,120 +393,13 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
   };
 
   // Mock script dataset
-  const [scripts, setScripts] = useState<ScriptItem[]>([
-    {
-      id: "S-10291",
-      title: "脚本 1 - 口播温和洁面破圈案",
-      author: "致上编导",
-      categoryTag: "AI分镜拆解",
-      content: "1: 哪怕是你一周染一次，也不会损伤你的头发，什么干枯毛躁，开叉打结都不会，就这样按一洗，洗出丰富的泡沫，使劲揉，使劲搓啊，它也不沾头皮...",
-      status: "待审核",
-      mainCategory: "个护家清",
-      primaryCategory: "个人护理",
-      secondaryCategory: "洗发护发",
-      classTag: "个护家清 / 卸妆油",
-      descTag: "爆款洗发水口播",
-      tasksCount: 2,
-      tasks: [
-        {
-          id: "06131146256",
-          name: "脚本 1 - 口播温和洁面破圈案",
-          assignee: "张三 (剪辑组)",
-          department: "剪辑一组 / 视频后发 / 张三",
-          deadline: "2026-07-02",
-          status: "已完成",
-          updatedAt: "2026-08-04 14:20"
-        },
-        {
-          id: "06131146255",
-          name: "脚本 1 - 口播温和洁面破圈案",
-          assignee: "李四 (拍摄组)",
-          department: "拍摄一组 / 现场摄制 / 李四",
-          deadline: "2026-07-05",
-          status: "进行中",
-          updatedAt: "2026-08-04 10:15"
-        }
-      ],
-      createdAt: "2026-08-04 11:30",
-      scenesCount: 6
-    },
-    {
-      id: "S-10292",
-      title: "脚本 2 - 植萃修护洗发水评测",
-      author: "致上编导",
-      categoryTag: "AI分镜拆解",
-      content: "1: 哪怕是你一周染一次，也不会损伤你的头发，什么干枯毛躁，开叉打结都不会，就这样按一洗，洗出丰富的泡沫，使劲揉，使劲搓啊，它也不沾头皮...",
-      status: "待审核",
-      mainCategory: "个护家清",
-      primaryCategory: "个人护理",
-      secondaryCategory: "洗发护发",
-      classTag: "个护家清 / 洗发水",
-      descTag: "植萃成分拆解",
-      tasksCount: 0,
-      tasks: [],
-      createdAt: "2026-08-03 16:45",
-      scenesCount: 5
-    },
-    {
-      id: "S-10293",
-      title: "脚本 3 - 卸妆油乳化深度实验",
-      author: "致上编导",
-      categoryTag: "AI分镜拆解",
-      content: "1: 哪怕是你一周染一次，也不会损伤你的头发，什么干枯毛躁，开叉打结都不会，就这样按一洗，洗出丰富的泡沫，使劲揉，使劲搓啊，它也不沾头皮...",
-      status: "审核通过",
-      mainCategory: "美妆",
-      primaryCategory: "美妆护肤",
-      secondaryCategory: "卸妆清洁",
-      classTag: "美妆护肤 / 卸妆油",
-      descTag: "标签描述",
-      tasksCount: 1,
-      tasks: [
-        { id: "T-803", name: "卸妆油实测1080P混剪", assignee: "王剪辑", status: "已完成", updatedAt: "2026-08-02 09:10" }
-      ],
-      createdAt: "2026-08-02 09:00",
-      scenesCount: 8
-    },
-    {
-      id: "S-10294",
-      title: "脚本 4 - 4K光感亮肤精华高能开箱",
-      author: "美妆内容部",
-      categoryTag: "爆款复刻",
-      content: "1: 皮肤暗沉黄气重？看这条视频就够了！28天实测对比，透亮感直接拉满，质地丝滑清爽，上脸一抹即化...",
-      status: "驳回-待修改",
-      mainCategory: "美妆",
-      primaryCategory: "美妆护肤",
-      secondaryCategory: "面部精华",
-      classTag: "美妆护肤 / 精华素",
-      descTag: "高转化率文案",
-      tasksCount: 3,
-      tasks: [
-        { id: "T-804", name: "精华素A/B测试投放剪辑", assignee: "刘运营", status: "进行中", updatedAt: "2026-08-01 18:30" },
-        { id: "T-805", name: "千川广告高能前3秒提审", assignee: "陈主管", status: "已完成", updatedAt: "2026-08-01 15:00" },
-        { id: "T-806", name: "字幕配音智能合成", assignee: "AI系统", status: "已完成", updatedAt: "2026-08-01 12:10" }
-      ],
-      createdAt: "2026-08-01 11:20",
-      scenesCount: 7
-    },
-    {
-      id: "S-10295",
-      title: "脚本 5 - 秋冬穿搭羊绒大衣氛围感种草",
-      author: "服饰组",
-      categoryTag: "原创策划",
-      content: "1: 穿对大衣真的太显贵了！今天给姐妹们推荐这款100%双面羊绒大衣，垂坠感极佳，版型遮肉修身...",
-      status: "审核通过",
-      mainCategory: "服饰内衣",
-      primaryCategory: "童装/童鞋",
-      secondaryCategory: "女装外套",
-      classTag: "服饰内衣 / 羊绒大衣",
-      descTag: "秋冬新品种草",
-      tasksCount: 1,
-      tasks: [
-        { id: "T-807", name: "羊绒大衣街拍场景渲染", assignee: "周导", status: "进行中", updatedAt: "2026-07-31 16:00" }
-      ],
-      createdAt: "2026-07-31 14:10",
-      scenesCount: 9
-    }
-  ]);
+  const [baseScripts, setScripts] = useState<ScriptItem[]>(INITIAL_SCRIPTS);
+  const uploaded = useUploadedResources();
+  const scripts = useTaggedResources("scripts", [...uploaded.filter((item) => item.resourceCategory === "脚本").map(uploadedScript), ...baseScripts]).map(script => {
+    const linked = taskRecords.filter(task => task.associatedScript?.id === script.id);
+    const tasks = [...linked.map(task => ({ id: task.id, name: script.title, assignee: task.assignee, department: task.assigneeDeptPath || "", deadline: task.deadlineDate, status: task.status === "completed" ? "已完成" as const : task.status === "pending" ? "待处理" as const : "进行中" as const, updatedAt: task.publishDate })), ...script.tasks.filter(task => !linked.some(item => item.id === task.id))];
+    return { ...script, tasks, tasksCount: Math.max(script.tasksCount, tasks.length) };
+  });
 
   // Selected row checkboxes
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -378,8 +420,8 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
 
   // Filter handlers
   const handleResetFilters = () => {
-    setSelectedMainCat("全部");
     setSelectedPrimaryCat("全部");
+    setSelectedSecondaryCat("全部");
     setSecondarySearch("");
     setSelectedStatus("全部");
     setPublicTagSearch("");
@@ -396,11 +438,11 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
     showToast("已重置所有筛选条件");
   };
 
-  const presetFilters = { searchQuery, selectedMainCat, selectedPrimaryCat, secondarySearch, selectedStatus, publicTagSearch, publicTagKeyword, personalTagSearch, selectedPersonalTag, sortBy, templateFilter, authorFilter, authorSearch, startDate, endDate };
+  const presetFilters = { searchQuery, selectedPrimaryCat, selectedSecondaryCat, secondarySearch, selectedStatus, publicTagSearch, publicTagKeyword, personalTagSearch, selectedPersonalTag, sortBy, templateFilter, authorFilter, authorSearch, startDate, endDate };
   const applyPresetFilters = (next: typeof SCRIPT_PRESET_DEFAULTS) => {
     setSearchQuery(next.searchQuery);
-    setSelectedMainCat(next.selectedMainCat);
     setSelectedPrimaryCat(next.selectedPrimaryCat);
+    setSelectedSecondaryCat(next.selectedSecondaryCat);
     setSecondarySearch(next.secondarySearch);
     setSelectedStatus(next.selectedStatus);
     setPublicTagSearch(next.publicTagSearch);
@@ -422,7 +464,8 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
       ...script,
       id: `S-${Math.floor(10000 + Math.random() * 90000)}`,
       title: `${script.title} (副本)`,
-      status: "待审核",
+      status: resourceConfigStore.defaultStatus("scripts"),
+      statusId: undefined,
       createdAt: new Date().toISOString().replace("T", " ").substring(0, 16),
       tasksCount: 0,
       tasks: []
@@ -445,6 +488,7 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
   const handlePublishTaskSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedScriptForPublish) return;
+    if (!taskSettings.enabled) { showToast("任务功能已关闭"); return; }
 
     const errors: Record<string, string> = {};
     if (!taskFormState.assigneePath) {
@@ -456,20 +500,21 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
     if (!taskFormState.deadlineDate) {
       errors.deadlineDate = "请选择出片日期";
     }
-    if (!taskFormState.product) {
-      errors.product = "请选择产品";
-    }
+    Object.assign(errors, taskFieldErrors(taskFields, taskCustomValues));
 
     if (Object.keys(errors).length > 0) {
       setTaskFormErrors(errors);
+      requestAnimationFrame(() => document.querySelector<HTMLElement>('[aria-invalid="true"], .border-rose-500')?.scrollIntoView({ block: "center", behavior: "smooth" }));
       return;
     }
 
     const scriptToPub = selectedScriptForPublish;
+    const collaborationTask = createScriptTask(scriptToPub, taskFormState, taskFields, taskCustomValues);
+    addTaskRecord(collaborationTask);
     const assigneeName = taskFormState.assigneePath.split("/").pop()?.trim() || "未指定";
 
     const newTask: ScriptTaskItem = {
-      id: `T-${Math.floor(800 + Math.random() * 200)}`,
+      id: collaborationTask.id,
       name: `${scriptToPub.title}`,
       assignee: assigneeName,
       department: taskFormState.assigneePath,
@@ -508,8 +553,7 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
       author: "致上编导",
       categoryTag: "AI分镜拆解",
       content: newScriptContent.trim() || "1: 美妆爆款口播分镜拆解内容...",
-      status: "待审核",
-      mainCategory: "美妆",
+      status: resourceConfigStore.defaultStatus("scripts"),
       primaryCategory: newScriptCategory,
       secondaryCategory: "通用分类",
       classTag: `演示分类 / ${newScriptCategory}`,
@@ -530,34 +574,30 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
   // Filter logic
   const filteredScripts = scripts.filter(s => {
     const homeSearch = searchQuery.trim().toLowerCase();
-    const matchesHomeSearch = !homeSearch || [s.title, s.content, s.mainCategory, s.primaryCategory, s.secondaryCategory, s.categoryTag, s.classTag, s.descTag, s.author]
+    const matchesHomeSearch = !homeSearch || [s.title, s.content, s.primaryCategory, s.secondaryCategory, s.categoryTag, s.classTag, s.descTag, s.author]
       .some((value) => value.toLowerCase().includes(homeSearch));
     if (!matchesHomeSearch) return false;
+    if (publicTagSearch && publicTagSearch !== "全部" && !s.publicTags.includes(publicTagSearch)) return false;
+    if (personalTagSearch && !s.personalTags.some((tag) => tag.includes(personalTagSearch))) return false;
+    if (selectedPersonalTag === "无个人标签" && s.personalTags.length) return false;
+    if (selectedPersonalTag === "有个人标签" && !s.personalTags.length) return false;
+    if (!["全部", "无个人标签", "有个人标签"].includes(selectedPersonalTag) && !s.personalTags.includes(selectedPersonalTag)) return false;
 
-    if (selectedMainCat !== "全部" && s.mainCategory !== selectedMainCat) return false;
     if (selectedPrimaryCat !== "全部" && s.primaryCategory !== selectedPrimaryCat) return false;
-    if (selectedStatus !== "全部" && s.status !== selectedStatus) return false;
+    if (selectedSecondaryCat !== "全部" && s.secondaryCategory !== selectedSecondaryCat) return false;
+    if (configStore.statusEnabled("scripts") && selectedStatus !== "全部" && s.status !== selectedStatus) return false;
     if (secondarySearch && !s.secondaryCategory.includes(secondarySearch) && !s.title.includes(secondarySearch)) return false;
     return true;
   });
 
-  const mainCategories = ["全部", "美妆", "个护家清", "服饰内衣", "食品饮料", "母婴宠物", "图书教育", "智能家居"];
+  const primaryCategoriesFirstRow = ["全部", ...configStore.categories("scripts").map(n => n.name)];
 
-  const primaryCategoriesFirstRow = [
-    "全部", "美妆护肤", "彩妆香水", "宠物食品", "宠物用品", "婴童尿裤", "奶粉辅食",
-    "婴童用品", "孕妇用品", "粮油速食", "传统滋补", "童装/童鞋"
-  ];
 
-  const primaryCategoriesSecondRow = [
-    "休闲零食", "图书", "饮料冲调", "学习用品", "教育音像", "数字阅读", "家庭清洁",
-    "家电好货", "美容美体", "个人护理", "化妆工具", "家居优选"
-  ];
 
   React.useEffect(() => {
     const tag = initialSearch?.tag;
     if (!tag) return;
-    if (mainCategories.includes(tag)) setSelectedMainCat(tag);
-    else if ([...primaryCategoriesFirstRow, ...primaryCategoriesSecondRow].includes(tag)) setSelectedPrimaryCat(tag);
+    if (primaryCategoriesFirstRow.includes(tag)) setSelectedPrimaryCat(tag);
     else if (["全部", "待审核", "审核通过", "驳回-待修改"].includes(tag)) setSelectedStatus(tag);
   }, [initialSearch?.requestId]);
 
@@ -584,124 +624,36 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
     <div className="flex-1 overflow-y-auto bg-slate-50 p-5 space-y-4 text-slate-800 font-sans relative">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-6 right-6 z-[80] bg-slate-900/90 backdrop-blur-md text-white text-xs font-bold px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2 border border-slate-700 animate-fade-in">
+        <OverlayPortal layer="toast" role="status" className="fixed top-6 right-6 z-[80] bg-slate-900/90 backdrop-blur-md text-white text-xs font-bold px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2 border border-slate-700 animate-fade-in">
           <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
           <span className="whitespace-pre-line">{toastMessage}</span>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* Filter Card 1: Top Filter Panel (Matches FinishedVideosView UI) */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-3.5 text-xs text-slate-700">
-        {/* Row 1: 主类目 & 常用筛选预设 */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-          <div className="flex items-start md:items-center gap-2 flex-1 flex-wrap">
-            <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">主 类 目：</span>
-            <div className="flex flex-wrap items-center gap-3">
-              {mainCategories.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedMainCat(cat)}
-                  className={`transition-colors cursor-pointer text-xs ${
-                    selectedMainCat === cat
-                      ? "text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded"
-                      : "text-slate-600 hover:text-purple-600 font-normal"
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-
+        {/* Row 1: 常用筛选预设 */}
+        <div className="flex items-center justify-end gap-2">
           {/* Right: 选择常用筛选预设 + 保存 */}
           <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
             <ResourceFilterPresets scope="scripts" defaults={SCRIPT_PRESET_DEFAULTS} value={presetFilters}
               selectedName={selectedPreset} onSelectName={setSelectedPreset} onApply={applyPresetFilters}
               seeds={[
-                { name: "洗发水", filters: { selectedMainCat: "个护家清", selectedPrimaryCat: "个人护理" } },
-                { name: "卸妆油模板", filters: { selectedMainCat: "美妆", selectedPrimaryCat: "美妆护肤" } },
+                { name: "洗发水", filters: { selectedPrimaryCat: "个人护理" } },
+                { name: "卸妆油模板", filters: { selectedPrimaryCat: "美妆护肤" } },
               ]} />
           </div>
         </div>
 
         {/* Row 2: 一级分类 */}
-        <div className="flex items-start gap-2 border-t border-slate-100 pt-3">
-          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2 mt-0.5">一级分类：</span>
-          <div className="flex-1 flex flex-wrap items-center gap-x-3.5 gap-y-2">
-            {(isMorePrimaryExpanded
-              ? [...primaryCategoriesFirstRow, ...primaryCategoriesSecondRow]
-              : primaryCategoriesFirstRow
-            ).map(cat => (
-              <button
-                key={cat}
-                onClick={() => setSelectedPrimaryCat(cat)}
-                className={`transition-colors cursor-pointer text-xs ${
-                  selectedPrimaryCat === cat
-                    ? "text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded"
-                    : "text-slate-600 hover:text-purple-600 font-normal"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-
-          <button
-            onClick={() => setIsMorePrimaryExpanded(!isMorePrimaryExpanded)}
-            className="text-purple-600 text-xs font-semibold flex items-center gap-0.5 shrink-0 ml-2 cursor-pointer hover:underline"
-          >
-            <span>{isMorePrimaryExpanded ? "收起" : "更多"}</span>
-            {isMorePrimaryExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
-        </div>
+          <ResourceCategoryFilters scope="scripts" primary={selectedPrimaryCat} secondary={selectedSecondaryCat} search={secondarySearch}
+            onPrimary={setSelectedPrimaryCat} onSecondary={setSelectedSecondaryCat} onSearch={setSecondarySearch} />
 
         {/* Row 3: 二级分类 */}
-        <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
-          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">二级分类：</span>
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="relative border border-slate-200 rounded-lg px-2.5 py-1 flex items-center gap-1.5 bg-white w-32 focus-within:border-purple-400">
-              <Search className="w-3.5 h-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="搜索分类"
-                value={secondarySearch}
-                onChange={(e) => setSecondarySearch(e.target.value)}
-                className="text-xs focus:outline-none w-full placeholder:text-slate-400 font-normal"
-              />
-            </div>
 
-            <button
-              onClick={() => setSecondarySearch("")}
-              className={`transition-colors cursor-pointer text-xs ${
-                !secondarySearch
-                  ? "text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded"
-                  : "text-slate-600 hover:text-purple-600 font-normal"
-              }`}
-            >
-              全部
-            </button>
-          </div>
-        </div>
 
         {/* Row 4: 状 态 */}
-        <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
-          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">状 态：</span>
-          <div className="flex items-center gap-2 flex-wrap">
-            {["全部", "待审核", "审核通过", "驳回-待修改"].map(st => (
-              <button
-                key={st}
-                onClick={() => setSelectedStatus(st)}
-                className={`transition-all cursor-pointer text-xs px-2.5 py-1 rounded-lg ${
-                  selectedStatus === st
-                    ? "text-purple-700 bg-purple-100/80 font-bold border border-purple-200 shadow-2xs"
-                    : "text-slate-600 hover:text-purple-600 hover:bg-slate-50 font-normal"
-                }`}
-              >
-                {st}
-              </button>
-            ))}
-          </div>
-        </div>
+        <ResourceStatusFilter scope="scripts" value={selectedStatus} onChange={setSelectedStatus} />
 
         {/* Row 5: 公共标签 */}
         <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
@@ -717,45 +669,12 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
         {/* Row 6: 个人标签 */}
         <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
           <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">个人标签：</span>
-          <div className="flex items-center gap-2 flex-wrap flex-1">
-            <div className="relative border border-slate-200 rounded-lg px-2.5 py-1 flex items-center gap-1.5 bg-white w-32 focus-within:border-purple-400">
-              <Search className="w-3.5 h-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="搜索标签"
-                value={personalTagSearch}
-                onChange={(e) => setPersonalTagSearch(e.target.value)}
-                className="text-xs focus:outline-none w-full placeholder:text-slate-400 font-normal"
-              />
-            </div>
-
-            <div className="flex items-center gap-1 border border-slate-200 rounded-lg p-0.5 bg-white">
-              {["全部", "无个人标签", "有个人标签"].map(ptag => (
-                <button
-                  key={ptag}
-                  onClick={() => setSelectedPersonalTag(ptag)}
-                  className={`px-3 py-1 rounded-md text-xs transition-all cursor-pointer ${
-                    selectedPersonalTag === ptag
-                      ? "bg-purple-600 text-white font-bold shadow-xs"
-                      : "text-slate-600 hover:bg-slate-50 font-medium"
-                  }`}
-                >
-                  {ptag}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => {
-                setPersonalTagSearch("");
-                setSelectedPersonalTag("全部");
-              }}
-              className="text-slate-500 hover:text-purple-600 text-xs flex items-center gap-1 cursor-pointer ml-3 font-normal"
-            >
-              <span>重置个人标签</span>
-              <Edit2 className="w-3 h-3 text-slate-400" />
-            </button>
-          </div>
+          <PersonalTagFilter
+            searchKeyword={personalTagSearch}
+            onSearchKeywordChange={setPersonalTagSearch}
+            selectedTag={selectedPersonalTag}
+            onSelectTag={setSelectedPersonalTag}
+          />
         </div>
       </div>
 
@@ -905,21 +824,7 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
 
                     {/* 状态 Badge */}
                     <td className="py-4 px-4">
-                      {script.status === "待审核" && (
-                        <span className="px-2.5 py-1 bg-amber-500 text-white font-bold rounded-md text-[11px] inline-block shadow-2xs">
-                          待审核
-                        </span>
-                      )}
-                      {script.status === "审核通过" && (
-                        <span className="px-2.5 py-1 bg-emerald-500 text-white font-bold rounded-md text-[11px] inline-block shadow-2xs">
-                          审核通过
-                        </span>
-                      )}
-                      {script.status === "驳回-待修改" && (
-                        <span className="px-2.5 py-1 bg-rose-500 text-white font-bold rounded-md text-[11px] inline-block shadow-2xs">
-                          驳回-待修改
-                        </span>
-                      )}
+                      <ResourceStatusBadge scope="scripts" status={script.status} className="px-2.5 py-1 font-bold rounded-md text-[11px] inline-block shadow-2xs" />
                     </td>
 
                     {/* 分类/标签 */}
@@ -985,7 +890,7 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
 
       {/* Modal 2: 导出 (Export Modal) */}
       {showExportModal && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-2xs animate-fade-in p-4">
+        <OverlayPortal layer="dialog" role="dialog" aria-modal="true" className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-2xs animate-fade-in p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-100">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-bold text-slate-900 text-sm border-l-4 border-purple-600 pl-2">
@@ -1040,12 +945,12 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
               </button>
             </div>
           </div>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* Modal 3: 查看关联任务 (View Script Tasks Modal) */}
       {selectedScriptForTasks && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-2xs animate-fade-in p-4">
+        <OverlayPortal layer="dialog" role="dialog" aria-modal="true" className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-2xs animate-fade-in p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-slate-100 flex flex-col max-h-[85vh]">
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
@@ -1169,12 +1074,12 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
               </div>
             </div>
           </div>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* Modal 4: 发布任务 (Publish Task Modal - Matches reference image / ScriptDetailPage) */}
       {selectedScriptForPublish && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-[70] p-4 font-sans animate-fade-in">
+        <OverlayPortal layer="dialog" role="dialog" aria-modal="true" className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-[70] p-4 font-sans animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden text-slate-800 flex flex-col max-h-[90vh]">
             {/* Header: | 新增任务 */}
             <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
@@ -1516,50 +1421,10 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
               </div>
 
               {/* 7. * 产品 */}
-              <div className="flex items-start gap-3">
-                <label className="w-24 text-right pr-1 pt-2 text-xs font-medium text-slate-700 shrink-0 flex items-center justify-end">
-                  <span className="text-rose-500 mr-1">*</span>产品
-                </label>
-                <div className="flex-1 min-w-0">
-                  <select
-                    value={taskFormState.product}
-                    onChange={(e) => {
-                      setTaskFormState({ ...taskFormState, product: e.target.value });
-                      if (taskFormErrors.product) setTaskFormErrors({ ...taskFormErrors, product: "" });
-                    }}
-                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg focus:bg-white focus:outline-none font-medium text-slate-800 cursor-pointer transition-colors ${
-                      taskFormErrors.product ? "border-rose-500 ring-1 ring-rose-500" : "border-slate-200 focus:border-purple-500"
-                    }`}
-                  >
-                    <option value="">请选择</option>
-                    {PRODUCTS_LIST.map((p) => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                  {taskFormErrors.product && (
-                    <p className="text-rose-500 text-[11px] font-medium mt-1">{taskFormErrors.product}</p>
-                  )}
-                </div>
-              </div>
+              <TaskCustomFields fields={taskFields} values={taskCustomValues} errors={taskFormErrors} onChange={(id, value) => { setTaskCustomValues(previous => ({ ...previous, [id]: value })); setTaskFormErrors(previous => ({ ...previous, [id]: "" })); }} />
 
               {/* 8. 脚本类型 */}
-              <div className="flex items-start gap-3">
-                <label className="w-24 text-right pr-1 pt-2 text-xs font-medium text-slate-700 shrink-0">
-                  脚本类型
-                </label>
-                <div className="flex-1 min-w-0">
-                  <select
-                    value={taskFormState.scriptType}
-                    onChange={(e) => setTaskFormState({ ...taskFormState, scriptType: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:border-purple-500 font-medium text-slate-800 cursor-pointer"
-                  >
-                    <option value="">请选择</option>
-                    {SCRIPT_TYPES.map((st) => (
-                      <option key={st} value={st}>{st}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+
 
               {/* 9. 关联脚本 (Auto-associated to current selected script) */}
               <div className="flex items-start gap-3">
@@ -1595,12 +1460,12 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
               </div>
             </form>
           </div>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* Modal 5: 新建脚本 Modal */}
       {showCreateScriptModal && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-2xs animate-fade-in p-4">
+        <OverlayPortal layer="dialog" role="dialog" aria-modal="true" className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-2xs animate-fade-in p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-bold text-slate-900 text-sm border-l-4 border-purple-600 pl-2">
@@ -1669,7 +1534,7 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
               </button>
             </div>
           </div>
-        </div>
+        </OverlayPortal>
       )}
     </div>
   );

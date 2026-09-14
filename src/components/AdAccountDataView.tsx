@@ -1,3 +1,5 @@
+import { useReportData } from "../lib/useReportData";
+import { REPORT_START, REPORT_TODAY, reportRows, reportTotals, selectReportFacts, percent } from "../lib/reportDemoData";
 import React, { useState } from "react";
 import {
   Calendar,
@@ -22,125 +24,8 @@ interface AdAccountDataViewProps {
   showToast?: (title: string, desc: string) => void;
 }
 
-// 1. Mock Data for "直播间汇总"
-const LIVE_ROOM_ROWS = [
-  { roomName: "未绑定直播间", leader: "-", spend: 0, roi: 0, gmv: 0, coupon: 0, conv: 0, cvr: "-", cpa: "-", imp: 0, clicks: 0, ctr: "-", cpc: "-", views: 0 },
-  { roomName: "直播间-美妆旗舰店爆品 (ID: 89021)", leader: "展展", spend: 185400.50, roi: 3.92, gmv: 726769.90, coupon: 42100.00, conv: 6180, cvr: "4.85%", cpa: "30.00", imp: 3820000, clicks: 127420, ctr: "3.34%", cpc: "1.46", views: 3100000 },
-  { roomName: "直播间-3C数码科技专场 (ID: 89035)", leader: "李强", spend: 124000.00, roi: 3.45, gmv: 427800.00, coupon: 28500.00, conv: 3950, cvr: "4.12%", cpa: "31.39", imp: 2450000, clicks: 95870, ctr: "3.91%", cpc: "1.29", views: 2050000 },
-  { roomName: "直播间-服装鞋包新品发布 (ID: 89048)", leader: "王丹", spend: 96800.00, roi: 3.10, gmv: 300080.00, coupon: 19800.00, conv: 2890, cvr: "3.80%", cpa: "33.49", imp: 1980000, clicks: 76050, ctr: "3.84%", cpc: "1.27", views: 1680000 },
-];
-
-// 2. Mock Data for "广告主明细"
-const ADVERTISER_DETAIL_ROWS = [
-  {
-    accountName: "直播-铃蓓-牧唐-芜湖1",
-    accountId: "1787869271614468",
-    team: "未绑定分组..",
-    group: "未绑定分组",
-    user: "-",
-    cat1: "未绑定分类..",
-    cat2: "未绑定分类",
-    spend: 0,
-    roi: 0,
-    gmv: 0,
-    coupon: 0,
-    conv: 0,
-    cvr: "-",
-    cpa: "-",
-    imp: 0,
-    clicks: 0
-  },
-  {
-    accountName: "直播-颜姿2-牧唐-芜湖",
-    accountId: "1783526642794571",
-    team: "未绑定分组..",
-    group: "未绑定分组",
-    user: "-",
-    cat1: "未绑定分类..",
-    cat2: "未绑定分类",
-    spend: 0,
-    roi: 0,
-    gmv: 0,
-    coupon: 0,
-    conv: 0,
-    cvr: "-",
-    cpa: "-",
-    imp: 0,
-    clicks: 0
-  },
-  {
-    accountName: "千川直通车-美妆03",
-    accountId: "1792182049182310",
-    team: "A部门",
-    group: "核心二组",
-    user: "张伟",
-    cat1: "美妆护肤",
-    cat2: "精华面霜",
-    spend: 142500.00,
-    roi: 3.85,
-    gmv: 548625.00,
-    coupon: 31200.00,
-    conv: 4620,
-    cvr: "4.75%",
-    cpa: "30.84",
-    imp: 2950000,
-    clicks: 97260
-  },
-  {
-    accountName: "千川直播号-数码01",
-    accountId: "1795123019823122",
-    team: "C部门",
-    group: "管理员组",
-    user: "李娜",
-    cat1: "3C数码",
-    cat2: "蓝牙耳机",
-    spend: 98200.50,
-    roi: 3.42,
-    gmv: 335845.70,
-    coupon: 21000.00,
-    conv: 3150,
-    cvr: "4.20%",
-    cpa: "31.17",
-    imp: 1890000,
-    clicks: 75000
-  },
-  {
-    accountName: "巨量信息流-洗护备用",
-    accountId: "1781203912039102",
-    team: "外部部门",
-    group: "分组一",
-    user: "zs_test",
-    cat1: "个人护理",
-    cat2: "洗发护发",
-    spend: 52100.00,
-    roi: 2.95,
-    gmv: 153695.00,
-    coupon: 11200.00,
-    conv: 1540,
-    cvr: "3.65%",
-    cpa: "33.83",
-    imp: 1120000,
-    clicks: 42190
-  }
-];
-
-// 3. Mock Data for "人员数据"
-const PERSONNEL_ROWS = [
-  { name: "张伟 (投放主管)", accountCount: 12, spend: 215000.00, roi: 3.88, gmv: 834200.00, coupon: 48000.00, conv: 6980, cvr: "4.65%", cpa: "30.80", imp: 4120000, clicks: 150100 },
-  { name: "李娜 (高级优化师)", accountCount: 8, spend: 168000.50, roi: 3.52, gmv: 591360.00, coupon: 35000.00, conv: 5320, cvr: "4.30%", cpa: "31.58", imp: 3100000, clicks: 123720 },
-  { name: "王磊 (主播运营)", accountCount: 6, spend: 98500.00, roi: 3.20, gmv: 315200.00, coupon: 19500.00, conv: 3080, cvr: "3.90%", cpa: "31.98", imp: 1950000, clicks: 78970 },
-  { name: "未绑定人员账号", accountCount: 2, spend: 0.00, roi: 0.00, gmv: 0.00, coupon: 0.00, conv: 0, cvr: "-", cpa: "-", imp: 0, clicks: 0 }
-];
-
-// 4. Mock Data for "分类数据"
-const CATEGORY_ROWS = [
-  { cat1: "美妆护肤", cat2: "面部精华/霜", accountCount: 15, spend: 245000.00, roi: 3.95, gmv: 967750.00, coupon: 52000.00, conv: 7850, cvr: "4.80%", cpa: "31.21" },
-  { cat1: "3C数码", cat2: "智能穿戴与耳机", accountCount: 9, spend: 142000.00, roi: 3.40, gmv: 482800.00, coupon: 28000.00, conv: 4420, cvr: "4.15%", cpa: "32.13" },
-  { cat1: "个人护理", cat2: "身体洗护", accountCount: 6, spend: 89000.00, roi: 3.12, gmv: 277680.00, coupon: 16500.00, conv: 2750, cvr: "3.75%", cpa: "32.36" },
-  { cat1: "未绑定分类", cat2: "未绑定分类", accountCount: 2, spend: 0.00, roi: 0.00, gmv: 0.00, coupon: 0.00, conv: 0, cvr: "-", cpa: "-" }
-];
-
 export default function AdAccountDataView({ showToast }: AdAccountDataViewProps) {
+  const report = useReportData();
   // 1. Top Level Platform Tabs (Matching screenshot header)
   const [activePlatform, setActivePlatform] = useState<string>("巨量千川");
 
@@ -157,8 +42,8 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
   const [selectedCategory, setSelectedCategory] = useState<string>("");
 
   // 5. Query Filters
-  const [startDate, setStartDate] = useState<string>("2026-07-15");
-  const [endDate, setEndDate] = useState<string>("2026-07-30");
+  const [startDate, setStartDate] = useState<string>(REPORT_START);
+  const [endDate, setEndDate] = useState<string>(REPORT_TODAY);
   const [advertiserIdInput, setAdvertiserIdInput] = useState<string>("");
   const [advertiserNameInput, setAdvertiserNameInput] = useState<string>("");
 
@@ -171,10 +56,14 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
   // 8. Sorting State
   const [sortField, setSortField] = useState<string>("spend");
   const [sortAsc, setSortAsc] = useState<boolean>(false);
+  const handleSort = (field: string) => { setSortAsc(sortField === field ? !sortAsc : false); setSortField(field); };
 
   // 9. Pagination State
   const [pageSize, setPageSize] = useState<number>(50);
   const [currentPage, setCurrentPage] = useState<number>(1);
+
+  const unboundAccounts = report.store.accounts.filter(account => account.platform === activePlatform && (!account.user || !account.group || !account.category));
+  React.useEffect(() => setCurrentPage(1), [activePlatform, activeDimension, subPromotion, startDate, endDate, selectedTeam, selectedGroup, selectedAccount, selectedCategory, advertiserIdInput, advertiserNameInput, pageSize]);
 
   // Handle Reset Filters
   const handleReset = () => {
@@ -184,8 +73,8 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
     setSelectedCategory("");
     setAdvertiserIdInput("");
     setAdvertiserNameInput("");
-    setStartDate("2026-07-15");
-    setEndDate("2026-07-30");
+    setStartDate(REPORT_START);
+    setEndDate(REPORT_TODAY);
     if (showToast) {
       showToast("重置成功", "已重置所有筛选过滤条件");
     }
@@ -208,35 +97,14 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
     }
   };
 
-  // Filter dataset logic
-  const getFilteredData = () => {
-    if (activeDimension === "live_summary") {
-      return LIVE_ROOM_ROWS.filter((r) => {
-        if (advertiserNameInput && !r.roomName.includes(advertiserNameInput)) return false;
-        return true;
-      });
-    } else if (activeDimension === "advertiser_detail") {
-      return ADVERTISER_DETAIL_ROWS.filter((r) => {
-        if (advertiserIdInput && !r.accountId.includes(advertiserIdInput)) return false;
-        if (advertiserNameInput && !r.accountName.includes(advertiserNameInput)) return false;
-        if (selectedTeam && r.team !== selectedTeam) return false;
-        if (selectedGroup && r.group !== selectedGroup) return false;
-        return true;
-      });
-    } else if (activeDimension === "personnel") {
-      return PERSONNEL_ROWS.filter((r) => {
-        if (advertiserNameInput && !r.name.includes(advertiserNameInput)) return false;
-        return true;
-      });
-    } else {
-      return CATEGORY_ROWS.filter((r) => {
-        if (selectedCategory && r.cat1 !== selectedCategory) return false;
-        return true;
-      });
-    }
-  };
-
-  const currentRows = getFilteredData();
+  const selectedFacts = selectReportFacts(report.facts, activePlatform, {
+    start: startDate || REPORT_START, end: endDate || REPORT_TODAY, department: selectedTeam, group: selectedGroup,
+    person: selectedAccount, category: selectedCategory, accountId: advertiserIdInput, query: advertiserNameInput,
+    promotion: activePlatform === "巨量千川" ? { standard: "标准推广", live_domain: "直播全域推广", product_domain: "商品全域推广" }[subPromotion] : undefined,
+  });
+  const totals = reportTotals(selectedFacts);
+  const currentRows = reportRows(selectedFacts, activeDimension).map(row => ({ ...row, cvr: percent(row.cvr), cpa: row.cpa.toFixed(2) }))
+    .sort((a, b) => (sortAsc ? 1 : -1) * ((Number(a[sortField]) || 0) - (Number(b[sortField]) || 0)));
 
   // Total Calculations
   const totalSpend = currentRows.reduce((acc, r: any) => acc + (r.spend || 0), 0);
@@ -338,14 +206,11 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
               <div className="relative">
                 <select
                   value={selectedTeam}
-                  onChange={(e) => setSelectedTeam(e.target.value)}
+                  onChange={(e) => { setSelectedTeam(e.target.value); setSelectedGroup(""); setSelectedAccount(""); setCurrentPage(1); }}
                   className="pl-3 pr-8 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-purple-500 shadow-2xs cursor-pointer min-w-[150px]"
                 >
                   <option value="">请选择部门</option>
-                  <option value="A部门">A部门</option>
-                  <option value="C部门">C部门</option>
-                  <option value="外部部门">外部部门</option>
-                  <option value="未绑定分组..">未绑定部门分组</option>
+            {report.tree.map(t => t.teamName).map(name => <option key={name} value={name}>{name}</option>)}
                 </select>
               </div>
 
@@ -353,14 +218,11 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
               <div className="relative">
                 <select
                   value={selectedGroup}
-                  onChange={(e) => setSelectedGroup(e.target.value)}
+                  onChange={(e) => { setSelectedGroup(e.target.value); setSelectedAccount(""); setCurrentPage(1); }}
                   className="pl-3 pr-8 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-purple-500 shadow-2xs cursor-pointer min-w-[150px]"
                 >
                   <option value="">请选择分组</option>
-                  <option value="核心二组">核心二组</option>
-                  <option value="管理员组">管理员组</option>
-                  <option value="分组一">分组一</option>
-                  <option value="未绑定分组">未绑定分组</option>
+            {report.tree.filter(t => !selectedTeam || t.teamName === selectedTeam).flatMap(t => t.groups.map(g => g.groupName)).map(name => <option key={name} value={name}>{name}</option>)}
                 </select>
               </div>
 
@@ -372,9 +234,7 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
                   className="pl-3 pr-8 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-purple-500 shadow-2xs cursor-pointer min-w-[150px]"
                 >
                   <option value="">请选择账号</option>
-                  <option value="张伟">张伟 (zs_test)</option>
-                  <option value="李娜">李娜 (0424)</option>
-                  <option value="未绑定">未绑定账号</option>
+            {report.tree.filter(t => !selectedTeam || t.teamName === selectedTeam).flatMap(t => t.groups.filter(g => !selectedGroup || g.groupName === selectedGroup).flatMap(g => g.accounts)).map(name => <option key={name} value={name}>{name}</option>)}
                 </select>
               </div>
 
@@ -386,10 +246,7 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
                   className="pl-3 pr-8 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-purple-500 shadow-2xs cursor-pointer min-w-[150px]"
                 >
                   <option value="">请选择分类</option>
-                  <option value="美妆护肤">美妆护肤</option>
-                  <option value="3C数码">3C数码</option>
-                  <option value="个人护理">个人护理</option>
-                  <option value="未绑定分类">未绑定分类</option>
+            {report.categories.map(c => c.name).map(name => <option key={name} value={name}>{name}</option>)}
                 </select>
               </div>
             </div>
@@ -513,7 +370,7 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
                 <tr className="bg-slate-50/90 border-y border-slate-200/80 text-slate-500 font-bold text-xs whitespace-nowrap">
                   <th className="py-3.5 px-6 font-bold">直播间</th>
                   <th className="py-3.5 px-4 font-bold text-center">负责人</th>
-                  <th className="py-3.5 px-4 font-bold text-center">
+                  <th onClick={() => handleSort("spend")} className="py-3.5 px-4 font-bold text-center">
                     <div className="inline-flex items-center gap-1 justify-center">
                       <span>消耗</span>
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
@@ -538,7 +395,7 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
                   <th className="py-3.5 px-4 font-bold text-center">用户</th>
                   <th className="py-3.5 px-4 font-bold">一级分类</th>
                   <th className="py-3.5 px-4 font-bold">二级分类</th>
-                  <th className="py-3.5 px-4 font-bold text-center">
+                  <th onClick={() => handleSort("spend")} className="py-3.5 px-4 font-bold text-center">
                     <div className="inline-flex items-center gap-1 justify-center">
                       <span>消耗</span>
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
@@ -589,8 +446,8 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
                     <td className="py-3.5 px-4 text-center text-slate-400">-</td>
                     <td className="py-3.5 px-4 text-center font-bold text-[#7C3AED]">{totalSpend.toFixed(2)}</td>
                     <td className="py-3.5 px-4 text-center font-bold text-rose-600">{avgRoi.toFixed(2)}</td>
-                    <td className="py-3.5 px-4 text-center font-bold text-slate-800">¥{totalGmv.toLocaleString()}</td>
-                    <td className="py-3.5 px-4 text-center text-slate-700">¥{totalCoupon.toLocaleString()}</td>
+                    <td className="py-3.5 px-4 text-center font-bold text-slate-800">{activePlatform === "TikTok" ? "$" : "¥"}{totalGmv.toLocaleString()}</td>
+                    <td className="py-3.5 px-4 text-center text-slate-700">{activePlatform === "TikTok" ? "$" : "¥"}{totalCoupon.toLocaleString()}</td>
                     <td className="py-3.5 px-4 text-center text-slate-800">{totalConv.toLocaleString()}</td>
                     <td className="py-3.5 px-4 text-center text-slate-400">-</td>
                     <td className="py-3.5 px-4 text-center text-slate-400">-</td>
@@ -607,18 +464,18 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
                     <td className="py-3.5 px-4 text-slate-400">-</td>
                     <td className="py-3.5 px-4 text-center font-bold text-[#7C3AED]">{totalSpend.toFixed(2)}</td>
                     <td className="py-3.5 px-4 text-center font-bold text-rose-600">{avgRoi.toFixed(2)}</td>
-                    <td className="py-3.5 px-4 text-center font-bold text-slate-800">¥{totalGmv.toLocaleString()}</td>
-                    <td className="py-3.5 px-6 text-center text-slate-700">¥{totalCoupon.toLocaleString()}</td>
+                    <td className="py-3.5 px-4 text-center font-bold text-slate-800">{activePlatform === "TikTok" ? "$" : "¥"}{totalGmv.toLocaleString()}</td>
+                    <td className="py-3.5 px-6 text-center text-slate-700">{activePlatform === "TikTok" ? "$" : "¥"}{totalCoupon.toLocaleString()}</td>
                   </>
                 )}
 
                 {activeDimension === "personnel" && (
                   <>
-                    <td className="py-3.5 px-4 text-center text-slate-800">28</td>
+                    <td className="py-3.5 px-4 text-center text-slate-800">{totals.accounts}</td>
                     <td className="py-3.5 px-4 text-center font-bold text-[#7C3AED]">{totalSpend.toFixed(2)}</td>
                     <td className="py-3.5 px-4 text-center font-bold text-rose-600">{avgRoi.toFixed(2)}</td>
-                    <td className="py-3.5 px-4 text-center text-slate-800">¥{totalGmv.toLocaleString()}</td>
-                    <td className="py-3.5 px-4 text-center text-slate-700">¥{totalCoupon.toLocaleString()}</td>
+                    <td className="py-3.5 px-4 text-center text-slate-800">{activePlatform === "TikTok" ? "$" : "¥"}{totalGmv.toLocaleString()}</td>
+                    <td className="py-3.5 px-4 text-center text-slate-700">{activePlatform === "TikTok" ? "$" : "¥"}{totalCoupon.toLocaleString()}</td>
                     <td className="py-3.5 px-4 text-center text-slate-800">{totalConv.toLocaleString()}</td>
                     <td className="py-3.5 px-4 text-center text-slate-400">-</td>
                     <td className="py-3.5 px-6 text-center text-slate-400">-</td>
@@ -628,11 +485,11 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
                 {activeDimension === "category" && (
                   <>
                     <td className="py-3.5 px-4 text-slate-400">-</td>
-                    <td className="py-3.5 px-4 text-center text-slate-800">32</td>
+                    <td className="py-3.5 px-4 text-center text-slate-800">{totals.accounts}</td>
                     <td className="py-3.5 px-4 text-center font-bold text-[#7C3AED]">{totalSpend.toFixed(2)}</td>
                     <td className="py-3.5 px-4 text-center font-bold text-rose-600">{avgRoi.toFixed(2)}</td>
-                    <td className="py-3.5 px-4 text-center text-slate-800">¥{totalGmv.toLocaleString()}</td>
-                    <td className="py-3.5 px-4 text-center text-slate-700">¥{totalCoupon.toLocaleString()}</td>
+                    <td className="py-3.5 px-4 text-center text-slate-800">{activePlatform === "TikTok" ? "$" : "¥"}{totalGmv.toLocaleString()}</td>
+                    <td className="py-3.5 px-4 text-center text-slate-700">{activePlatform === "TikTok" ? "$" : "¥"}{totalCoupon.toLocaleString()}</td>
                     <td className="py-3.5 px-6 text-center text-slate-800">{totalConv.toLocaleString()}</td>
                   </>
                 )}
@@ -640,14 +497,14 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
 
               {/* Data Rows for 直播间汇总 (Screenshot 1) */}
               {activeDimension === "live_summary" &&
-                currentRows.map((row: any, idx) => (
+                currentRows.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((row: any, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/80 transition-colors whitespace-nowrap">
                     <td className="py-3.5 px-6 font-bold text-slate-800">{row.roomName}</td>
                     <td className="py-3.5 px-4 text-center text-slate-600">{row.leader}</td>
                     <td className="py-3.5 px-4 text-center font-bold text-slate-900">{row.spend.toFixed(2)}</td>
                     <td className="py-3.5 px-4 text-center font-bold text-rose-600">{row.roi.toFixed(2)}</td>
-                    <td className="py-3.5 px-4 text-center text-slate-700">¥{row.gmv.toLocaleString()}</td>
-                    <td className="py-3.5 px-4 text-center text-slate-600">¥{row.coupon.toLocaleString()}</td>
+                    <td className="py-3.5 px-4 text-center text-slate-700">{activePlatform === "TikTok" ? "$" : "¥"}{row.gmv.toLocaleString()}</td>
+                    <td className="py-3.5 px-4 text-center text-slate-600">{activePlatform === "TikTok" ? "$" : "¥"}{row.coupon.toLocaleString()}</td>
                     <td className="py-3.5 px-4 text-center text-slate-700">{row.conv.toLocaleString()}</td>
                     <td className="py-3.5 px-4 text-center text-slate-600">{row.cvr}</td>
                     <td className="py-3.5 px-4 text-center text-slate-600">{row.cpa}</td>
@@ -657,7 +514,7 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
 
               {/* Data Rows for 广告主明细 (Screenshot 2) */}
               {activeDimension === "advertiser_detail" &&
-                currentRows.map((row: any, idx) => (
+                currentRows.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((row: any, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/80 transition-colors whitespace-nowrap">
                     <td className="py-3.5 px-6">
                       <div className="font-bold text-slate-800">{row.accountName}</div>
@@ -670,21 +527,21 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
                     <td className="py-3.5 px-4 text-indigo-600 font-medium">{row.cat2}</td>
                     <td className="py-3.5 px-4 text-center font-bold text-slate-900">{row.spend.toFixed(2)}</td>
                     <td className="py-3.5 px-4 text-center font-bold text-rose-600">{row.roi.toFixed(2)}</td>
-                    <td className="py-3.5 px-4 text-center text-slate-700">¥{row.gmv.toLocaleString()}</td>
-                    <td className="py-3.5 px-6 text-center text-slate-600">¥{row.coupon.toLocaleString()}</td>
+                    <td className="py-3.5 px-4 text-center text-slate-700">{activePlatform === "TikTok" ? "$" : "¥"}{row.gmv.toLocaleString()}</td>
+                    <td className="py-3.5 px-6 text-center text-slate-600">{activePlatform === "TikTok" ? "$" : "¥"}{row.coupon.toLocaleString()}</td>
                   </tr>
                 ))}
 
               {/* Data Rows for 人员数据 */}
               {activeDimension === "personnel" &&
-                currentRows.map((row: any, idx) => (
+                currentRows.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((row: any, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/80 transition-colors whitespace-nowrap">
                     <td className="py-3.5 px-6 font-bold text-[#7C3AED]">{row.name}</td>
                     <td className="py-3.5 px-4 text-center font-bold text-slate-700">{row.accountCount} 个</td>
                     <td className="py-3.5 px-4 text-center font-bold text-slate-900">{row.spend.toFixed(2)}</td>
                     <td className="py-3.5 px-4 text-center font-bold text-rose-600">{row.roi.toFixed(2)}</td>
-                    <td className="py-3.5 px-4 text-center text-slate-700">¥{row.gmv.toLocaleString()}</td>
-                    <td className="py-3.5 px-4 text-center text-slate-600">¥{row.coupon.toLocaleString()}</td>
+                    <td className="py-3.5 px-4 text-center text-slate-700">{activePlatform === "TikTok" ? "$" : "¥"}{row.gmv.toLocaleString()}</td>
+                    <td className="py-3.5 px-4 text-center text-slate-600">{activePlatform === "TikTok" ? "$" : "¥"}{row.coupon.toLocaleString()}</td>
                     <td className="py-3.5 px-4 text-center text-slate-700">{row.conv.toLocaleString()}</td>
                     <td className="py-3.5 px-4 text-center text-slate-600">{row.cvr}</td>
                     <td className="py-3.5 px-6 text-center text-slate-600">{row.cpa}</td>
@@ -693,15 +550,15 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
 
               {/* Data Rows for 分类数据 */}
               {activeDimension === "category" &&
-                currentRows.map((row: any, idx) => (
+                currentRows.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((row: any, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/80 transition-colors whitespace-nowrap">
                     <td className="py-3.5 px-6 font-bold text-slate-800">{row.cat1}</td>
                     <td className="py-3.5 px-4 font-medium text-slate-700">{row.cat2}</td>
                     <td className="py-3.5 px-4 text-center font-bold text-slate-700">{row.accountCount} 个</td>
                     <td className="py-3.5 px-4 text-center font-bold text-slate-900">{row.spend.toFixed(2)}</td>
                     <td className="py-3.5 px-4 text-center font-bold text-rose-600">{row.roi.toFixed(2)}</td>
-                    <td className="py-3.5 px-4 text-center text-slate-700">¥{row.gmv.toLocaleString()}</td>
-                    <td className="py-3.5 px-4 text-center text-slate-600">¥{row.coupon.toLocaleString()}</td>
+                    <td className="py-3.5 px-4 text-center text-slate-700">{activePlatform === "TikTok" ? "$" : "¥"}{row.gmv.toLocaleString()}</td>
+                    <td className="py-3.5 px-4 text-center text-slate-600">{activePlatform === "TikTok" ? "$" : "¥"}{row.coupon.toLocaleString()}</td>
                     <td className="py-3.5 px-6 text-center text-slate-700">{row.conv.toLocaleString()}</td>
                   </tr>
                 ))}
@@ -720,7 +577,7 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
           <div className="relative">
             <select
               value={pageSize}
-              onChange={(e) => setPageSize(Number(e.target.value))}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
               className="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-purple-500 cursor-pointer shadow-2xs"
             >
               <option value={10}>10条/页</option>
@@ -739,11 +596,9 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
             >
               &lt;
             </button>
-            <button className="px-3 py-1 bg-[#7C3AED] text-white font-bold rounded-lg cursor-pointer">
-              1
-            </button>
+            <button className="px-3 py-1 bg-[#7C3AED] text-white font-bold rounded-lg cursor-pointer">{currentPage}</button>
             <button
-              disabled
+              disabled={currentPage * pageSize >= currentRows.length} onClick={() => setCurrentPage(p => p + 1)}
               className="px-2.5 py-1 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 font-bold cursor-pointer"
             >
               &gt;
@@ -782,14 +637,14 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
 
             <div className="p-6 space-y-4">
               <p className="text-xs text-slate-600 leading-relaxed">
-                当前有 <span className="font-bold text-purple-600">2</span> 个广告主账户未完成部门或品类映射。选择归属部门后系统将自动更新历史投产统计数据。
+                当前有 <span className="font-bold text-purple-600">{unboundAccounts.length}</span> 个广告主账户未完成部门或品类映射。选择归属部门后系统将自动更新历史投产统计数据。
               </p>
 
               <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200/80">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">未绑定账户名称</label>
                   <div className="text-xs font-mono font-bold text-slate-900 bg-white px-3 py-2 rounded-lg border border-slate-200">
-                    直播-铃蓓-牧唐-芜湖1 (1787869271614468)
+                    {unboundAccounts[0] ? `${unboundAccounts[0].name} (${unboundAccounts[0].id})` : "无待绑定账户"}
                   </div>
                 </div>
 
@@ -797,17 +652,13 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">分配归属部门</label>
                     <select className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium outline-none focus:border-purple-500">
-                      <option value="A部门">A部门</option>
-                      <option value="C部门">C部门</option>
-                      <option value="外部部门">外部部门</option>
+                      {report.tree.map(t => <option key={t.teamName} value={t.teamName}>{t.teamName}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">指定所属分组</label>
                     <select className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium outline-none focus:border-purple-500">
-                      <option value="核心二组">核心二组</option>
-                      <option value="管理员组">管理员组</option>
-                      <option value="分组一">分组一</option>
+                      {report.tree.flatMap(t => t.groups).map(g => <option key={g.groupName} value={g.groupName}>{g.groupName}</option>)}
                     </select>
                   </div>
                 </div>
@@ -817,16 +668,14 @@ export default function AdAccountDataView({ showToast }: AdAccountDataViewProps)
                     <label className="block text-xs font-bold text-slate-700 mb-1">责任负责人</label>
                     <input
                       type="text"
-                      defaultValue="张伟"
+                      defaultValue={unboundAccounts[0]?.user || ""}
                       className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium outline-none focus:border-purple-500"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">主营业务品类</label>
                     <select className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium outline-none focus:border-purple-500">
-                      <option value="美妆护肤">美妆护肤</option>
-                      <option value="3C数码">3C数码</option>
-                      <option value="个人护理">个人护理</option>
+                      {report.categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                     </select>
                   </div>
                 </div>

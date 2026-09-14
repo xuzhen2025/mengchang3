@@ -1,5 +1,9 @@
 import React, { useState } from "react";
+import { useResourceConfig } from "../lib/useResourceConfig";
+import CategoryCascader from "./CategoryCascader";
+import { useTagCatalog, useTagGroupSelection, useTagSelection } from "../lib/useResourceTags";
 import LinkScriptModal from "./LinkScriptModal";
+import { publishResources, type ResourcePublishDetails } from "../lib/resourceUploads";
 import {
   ArrowLeft,
   UploadCloud,
@@ -24,25 +28,12 @@ interface UploadImageModalProps {
   isOpen: boolean;
   isPage?: boolean;
   onClose: () => void;
-  onPublishSuccess?: (msg: string) => void;
+  onPublishSuccess?: (msg: string, details?: ResourcePublishDetails) => void;
   initialFiles?: Array<{ name: string; type?: string; url?: string }>;
 }
 
 // Category Cascade Options
-const CATEGORY_TREE = [
-  {
-    name: "肖像权",
-    children: ["外拍剧情", "内部模特", "合作达人", "雅慧肖像"],
-  },
-  {
-    name: "产品视觉",
-    children: ["主图透光", "场景展示", "细节放大", "白底铺平"],
-  },
-  {
-    name: "开店资料",
-    children: ["营业执照", "品牌授权", "质检报告", "商标注册"],
-  },
-];
+
 
 // Preset Template Interface
 interface PresetTemplate {
@@ -57,26 +48,21 @@ const INITIAL_PRESETS: PresetTemplate[] = [
   {
     id: "p1",
     name: "默认肖像图片模板",
-    category: "肖像权 / 外拍剧情",
+    category: "模特切片 / 正面展示图",
     nameType: "title_suffix",
     imageTitle: "模特肖像精修图",
   },
   {
     id: "p2",
     name: "电商产品主图模板",
-    category: "产品视觉 / 主图透光",
+    category: "电商营销 / 主图宣发",
     nameType: "title_suffix",
     imageTitle: "高清商品主图",
   },
 ];
 
 // Mock Tag Groups & Sub-Tags for Personal & Public Tags
-const TAG_GROUPS_DATA: Record<string, string[]> = {
-  电商痛点: ["价格昂贵", "穿戴繁琐", "臃肿显胖", "闷热不透气", "掉档跑偏"],
-  产品亮点: ["极致无痕", "高弹透气", "轻盈裸感", "德绒蓄热", "防勾抗起球"],
-  剪辑风格: ["硬广直投", "剧情反转", "口播种草", "高光切片", "混剪卡点"],
-  人群画像: ["年轻职场", "宝妈群体", "学生党", "大码人群", "精致高净值"],
-};
+
 
 export default function UploadImageModal({
   isOpen,
@@ -109,7 +95,9 @@ export default function UploadImageModal({
 
   // Category Selector State
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
-  const [hoveredCategory, setHoveredCategory] = useState<string>("肖像权");
+  const { store: configStore } = useResourceConfig();
+  const CATEGORY_TREE = configStore.categories("images").map(n => ({ name: n.name, children: n.children.map(c => c.name) }));
+  const [hoveredCategory, setHoveredCategory] = useState<string>(CATEGORY_TREE[0]?.name || "");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
 
   // Basic Info Form States
@@ -134,22 +122,16 @@ export default function UploadImageModal({
   const [publicSearchText, setPublicSearchText] = useState("");
   const [publicGroupSearch, setPublicGroupSearch] = useState("");
   const [publicSubSearch, setPublicSubSearch] = useState("");
-  const [selectedPublicGroupKey, setSelectedPublicGroupKey] =
-    useState("电商痛点");
-  const [addedPublicTags, setAddedPublicTags] = useState<string[]>([
-    "极致无痕",
-    "硬广直投",
-  ]);
+  const { publicGroups: PUBLIC_TAG_GROUPS, personalGroups: PERSONAL_TAG_GROUPS } = useTagCatalog();
+  const [selectedPublicGroupKey, setSelectedPublicGroupKey] = useTagGroupSelection(PUBLIC_TAG_GROUPS);
+  const [addedPublicTags, setAddedPublicTags] = useTagSelection("public");
 
   // Personal Tag 3-Column States
   const [personalSearchText, setPersonalSearchText] = useState("");
   const [personalGroupSearch, setPersonalGroupSearch] = useState("");
   const [personalSubSearch, setPersonalSubSearch] = useState("");
-  const [selectedPersonalGroupKey, setSelectedPersonalGroupKey] =
-    useState("电商痛点");
-  const [addedPersonalTags, setAddedPersonalTags] = useState<string[]>([
-    "年轻职场",
-  ]);
+  const [selectedPersonalGroupKey, setSelectedPersonalGroupKey] = useTagGroupSelection(PERSONAL_TAG_GROUPS);
+  const [addedPersonalTags, setAddedPersonalTags] = useTagSelection("personal");
 
   // Date & Other Info States
   const [startDate, setStartDate] = useState("");
@@ -203,7 +185,7 @@ export default function UploadImageModal({
     const newTpl: PresetTemplate = {
       id: `custom-${Date.now()}`,
       name: newTemplateName.trim(),
-      category: selectedCategory || "肖像权 / 外拍剧情",
+      category: selectedCategory,
       nameType,
       imageTitle,
     };
@@ -224,12 +206,19 @@ export default function UploadImageModal({
 
   // Handle Publish
   const handlePublish = (mode: string) => {
+    if (uploadedFiles.length === 0) { setToastMessage("请先上传图片"); return; }
+    const [primaryCategory = "", secondaryCategory = ""] = selectedCategory.split(" / ");
+    if (!configStore.categoryValid("images", primaryCategory, secondaryCategory)) { setToastMessage("请选择当前可用的一级分类和二级分类"); return; }
+    const published = publishResources({ partition: "图片", primaryCategory, secondaryCategory,
+      publicTags: addedPublicTags, personalTags: addedPersonalTags,
+      files: uploadedFiles.map((file) => ({ name: file.name, size: file.size, url: initialFiles.find((initial) => initial.name === file.name)?.url || URL.createObjectURL(file) })),
+    });
     const msg =
       mode === "相同配置继续上传"
         ? "✅ 发布成功！已保留当前配置，可继续上传下一批图片素材。"
         : "✅ 图片发布成功！已存入资源库。";
     if (onPublishSuccess) {
-      onPublishSuccess(msg);
+      onPublishSuccess(msg, published);
     } else {
       onClose();
     }
@@ -478,108 +467,14 @@ export default function UploadImageModal({
               {/* 1. 图片分类 */}
               <div className="relative">
                 <div className="flex items-center gap-4">
-                  <label className="w-24 font-bold text-slate-700 text-right shrink-0">
-                    <span className="text-rose-500 mr-1">*</span>图片分类
-                  </label>
-                  <div className="flex-1 relative">
-                    <div
-                      onClick={() =>
-                        setShowCategoryDropdown(!showCategoryDropdown)
-                      }
-                      className="w-full bg-white border border-slate-200 hover:border-purple-400 rounded-xl px-3.5 py-2 text-xs text-slate-700 flex items-center justify-between cursor-pointer transition-colors shadow-2xs"
-                    >
-                      <span
-                        className={
-                          selectedCategory
-                            ? "text-slate-800 font-bold"
-                            : "text-slate-400"
-                        }
-                      >
-                        {selectedCategory || "请选择分类，支持输入文字搜索"}
-                      </span>
-                      <ChevronDown className="w-4 h-4 text-slate-400" />
-                    </div>
-
-                    {/* Category Cascade Menu */}
-                    {showCategoryDropdown && (
-                      <div className="absolute top-full left-0 mt-1.5 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl flex overflow-hidden min-w-[320px] animate-in fade-in duration-100">
-                        {/* Left Column (Primary Category) */}
-                        <div className="w-36 bg-slate-50 border-r border-slate-100 py-1.5">
-                          {CATEGORY_TREE.map((cat) => (
-                            <div
-                              key={cat.name}
-                              onMouseEnter={() => setHoveredCategory(cat.name)}
-                              className={`px-3.5 py-2 text-xs font-bold flex items-center justify-between cursor-pointer transition-colors ${
-                                hoveredCategory === cat.name
-                                  ? "bg-purple-50 text-purple-700"
-                                  : "text-slate-700 hover:bg-slate-100"
-                              }`}
-                            >
-                              <span>{cat.name}</span>
-                              <ChevronRight className="w-3.5 h-3.5 opacity-60" />
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Right Column (Sub Categories) */}
-                        <div className="flex-1 p-2 bg-white space-y-1">
-                          {CATEGORY_TREE.find(
-                            (c) => c.name === hoveredCategory,
-                          )?.children.map((sub) => (
-                            <div
-                              key={sub}
-                              onClick={() => {
-                                setSelectedCategory(
-                                  `${hoveredCategory} / ${sub}`,
-                                );
-                                setShowCategoryDropdown(false);
-                              }}
-                              className="px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-purple-50 hover:text-purple-700 rounded-lg cursor-pointer transition-colors"
-                            >
-                              {sub}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <label className="w-24 font-bold text-slate-700 text-right shrink-0"><span className="text-rose-500 mr-1">*</span>图片分类</label>
+                  <CategoryCascader scope="images" primaryCategory={selectedCategory.split(" / ")[0] || ""} secondaryCategory={selectedCategory.split(" / ")[1] || ""} onSelect={(primary, secondary) => setSelectedCategory([primary, secondary].filter(Boolean).join(" / "))} />
                 </div>
 
                 {/* Quick Category Selection Tags Box */}
-                <div className="ml-28 mt-2.5 bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/60 flex items-center gap-2">
-                  <span className="text-[11px] font-bold text-slate-500 mr-1">
-                    一级分类
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedCategory("肖像权 / 外拍剧情");
-                      setHoveredCategory("肖像权");
-                    }}
-                    className="px-3 py-1 bg-white hover:bg-purple-50 hover:text-purple-600 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 cursor-pointer transition-colors shadow-2xs"
-                  >
-                    肖像权
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedCategory("产品视觉 / 主图透光");
-                      setHoveredCategory("产品视觉");
-                    }}
-                    className="px-3 py-1 bg-white hover:bg-purple-50 hover:text-purple-600 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 cursor-pointer transition-colors shadow-2xs"
-                  >
-                    产品视觉
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedCategory("开店资料 / 营业执照");
-                      setHoveredCategory("开店资料");
-                    }}
-                    className="px-3 py-1 bg-white hover:bg-purple-50 hover:text-purple-600 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 cursor-pointer transition-colors shadow-2xs"
-                  >
-                    开店资料
-                  </button>
+                <div className="ml-28 mt-2.5 bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/60 flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] font-bold text-slate-500 mr-1">一级分类</span>
+                  {CATEGORY_TREE.map(category => <button key={category.name} type="button" onClick={() => setSelectedCategory([category.name, category.children[0]].filter(Boolean).join(" / "))} className="px-3 py-1 bg-white hover:bg-purple-50 hover:text-purple-600 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 cursor-pointer">{category.name}</button>)}
                 </div>
               </div>
 
@@ -787,7 +682,7 @@ export default function UploadImageModal({
                     className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:outline-none shrink-0"
                   />
                   <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-                    {Object.keys(TAG_GROUPS_DATA)
+                    {Object.keys(PUBLIC_TAG_GROUPS)
                       .filter((g) => g.includes(publicGroupSearch.trim()))
                       .map((group) => (
                         <div
@@ -821,7 +716,7 @@ export default function UploadImageModal({
                     className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:outline-none shrink-0"
                   />
                   <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 pt-1">
-                    {(TAG_GROUPS_DATA[selectedPublicGroupKey] || [])
+                    {(PUBLIC_TAG_GROUPS[selectedPublicGroupKey] || [])
                       .filter((sub) => sub.includes(publicSubSearch.trim()))
                       .map((subTag) => {
                         const isChecked = addedPublicTags.includes(subTag);
@@ -950,7 +845,7 @@ export default function UploadImageModal({
                     className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:outline-none shrink-0"
                   />
                   <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-                    {Object.keys(TAG_GROUPS_DATA)
+                    {Object.keys(PERSONAL_TAG_GROUPS)
                       .filter((g) => g.includes(personalGroupSearch.trim()))
                       .map((group) => (
                         <div
@@ -984,7 +879,7 @@ export default function UploadImageModal({
                     className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:outline-none shrink-0"
                   />
                   <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 pt-1">
-                    {(TAG_GROUPS_DATA[selectedPersonalGroupKey] || [])
+                    {(PERSONAL_TAG_GROUPS[selectedPersonalGroupKey] || [])
                       .filter((sub) => sub.includes(personalSubSearch.trim()))
                       .map((subTag) => {
                         const isChecked = addedPersonalTags.includes(subTag);

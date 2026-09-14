@@ -63,7 +63,7 @@ export default function FaceSwapComparePlayer({ source, version, analysis, pendi
         </div>
       </section>
       <section ref={resultPanelRef} tabIndex={-1} aria-label="换脸结果预览" className="flex min-h-0 min-w-0 flex-col outline-none" data-testid="face-result-panel">
-        <div className="mb-2 flex min-h-9 shrink-0 flex-wrap items-center justify-between gap-2">{resultHeader}</div>
+        <div className="mb-2 flex min-h-9 shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5">{resultHeader}</div>
         <div className={`relative min-h-0 flex-1 overflow-hidden rounded-md ${version ? "bg-black" : "border border-slate-200 bg-slate-50"}`}>
           {version ? <video key={version.id} ref={resultRef} src={version.videoUrl} muted={muted} playsInline preload="metadata" className="absolute inset-0 h-full w-full object-contain" onClick={() => playing ? pause() : void play()} onEnded={pause} onPause={() => { sourceRef.current?.pause(); setPlaying(false); }} onTimeUpdate={updateTime} onError={() => { pause(); setError("结果视频无法读取。"); }} /> : !pending && <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-400"><FileVideo2 size={24} strokeWidth={1.4} /><span className="text-xs">暂无换脸结果</span></div>}
           {pending && <ProgressOverlay {...pending} compact={Boolean(version)} />}

@@ -1,4 +1,8 @@
 import React, { useState, useRef } from "react";
+import { useResourceConfig, useResourceConfigState } from "../lib/useResourceConfig";
+import { ResourceCategoryModal } from "./ResourceEditDialog";
+import ResourceTagModal from "./ResourceTagModal";
+import { useResourceTagState } from "../lib/useResourceTags";
 import AnchoredPopover from "./overlays/AnchoredPopover";
 import {
   ArrowLeft,
@@ -34,6 +38,9 @@ export interface ImageItem {
   time: string;
   downloads: number;
   tags?: string[];
+  publicTags?: string[];
+  personalTags?: string[];
+  personalTag?: string;
   isFolder?: boolean;
 }
 
@@ -43,29 +50,11 @@ export interface ImageDetailViewProps {
   showToast: (msg: string) => void;
 }
 
-export const CATEGORY_TREE = [
-  { name: "资质 / a店铺", subs: ["店铺授权书", "品牌营业执照", "质检合格证", "商标注册证"] },
-  { name: "彩妆香水", subs: ["唇膏口红", "香水底妆", "眼影彩盘", "卸妆洁面"] },
-  { name: "宠物食品", subs: ["猫粮", "狗粮", "零食罐头", "宠物保健品"] },
-  { name: "宠物用品", subs: ["猫砂猫盆", "宠物玩具", "牵引驱虫", "清洁洗护"] },
-  { name: "婴童尿裤", subs: ["婴儿纸尿裤", "拉拉裤", "湿巾/纸巾"] },
-  { name: "奶粉辅食", subs: ["一段奶粉", "二段奶粉", "三段奶粉", "营养辅食"] },
-  { name: "个护美妆", subs: ["美妆", "面部护肤", "身体护理", "洗护发"] },
-  { name: "服饰内衣", subs: ["女装", "男装", "内衣家居", "鞋靴箱包"] },
-];
 
-export const PUBLIC_TAG_GROUPS: Record<string, string[]> = {
-  "模特": ["张三", "里斯", "溜溜", "王五", "娃娃", "事事", "琪琪", "久久", "苏逸飞", "沈知许"],
-  "场景": ["测试2", "室内展厅", "户外公园", "直播间", "办公室", "家庭生活", "街拍"],
-  "合作达人": ["美妆小达人", "生活测评官", "种草狂魔", "时尚指南"],
-  "视觉分类": ["白爆款: 主图", "高清无水印", "精修平铺", "模特穿搭", "细节特写"],
-  "编导姓名": ["张编", "王编", "李编", "刘编"]
-};
 
-export const PERSONAL_TAG_GROUPS: Record<string, string[]> = {
-  "常用精选": ["精选爆款", "首图必选", "高点击率"],
-  "部门必用": ["A/B测试", "主推图", "大促备用"]
-};
+
+
+
 
 export interface OperationLogItem {
   id: string;
@@ -86,11 +75,9 @@ export default function ImageDetailView({
   const [selectedDetailThumbIndex, setSelectedDetailThumbIndex] = useState<number>(0);
 
   // Basic Info Fields & States (Matches FinishedVideoDetailModal pattern)
-  const [categoryText, setCategoryText] = useState(
-    item.primaryCategory && item.secondaryCategory
-      ? `${item.primaryCategory} / ${item.secondaryCategory}`
-      : "资质 / a店铺"
-  );
+  const [categoryText, setCategoryText] = useResourceConfigState("images", item, "category");
+  const { store: configStore } = useResourceConfig();
+  const CATEGORY_TREE = configStore.categories("images").map(n => ({ name: n.name, subs: n.children.map(c => c.name) }));
   const [showModifyCategoryModal, setShowModifyCategoryModal] = useState(false);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [selectedPrimaryCat, setSelectedPrimaryCat] = useState("资质 / a店铺");
@@ -101,7 +88,7 @@ export default function ImageDetailView({
   const [tempTitleText, setTempTitleText] = useState("");
 
   // Public Tags Modal States
-  const [publicTags, setPublicTags] = useState<string[]>(["场景：测试2", "白爆款: 主图", "高清无水印"]);
+  const [publicTags, setPublicTags] = useResourceTagState("images", item, "public");
   const [showPublicTagModal, setShowPublicTagModal] = useState(false);
   const [publicGroupSearch, setPublicGroupSearch] = useState("");
   const [publicSubSearch, setPublicSubSearch] = useState("");
@@ -110,7 +97,7 @@ export default function ImageDetailView({
   const [publicPresetTab, setPublicPresetTab] = useState<"我的预设" | "分享给我">("我的预设");
 
   // Personal Tags Modal States
-  const [personalTags, setPersonalTags] = useState<string[]>(["常用精选", "部门必用"]);
+  const [personalTags, setPersonalTags] = useResourceTagState("images", item, "personal");
   const [showPersonalTagModal, setShowPersonalTagModal] = useState(false);
   const [personalGroupSearch, setPersonalGroupSearch] = useState("");
   const [personalSubSearch, setPersonalSubSearch] = useState("");
@@ -555,135 +542,7 @@ export default function ImageDetailView({
 
       {/* MODAL 1: 修改分类 Modal (Matching FinishedVideoDetailModal) */}
       {showModifyCategoryModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[110] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-4 bg-purple-600 rounded-full"></span>
-                <h3 className="text-base font-extrabold text-slate-900 tracking-tight">修改分类</h3>
-              </div>
-              <button
-                onClick={() => {
-                  setShowModifyCategoryModal(false);
-                  setIsCategoryDropdownOpen(false);
-                }}
-                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-8 space-y-6 min-h-[320px] pb-32">
-              <div className="flex items-start gap-4 pt-2">
-                <label className="text-xs font-bold text-slate-700 shrink-0 pt-2.5 flex items-center">
-                  <span className="text-rose-500 font-bold mr-1">*</span>
-                  <span>分类</span>
-                </label>
-
-                <div className="relative flex-1">
-                  {/* Cascading Select Trigger Input */}
-                  <div
-                    onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
-                    className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-xs font-medium cursor-pointer flex items-center justify-between transition-all shadow-2xs ${
-                      isCategoryDropdownOpen
-                        ? "border-purple-500 ring-2 ring-purple-100 shadow-xs"
-                        : "border-purple-300 hover:border-purple-400"
-                    }`}
-                  >
-                    <span className={tempCategoryPath ? "text-slate-800 font-bold" : "text-slate-400"}>
-                      {tempCategoryPath || "请选择分类"}
-                    </span>
-                    <ChevronDown className={`w-4 h-4 text-purple-400 transition-transform duration-200 ${isCategoryDropdownOpen ? "rotate-180 text-purple-600" : ""}`} />
-                  </div>
-
-                  {/* Cascading Options Dropdown */}
-                  {isCategoryDropdownOpen && (
-                    <div className="absolute top-full left-0 mt-1 z-50 bg-white rounded-2xl shadow-2xl border border-slate-200/90 w-[360px] flex divide-x divide-slate-100 overflow-hidden text-xs animate-in fade-in duration-100">
-                      {/* Primary Categories Column */}
-                      <div className="w-1/2 py-1 max-h-64 overflow-y-auto space-y-0.5">
-                        {CATEGORY_TREE.map((cat) => (
-                          <div
-                            key={cat.name}
-                            onMouseEnter={() => setSelectedPrimaryCat(cat.name)}
-                            onClick={() => {
-                              setSelectedPrimaryCat(cat.name);
-                              if (!cat.subs || cat.subs.length === 0) {
-                                setTempCategoryPath(cat.name);
-                                addOperationLog("类目变更", categoryText, cat.name);
-                                setCategoryText(cat.name);
-                                setIsCategoryDropdownOpen(false);
-                                setShowModifyCategoryModal(false);
-                                showToast(`✅ 已分类修改为：${cat.name}`);
-                              }
-                            }}
-                            className={`px-3.5 py-2.5 flex items-center justify-between cursor-pointer transition-colors ${
-                              selectedPrimaryCat === cat.name
-                                ? "bg-purple-50 text-purple-700 font-bold"
-                                : "hover:bg-slate-50 text-slate-700 font-medium"
-                            }`}
-                          >
-                            <span>{cat.name}</span>
-                            <ChevronRight className={`w-3.5 h-3.5 ${selectedPrimaryCat === cat.name ? "text-purple-600" : "text-slate-300"}`} />
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Secondary Categories / Subcategories Column */}
-                      <div className="w-1/2 py-1 max-h-64 overflow-y-auto space-y-0.5 bg-white">
-                        {(CATEGORY_TREE.find(c => c.name === selectedPrimaryCat)?.subs || []).map((sub) => (
-                          <div
-                            key={sub}
-                            onClick={() => {
-                              const selectedVal = `${selectedPrimaryCat} / ${sub}`;
-                              setTempCategoryPath(selectedVal);
-                              addOperationLog("类目变更", categoryText, selectedVal);
-                              setCategoryText(selectedVal);
-                              setIsCategoryDropdownOpen(false);
-                              setShowModifyCategoryModal(false);
-                              showToast(`✅ 已成功修改图片分类为：${selectedVal}`);
-                            }}
-                            className="px-3.5 py-2.5 hover:bg-purple-50 hover:text-purple-700 text-slate-700 cursor-pointer font-medium transition-colors"
-                          >
-                            {sub}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end gap-2">
-              <button
-                onClick={() => {
-                  setShowModifyCategoryModal(false);
-                  setIsCategoryDropdownOpen(false);
-                }}
-                className="px-4 py-1.5 bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-              >
-                取消
-              </button>
-              <button
-                onClick={() => {
-                  if (tempCategoryPath && tempCategoryPath !== categoryText) {
-                    addOperationLog("类目变更", categoryText, tempCategoryPath);
-                    setCategoryText(tempCategoryPath);
-                    showToast(`✅ 已成功保存分类为：${tempCategoryPath}`);
-                  }
-                  setShowModifyCategoryModal(false);
-                  setIsCategoryDropdownOpen(false);
-                }}
-                className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
-              >
-                确定
-              </button>
-            </div>
-          </div>
-        </div>
+        <ResourceCategoryModal scope="images" initialCategory={categoryText} onClose={() => setShowModifyCategoryModal(false)} onConfirm={value => { setCategoryText(value); setShowModifyCategoryModal(false); showToast("分类修改成功"); }} />
       )}
 
       {/* MODAL 2: 编辑标题 Modal (Matching FinishedVideoDetailModal) */}
@@ -758,339 +617,10 @@ export default function ImageDetailView({
       )}
 
       {/* MODAL 3: 关联公共标签 Modal (Matching FinishedVideoDetailModal 3-column layout) */}
-      {showPublicTagModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[110] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-4 bg-purple-600 rounded-full"></span>
-                <h3 className="text-base font-extrabold text-slate-900 tracking-tight">关联公共标签</h3>
-              </div>
-              <button
-                onClick={() => setShowPublicTagModal(false)}
-                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="p-6">
-              <div className="grid grid-cols-3 gap-3.5 h-[380px]">
-                {/* Col 1: 标签组 */}
-                <div className="border border-slate-200/80 rounded-xl overflow-hidden flex flex-col bg-white">
-                  <div className="bg-slate-100/90 text-slate-700 text-xs font-bold py-2.5 px-3.5 border-b border-slate-200/80 flex items-center justify-between">
-                    <span>标签组</span>
-                    <button
-                      onClick={() => showToast("已刷新标签组")}
-                      className="text-purple-600 hover:underline text-xs font-normal cursor-pointer"
-                    >
-                      刷新
-                    </button>
-                  </div>
-                  <div className="p-3 flex-1 flex flex-col overflow-hidden">
-                    <input
-                      type="text"
-                      placeholder="请输入标签组名称"
-                      value={publicGroupSearch}
-                      onChange={(e) => setPublicGroupSearch(e.target.value)}
-                      className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-100 mb-2.5"
-                    />
-                    <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-                      {Object.keys(PUBLIC_TAG_GROUPS)
-                        .filter(g => g.includes(publicGroupSearch.trim()))
-                        .map((group) => (
-                          <div
-                            key={group}
-                            onClick={() => setSelectedPublicGroupKey(group)}
-                            className={`px-3 py-2 rounded-lg cursor-pointer text-xs font-medium transition-colors ${
-                              selectedPublicGroupKey === group
-                                ? "text-purple-600 font-bold bg-purple-50/80"
-                                : "text-slate-700 hover:bg-slate-50"
-                            }`}
-                          >
-                            {group}
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Col 2: 子标签 */}
-                <div className="border border-slate-200/80 rounded-xl overflow-hidden flex flex-col bg-white">
-                  <div className="bg-slate-100/90 text-slate-700 text-xs font-bold py-2.5 px-3.5 border-b border-slate-200/80 flex items-center justify-between">
-                    <span>子标签</span>
-                    <button
-                      onClick={() => showToast("弹出添加子标签弹窗")}
-                      className="text-purple-600 hover:underline text-xs font-normal cursor-pointer"
-                    >
-                      + 添加子标签
-                    </button>
-                  </div>
-                  <div className="p-3 flex-1 flex flex-col overflow-hidden">
-                    <input
-                      type="text"
-                      placeholder="请输入标签名称"
-                      value={publicSubSearch}
-                      onChange={(e) => setPublicSubSearch(e.target.value)}
-                      className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-100 mb-2.5"
-                    />
-                    <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
-                      {(PUBLIC_TAG_GROUPS[selectedPublicGroupKey] || [])
-                        .filter(sub => sub.includes(publicSubSearch.trim()))
-                        .map((subTag) => {
-                          const fullTagName = `${selectedPublicGroupKey}: ${subTag}`;
-                          const isChecked = tempAddedPublicTags.includes(fullTagName) || tempAddedPublicTags.includes(subTag);
-                          return (
-                            <label
-                              key={subTag}
-                              className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer hover:text-purple-700 select-none"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => {
-                                  if (isChecked) {
-                                    setTempAddedPublicTags(tempAddedPublicTags.filter(t => t !== fullTagName && t !== subTag));
-                                  } else {
-                                    setTempAddedPublicTags([...tempAddedPublicTags, fullTagName]);
-                                  }
-                                }}
-                                className="w-3.5 h-3.5 rounded text-purple-600 focus:ring-purple-500 border-slate-300"
-                              />
-                              <span>{subTag}</span>
-                            </label>
-                          );
-                        })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Col 3: 已添加标签 */}
-                <div className="border border-slate-200/80 rounded-xl overflow-hidden flex flex-col bg-white">
-                  <div className="bg-slate-100/90 text-slate-700 text-xs font-bold py-2.5 px-3.5 border-b border-slate-200/80 flex items-center justify-between">
-                    <span>已添加标签</span>
-                    <button
-                      onClick={() => showToast("已保存当前选择为预设")}
-                      className="text-purple-600 hover:underline text-xs font-normal cursor-pointer"
-                    >
-                      保存为预设
-                    </button>
-                  </div>
-                  <div className="p-3 flex-1 overflow-y-auto">
-                    {tempAddedPublicTags.length === 0 ? (
-                      <div className="text-slate-400 text-xs pt-4 text-left">
-                        暂未添加标签
-                      </div>
-                    ) : (
-                      <div className="space-y-1.5">
-                        {tempAddedPublicTags.map((tag) => (
-                          <div
-                            key={tag}
-                            className="bg-slate-50 border border-slate-100 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg flex items-center justify-between font-medium hover:bg-slate-100/80 transition-colors"
-                          >
-                            <span>{tag}</span>
-                            <button
-                              onClick={() => setTempAddedPublicTags(tempAddedPublicTags.filter(t => t !== tag))}
-                              className="text-slate-400 hover:text-rose-500 cursor-pointer ml-2"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-3.5 bg-slate-50/50 border-t border-slate-100 flex items-center justify-end gap-2.5">
-              <button
-                onClick={() => setShowPublicTagModal(false)}
-                className="px-5 py-1.5 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-              >
-                取消
-              </button>
-              <button
-                onClick={() => {
-                  const oldTagsStr = publicTags.join(", ") || "无";
-                  const newTagsStr = tempAddedPublicTags.join(", ") || "无";
-                  if (oldTagsStr !== newTagsStr) {
-                    addOperationLog("修改公共标签", oldTagsStr, newTagsStr);
-                  }
-                  setPublicTags([...tempAddedPublicTags]);
-                  showToast("✅ 已同步公共标签设置");
-                  setShowPublicTagModal(false);
-                }}
-                className="px-5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
-              >
-                确定
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showPublicTagModal && <ResourceTagModal kind="public" initialTags={publicTags} onClose={() => setShowPublicTagModal(false)} onConfirm={(tags) => { addOperationLog("修改公共标签", publicTags.join(", "), tags.join(", ") || "无"); setPublicTags(tags); showToast("公共标签已更新"); }} showToast={showToast} />}
 
       {/* MODAL 4: 关联个人标签 Modal (Matching FinishedVideoDetailModal 3-column layout) */}
-      {showPersonalTagModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[110] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-4 bg-purple-600 rounded-full"></span>
-                <h3 className="text-base font-extrabold text-slate-900 tracking-tight">关联个人标签</h3>
-              </div>
-              <button
-                onClick={() => setShowPersonalTagModal(false)}
-                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="p-6">
-              <div className="grid grid-cols-3 gap-4 h-[380px]">
-                {/* Col 1: 标签组 */}
-                <div className="border border-slate-200/80 rounded-xl overflow-hidden flex flex-col bg-white">
-                  <div className="bg-slate-100/90 text-slate-700 text-xs font-bold py-2.5 px-3.5 border-b border-slate-200/80">
-                    <span>标签组</span>
-                  </div>
-                  <div className="p-3 flex-1 flex flex-col overflow-hidden">
-                    <input
-                      type="text"
-                      placeholder="搜索标签组"
-                      value={personalGroupSearch}
-                      onChange={(e) => setPersonalGroupSearch(e.target.value)}
-                      className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:border-purple-400 mb-2.5"
-                    />
-                    <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-                      {Object.keys(PERSONAL_TAG_GROUPS)
-                        .filter(g => g.includes(personalGroupSearch.trim()))
-                        .map((group) => (
-                          <div
-                            key={group}
-                            onClick={() => setSelectedPersonalGroupKey(group)}
-                            className={`px-3 py-2 rounded-lg cursor-pointer text-xs font-medium transition-colors ${
-                              selectedPersonalGroupKey === group
-                                ? "text-purple-600 font-bold bg-purple-50/80"
-                                : "text-slate-700 hover:bg-slate-50"
-                            }`}
-                          >
-                            {group}
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Col 2: 子标签 */}
-                <div className="border border-slate-200/80 rounded-xl overflow-hidden flex flex-col bg-white">
-                  <div className="bg-slate-100/90 text-slate-700 text-xs font-bold py-2.5 px-3.5 border-b border-slate-200/80">
-                    <span>子标签</span>
-                  </div>
-                  <div className="p-3 flex-1 flex flex-col overflow-hidden">
-                    <input
-                      type="text"
-                      placeholder="搜索标签名称"
-                      value={personalSubSearch}
-                      onChange={(e) => setPersonalSubSearch(e.target.value)}
-                      className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:border-purple-400 mb-2.5"
-                    />
-                    <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
-                      {(PERSONAL_TAG_GROUPS[selectedPersonalGroupKey] || [])
-                        .filter(sub => sub.includes(personalSubSearch.trim()))
-                        .map((subTag) => {
-                          const isChecked = tempAddedPersonalTags.includes(subTag);
-                          return (
-                            <label
-                              key={subTag}
-                              className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer hover:text-purple-700 select-none"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => {
-                                  if (isChecked) {
-                                    setTempAddedPersonalTags(tempAddedPersonalTags.filter(t => t !== subTag));
-                                  } else {
-                                    setTempAddedPersonalTags([...tempAddedPersonalTags, subTag]);
-                                  }
-                                }}
-                                className="w-3.5 h-3.5 rounded text-purple-600 focus:ring-purple-500 border-slate-300"
-                              />
-                              <span>{subTag}</span>
-                            </label>
-                          );
-                        })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Col 3: 已添加个人标签 */}
-                <div className="border border-slate-200/80 rounded-xl overflow-hidden flex flex-col bg-white">
-                  <div className="bg-slate-100/90 text-slate-700 text-xs font-bold py-2.5 px-3.5 border-b border-slate-200/80">
-                    <span>已选择标签 ({tempAddedPersonalTags.length})</span>
-                  </div>
-                  <div className="p-3 flex-1 overflow-y-auto">
-                    {tempAddedPersonalTags.length === 0 ? (
-                      <div className="text-slate-400 text-xs pt-4 text-left">
-                        暂未选择个人标签
-                      </div>
-                    ) : (
-                      <div className="space-y-1.5">
-                        {tempAddedPersonalTags.map((tag) => (
-                          <div
-                            key={tag}
-                            className="bg-purple-50 border border-purple-100 text-purple-700 text-xs px-2.5 py-1.5 rounded-lg flex items-center justify-between font-medium"
-                          >
-                            <span>{tag}</span>
-                            <button
-                              onClick={() => setTempAddedPersonalTags(tempAddedPersonalTags.filter(t => t !== tag))}
-                              className="text-purple-400 hover:text-rose-500 cursor-pointer ml-2"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-3.5 bg-slate-50/50 border-t border-slate-100 flex items-center justify-end gap-2.5">
-              <button
-                onClick={() => setShowPersonalTagModal(false)}
-                className="px-5 py-1.5 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-              >
-                取消
-              </button>
-              <button
-                onClick={() => {
-                  const oldTagsStr = personalTags.join(", ") || "无";
-                  const newTagsStr = tempAddedPersonalTags.join(", ") || "无";
-                  if (oldTagsStr !== newTagsStr) {
-                    addOperationLog("修改个人标签", oldTagsStr, newTagsStr);
-                  }
-                  setPersonalTags([...tempAddedPersonalTags]);
-                  showToast("✅ 已保存个人标签");
-                  setShowPersonalTagModal(false);
-                }}
-                className="px-5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
-              >
-                确定
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showPersonalTagModal && <ResourceTagModal kind="personal" initialTags={personalTags} onClose={() => setShowPersonalTagModal(false)} onConfirm={(tags) => { addOperationLog("修改个人标签", personalTags.join(", "), tags.join(", ") || "无"); setPersonalTags(tags); showToast("个人标签已更新"); }} showToast={showToast} />}
 
       {/* 5. 图片排序 Modal */}
       {showSortModal && (

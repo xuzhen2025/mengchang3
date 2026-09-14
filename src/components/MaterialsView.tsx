@@ -1,5 +1,11 @@
 import React, { useState } from "react";
-import { PublicTagFilter } from "./PublicTagFilter";
+import { useTaggedResources } from "../lib/useResourceTags";
+import { resourceTagStore } from "../lib/resourceTags";
+import { resourceConfigStore } from "../lib/resourceConfig";
+import { useResourceConfig, useConfigFilter } from "../lib/useResourceConfig";
+import { useUploadedResources } from "../lib/resourceUploads";
+import { PublicTagFilter, PersonalTagFilter } from "./PublicTagFilter";
+import { ResourceCategoryFilters, ResourceStatusFilter, ResourceStatusBadge } from "./ResourceConfigControls";
 import FinishedVideoDetailModal from "./FinishedVideoDetailModal";
 import { Pagination } from "./Pagination";
 import { Asset, ResourceSearchIntent } from "../types";
@@ -102,8 +108,9 @@ interface FinishedVideo extends VideoResourceMetadata {
   usedMaterials?: UsedMaterial[];
 }
 
-const INITIAL_FINISHED: FinishedVideo[] = [
+export const INITIAL_FINISHED: FinishedVideo[] = [
   {
+        personalTags: ["本周主推"],
     id: "fv1",
     numericId: "110332274",
     title: "0730-8835-鲁月园-复古耳环动态奢感视频.mp4",
@@ -130,7 +137,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     category: "女士内衣",
     typeLabel: "混剪",
     subtitle: "不管咱胖不胖",
-    tags: ["达人成片", "腾讯广告", "8015-摄影/编导（基础）"],
+    tags: ["商品展示","高端质感","达人成片"],
     status: "待审核",
     version: "v2.0 爆款优化版",
     secondaryCount: 5,
@@ -142,6 +149,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     ]
   },
   {
+        personalTags: ["待二创","美妆项目"],
     id: "fv2",
     numericId: "110332275",
     title: "0730-8836-水光针去黄测评-爆款对比.mp4",
@@ -166,7 +174,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     category: "草本初色内衣",
     typeLabel: "AI画质提升",
     subtitle: "透气无痕聚拢体验",
-    tags: ["快手投手", "草本剪辑"],
+    tags: ["实测对比","美妆护肤","千川投流"],
     status: "审核通过",
     version: "v1.0 剪辑初稿",
     secondaryCount: 1,
@@ -177,6 +185,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     ]
   },
   {
+        personalTags: ["本周主推","服饰项目"],
     id: "fv3",
     numericId: "110332276",
     title: "0730-8837-防晒冰丝T恤冷感微距分镜.mp4",
@@ -203,7 +212,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     category: "女士睡衣",
     typeLabel: "高质感原创",
     subtitle: "瞬间冰感降温",
-    tags: ["短视频推广", "达人姓名"],
+    tags: ["防晒","清凉冰丝","材质特写"],
     status: "已上机",
     version: "v1.5 迭代分镜版",
     secondaryCount: 3,
@@ -238,7 +247,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     category: "塑身裤",
     typeLabel: "切片重构",
     subtitle: "真实防粘不粘底",
-    tags: ["直播", "8018-沈阳分组"],
+    tags: ["口播种草","家庭生活","使用过程"],
     status: "审核驳回",
     version: "v1.0 测试版",
     secondaryCount: 0,
@@ -274,7 +283,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     category: "女士内裤",
     typeLabel: "混剪",
     subtitle: "收腹高腰无痕提臀",
-    tags: ["AD优质素材", "首发素材"],
+    tags: ["高弹透气","模特出镜","服饰内衣"],
     status: "画面利用",
     version: "v3.0 爆款冲榜版",
     secondaryCount: 8,
@@ -284,6 +293,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     ]
   },
   {
+        personalTags: ["服饰项目"],
     id: "fv6",
     numericId: "110332279",
     title: "0730-8840-极简美肤衣无感贴合对比镜头.mp4",
@@ -310,7 +320,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     category: "4199美肤衣",
     typeLabel: "AI画质",
     subtitle: "隐形无痕 贴肤如丝",
-    tags: ["美肤衣", "爆款视频"],
+    tags: ["美肤衣","轻盈裸感","效果对比"],
     status: "审核通过",
     version: "v2.1 优化音轨版",
     secondaryCount: 4,
@@ -320,6 +330,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     ]
   },
   {
+        personalTags: ["秋季上新"],
     id: "fv7",
     numericId: "110332280",
     title: "0730-8841-保暖内衣发热纤维实验展示.mp4",
@@ -345,7 +356,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     category: "保暖内衣",
     typeLabel: "高质感原创",
     subtitle: "德绒发热 37度恒温",
-    tags: ["秋冬新品", "千川投流"],
+    tags: ["秋冬新品","德绒蓄热","实测对比"],
     status: "已上机",
     version: "v1.0 官方正片",
     secondaryCount: 6,
@@ -380,7 +391,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     category: "秒缇8024前扣内衣",
     typeLabel: "混剪",
     subtitle: "前扣一秒穿脱 聚拢不空杯",
-    tags: ["秒缇前扣", "抖音卡片"],
+    tags: ["秒缇前扣","使用过程","细节展示"],
     status: "审核通过",
     version: "v1.2 修改试看",
     secondaryCount: 2,
@@ -415,7 +426,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     category: "男士内裤",
     typeLabel: "剪辑",
     subtitle: "干爽不闷热 告别黏腻",
-    tags: ["男士爆款", "快手挂车"],
+    tags: ["男士内衣","高弹透气","实测对比"],
     status: "画面利用",
     version: "v2.0 精剪混剪",
     secondaryCount: 3,
@@ -451,7 +462,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     category: "少女内衣",
     typeLabel: "AI画质提升",
     subtitle: "天然有机棉 保护成长期",
-    tags: ["少女系列", "安全舒适"],
+    tags: ["少女系列","安全舒适","材质特写"],
     status: "待审核",
     version: "v1.0 试跑版",
     secondaryCount: 1,
@@ -486,7 +497,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     category: "8811纯棉",
     typeLabel: "高质感原创",
     subtitle: "居家触感 亲肤软糯",
-    tags: ["情侣家居", "S级爆款"],
+    tags: ["情侣家居","家庭生活","模特出镜"],
     status: "已上机",
     version: "v3.2 全量终版",
     secondaryCount: 10,
@@ -521,7 +532,7 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     category: "草本8018",
     typeLabel: "混剪",
     subtitle: "提背直腰 塑造开肩美姿",
-    tags: ["体态矫正", "草本塑身"],
+    tags: ["体态矫正","前后对比","服饰内衣"],
     status: "画面利用",
     version: "v2.0 优化对比版",
     secondaryCount: 4,
@@ -531,6 +542,14 @@ const INITIAL_FINISHED: FinishedVideo[] = [
     ]
   }
 ];
+INITIAL_FINISHED.push(...["植萃精华使用实拍原素材.mp4","通勤风衣面料细节.mp4","收纳盒容量对比实拍.mp4"].map((title, index) => ({
+  ...INITIAL_FINISHED[index % INITIAL_FINISHED.length], id: "materials-analytics-" + (index + 1), title,
+  author: ["徐振", "王剪辑", "周雅"][index], downloads: [8, 12, 5][index],
+  createdAt: `2026-09-${10 + index} 10:30`, time: `2026-09-${10 + index} 10:30`,
+})));
+
+resourceTagStore.register("materials", INITIAL_FINISHED);
+resourceConfigStore.register("materials", INITIAL_FINISHED);
 
 const AD_ACCOUNTS_MOCK = [
   "抖音小店首饰专营",
@@ -541,17 +560,12 @@ const AD_ACCOUNTS_MOCK = [
 ];
 
 // Categories from Screenshot
-const MAIN_CATEGORIES = ["全部", "达人成片", "草本初色内衣", "短视频推广", "直播"];
 
-const PRIMARY_CATEGORIES = [
-  "全部", "女士内衣", "女士内裤", "女士睡衣", "塑身裤", "塑身衣", "保暖内衣", "少女内衣", "袜子", "男士内裤", "男士睡衣", "购买达人视频",
-  "秒缇8024前扣内衣", "草本8015", "8018内衣", "4199美肤衣", "草本8018", "8015内衣", "102修容衣", "8811纯棉", "2640内裤"
-];
 
 // Custom invented secondary categories as requested
-const SECONDARY_CATEGORIES = ["全部", "抹胸款", "无钢圈", "聚拢款", "蕾丝杯面", "无痕塑形", "爆款走秀", "高弹透气", "情侣套盒", "收腹高腰"];
 
-const STATUS_OPTIONS = ["全部", "待审核", "审核通过", "审核驳回", "已修改", "二次修改", "已上机", "画面利用", "放弃"];
+
+
 
 const SORT_OPTIONS = [
   "最新发布",
@@ -612,16 +626,17 @@ interface MaterialsViewProps {
 }
 
 export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNavigateToDelivery, onDetailStateChange, initialSearch, onClearSearch }: MaterialsViewProps) {
+  const uploaded = useUploadedResources();
   const [baseVideos, setVideos] = useState<FinishedVideo[]>(() => [...uploadedVideos.map(toPublishedVideo), ...INITIAL_FINISHED]);
   const { edits, saveEdits } = useResourceEdits<VideoResourceMetadata>("materials");
-  const videos = baseVideos.map(video => ({
-    ...video, associatedScripts: DEFAULT_ASSOCIATED_SCRIPTS, relatedVideos: DEFAULT_RELATED_VIDEOS,
-    ...edits[video.id],
-  }));
+  const untaggedVideos = [...uploaded.filter((item) => item.resourceCategory === "素材").map(toPublishedVideo), ...baseVideos].map(video => ({
+      ...video, associatedScripts: DEFAULT_ASSOCIATED_SCRIPTS, relatedVideos: DEFAULT_RELATED_VIDEOS,
+      ...edits[video.id],
+    }));
+  const videos = useTaggedResources<FinishedVideo>("materials", untaggedVideos);
   const [activeTab, setActiveTab] = useState<"all" | "secondary" | "performance">("all");
   
   // Screenshot Filter States
-  const [mainCat, setMainCat] = useState("全部");
   const [selectedPreset, setSelectedPreset] = useState("");
   const [searchQuery, setSearchQuery] = useState(initialSearch?.query || "");
   React.useEffect(() => { setSearchQuery(initialSearch?.query || ""); }, [initialSearch?.requestId, initialSearch?.query]);
@@ -631,13 +646,17 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
   const [secondarySearch, setSecondarySearch] = useState("");
   const [secondaryCat, setSecondaryCat] = useState("全部");
   const [statusVal, setStatusVal] = useState("全部");
+  const { store: configStore } = useResourceConfig();
+  const PRIMARY_CATEGORIES = ["全部", ...configStore.categories("materials").map(n => n.name)];
+  const SECONDARY_CATEGORIES = ["全部", ...configStore.categories("materials").flatMap(n => n.children.map(c => c.name))];
+  const STATUS_OPTIONS = ["全部", ...configStore.statuses("materials").map(s => s.name)];
   
   const [publicTagSearch, setPublicTagSearch] = useState("");
   const [publicTagKeyword, setPublicTagKeyword] = useState("");
   const [selectedPublicTag, setSelectedPublicTag] = useState("全部");
   
   const [personalTagSearch, setPersonalTagSearch] = useState("");
-  const [personalTagFilter, setPersonalTagFilter] = useState<"all" | "none" | "has">("all");
+  const [personalTagFilter, setPersonalTagFilter] = useState("all");
 
   // Advanced Search States
   const [sortBy, setSortBy] = useState("最新发布");
@@ -656,6 +675,7 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
   const [selectedVideoIds, setSelectedVideoIds] = useState<string[]>([]);
   const [isSelectionActive, setIsSelectionActive] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  React.useEffect(() => { setCurrentPage(1); }, [personalTagFilter, personalTagSearch]);
   const [pageSize, setPageSize] = useState(20);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [hoveredVideoId, setHoveredVideoId] = useState<string | null>(null);
@@ -669,8 +689,7 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
   React.useEffect(() => {
     const tag = initialSearch?.tag;
     if (!tag) return;
-    if (MAIN_CATEGORIES.includes(tag)) setMainCat(tag);
-    else if (PRIMARY_CATEGORIES.includes(tag)) setPrimaryCat(tag);
+    if (PRIMARY_CATEGORIES.includes(tag)) setPrimaryCat(tag);
     else if (SECONDARY_CATEGORIES.includes(tag)) setSecondaryCat(tag);
     else if (STATUS_OPTIONS.includes(tag)) setStatusVal(tag);
     else if (AD_PLATFORM_TAG_OPTIONS.includes(tag)) setAdPlatformTag(tag);
@@ -727,10 +746,9 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
     }
   }, []);
 
-  const presetFilters = { searchQuery, mainCat, primaryCat, secondarySearch, secondaryCat, statusVal, publicTagSearch, publicTagKeyword, selectedPublicTag, personalTagSearch, personalTagFilter, sortBy, adPlatformTag, costRange, systemAutoTag, authorType, authorInput, timeType, startDate, endDate };
+  const presetFilters = { searchQuery, primaryCat, secondarySearch, secondaryCat, statusVal, publicTagSearch, publicTagKeyword, selectedPublicTag, personalTagSearch, personalTagFilter, sortBy, adPlatformTag, costRange, systemAutoTag, authorType, authorInput, timeType, startDate, endDate };
   const applyPresetFilters = (next: typeof VIDEO_PRESET_DEFAULTS) => {
     setSearchQuery(next.searchQuery);
-    setMainCat(next.mainCat);
     setPrimaryCat(next.primaryCat);
     setSecondarySearch(next.secondarySearch);
     setSecondaryCat(next.secondaryCat);
@@ -739,7 +757,7 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
     setPublicTagKeyword(next.publicTagKeyword);
     setSelectedPublicTag(next.selectedPublicTag);
     setPersonalTagSearch(next.personalTagSearch);
-    setPersonalTagFilter(next.personalTagFilter as "all" | "none" | "has");
+    setPersonalTagFilter(next.personalTagFilter);
     setSortBy(next.sortBy);
     setAdPlatformTag(next.adPlatformTag);
     setCostRange(next.costRange);
@@ -757,7 +775,6 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
 
   // Reset Filters
   const handleResetFilters = () => {
-    setMainCat("全部");
     setSelectedPreset("");
     setPrimaryCat("全部");
     setSecondarySearch("");
@@ -791,9 +808,6 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
       .some((value) => String(value).toLowerCase().includes(homeSearch));
     if (!matchesHomeSearch) return false;
 
-    // Main category
-    const matchesMain = mainCat === "全部" ? true : (v.tags?.includes(mainCat) || v.title.includes(mainCat));
-    
     // Primary category
     const matchesPrimary = primaryCat === "全部" ? true : (v.category === primaryCat || v.title.includes(primaryCat));
     
@@ -802,7 +816,7 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
     const matchesSecondaryCat = secondaryCat === "全部" ? true : v.title.includes(secondaryCat);
     
     // Status
-    const matchesStatus = statusVal === "全部" ? true : (v.status === statusVal || (statusVal === "已上机" && v.status === "已投放"));
+    const matchesStatus = !configStore.statusEnabled("materials") || statusVal === "全部" || v.status === statusVal;
     
     // Public tag
     const matchesPublicSearch = !publicTagSearch ? true : v.tags?.some(t => t.toLowerCase().includes(publicTagSearch.toLowerCase()));
@@ -810,7 +824,8 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
 
     // Personal tag
     const matchesPersonalSearch = !personalTagSearch || v.personalTags?.some(tag => tag.includes(personalTagSearch));
-    const matchesPersonalFilter = personalTagFilter === "all" || (personalTagFilter === "none" ? !v.personalTags?.length : Boolean(v.personalTags?.length));
+    const matchesPersonalFilter = personalTagFilter === "all" || (personalTagFilter === "none" ? !v.personalTags?.length
+      : personalTagFilter === "has" ? Boolean(v.personalTags?.length) : v.personalTags?.includes(personalTagFilter));
 
     // Author
     const matchesAuthor = !authorInput ? true : v.author.toLowerCase().includes(authorInput.toLowerCase());
@@ -831,7 +846,7 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
       return true;
     })();
 
-    return matchesMain && matchesPrimary && matchesSecondarySearch && matchesSecondaryCat && matchesStatus && matchesPublicSearch && matchesPublicTagSelect && matchesPersonalSearch && matchesPersonalFilter && matchesAuthor && matchesAdPlatformTag && matchesCostRange;
+    return matchesPrimary && matchesSecondarySearch && matchesSecondaryCat && matchesStatus && matchesPublicSearch && matchesPublicTagSelect && matchesPersonalSearch && matchesPersonalFilter && matchesAuthor && matchesAdPlatformTag && matchesCostRange;
   }).sort((a, b) => {
     if (sortBy === "最新发布") return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     if (sortBy === "最早发布") return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
@@ -1227,7 +1242,7 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
           {/* ===== FILTER CARD (EXACT REPLICA OF ATTACHED SCREENSHOT) ===== */}
           <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-3.5 text-xs text-slate-700">
         
-        {/* ROW 1: 常用筛选预设 (Occupies its own top row since there is no 主类目) */}
+        {/* ROW 1: 常用筛选预设 */}
         <div className="flex justify-end items-center gap-2 pb-1 border-b border-slate-100/60">
           <ResourceFilterPresets scope="materials" defaults={VIDEO_PRESET_DEFAULTS} value={presetFilters}
             selectedName={selectedPreset} onSelectName={setSelectedPreset} onApply={applyPresetFilters}
@@ -1238,83 +1253,14 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
         </div>
 
         {/* ROW 2: 一级分类 */}
-        <div className="flex items-start gap-2 pt-1">
-          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2 mt-0.5">一级分类：</span>
-          <div className="flex-1 flex flex-wrap items-center gap-x-3.5 gap-y-2">
-            {(primaryMore ? PRIMARY_CATEGORIES : PRIMARY_CATEGORIES.slice(0, 12)).map(cat => (
-              <button
-                key={cat}
-                onClick={() => setPrimaryCat(cat)}
-                className={`transition-colors cursor-pointer text-xs ${
-                  primaryCat === cat 
-                    ? "text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded" 
-                    : "text-slate-600 hover:text-purple-600 font-normal"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-
-          <button
-            onClick={() => setPrimaryMore(!primaryMore)}
-            className="text-purple-600 text-xs font-semibold flex items-center gap-0.5 shrink-0 ml-2 cursor-pointer hover:underline"
-          >
-            <span>{primaryMore ? "收起" : "更多"}</span>
-            {primaryMore ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
-        </div>
+          <ResourceCategoryFilters scope="materials" primary={primaryCat} secondary={secondaryCat} search={secondarySearch}
+            onPrimary={setPrimaryCat} onSecondary={setSecondaryCat} onSearch={setSecondarySearch} />
 
         {/* ROW 3: 二级分类 (Custom invented options) */}
-        <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
-          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">二级分类：</span>
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="relative border border-slate-200 rounded-lg px-2.5 py-1 flex items-center gap-1.5 bg-white w-32 focus-within:border-purple-400">
-              <Search className="w-3.5 h-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="搜索分类"
-                value={secondarySearch}
-                onChange={(e) => setSecondarySearch(e.target.value)}
-                className="text-xs focus:outline-none w-full placeholder:text-slate-400 font-normal"
-              />
-            </div>
 
-            {SECONDARY_CATEGORIES.map(sec => (
-              <button
-                key={sec}
-                onClick={() => setSecondaryCat(sec)}
-                className={`transition-colors cursor-pointer text-xs ${
-                  secondaryCat === sec 
-                    ? "text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded" 
-                    : "text-slate-600 hover:text-purple-600 font-normal"
-                }`}
-              >
-                {sec}
-              </button>
-            ))}
-          </div>
-        </div>
 
         {/* ROW 4: 状 态 */}
-        <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
-          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">状 态：</span>
-          <div className="flex items-center gap-2 flex-wrap">
-            {STATUS_OPTIONS.map(st => (
-              <button
-                key={st}
-                onClick={() => setStatusVal(st)}
-                className={`transition-all cursor-pointer text-xs px-2.5 py-1 rounded-lg ${
-                  statusVal === st 
-                    ? "text-purple-700 bg-purple-100/80 font-bold border border-purple-200 shadow-2xs" 
-                    : "text-slate-600 hover:text-purple-600 hover:bg-slate-50 font-normal"
-                }`}
-              >
-                {st}
-              </button>
-            ))}
-          </div>
-        </div>
+        <ResourceStatusFilter scope="materials" value={statusVal} onChange={setStatusVal} />
 
         {/* ROW 5: 公共标签 */}
         <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
@@ -1330,56 +1276,12 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
         {/* ROW 6: 个人标签 */}
         <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
           <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">个人标签：</span>
-          <div className="flex items-center gap-2 flex-wrap flex-1">
-            <div className="relative border border-slate-200 rounded-lg px-2.5 py-1 flex items-center gap-1.5 bg-white w-32 focus-within:border-purple-400">
-              <Search className="w-3.5 h-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="搜索标签"
-                value={personalTagSearch}
-                onChange={(e) => setPersonalTagSearch(e.target.value)}
-                className="text-xs focus:outline-none w-full placeholder:text-slate-400"
-              />
-            </div>
-
-            <div className="flex items-center gap-1 border border-slate-200 rounded-lg p-0.5 bg-white">
-              <button
-                onClick={() => setPersonalTagFilter("all")}
-                className={`px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                  personalTagFilter === "all" ? "bg-purple-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                全部
-              </button>
-              <button
-                onClick={() => setPersonalTagFilter("none")}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                  personalTagFilter === "none" ? "bg-purple-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                无个人标签
-              </button>
-              <button
-                onClick={() => setPersonalTagFilter("has")}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                  personalTagFilter === "has" ? "bg-purple-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                有个人标签
-              </button>
-            </div>
-
-            <button
-              onClick={() => {
-                setPersonalTagSearch("");
-                setPersonalTagFilter("all");
-              }}
-              className="text-slate-500 hover:text-purple-600 text-xs flex items-center gap-1 cursor-pointer ml-3"
-            >
-              <span>重置个人标签</span>
-              <Edit3 className="w-3 h-3 text-slate-400" />
-            </button>
-          </div>
+          <PersonalTagFilter
+            searchKeyword={personalTagSearch}
+            onSearchKeywordChange={setPersonalTagSearch}
+            selectedTag={({ all: "全部", none: "无个人标签", has: "有个人标签" }[personalTagFilter] || personalTagFilter)}
+            onSelectTag={(tag) => setPersonalTagFilter({ "全部": "all", "无个人标签": "none", "有个人标签": "has" }[tag] || tag)}
+          />
         </div>
 
       </div>
@@ -1699,11 +1601,7 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
                   <td className="p-3 font-mono font-bold text-orange-600">¥{video.cost.toLocaleString()}</td>
                   <td className="p-3 font-mono font-bold text-purple-600">{video.roi ? `${video.roi.toFixed(2)}x` : "-"}</td>
                   <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      video.syncStatus === "synced" ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-slate-100 text-slate-500"
-                    }`}>
-                      {video.syncStatus === "synced" ? "已同步" : "未同步"}
-                    </span>
+                    <ResourceStatusBadge scope="materials" status={video.status} />
                   </td>
                   <td className="p-3 text-slate-400 font-mono text-[10px]">{video.createdAt}</td>
                   <td className="p-3 text-right">
@@ -2062,9 +1960,7 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
                   </span>
 
                   {/* Top Right Tag: Status */}
-                  <span className={`absolute top-0 right-0 text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-bl-lg z-10 shadow-xs ${getStatusBadgeStyle(video.status)}`}>
-                    {video.status || "待审核"}
-                  </span>
+                  <ResourceStatusBadge scope="materials" status={video.status} className="absolute top-0 right-0 text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-bl-lg z-10 shadow-xs" />
 
                   {/* ID Overlay (top left below tag) */}
                   <div className="absolute top-6 left-1.5 z-10 bg-black/50 backdrop-blur-xs text-white/90 text-[10px] font-mono px-1.5 py-0.2 rounded">

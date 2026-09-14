@@ -28,6 +28,7 @@ import VideoResourcePickerModal, { VideoResourcePickerItem } from "./VideoResour
 
 export interface DynamicScriptTemplateFormHandle {
   validate: () => boolean;
+  getSnapshot: () => { templateId: string; templateName: string; rowValues: Record<string, ScriptFieldValue>; rows: ScriptInputRow[] };
 }
 
 type ScriptFieldValue = string | string[] | ImageResourcePickerItem[] | VideoResourcePickerItem[];
@@ -242,7 +243,7 @@ const DynamicScriptTemplateForm = forwardRef<DynamicScriptTemplateFormHandle>(fu
     return true;
   };
 
-  useImperativeHandle(ref, () => ({ validate }), [columnFields, rowFields, rowValues, rows, selectedTemplate]);
+  useImperativeHandle(ref, () => ({ validate, getSnapshot: () => ({ templateId: selectedTemplateId, templateName: selectedTemplate?.title || "", rowValues, rows }) }), [columnFields, rowFields, rowValues, rows, selectedTemplate, selectedTemplateId]);
 
   const changeTemplate = (templateId: string) => {
     setSelectedTemplateId(templateId);

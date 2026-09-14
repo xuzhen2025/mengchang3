@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import { AD_STORE_KEY, DEFAULT_AD_PARAMETERS, adCatalog, advanceAdStore, authorizeAdAccount, cancelAdRecords, canSeeAdAccount, createAdRecords, createAdStore, getAdActor, readAdStore, resolveAdName, revokeAdAccounts, saveAdTemplate, updateAdStore, validateAdDraft, validateAdTemplate, visibleAdRecords, type AdDraft, type AdTemplate } from "../src/lib/adPush";
 import { saveResourceEdits } from "../src/lib/useResourceEdits";
+import { resourceTagStore } from "../src/lib/resourceTags";
+import { resourceConfigStore } from "../src/lib/resourceConfig";
 
 const values = new Map<string, string>();
 const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key) };
@@ -117,7 +119,21 @@ test("records filter by video and visible account, not operator", () => {
   assert.equal(visibleAdRecords({ ...s, visibility: "personal" }, { ...actor, name: "普通用户" }, "fv1").length, 0);
 });
 test("resource status update merges without removing existing metadata", () => {
-  assert.ok(saveResourceEdits("finished", { fv1: { status: "待审核", tags: ["原标签"] } }));
+  assert.ok(saveResourceEdits("finished", { fv1: { title: "商品实拍成片", status: "待审核", tags: ["产品实拍"] } }));
   assert.ok(saveResourceEdits("finished", { fv1: { status: "已上机" } }));
-  assert.deepEqual(JSON.parse(storage.getItem("mengchang-resource-edits-v1-finished")!).fv1, { status: "已上机", tags: ["原标签"] });
+  assert.deepEqual(JSON.parse(storage.getItem("mengchang-resource-edits-v1-finished")!).fv1, { title: "商品实拍成片" });
+  assert.equal(resourceConfigStore.project("finished", { id: "fv1", status: "待审核" }).status, "已上机");
+  assert.deepEqual(resourceTagStore.project("finished", { id: "fv1" }).publicTags, ["产品实拍"]);
+});
+
+test("status updates preserve legacy stored metadata without reviving obsolete tags", () => {
+  storage.setItem("mengchang-resource-edits-v1-finished", JSON.stringify({
+    legacy: { title: "历史成片", tags: ["原标签"], status: "待审核" },
+  }));
+  assert.ok(saveResourceEdits("finished", { legacy: { status: "已上机" } }));
+  assert.deepEqual(JSON.parse(storage.getItem("mengchang-resource-edits-v1-finished")!).legacy, {
+    title: "历史成片",
+  });
+  assert.equal(resourceConfigStore.project("finished", { id: "legacy", status: "待审核" }).status, "已上机");
+  assert.deepEqual(resourceTagStore.project("finished", { id: "legacy" }).publicTags, []);
 });

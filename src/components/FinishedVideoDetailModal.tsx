@@ -3,12 +3,15 @@ import { useAdStore } from "../lib/useAdStore";
 import React, { useState, useRef, useEffect } from "react";
 import LinkScriptModal from "./LinkScriptModal";
 import ResourceTagModal from "./ResourceTagModal";
+import { useResourceTagState } from "../lib/useResourceTags";
 import OverlayPortal from "./overlays/OverlayPortal";
 import AnchoredPopover from "./overlays/AnchoredPopover";
 import { ResourceCategoryModal, VideoStatusSelect } from "./ResourceEditDialog";
+import { useResourceConfigState, useResourceConfig } from "../lib/useResourceConfig";
+import { ResourceStatusBadge } from "./ResourceConfigControls";
 import { appendById, toRelatedVideo, VideoResourceMetadata } from "../lib/resourceBatch";
 import { DEFAULT_ASSOCIATED_SCRIPTS, DEFAULT_RELATED_VIDEOS, RELATED_VIDEO_OPTIONS, AssociatedScript } from "../data/videoResourceOptions";
-export { CATEGORY_TREE, PERSONAL_TAG_GROUPS, PUBLIC_TAG_GROUPS } from "../data/videoResourceOptions";
+export { CATEGORY_TREE } from "../data/videoResourceOptions";
 export type { AssociatedScript } from "../data/videoResourceOptions";
 import ReferencedVideosProduced from "./ReferencedVideosProduced";
 import AssetPagination from "./AssetPagination";
@@ -634,17 +637,18 @@ export default function FinishedVideoDetailModal({
   const [activeRightTab, setActiveRightTab] = useState<"info" | "review" | "interaction" | "project">("info");
 
   // Video Info Form Fields
-  const [categoryText, setCategoryText] = useState(video.category || "个护 / 美妆");
+  const [categoryText, setCategoryText] = useResourceConfigState(isMaterialMode ? "materials" : "finished", video, "category");
   const [showModifyCategoryModal, setShowModifyCategoryModal] = useState(false);
   const [titleText, setTitleText] = useState(video.title || "视频标题1");
   const [showModifyTitleModal, setShowModifyTitleModal] = useState(false);
   const [tempTitleText, setTempTitleText] = useState("");
-  const [publicTags, setPublicTags] = useState<string[]>(video.tags || []);
+  const [publicTags, setPublicTags] = useResourceTagState(isMaterialMode ? "materials" : "finished", video, "public");
   const [showPublicTagModal, setShowPublicTagModal] = useState(initialTagModal === "public");
 
-  const [personalTags, setPersonalTags] = useState<string[]>(video.personalTags || []);
+  const [personalTags, setPersonalTags] = useResourceTagState(isMaterialMode ? "materials" : "finished", video, "personal");
   const [showPersonalTagModal, setShowPersonalTagModal] = useState(initialTagModal === "personal");
-  const [videoStatus, setVideoStatus] = useState(video.status || "已上机");
+  const [videoStatus, setVideoStatus] = useResourceConfigState(isMaterialMode ? "materials" : "finished", video, "status");
+  const { store: configStore } = useResourceConfig();
   const [isChangingStatus, setIsChangingStatus] = useState(false);
   const [videoNotes, setVideoNotes] = useState("");
   const [notesHistory, setNotesHistory] = useState<{ id: string; timestamp: string; content: string }[]>([]);
@@ -905,11 +909,6 @@ export default function FinishedVideoDetailModal({
     setOperationLogs(prev => [newLog, ...prev]);
   };
 
-  useEffect(() => {
-    if (video?.status) {
-      setVideoStatus(video.status);
-    }
-  }, [video?.status]);
 
   const handleSaveNote = (newContent: string) => {
     const trimmed = newContent.trim();
@@ -2057,11 +2056,6 @@ export default function FinishedVideoDetailModal({
                               <span className="text-[10px] text-white/90 font-mono font-medium drop-shadow-xs">{video.shares || 842}</span>
                             </div>
 
-                            {/* "批注" Pill Button */}
-                            <div className="px-2 py-0.5 bg-black/40 backdrop-blur-md border border-white/30 text-white rounded-md text-[10px] font-medium flex items-center gap-1 shadow-sm">
-                              <Edit3 className="w-2.5 h-2.5 text-purple-300" />
-                              <span>批注</span>
-                            </div>
                           </div>
                         </div>
 
@@ -2464,6 +2458,7 @@ export default function FinishedVideoDetailModal({
                     {/* 视频状态 */}
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
+                        {configStore.statusEnabled(isMaterialMode ? "materials" : "finished") && <>
                         <span className="w-20 text-slate-500 font-medium shrink-0">视频状态</span>
                         <div className="flex items-center gap-2">
                           {isChangingStatus ? (
@@ -2484,18 +2479,7 @@ export default function FinishedVideoDetailModal({
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <span className={`px-2.5 py-1 text-white font-extrabold text-xs rounded-md shadow-2xs ${
-                                videoStatus === "已上机" ? "bg-blue-600" :
-                                videoStatus === "审核通过" ? "bg-emerald-600" :
-                                videoStatus === "待审核" ? "bg-amber-500" :
-                                videoStatus === "审核驳回" ? "bg-rose-600" :
-                                videoStatus === "已修改" ? "bg-indigo-600" :
-                                videoStatus === "二次修改" ? "bg-purple-600" :
-                                (videoStatus === "画面利用" || videoStatus === "已搭") ? "bg-cyan-600" :
-                                "bg-slate-500"
-                              }`}>
-                                {videoStatus}
-                              </span>
+                              <ResourceStatusBadge scope={isMaterialMode ? "materials" : "finished"} status={videoStatus} className="px-2.5 py-1 font-extrabold text-xs rounded-md shadow-2xs" />
                               <button
                                 onClick={() => setIsChangingStatus(true)}
                                 className="text-purple-600 hover:text-purple-700 font-medium text-xs cursor-pointer hover:underline"
@@ -2505,6 +2489,7 @@ export default function FinishedVideoDetailModal({
                             </div>
                           )}
                         </div>
+                        </>}
                       </div>
 
                       {/* 备注修改历史 Select */}
@@ -3943,7 +3928,7 @@ export default function FinishedVideoDetailModal({
 
       </div>
 
-      {showModifyCategoryModal && <ResourceCategoryModal initialCategory={categoryText}
+      {showModifyCategoryModal && <ResourceCategoryModal scope={isMaterialMode ? "materials" : "finished"} initialCategory={categoryText}
         onClose={() => setShowModifyCategoryModal(false)}
         onConfirm={category => {
           if (!updateMetadata({ category })) return;

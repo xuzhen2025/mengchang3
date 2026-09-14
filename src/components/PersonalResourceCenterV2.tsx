@@ -1,4 +1,8 @@
 import React, { useMemo, useState } from "react";
+import { useTagCatalog, useScopedTaggedResources } from "../lib/useResourceTags";
+import { useUploadedResources, resourceScope } from "../lib/resourceUploads";
+import { resourceTagStore } from "../lib/resourceTags";
+import OverlayPortal from "./overlays/OverlayPortal";
 import {
   CalendarDays,
   Check,
@@ -162,22 +166,9 @@ const TASK_UPLOAD_ASSETS: PersonalAsset[] = [
 
 const RESOURCE_CATEGORIES: ResourceCategory[] = ["成片", "素材", "图片", "音频", "脚本"];
 
-const DEFAULT_PERSONAL_TAGS: PersonalTagItem[] = [
-  { id: "pt-1", name: "本周主推", color: "#7c3aed", resourceIds: ["a1", "a4"] },
-  { id: "pt-2", name: "待二创", color: "#0284c7", resourceIds: ["a3"] },
-  { id: "pt-3", name: "高转化备选", color: "#059669", resourceIds: ["task-upload-110321101"] },
-  { id: "pt-4", name: "七夕礼赠", color: "#e11d48", resourceIds: ["a4"] },
-  { id: "pt-5", name: "美妆项目", color: "#0891b2", resourceIds: ["a1", "a7"] },
-  { id: "pt-6", name: "已交付", color: "#16a34a", resourceIds: ["task-upload-110321101", "task-upload-110321104"] },
-  { id: "pt-7", name: "需补充素材", color: "#d97706", resourceIds: ["task-upload-110321102"] },
-  { id: "pt-8", name: "口播专项", color: "#4f46e5", resourceIds: ["a6", "task-upload-110321103"] }
-];
 
-const DEFAULT_PERSONAL_TAG_GROUPS: PersonalTagGroup[] = [
-  { id: "ptg-1", name: "内容排期", tagIds: ["pt-1", "pt-2", "pt-4"] },
-  { id: "ptg-2", name: "转化价值", tagIds: ["pt-3", "pt-7"] },
-  { id: "ptg-3", name: "项目归档", tagIds: ["pt-5", "pt-6", "pt-8"] }
-];
+
+
 
 const loadJson = <T,>(key: string, fallback: T): T => {
   try {
@@ -224,16 +215,14 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
   const [endDate, setEndDate] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name">("newest");
   const [bindings, setBindings] = useState<TaskResourceBinding[]>(loadTaskBindings);
-  const [tags, setTags] = useState<PersonalTagItem[]>(() => {
-    const stored = loadJson<PersonalTagItem[]>(PERSONAL_TAGS_KEY, []);
-    return Array.from(new Map([...DEFAULT_PERSONAL_TAGS, ...stored].map((tagItem) => [tagItem.id, tagItem])).values());
-  });
-  const [tagGroups, setTagGroups] = useState<PersonalTagGroup[]>(() => loadJson(PERSONAL_TAG_GROUPS_KEY, DEFAULT_PERSONAL_TAG_GROUPS));
-  const [selectedTagGroupId, setSelectedTagGroupId] = useState("ptg-1");
+  const { personalTags: tags, personalTagGroups: tagGroups, revision: tagRevision } = useTagCatalog();
+
+  const [selectedTagGroupId, setSelectedTagGroupId] = useState("personal-group-1");
   const [groupSearch, setGroupSearch] = useState("");
   const [tagSearch, setTagSearch] = useState("");
   const [newGroupName, setNewGroupName] = useState("");
   const [newTagName, setNewTagName] = useState("");
+  const [editingTagId, setEditingTagId] = useState<string | null>(null);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [editingGroupName, setEditingGroupName] = useState("");
   const [showAddTagModal, setShowAddTagModal] = useState(false);
@@ -245,13 +234,15 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
   const [linkableTaskPage, setLinkableTaskPage] = useState(1);
   const [taskPageSize, setTaskPageSize] = useState(20);
 
-  const personalAssets = useMemo(() => {
-    const merged = [
-      ...assets.filter((asset) => !asset.deletedAt && asset.creator === CURRENT_USER).map(normalizeAsset),
-      ...TASK_UPLOAD_ASSETS
-    ];
-    return Array.from(new Map(merged.map((asset) => [asset.id, asset])).values());
-  }, [assets]);
+  const basePersonalAssets = useMemo(() => {
+      const merged = [
+        ...assets.filter((asset) => !asset.deletedAt && asset.creator === CURRENT_USER).map(normalizeAsset),
+        ...TASK_UPLOAD_ASSETS
+      ];
+      return Array.from(new Map(merged.map((asset) => [asset.id, asset])).values());
+    }, [assets]);
+  const uploadedResources = useUploadedResources();
+  const personalAssets = useScopedTaggedResources<PersonalAsset>(Array.from(new Map([...uploadedResources.filter((item) => item.creator === CURRENT_USER).map(normalizeAsset), ...basePersonalAssets].map((item) => [item.id, item])).values()), resourceScope);
 
   const categoryOptions = useMemo(() => Array.from(new Set(personalAssets.map((asset) => asset.category).filter(Boolean) as string[])).sort(), [personalAssets]);
   const publicTagOptions = useMemo(() => Array.from(new Set(personalAssets.flatMap((asset) => asset.publicTags))).sort(), [personalAssets]);
@@ -285,19 +276,14 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
   const audioAssets = filteredAssets.filter((asset) => asset.resourceCategory === "音频");
   const scriptAssets = filteredAssets.filter((asset) => asset.resourceCategory === "脚本");
 
-  const persistTags = (next: PersonalTagItem[]) => {
-    setTags(next);
-    window.localStorage.setItem(PERSONAL_TAGS_KEY, JSON.stringify(next));
-  };
+  const persistTags = resourceTagStore.setPersonalTags;
 
-  const persistTagGroups = (next: PersonalTagGroup[]) => {
-    setTagGroups(next);
-    window.localStorage.setItem(PERSONAL_TAG_GROUPS_KEY, JSON.stringify(next));
-  };
+  const persistTagGroups = resourceTagStore.setPersonalGroups;
 
   const addTagGroup = () => {
     const name = newGroupName.trim();
     if (!name) return;
+    if (tagGroups.some((group) => group.name === name)) { onToast("已存在同名标签组"); return; }
     const group: PersonalTagGroup = { id: `ptg-${Date.now()}`, name, tagIds: [] };
     persistTagGroups([...tagGroups, group]);
     setSelectedTagGroupId(group.id);
@@ -308,6 +294,7 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
   const saveTagGroupName = (groupId: string) => {
     const name = editingGroupName.trim();
     if (!name) return;
+    if (tagGroups.some((group) => group.id !== groupId && group.name === name)) { onToast("已存在同名标签组"); return; }
     persistTagGroups(tagGroups.map((group) => group.id === groupId ? { ...group, name } : group));
     setEditingGroupId(null);
     onToast("标签组名称已更新");
@@ -326,6 +313,12 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
   const addTagToCurrentGroup = () => {
     const name = newTagName.trim();
     if (!name || !selectedTagGroup) return;
+    if (tags.some((tag) => selectedTagGroup.tagIds.includes(tag.id) && tag.id !== editingTagId && tag.name === name)) { onToast("同一标签组内不能添加同名标签"); return; }
+    if (editingTagId) {
+      persistTags(tags.map((tag) => tag.id === editingTagId ? { ...tag, name } : tag));
+      setShowAddTagModal(false); setEditingTagId(null); setNewTagName("");
+      onToast("个人标签已更新，关联资源同步生效"); return;
+    }
     const tagItem: PersonalTagItem = {
       id: `pt-${Date.now()}`,
       name,
@@ -477,7 +470,7 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
         <section className="flex min-w-0 flex-1 flex-col">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-4">
             <div className="flex flex-wrap items-center gap-2">
-              <button type="button" disabled={!selectedTagGroup} onClick={() => setShowAddTagModal(true)} className="flex items-center gap-1 rounded-md bg-violet-600 px-4 py-2 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-40"><Plus className="h-3.5 w-3.5" />新增</button>
+              <button type="button" disabled={!selectedTagGroup} onClick={() => { setEditingTagId(null); setNewTagName(""); setShowAddTagModal(true); }} className="flex items-center gap-1 rounded-md bg-violet-600 px-4 py-2 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-40"><Plus className="h-3.5 w-3.5" />新增</button>
               <button type="button" onClick={() => { setTagSelectMode(!tagSelectMode); setSelectedTagIds([]); }} className="rounded-md border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">{tagSelectMode ? "取消选择" : "选择"}</button>
               <label className="flex cursor-pointer items-center gap-2 px-1 text-xs font-semibold text-slate-600"><input type="checkbox" disabled={!tagSelectMode || visibleGroupTags.length === 0} checked={tagSelectMode && visibleGroupTags.length > 0 && visibleGroupTags.every((tagItem) => selectedTagIds.includes(tagItem.id))} onChange={(event) => setSelectedTagIds(event.target.checked ? visibleGroupTags.map((tagItem) => tagItem.id) : [])} />选中本页</label>
               <button type="button" disabled={!selectedTagGroup} onClick={() => { if (selectedTagGroup) { setEditingGroupId(selectedTagGroup.id); setEditingGroupName(selectedTagGroup.name); } }} className="rounded-md border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40">修改标签组</button>
@@ -490,16 +483,17 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
           <div className="flex flex-1 content-start flex-wrap gap-3 overflow-y-auto p-5">
             {visibleGroupTags.map((tagItem) => {
               const selected = selectedTagIds.includes(tagItem.id);
-              return <button type="button" key={tagItem.id} onClick={() => { if (tagSelectMode) setSelectedTagIds((prev) => selected ? prev.filter((id) => id !== tagItem.id) : [...prev, tagItem.id]); }} className={`flex h-11 min-w-36 items-center justify-between gap-3 rounded-md border px-4 text-xs font-semibold transition-colors ${selected ? "border-violet-500 bg-violet-50 text-violet-700" : "border-slate-200 bg-slate-50 text-slate-700 hover:border-violet-300"}`}>
+              return <div key={tagItem.id} onClick={() => { if (tagSelectMode) setSelectedTagIds((prev) => selected ? prev.filter((id) => id !== tagItem.id) : [...prev, tagItem.id]); }} className={`flex h-11 min-w-36 items-center justify-between gap-3 rounded-md border px-4 text-xs font-semibold transition-colors ${selected ? "border-violet-500 bg-violet-50 text-violet-700" : "border-slate-200 bg-slate-50 text-slate-700 hover:border-violet-300"}`}>
                 <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: tagItem.color }} />{tagItem.name}<span className="font-normal text-slate-400">{tagItem.resourceIds.length}</span></span>
+                {!tagSelectMode && <button type="button" title={`编辑个人标签 ${tagItem.name}`} onClick={() => { setEditingTagId(tagItem.id); setNewTagName(tagItem.name); setShowAddTagModal(true); }} className="rounded p-1 text-slate-400 hover:text-violet-600"><Edit3 className="h-3.5 w-3.5" /></button>}
                 {tagSelectMode ? <span className={`flex h-4 w-4 items-center justify-center rounded border ${selected ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300 bg-white"}`}>{selected && <Check className="h-3 w-3" />}</span> : <span title="删除标签" onClick={(event) => { event.stopPropagation(); if (window.confirm(`删除个人标签“${tagItem.name}”？`)) removePersonalTags([tagItem.id]); }} className="rounded p-0.5 text-slate-400 hover:bg-white hover:text-rose-500"><X className="h-3.5 w-3.5" /></span>}
-              </button>;
+              </div>;
             })}
             {selectedTagGroup && visibleGroupTags.length === 0 && <div className="flex w-full flex-col items-center justify-center py-20 text-xs text-slate-400"><Tag className="mb-2 h-8 w-8 text-slate-300" />暂无符合条件的个人标签</div>}
           </div>
         </section>
 
-        {showAddTagModal && <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/50 p-4"><div className="w-full max-w-sm rounded-lg bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><div><h3 className="text-sm font-bold text-slate-900">新增个人标签</h3><p className="mt-1 text-xs text-slate-500">添加到“{selectedTagGroup?.name}”</p></div><button type="button" title="关闭" onClick={() => setShowAddTagModal(false)}><X className="h-5 w-5 text-slate-400" /></button></div><div className="p-5"><label className="text-xs font-semibold text-slate-600">标签名称</label><input autoFocus value={newTagName} onChange={(event) => setNewTagName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addTagToCurrentGroup(); }} placeholder="请输入标签名称" className="mt-2 w-full rounded-md border border-slate-200 px-3 py-2.5 text-xs outline-none focus:border-violet-400" /></div><div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4"><button type="button" onClick={() => setShowAddTagModal(false)} className="rounded-md border border-slate-200 px-4 py-2 text-xs text-slate-600">取消</button><button type="button" onClick={addTagToCurrentGroup} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white">确认新增</button></div></div></div>}
+        {showAddTagModal && <OverlayPortal className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/50 p-4"><div className="w-full max-w-sm rounded-lg bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><div><h3 className="text-sm font-bold text-slate-900">{editingTagId ? "编辑个人标签" : "新增个人标签"}</h3><p className="mt-1 text-xs text-slate-500">添加到“{selectedTagGroup?.name}”</p></div><button type="button" title="关闭" onClick={() => setShowAddTagModal(false)}><X className="h-5 w-5 text-slate-400" /></button></div><div className="p-5"><label className="text-xs font-semibold text-slate-600">标签名称</label><input autoFocus value={newTagName} onChange={(event) => setNewTagName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addTagToCurrentGroup(); }} placeholder="请输入标签名称" className="mt-2 w-full rounded-md border border-slate-200 px-3 py-2.5 text-xs outline-none focus:border-violet-400" /></div><div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4"><button type="button" onClick={() => setShowAddTagModal(false)} className="rounded-md border border-slate-200 px-4 py-2 text-xs text-slate-600">取消</button><button type="button" onClick={addTagToCurrentGroup} className="rounded-md bg-violet-600 px-4 py-2 text-xs font-semibold text-white">{editingTagId ? "保存" : "确认新增"}</button></div></div></OverlayPortal>}
       </div>
     );
   }
@@ -550,7 +544,7 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
       )}
 
       {bindingAsset && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/50 p-4">
+        <OverlayPortal className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/50 p-4">
           <div className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
               <div className="min-w-0"><h3 className="text-sm font-bold text-slate-900">任务关联</h3><p className="mt-1 truncate text-xs text-slate-500">{bindingAsset.name}</p><div className="mt-2 flex flex-wrap gap-1.5"><span className="rounded border border-purple-200 bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-700">{bindingAsset.resourceCategory}</span><span className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] text-slate-600">{bindingAsset.category || "未分类"}</span><span className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-500">{bindingAsset.status || "待审核"}</span></div></div>
@@ -571,7 +565,7 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
 
             <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-5 py-4"><p className="text-[10px] text-slate-400">绑定后将计入对应任务的已提交文件数量</p><div className="flex gap-2"><button type="button" onClick={() => setBindingAsset(null)} className="rounded-md border border-slate-200 px-4 py-2 text-xs text-slate-600 hover:bg-slate-50">关闭</button><button type="button" disabled={selectedTaskIds.length === 0} onClick={confirmBinding} className="rounded-md bg-purple-600 px-4 py-2 text-xs font-semibold text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-40">关联所选任务（{selectedTaskIds.length}）</button></div></div>
           </div>
-        </div>
+        </OverlayPortal>
       )}
     </div>
   );

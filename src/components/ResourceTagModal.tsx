@@ -1,15 +1,14 @@
 import React, { useState } from "react";
 import { X } from "lucide-react";
 import OverlayPortal from "./overlays/OverlayPortal";
-import { PERSONAL_TAG_GROUPS, PUBLIC_TAG_GROUPS } from "../data/videoResourceOptions";
+import { useTagCatalog, useTagGroupSelection, useTagSelection } from "../lib/useResourceTags";
+import PersonalResourceCenterV2 from "./PersonalResourceCenterV2";
 
 interface ResourceTagModalProps {
   kind: "public" | "personal";
   initialTags?: string[];
   title?: string;
   requireSelection?: boolean;
-  publicGroups?: Record<string, string[]>;
-  personalGroups?: Record<string, string[]>;
   onClose: () => void;
   onConfirm: (tags: string[]) => boolean | void;
   showToast: (message: string) => void;
@@ -17,17 +16,18 @@ interface ResourceTagModalProps {
 
 export default function ResourceTagModal({
   kind, initialTags = [], title, requireSelection = false,
-  publicGroups = PUBLIC_TAG_GROUPS, personalGroups = PERSONAL_TAG_GROUPS,
   onClose, onConfirm, showToast,
 }: ResourceTagModalProps) {
+  const { publicGroups, personalGroups } = useTagCatalog();
+  const [showPersonalManager, setShowPersonalManager] = useState(false);
   const [publicGroupSearch, setPublicGroupSearch] = useState("");
   const [publicSubSearch, setPublicSubSearch] = useState("");
-  const [selectedPublicGroupKey, setSelectedPublicGroupKey] = useState(Object.keys(publicGroups)[0] || "");
-  const [tempAddedPublicTags, setTempAddedPublicTags] = useState<string[]>([...initialTags]);
+  const [selectedPublicGroupKey, setSelectedPublicGroupKey] = useTagGroupSelection(publicGroups);
+  const [tempAddedPublicTags, setTempAddedPublicTags] = useTagSelection("public", initialTags);
   const [personalGroupSearch, setPersonalGroupSearch] = useState("");
   const [personalSubSearch, setPersonalSubSearch] = useState("");
-  const [selectedPersonalGroupKey, setSelectedPersonalGroupKey] = useState(Object.keys(personalGroups)[0] || "");
-  const [tempAddedPersonalTags, setTempAddedPersonalTags] = useState<string[]>([...initialTags]);
+  const [selectedPersonalGroupKey, setSelectedPersonalGroupKey] = useTagGroupSelection(personalGroups);
+  const [tempAddedPersonalTags, setTempAddedPersonalTags] = useTagSelection("personal", initialTags);
   return <>
       {/* 关联个人标签 Modal */}
       {kind === "personal" && (
@@ -51,7 +51,7 @@ export default function ResourceTagModal({
             <div className="p-6 space-y-4">
               <div>
                 <button
-                  onClick={() => showToast("进入编辑个人标签模式")}
+                  onClick={() => setShowPersonalManager(true)}
                   className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs"
                 >
                   编辑个人标签
@@ -218,7 +218,7 @@ export default function ResourceTagModal({
                   <div className="bg-slate-100/90 text-slate-700 text-xs font-bold py-2.5 px-3.5 border-b border-slate-200/80 flex items-center justify-between">
                     <span>标签组</span>
                     <button
-                      onClick={() => showToast("已刷新标签组")}
+                      onClick={() => { setPublicGroupSearch(""); setPublicSubSearch(""); showToast("已同步管理端最新标签"); }}
                       className="text-purple-600 hover:underline text-xs font-normal cursor-pointer"
                     >
                       刷新
@@ -256,12 +256,6 @@ export default function ResourceTagModal({
                 <div className="border border-slate-200/80 rounded-xl overflow-hidden flex flex-col bg-white min-h-[180px]">
                   <div className="bg-slate-100/90 text-slate-700 text-xs font-bold py-2.5 px-3.5 border-b border-slate-200/80 flex items-center justify-between">
                     <span>子标签</span>
-                    <button
-                      onClick={() => showToast("弹出添加子标签弹窗")}
-                      className="text-purple-600 hover:underline text-xs font-normal cursor-pointer"
-                    >
-                      + 添加子标签
-                    </button>
                   </div>
                   <div className="p-3 flex-1 flex flex-col overflow-hidden">
                     <input
@@ -305,12 +299,6 @@ export default function ResourceTagModal({
                 <div className="border border-slate-200/80 rounded-xl overflow-hidden flex flex-col bg-white min-h-[180px]">
                   <div className="bg-slate-100/90 text-slate-700 text-xs font-bold py-2.5 px-3.5 border-b border-slate-200/80 flex items-center justify-between">
                     <span>已添加标签</span>
-                    <button
-                      onClick={() => showToast("已保存当前选择为预设")}
-                      className="text-purple-600 hover:underline text-xs font-normal cursor-pointer"
-                    >
-                      保存为预设
-                    </button>
                   </div>
                   <div className="p-3 flex-1 overflow-y-auto">
                     {tempAddedPublicTags.length === 0 ? (
@@ -363,5 +351,11 @@ export default function ResourceTagModal({
         </OverlayPortal>
       )}
 
+    {showPersonalManager && <OverlayPortal role="dialog" aria-modal="true" aria-label="编辑个人标签" className="fixed inset-0 flex items-center justify-center bg-slate-950/50 p-4">
+      <div className="flex h-[640px] max-h-[calc(100dvh-32px)] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3"><h3 className="text-sm font-bold">编辑个人标签</h3><button type="button" title="关闭标签管理" onClick={() => setShowPersonalManager(false)} className="rounded p-2 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>
+        <PersonalResourceCenterV2 mode="personal_tags" assets={[]} onToast={showToast} />
+      </div>
+    </OverlayPortal>}
   </>;
 }

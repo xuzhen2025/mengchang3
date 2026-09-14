@@ -2,7 +2,7 @@ import React, { useRef, useState } from "react";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
 import OverlayPortal from "./overlays/OverlayPortal";
 import AnchoredPopover from "./overlays/AnchoredPopover";
-import { CATEGORY_TREE } from "../data/videoResourceOptions";
+import { useResourceConfig } from "../lib/useResourceConfig";
 
 export function ResourceEditDialog({ title, onClose, onConfirm, disabled, children }: {
   title: string; onClose: () => void; onConfirm: () => void; disabled?: boolean; children: React.ReactNode;
@@ -24,15 +24,18 @@ export function ResourceEditDialog({ title, onClose, onConfirm, disabled, childr
   </OverlayPortal>;
 }
 
-export function ResourceCategoryModal({ initialCategory = "", onClose, onConfirm }: {
-  initialCategory?: string; onClose: () => void; onConfirm: (category: string) => void;
+export function ResourceCategoryModal({ initialCategory = "", scope = "finished", onClose, onConfirm }: {
+  initialCategory?: string; scope?: string; onClose: () => void; onConfirm: (category: string) => void;
 }) {
+  const { store } = useResourceConfig();
+  const CATEGORY_TREE = store.categories(scope).map(n => ({ name: n.name, subs: n.children.map(c => c.name) }));
   const [category, setCategory] = useState(initialCategory);
-  const [primary, setPrimary] = useState(initialCategory.split(" / ")[0] || "宠物食品");
+  const [primary, setPrimary] = useState(initialCategory.split(" / ")[0] || CATEGORY_TREE[0]?.name || "");
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
   const select = (value: string) => { setCategory(value); setOpen(false); };
-  return <ResourceEditDialog title="修改分类" onClose={onClose} onConfirm={() => onConfirm(category)} disabled={!category}>
+  const [selectedPrimary = "", selectedSecondary = ""] = category.split(" / ");
+  return <ResourceEditDialog title="修改分类" onClose={onClose} onConfirm={() => onConfirm(category)} disabled={!store.categoryValid(scope, selectedPrimary, selectedSecondary)}>
     <div className="flex items-start gap-4 pt-2">
       <label className="text-xs font-bold text-slate-700 shrink-0 pt-2.5"><span className="text-rose-500 mr-1">*</span>分类</label>
       <button ref={anchorRef} onClick={() => setOpen(value => !value)} aria-expanded={open}
@@ -62,9 +65,12 @@ export function ResourceCategoryModal({ initialCategory = "", onClose, onConfirm
 export function VideoStatusSelect({ value, onChange, isMaterialMode = false, placeholder = false }: {
   value: string; onChange: (value: string) => void; isMaterialMode?: boolean; placeholder?: boolean;
 }) {
+  const { store } = useResourceConfig();
+  const scope = isMaterialMode ? "materials" : "finished";
+  if (!store.statusEnabled(scope)) return null;
   return <select aria-label="视频状态" value={value} onChange={event => onChange(event.target.value)}
     className="px-2.5 py-1 bg-white border border-purple-300 rounded-lg text-xs font-bold text-purple-900 focus:outline-none cursor-pointer shadow-2xs">
     {placeholder && <option value="" disabled>请选择状态</option>}
-    {["待审核", "审核通过", "审核驳回", "已修改", "二次修改", "已上机", isMaterialMode ? "画面利用" : "已搭", "放弃"].map(status => <option key={status} value={status}>{status}</option>)}
+    {store.statuses(scope).map(status => <option key={status.id} value={status.name}>{status.name}</option>)}
   </select>;
 }

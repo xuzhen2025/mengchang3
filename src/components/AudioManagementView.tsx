@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { PublicTagFilter } from "./PublicTagFilter";
+import { useTaggedResources, useTagCatalog } from "../lib/useResourceTags";
+import { resourceTagStore } from "../lib/resourceTags";
+import { resourceConfigStore } from "../lib/resourceConfig";
+import { useResourceConfig, useConfigFilter } from "../lib/useResourceConfig";
+import { useUploadedResources, uploadedAudio } from "../lib/resourceUploads";
+import { PublicTagFilter, PersonalTagFilter } from "./PublicTagFilter";
+import { ResourceCategoryFilters, ResourceStatusFilter, ResourceStatusBadge } from "./ResourceConfigControls";
 import AudioDetailView from "./AudioDetailView";
 import { Pagination } from "./Pagination";
 import { ResourceSearchIntent } from "../types";
@@ -51,20 +57,9 @@ import {
   User
 } from "lucide-react";
 
-const PUBLIC_TAG_GROUPS: Record<string, string[]> = {
-  "模特": ["张三", "里斯", "溜溜", "王五", "娃娃", "事事", "琪琪", "久久", "苏逸飞", "沈知许"],
-  "场景": ["模特", "室内展厅", "户外公园", "直播间", "办公室", "家庭生活", "街拍"],
-  "合作达人": ["美妆小达人", "生活测评官", "种草狂魔", "时尚指南"],
-  "脚本类型": ["纯混剪", "痛点剧本", "口播测评", "拆箱体验"],
-  "创新点": ["视觉冲击", "强勾子", "对比反转", "开箱震撼"],
-  "编导姓名": ["张编", "王编", "李编", "刘编"]
-};
 
-const PERSONAL_TAG_GROUPS: Record<string, string[]> = {
-  "Zs测试一": ["Zs测试一", "个人测试标签2", "重点剪辑音频"],
-  "我的常用": ["高质量播音", "短视频配音", "爆款BGM"],
-  "部门协作": ["需重新剪辑", "待试听核对", "已审核通过"]
-};
+
+
 
 export interface AudioItem {
   id: string;
@@ -91,7 +86,7 @@ interface AudioManagementViewProps {
   onClearSearch?: () => void;
 }
 
-const INITIAL_AUDIO_LIST: AudioItem[] = [
+export const INITIAL_AUDIO_LIST: AudioItem[] = [
   {
     id: "aud-1",
     title: "现在洁牙",
@@ -104,8 +99,8 @@ const INITIAL_AUDIO_LIST: AudioItem[] = [
     time: "25 天前",
     primaryCategory: "美容美体",
     secondaryCategory: "医疗机构",
-    publicTags: ["场景", "合作达人"],
-    personalTag: "有个人标签",
+    publicTags: ["商品旁白","自然男声"],
+    personalTag: "口播专项",
     size: "1.2 MB"
   },
   {
@@ -120,7 +115,7 @@ const INITIAL_AUDIO_LIST: AudioItem[] = [
     time: "25 天前",
     primaryCategory: "美容美体",
     secondaryCategory: "警示解说",
-    publicTags: ["创新点"],
+    publicTags: ["痛点解说","自然男声"],
     personalTag: "无个人标签",
     size: "1.4 MB"
   },
@@ -136,8 +131,8 @@ const INITIAL_AUDIO_LIST: AudioItem[] = [
     time: "25 天前",
     primaryCategory: "美容美体",
     secondaryCategory: "短对话",
-    publicTags: ["模特"],
-    personalTag: "Zs测试一",
+    publicTags: ["商品旁白","温柔女声"],
+    personalTag: "口播专项",
     size: "0.4 MB"
   },
   {
@@ -152,8 +147,8 @@ const INITIAL_AUDIO_LIST: AudioItem[] = [
     time: "25 天前",
     primaryCategory: "个人护理",
     secondaryCategory: "口播切片",
-    publicTags: ["合作达人"],
-    personalTag: "Zs测试二",
+    publicTags: ["促销口播"],
+    personalTag: "待二创",
     size: "0.2 MB"
   },
   {
@@ -168,8 +163,8 @@ const INITIAL_AUDIO_LIST: AudioItem[] = [
     time: "1小时前",
     primaryCategory: "美妆护肤",
     secondaryCategory: "洗护系列",
-    publicTags: ["模特", "创新点"],
-    personalTag: "有个人标签",
+    publicTags: ["商品旁白","温柔女声"],
+    personalTag: "美妆项目",
     size: "1.1 MB"
   },
   {
@@ -184,8 +179,8 @@ const INITIAL_AUDIO_LIST: AudioItem[] = [
     time: "3天前",
     primaryCategory: "休闲零食",
     secondaryCategory: "促销大促",
-    publicTags: ["场景"],
-    personalTag: "测试分享标签",
+    publicTags: ["轻快节奏","纯音乐"],
+    personalTag: "本周主推",
     size: "2.5 MB"
   },
   {
@@ -200,8 +195,8 @@ const INITIAL_AUDIO_LIST: AudioItem[] = [
     time: "5天前",
     primaryCategory: "服饰内衣",
     secondaryCategory: "品牌调性",
-    publicTags: ["模特", "场景"],
-    personalTag: "有个人标签",
+    publicTags: ["舒缓氛围","服饰内衣"],
+    personalTag: "服饰项目",
     size: "0.8 MB"
   },
   {
@@ -216,15 +211,22 @@ const INITIAL_AUDIO_LIST: AudioItem[] = [
     time: "7天前",
     primaryCategory: "家居优选",
     secondaryCategory: "趣味音效",
-    publicTags: ["创新点"],
+    publicTags: ["转场音效"],
     personalTag: "无个人标签",
     size: "0.1 MB"
   }
 ];
+INITIAL_AUDIO_LIST.push(...["植萃精华自然口播.wav","通勤穿搭轻快配乐.mp3","收纳产品开箱解说.wav"].map((title, index) => ({
+  ...INITIAL_AUDIO_LIST[index % INITIAL_AUDIO_LIST.length], id: "audio-analytics-" + (index + 1), title,
+  author: ["徐振", "王剪辑", "周雅"][index], downloads: [8, 12, 5][index],
+  createdAt: `2026-09-${10 + index} 10:30`, time: `2026-09-${10 + index} 10:30`,
+})));
+
+resourceTagStore.register("audio", INITIAL_AUDIO_LIST);
+resourceConfigStore.register("audio", INITIAL_AUDIO_LIST);
 
 export default function AudioManagementView({ onTriggerTask, onDetailStateChange, initialSearch, onClearSearch }: AudioManagementViewProps) {
   // Category states
-  const [selectedMainCategory, setSelectedMainCategory] = useState("全部");
   const [selectedPrimaryCategory, setSelectedPrimaryCategory] = useState("全部");
   const [selectedSecondaryCategory, setSelectedSecondaryCategory] = useState("全部");
   const [selectedPublicTag, setSelectedPublicTag] = useState("全部");
@@ -263,8 +265,11 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
 
   // Audio items list
   const [baseAudioList, setAudioList] = useState<AudioItem[]>(INITIAL_AUDIO_LIST);
+  const uploaded = useUploadedResources();
   const { edits: audioEdits, saveEdits: saveAudioEdits } = useResourceEdits<AudioItem>("audio");
-  const audioList = baseAudioList.map(item => ({ ...item, ...audioEdits[item.id] }));
+  const untaggedAudioList = [...uploaded.filter((item) => item.resourceCategory === "音频").map(uploadedAudio), ...baseAudioList].map(item => ({ ...item, ...audioEdits[item.id] }));
+  const audioList = useTaggedResources("audio", untaggedAudioList);
+  const { publicGroups: PUBLIC_TAG_GROUPS, personalGroups: PERSONAL_TAG_GROUPS } = useTagCatalog();
   const [batchTagKind, setBatchTagKind] = useState<"public" | "personal" | null>(null);
 
   // Audio Detail Modal State
@@ -385,10 +390,9 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
     setCurrentTimeMap((prev) => ({ ...prev, [id]: val }));
   };
 
-  const presetFilters = { searchQuery, selectedMainCategory, selectedPrimaryCategory, selectedSecondaryCategory, selectedPublicTag, selectedPersonalTag, sortBy, searchCategoryKeyword, searchPublicTagKeyword, searchPersonalTagKeyword, searchAuthorKeyword, startDate, endDate };
+  const presetFilters = { searchQuery, selectedPrimaryCategory, selectedSecondaryCategory, selectedPublicTag, selectedPersonalTag, sortBy, searchCategoryKeyword, searchPublicTagKeyword, searchPersonalTagKeyword, searchAuthorKeyword, startDate, endDate };
   const applyPresetFilters = (next: typeof AUDIO_PRESET_DEFAULTS) => {
     setSearchQuery(next.searchQuery);
-    setSelectedMainCategory(next.selectedMainCategory);
     setSelectedPrimaryCategory(next.selectedPrimaryCategory);
     setSelectedSecondaryCategory(next.selectedSecondaryCategory);
     setSelectedPublicTag(next.selectedPublicTag);
@@ -412,9 +416,6 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
       .some((value) => value.toLowerCase().includes(homeSearch));
     if (!matchesHomeSearch) return false;
 
-    if (selectedMainCategory !== "全部" && item.primaryCategory !== selectedMainCategory) {
-      // rough match or custom logic
-    }
     if (selectedPrimaryCategory !== "全部" && item.primaryCategory !== selectedPrimaryCategory) {
       return false;
     }
@@ -471,26 +472,19 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
     }
   };
 
-  const mainCategories = ["全部", "美妆", "个护家清", "服饰内衣", "食品饮料", "母婴宠物", "图书教育", "智能家居"];
+  const { store: configStore } = useResourceConfig();
+  const primaryCategories = ["全部", ...configStore.categories("audio").map(n => n.name)];
 
-  const primaryCategories = [
-    "全部", "美妆护肤", "彩妆香水", "宠物食品", "宠物用品", "婴童尿裤", 
-    "奶粉辅食", "婴童用品", "孕妇用品", "传统滋补", "童装/童鞋", "休闲零食", 
-    "图书", "饮料冲调", "学习用品", "粮油速食", "教育音像", "数字阅读", 
-    "家庭清洁", "家电好货", "美容美体", "个人护理", "化妆工具", "家居优选"
-  ];
+  const secondaryCategories = ["全部", ...configStore.categories("audio").flatMap(n => n.children.map(c => c.name))];
 
-  const secondaryCategories = ["全部", "猫粮", "狗粮", "口播切片", "促销大促", "品牌调性", "趣味音效"];
-
-  const publicTags = ["模特", "场景", "合作达人", "创新点"];
-
-  const personalTags = ["全部", "无个人标签", "有个人标签", "Zs测试一", "Zs测试二", "测试分享标签"];
+  const publicTags = Object.values(PUBLIC_TAG_GROUPS).flat();
+  const personalTags = ["全部", "无个人标签", "有个人标签", ...Object.values(PERSONAL_TAG_GROUPS).flat()];
+  useEffect(() => { setCurrentPage(1); }, [selectedPersonalTag, searchPersonalTagKeyword]);
 
   React.useEffect(() => {
     const tag = initialSearch?.tag;
     if (!tag) return;
-    if (mainCategories.includes(tag)) setSelectedMainCategory(tag);
-    else if (primaryCategories.includes(tag)) setSelectedPrimaryCategory(tag);
+    if (primaryCategories.includes(tag)) setSelectedPrimaryCategory(tag);
     else if (secondaryCategories.includes(tag)) setSelectedSecondaryCategory(tag);
     else if (publicTags.includes(tag)) setSelectedPublicTag(tag);
     else if (personalTags.includes(tag)) setSelectedPersonalTag(tag);
@@ -532,26 +526,8 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
       {/* Top Cascading Filter Section */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3.5 text-xs text-slate-700">
         
-        {/* Row 1: 主类目 */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 pb-2 border-b border-slate-100">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">主 类 目：</span>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {mainCategories.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedMainCategory(cat)}
-                  className={`transition-colors cursor-pointer text-xs ${
-                    selectedMainCategory === cat
-                      ? "text-purple-600 font-bold bg-purple-50 px-2.5 py-1 rounded-md"
-                      : "text-slate-600 hover:text-purple-600 font-normal px-2.5 py-1"
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* Row 1: 常用筛选预设 */}
+        <div className="flex items-center justify-end gap-2 pb-2 border-b border-slate-100">
           <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
             <ResourceFilterPresets scope="audio" defaults={AUDIO_PRESET_DEFAULTS} value={presetFilters}
               selectedName={selectedPreset} onSelectName={setSelectedPreset} onApply={applyPresetFilters}
@@ -564,24 +540,8 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
 
         {/* Row 2: 一级分类 */}
         <div className="flex items-start justify-between pb-2 border-b border-slate-100">
-          <div className="flex items-start gap-2 flex-1 flex-wrap">
-            <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2 mt-0.5">一级分类：</span>
-            <div className="flex items-center gap-1 flex-wrap flex-1">
-              {(showMorePrimary ? primaryCategories : primaryCategories.slice(0, 14)).map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedPrimaryCategory(cat)}
-                  className={`transition-colors cursor-pointer text-xs ${
-                    selectedPrimaryCategory === cat
-                      ? "text-purple-600 font-bold bg-purple-50 px-2.5 py-1 rounded-md"
-                      : "text-slate-600 hover:text-purple-600 font-normal px-2.5 py-1"
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
+          <ResourceCategoryFilters scope="audio" primary={selectedPrimaryCategory} secondary={selectedSecondaryCategory} search={searchCategoryKeyword}
+            onPrimary={setSelectedPrimaryCategory} onSecondary={setSelectedSecondaryCategory} onSearch={setSearchCategoryKeyword} />
           <button
             onClick={() => setShowMorePrimary(!showMorePrimary)}
             className="text-purple-600 hover:text-purple-700 font-bold text-xs flex items-center gap-0.5 shrink-0 pt-1 cursor-pointer hover:underline"
@@ -592,34 +552,7 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
         </div>
 
         {/* Row 3: 二级分类 */}
-        <div className="flex items-center gap-2 pb-2 border-b border-slate-100 flex-wrap">
-          <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">二级分类：</span>
-          <div className="relative border border-slate-200 rounded-lg px-2.5 py-1 flex items-center gap-1.5 bg-white w-32 shrink-0 focus-within:border-purple-400 mr-1">
-            <Search className="w-3.5 h-3.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="搜索分类"
-              value={searchCategoryKeyword}
-              onChange={(e) => setSearchCategoryKeyword(e.target.value)}
-              className="text-xs focus:outline-none w-full placeholder:text-slate-400 font-normal"
-            />
-          </div>
-          <div className="flex items-center gap-1 flex-wrap">
-            {secondaryCategories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedSecondaryCategory(cat)}
-                className={`transition-colors cursor-pointer text-xs ${
-                  selectedSecondaryCategory === cat
-                    ? "text-purple-600 font-bold bg-purple-50 px-2.5 py-1 rounded-md"
-                    : "text-slate-600 hover:text-purple-600 font-normal px-2.5 py-1"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
+
 
         {/* Row 4: 公共标签 */}
         <div className="flex items-center gap-2 pb-2 border-b border-slate-100 flex-wrap">
@@ -635,60 +568,12 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
         {/* Row 5: 个人标签 */}
         <div className="flex items-center gap-2 pb-2 border-b border-slate-100 flex-wrap">
           <span className="text-slate-900 font-bold shrink-0 w-20 text-right pr-2">个人标签：</span>
-          <div className="relative border border-slate-200 rounded-lg px-2.5 py-1 flex items-center gap-1.5 bg-white w-32 shrink-0 focus-within:border-purple-400 mr-1">
-            <Search className="w-3.5 h-3.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="搜索标签"
-              value={searchPersonalTagKeyword}
-              onChange={(e) => setSearchPersonalTagKeyword(e.target.value)}
-              className="text-xs focus:outline-none w-full placeholder:text-slate-400 font-normal"
-            />
-          </div>
-          <div className="flex-1 flex flex-wrap items-center gap-2">
-            {/* Selector group for [全部 | 无个人标签 | 有个人标签] */}
-            <div className="flex items-center gap-1 border border-slate-200 rounded-lg p-0.5 bg-white shrink-0">
-              {personalTags.slice(0, 3).map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => setSelectedPersonalTag(tag)}
-                  className={`px-3 py-1 rounded-md text-xs transition-all cursor-pointer ${
-                    selectedPersonalTag === tag
-                      ? "bg-purple-600 text-white font-bold shadow-xs"
-                      : "text-slate-600 hover:bg-slate-50 font-medium"
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-
-            {/* Extended Personal Tags */}
-            {personalTags.slice(3).map((tag) => (
-              <button
-                key={tag}
-                onClick={() => setSelectedPersonalTag(tag)}
-                className={`transition-colors cursor-pointer text-xs px-2 py-0.5 rounded ${
-                  selectedPersonalTag === tag
-                    ? "text-purple-600 font-bold bg-purple-100/70 border border-purple-200"
-                    : "text-slate-600 hover:text-purple-600 font-normal"
-                }`}
-              >
-                {tag}
-              </button>
-            ))}
-
-            <button
-              onClick={() => {
-                setSearchPersonalTagKeyword("");
-                setSelectedPersonalTag("全部");
-              }}
-              className="text-slate-500 hover:text-purple-600 text-xs flex items-center gap-1 cursor-pointer ml-2 font-normal"
-            >
-              <span>重置个人标签</span>
-              <Edit2 className="w-3 h-3 text-slate-400" />
-            </button>
-          </div>
+          <PersonalTagFilter
+            searchKeyword={searchPersonalTagKeyword}
+            onSearchKeywordChange={setSearchPersonalTagKeyword}
+            selectedTag={selectedPersonalTag}
+            onSelectTag={setSelectedPersonalTag}
+          />
         </div>
       </div>
 
@@ -765,7 +650,7 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
 
       {batchTagKind && <ResourceTagModal kind={batchTagKind}
         title={batchTagKind === "public" ? "添加公共标签" : "添加个人标签"}
-        publicGroups={PUBLIC_TAG_GROUPS} personalGroups={PERSONAL_TAG_GROUPS} requireSelection
+        requireSelection
         onClose={() => setBatchTagKind(null)} showToast={showToast}
         onConfirm={added => {
           const patches = Object.fromEntries(audioList.filter(item => selectedIds.includes(item.id)).map(item => {

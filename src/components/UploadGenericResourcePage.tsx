@@ -1,6 +1,8 @@
 import React, { useState } from "react";
+import { useTagCatalog, useTagGroupSelection, useTagSelection } from "../lib/useResourceTags";
 import LinkScriptModal from "./LinkScriptModal";
 import CategoryCascader from "./CategoryCascader";
+import { resourceConfigStore } from "../lib/resourceConfig";
 import {
   ArrowLeft,
   UploadCloud,
@@ -19,19 +21,15 @@ import {
 } from "lucide-react";
 import { UploadFileType } from "./ResourcesView";
 import UploadScriptPage from "./UploadScriptPage";
+import { publishResources, type ResourcePublishDetails } from "../lib/resourceUploads";
 
 interface UploadGenericResourcePageProps {
   type: UploadFileType;
   onClose: () => void;
-  onPublishSuccess?: (msg: string) => void;
+  onPublishSuccess?: (msg: string, details?: ResourcePublishDetails) => void;
 }
 
-const TAG_GROUPS_DATA: Record<string, string[]> = {
-  "电商痛点": ["价格昂贵", "穿戴繁琐", "臃肿显胖", "闷热不透气", "掉档跑偏"],
-  "产品亮点": ["极致无痕", "高弹透气", "轻盈裸感", "德绒蓄热", "防勾抗起球"],
-  "剪辑风格": ["硬广直投", "剧情反转", "口播种草", "高光切片", "混剪卡点"],
-  "人群画像": ["年轻职场", "宝妈群体", "学生党", "大码人群", "精致高净值"]
-};
+
 
 export default function UploadGenericResourcePage({
   type,
@@ -97,8 +95,9 @@ export default function UploadGenericResourcePage({
   const [presetTemplate, setPresetTemplate] = useState("");
 
   // Basic Info States
-  const [primaryCategory, setPrimaryCategory] = useState("爆款素材");
-  const [secondaryCategory, setSecondaryCategory] = useState("服饰内衣");
+  const resourceScope = { 成片: "finished", 素材: "materials", 图片: "images", 音频: "audio", 脚本: "scripts" }[type];
+  const [primaryCategory, setPrimaryCategory] = useState(() => resourceConfigStore.categories(resourceScope)[0]?.name || "");
+  const [secondaryCategory, setSecondaryCategory] = useState(() => resourceConfigStore.categories(resourceScope)[0]?.children[0]?.name || "");
   const [audioCategorySearch, setAudioCategorySearch] = useState("");
   const [selectedCategoryTag, setSelectedCategoryTag] = useState<string>("提臀裤");
   const [namingType, setNamingType] = useState<"file_name" | "custom" | "prefix">("file_name");
@@ -115,15 +114,16 @@ export default function UploadGenericResourcePage({
   const [publicTagSearch, setPublicTagSearch] = useState("");
   const [publicGroupSearch, setPublicGroupSearch] = useState("");
   const [publicSubSearch, setPublicSubSearch] = useState("");
-  const [selectedPublicGroupKey, setSelectedPublicGroupKey] = useState("电商痛点");
-  const [addedPublicTags, setAddedPublicTags] = useState<string[]>([]);
+  const { publicGroups: PUBLIC_TAG_GROUPS, personalGroups: PERSONAL_TAG_GROUPS } = useTagCatalog();
+  const [selectedPublicGroupKey, setSelectedPublicGroupKey] = useTagGroupSelection(PUBLIC_TAG_GROUPS);
+  const [addedPublicTags, setAddedPublicTags] = useTagSelection("public");
 
   // Personal Tag 3-Column States
   const [personalTagSearch, setPersonalTagSearch] = useState("");
   const [personalGroupSearch, setPersonalGroupSearch] = useState("");
   const [personalSubSearch, setPersonalSubSearch] = useState("");
-  const [selectedPersonalGroupKey, setSelectedPersonalGroupKey] = useState("电商痛点");
-  const [addedPersonalTags, setAddedPersonalTags] = useState<string[]>([]);
+  const [selectedPersonalGroupKey, setSelectedPersonalGroupKey] = useTagGroupSelection(PERSONAL_TAG_GROUPS);
+  const [addedPersonalTags, setAddedPersonalTags] = useTagSelection("personal");
 
   // Other Info
   const [audioDescription, setAudioDescription] = useState("");
@@ -135,6 +135,7 @@ export default function UploadGenericResourcePage({
   const [receiver, setReceiver] = useState("");
   const [messageContent, setMessageContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [categoryError, setCategoryError] = useState("");
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -144,12 +145,20 @@ export default function UploadGenericResourcePage({
   };
 
   const handlePublish = () => {
+    if (!selectedFile || isSubmitting) return;
+    if (!resourceConfigStore.categoryValid(resourceScope, primaryCategory, secondaryCategory)) { setCategoryError("请选择当前可用的一级分类和二级分类"); return; }
+    setCategoryError("");
     setIsSubmitting(true);
     setTimeout(() => {
       setIsSubmitting(false);
+      if (!resourceConfigStore.categoryValid(resourceScope, primaryCategory, secondaryCategory)) { setCategoryError("分类已变更，请重新选择"); return; }
+      const published = publishResources({ partition: type, primaryCategory, secondaryCategory,
+        publicTags: addedPublicTags, personalTags: addedPersonalTags,
+        files: [{ name: selectedFile.name, size: selectedFile.size, url: URL.createObjectURL(selectedFile) }],
+      });
       onClose();
       if (onPublishSuccess) {
-        onPublishSuccess(`✅ 已成功上传【${type}】资源`);
+        onPublishSuccess(`✅ 已成功上传【${type}】资源`, published);
       }
     }, 600);
   };
@@ -157,6 +166,7 @@ export default function UploadGenericResourcePage({
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[#F5F6FA] w-full h-full overflow-hidden animate-in fade-in duration-150">
       
+      {categoryError && <div role="alert" className="px-6 py-2 text-rose-600 bg-rose-50 shrink-0">{categoryError}</div>}
       {/* Top Page Header Bar */}
       <div className="px-6 py-3.5 bg-white border-b border-slate-200/80 flex items-center justify-between shrink-0 shadow-2xs">
         <div className="flex items-center gap-3">
@@ -263,6 +273,7 @@ export default function UploadGenericResourcePage({
                 </label>
                 <div className="flex-1">
                   <CategoryCascader
+                    scope={resourceScope}
                     primaryCategory={primaryCategory}
                     secondaryCategory={secondaryCategory}
                     onSelect={(p, s) => {
@@ -456,7 +467,7 @@ export default function UploadGenericResourcePage({
                     className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:outline-none shrink-0"
                   />
                   <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-                    {Object.keys(TAG_GROUPS_DATA)
+                    {Object.keys(PUBLIC_TAG_GROUPS)
                       .filter(g => g.includes(publicGroupSearch.trim()))
                       .map((group) => (
                         <div
@@ -488,7 +499,7 @@ export default function UploadGenericResourcePage({
                     className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:outline-none shrink-0"
                   />
                   <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 pt-1">
-                    {(TAG_GROUPS_DATA[selectedPublicGroupKey] || [])
+                    {(PUBLIC_TAG_GROUPS[selectedPublicGroupKey] || [])
                       .filter(sub => sub.includes(publicSubSearch.trim()))
                       .map((subTag) => {
                         const isChecked = addedPublicTags.includes(subTag);
@@ -608,7 +619,7 @@ export default function UploadGenericResourcePage({
                     className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:outline-none shrink-0"
                   />
                   <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-                    {Object.keys(TAG_GROUPS_DATA)
+                    {Object.keys(PERSONAL_TAG_GROUPS)
                       .filter(g => g.includes(personalGroupSearch.trim()))
                       .map((group) => (
                         <div
@@ -640,7 +651,7 @@ export default function UploadGenericResourcePage({
                     className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:outline-none shrink-0"
                   />
                   <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 pt-1">
-                    {(TAG_GROUPS_DATA[selectedPersonalGroupKey] || [])
+                    {(PERSONAL_TAG_GROUPS[selectedPersonalGroupKey] || [])
                       .filter(sub => sub.includes(personalSubSearch.trim()))
                       .map((subTag) => {
                         const isChecked = addedPersonalTags.includes(subTag);
