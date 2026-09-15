@@ -17,8 +17,7 @@ import {
   Calendar,
   Check,
   AlertTriangle,
-  Tag as TagIcon,
-  Image as ImageIcon
+  Tag as TagIcon
 } from "lucide-react";
 
 // 分类层级节点接口
@@ -115,10 +114,7 @@ export default function TagGroupManagementView() {
   const [editingSubTagId, setEditingSubTagId] = useState<string | null>(null);
   const [formStartDate, setFormStartDate] = useState("");
   const [formEndDate, setFormEndDate] = useState("");
-  const [formAiDirection, setFormAiDirection] = useState("其他");
   const [formDescription, setFormDescription] = useState("");
-  const [formImageFile, setFormImageFile] = useState<File | null>(null);
-  const [formImagePreview, setFormImagePreview] = useState<string | null>(null);
 
   // 右侧子标签多选模式 & 批量删除状态
   const [isSelectMode, setIsSelectMode] = useState(false);
@@ -248,20 +244,8 @@ export default function TagGroupManagementView() {
     setFormSubTagNamesText("");
     setFormStartDate("");
     setFormEndDate("");
-    setFormAiDirection("其他");
     setFormDescription("");
-    setFormImageFile(null);
-    setFormImagePreview(null);
     setIsAddSubTagModalOpen(true);
-  };
-
-  // 图片拖拽与上传
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setFormImageFile(file);
-      setFormImagePreview(URL.createObjectURL(file));
-    }
   };
 
   // 提交新增子标签
@@ -288,9 +272,7 @@ export default function TagGroupManagementView() {
       name: n,
       startDate: formStartDate,
       endDate: formEndDate,
-      aiDirection: formAiDirection,
       description: formDescription,
-      imageUrl: formImagePreview || undefined,
     }));
 
     setTagGroups((prev) =>
@@ -299,7 +281,7 @@ export default function TagGroupManagementView() {
           return {
             ...g,
             subTags: editingSubTagId
-              ? g.subTags.map((tag) => tag.id === editingSubTagId ? { ...newSubTags[0], id: tag.id } : tag)
+              ? g.subTags.map((tag) => tag.id === editingSubTagId ? { ...tag, ...newSubTags[0], id: tag.id } : tag)
               : [...g.subTags, ...newSubTags],
           };
         }
@@ -670,8 +652,7 @@ export default function TagGroupManagementView() {
                       onClick={() => {
                         setEditingSubTagId(subTag.id); setFormSubTagNamesText(subTag.name);
                         setFormStartDate(subTag.startDate || ""); setFormEndDate(subTag.endDate || "");
-                        setFormAiDirection(subTag.aiDirection || "其他"); setFormDescription(subTag.description || "");
-                        setFormImagePreview(subTag.imageUrl || null); setFormImageFile(null); setIsAddSubTagModalOpen(true);
+                        setFormDescription(subTag.description || ""); setIsAddSubTagModalOpen(true);
                       }}
                       className="rounded p-0.5 text-slate-400 hover:text-violet-600"
                     ><Edit3 className="h-3.5 w-3.5" /></button>
@@ -1074,7 +1055,7 @@ export default function TagGroupManagementView() {
       )}
 
       {/* ========================================================================= */}
-      {/* 模态框 3：新增标签 (新增子标签，完全对齐截图 4)                             */}
+      {/* 模态框 3：新增 / 编辑标签                                                */}
       {/* ========================================================================= */}
       {isAddSubTagModalOpen && (
         <OverlayPortal role="dialog" aria-modal="true" className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
@@ -1137,26 +1118,7 @@ export default function TagGroupManagementView() {
                 </div>
               </div>
 
-              {/* 3. AI识别方向 */}
-              <div className="flex items-center gap-4">
-                <label className="text-xs font-bold text-slate-700 w-24 text-right shrink-0">
-                  AI识别方向
-                </label>
-                <select
-                  value={formAiDirection}
-                  onChange={(e) => setFormAiDirection(e.target.value)}
-                  className="flex-1 px-3.5 py-2 bg-white border border-slate-200 focus:border-[#7C3AED] focus:ring-1 focus:ring-purple-200 rounded-lg text-xs outline-hidden font-medium text-slate-800 cursor-pointer"
-                >
-                  <option value="其他">其他</option>
-                  <option value="人物/明星">人物/明星</option>
-                  <option value="场景/背景">场景/背景</option>
-                  <option value="产品/商品">产品/商品</option>
-                  <option value="风格/调性">风格/调性</option>
-                  <option value="文案/主题">文案/主题</option>
-                </select>
-              </div>
-
-              {/* 4. 文字描述 */}
+              {/* 3. 文字描述 */}
               <div className="flex items-start gap-4">
                 <label className="text-xs font-bold text-slate-700 w-24 text-right shrink-0 pt-2">
                   文字描述
@@ -1168,42 +1130,6 @@ export default function TagGroupManagementView() {
                   placeholder="请简单描述这个标签"
                   className="flex-1 px-3.5 py-2 bg-white border border-slate-200 focus:border-[#7C3AED] rounded-lg text-xs outline-hidden font-medium text-slate-800 placeholder:text-slate-400 resize-y"
                 />
-              </div>
-
-              {/* 5. 图片描述 */}
-              <div className="flex items-start gap-4">
-                <label className="text-xs font-bold text-slate-700 w-24 text-right shrink-0 pt-2">
-                  图片描述
-                </label>
-                <div className="flex-1 border-2 border-dashed border-slate-200 hover:border-purple-300 rounded-xl p-5 bg-slate-50/50 flex flex-col items-center justify-center text-center relative group transition-colors">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                  />
-                  {formImagePreview ? (
-                    <div className="relative space-y-2">
-                      <img
-                        src={formImagePreview}
-                        alt="预览"
-                        className="w-24 h-24 object-cover rounded-lg border border-slate-200 mx-auto shadow-2xs"
-                      />
-                      <p className="text-[11px] text-purple-600 font-bold">点击更换图片文件</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <p className="text-xs text-slate-500 font-medium">粘贴或拖拽至这里上传</p>
-                      <button
-                        type="button"
-                        className="px-4 py-1.5 border border-dashed border-slate-300 group-hover:border-[#7C3AED] text-slate-600 group-hover:text-[#7C3AED] text-xs font-bold rounded-lg flex items-center gap-1.5 mx-auto bg-white transition-colors"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>添加本地文件</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
               </div>
 
               {/* Modal Footer */}

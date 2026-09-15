@@ -945,7 +945,7 @@ function MediaPickerModal(props: MediaPickerModalProps) {
 
 function StandardMediaPickerModal({ allowed, maxSelections, initialSelected, items, onClose, onConfirm }: MediaPickerModalProps & { allowed: "image" | "video" }) {
   const [tab, setTab] = useState<"library" | "local">("library");
-  const [section, setSection] = useState<"全部" | "成片" | "素材">("全部");
+  const [section, setSection] = useState<"成片" | "素材">("成片");
   const [primaryCategory, setPrimaryCategory] = useState("全部一级分类");
   const [secondaryCategory, setSecondaryCategory] = useState("全部二级分类");
   const [tag, setTag] = useState("全部标签");
@@ -968,7 +968,7 @@ function StandardMediaPickerModal({ allowed, maxSelections, initialSelected, ite
   const statuses = Array.from(new Set(rows.map(({ meta }) => meta.status)));
   const authors = Array.from(new Set(rows.map(({ meta }) => meta.author)));
   const filteredRows = rows.filter(({ item, meta }) =>
-    (allowed === "image" || section === "全部" || meta.section === section) &&
+    (allowed === "image" || meta.section === section) &&
     (primaryCategory === "全部一级分类" || meta.primaryCategory === primaryCategory) &&
     (secondaryCategory === "全部二级分类" || meta.secondaryCategory === secondaryCategory) &&
     (tag === "全部标签" || meta.tag === tag) &&
@@ -1054,7 +1054,7 @@ function StandardMediaPickerModal({ allowed, maxSelections, initialSelected, ite
         </div>
 
         {tab === "library" ? <>
-          {allowed === "video" && <div className="mb-4 flex shrink-0 items-center gap-1 border-b border-slate-200">{(["全部", "成片", "素材"] as const).map((item) => <button key={item} onClick={() => { setSection(item); setPage(1); }} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${section === item ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>{item}</button>)}</div>}
+          {allowed === "video" && <div className="mb-4 flex shrink-0 items-center gap-1 border-b border-slate-200">{(["成片", "素材"] as const).map((item) => <button key={item} onClick={() => { setSection(item); setPage(1); }} className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${section === item ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}>{{ 成片: "成片管理", 素材: "素材管理" }[item]}</button>)}</div>}
           <div className="mb-4 flex shrink-0 flex-nowrap items-center gap-2 overflow-x-auto pb-1">
             <select value={primaryCategory} onChange={(event) => { setPrimaryCategory(event.target.value); setPage(1); }} className="h-9 w-[130px] shrink-0 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部一级分类</option>{primaryCategories.map((item) => <option key={item}>{item}</option>)}</select>
             <select value={secondaryCategory} onChange={(event) => { setSecondaryCategory(event.target.value); setPage(1); }} className="h-9 w-[130px] shrink-0 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部二级分类</option>{secondaryCategories.map((item) => <option key={item}>{item}</option>)}</select>

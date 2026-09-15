@@ -60,6 +60,7 @@ export interface FaceSwapSession {
   selectedVersionId: string | null;
   view: "settings" | "result";
   error: string;
+  demoStatic?: boolean;
 }
 
 export const cloneGroups = (groups: FaceGroup[]) => groups.map((group) => ({

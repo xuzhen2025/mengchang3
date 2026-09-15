@@ -388,6 +388,7 @@ export default function UploadFinishedVideoModal({
 
   const content = (
     <div
+      data-testid={isPage ? "video-upload-page" : undefined}
       className={
         isPage
           ? "flex-1 flex flex-col min-h-0 bg-[#F8F9FD] w-full h-full overflow-hidden animate-in fade-in duration-200"

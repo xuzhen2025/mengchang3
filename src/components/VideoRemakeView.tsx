@@ -1730,7 +1730,7 @@ function FinalStep({ source, shots, finalName, onUpload }: { source: SourceVideo
 
 function SourceVideoModal({ assets, selected, onClose, onConfirm, showToast }: { assets: Asset[]; selected: SourceVideo | null; onClose: () => void; onConfirm: (item: SourceVideo) => void; showToast: (message: string) => void }) {
   const [tab, setTab] = useState<"library" | "local">("library");
-  const [section, setSection] = useState<"全部" | "成片" | "素材">("全部");
+  const [section, setSection] = useState<"成片" | "素材">("成片");
   const [primaryCategory, setPrimaryCategory] = useState("全部一级分类");
   const [secondaryCategory, setSecondaryCategory] = useState("全部二级分类");
   const [tag, setTag] = useState("全部标签");
@@ -1759,7 +1759,7 @@ function SourceVideoModal({ assets, selected, onClose, onConfirm, showToast }: {
   const statuses = Array.from(new Set(videos.map((item) => item.status)));
   const authors = Array.from(new Set(videos.map((item) => item.author)));
   const filtered = videos.filter((item) =>
-    (section === "全部" || item.source.section === section) &&
+    item.source.section === section &&
     (primaryCategory === "全部一级分类" || item.primaryCategory === primaryCategory) &&
     (secondaryCategory === "全部二级分类" || item.secondaryCategory === secondaryCategory) &&
     (tag === "全部标签" || item.tags.includes(tag)) &&
@@ -1791,7 +1791,7 @@ function SourceVideoModal({ assets, selected, onClose, onConfirm, showToast }: {
     <div className="flex h-full min-h-0 flex-col p-5">
       <div className="mb-5 flex shrink-0 items-center justify-between border-b border-slate-200"><div className="flex items-center gap-1"><TabButton active={tab === "library"} onClick={() => switchTab("library")}>资源库</TabButton><TabButton active={tab === "local"} onClick={() => switchTab("local")}>本地上传</TabButton></div><button onClick={onClose} title="关闭" className="mb-1 rounded p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>
       {tab === "library" ? <>
-        <div className="mb-4 flex shrink-0 items-center gap-1 border-b border-slate-200">{(["全部", "成片", "素材"] as const).map((item) => <TabButton key={item} active={section === item} onClick={() => setSection(item)}>{item}</TabButton>)}</div>
+        <div className="mb-4 flex shrink-0 items-center gap-1 border-b border-slate-200">{(["成片", "素材"] as const).map((item) => <TabButton key={item} active={section === item} onClick={() => setSection(item)}>{{ 成片: "成片管理", 素材: "素材管理" }[item]}</TabButton>)}</div>
         <div className="mb-4 flex shrink-0 flex-nowrap items-center gap-2 overflow-x-auto pb-1">
           <select value={primaryCategory} onChange={(event) => setPrimaryCategory(event.target.value)} className="h-9 w-[130px] shrink-0 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部一级分类</option>{primaryCategories.map((item) => <option key={item}>{item}</option>)}</select>
           <select value={secondaryCategory} onChange={(event) => setSecondaryCategory(event.target.value)} className="h-9 w-[130px] shrink-0 rounded-md border border-slate-200 px-2 text-xs text-slate-600"><option>全部二级分类</option>{secondaryCategories.map((item) => <option key={item}>{item}</option>)}</select>

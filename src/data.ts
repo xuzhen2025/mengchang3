@@ -1,4 +1,4 @@
-import { GalleryItem, Asset, Task, CreditTransaction, AppMessage, AiVideoMediaItem } from "./types";
+import { GalleryItem, Asset, Task, CreditTransaction, AppMessage, AiVideoMediaItem, WatermarkTaskSnapshot, EnhanceTaskSnapshot } from "./types";
 
 export const MESSAGE_CATEGORY_CONFIGS = [
   { id: "approval", name: "审批待办", subcategories: ["积分申请"] },
@@ -811,6 +811,53 @@ export const INITIAL_TASKS: Task[] = [
     }
   }
 ];
+
+// Fixed task-queue fixtures keep every category demonstrable without waiting for a
+// live job to finish. The real creation flows continue to use their own lifecycle.
+const DEMO_TASK_VIDEO = "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4";
+const DEMO_TASK_COVER = "https://images.unsplash.com/photo-1485462537746-965f33f7f6a7?w=600&auto=format&fit=crop&q=80";
+const DEMO_TASK_STATUSES: Task["status"][] = ["queue", "generating", "completed", "failed", "cancelled"];
+
+const demoWatermarkSnapshot = (id: string, name: string): WatermarkTaskSnapshot => ({
+  sourceVideo: { id, name: `${name}.mp4`, url: DEMO_TASK_VIDEO, coverUrl: DEMO_TASK_COVER, size: "18.4 MB", duration: 15, resolution: "1920 x 1080" },
+  regions: [{ id: `${id}-region`, x: 76, y: 6, width: 19, height: 12 }],
+});
+
+const makeToolDemoTasks = (category: "watermark" | "subtitle" | "enhance") => DEMO_TASK_STATUSES.map((status, index): Task => {
+  const id = `demo-${category}-${status}`;
+  const label = category === "watermark" ? "视频去水印" : category === "subtitle" ? "字幕擦除" : "画质增强";
+  const sourceName = category === "watermark" ? "秋季女装直播切片" : category === "subtitle" ? "护肤产品口播切片" : "厨房素材画质优化";
+  const snapshot = category === "enhance"
+    ? { sourceVideo: { ...demoWatermarkSnapshot(id, sourceName).sourceVideo, resolution: "1280 x 720", fps: 30 }, requestedResolution: "1080p" as const, outputResolution: "1080p" as const, frameRate: "source" as const, outputFps: 30, billingMinutes: 1 }
+    : demoWatermarkSnapshot(id, sourceName);
+  const output = { name: `${sourceName}_${label}.mp4`, videoUrl: DEMO_TASK_VIDEO, coverUrl: DEMO_TASK_COVER, size: "18.4 MB", duration: 15, resolution: "1920 x 1080" };
+  const enhanceOutput = { ...output, fps: 30, resolution: "1280 x 720" };
+  return {
+    id, name: `${sourceName} · ${label} · ${index + 1}`, type: category, status, progress: status === "completed" ? 100 : status === "generating" ? 56 : status === "failed" ? 64 : 0,
+    inputFiles: [DEMO_TASK_VIDEO], outputFiles: status === "completed" ? [DEMO_TASK_VIDEO] : undefined, createdAt: `2026-09-15 0${9 + index}:2${index}:00`, creditsCost: category === "enhance" ? 18 : 40,
+    refundedCredits: status === "failed" || status === "cancelled" ? (category === "enhance" ? 18 : 40) : undefined, failureReason: status === "failed" ? `${label}处理异常，已停止处理，积分已全额退回。` : undefined,
+    source: "tool", category, autoProgress: false, restartable: status === "failed" || status === "cancelled", cancellable: status === "queue",
+    ...(category === "watermark" ? { watermarkSnapshot: snapshot as WatermarkTaskSnapshot, watermarkOutput: status === "completed" ? output : undefined } : category === "subtitle" ? { subtitleSnapshot: snapshot as WatermarkTaskSnapshot, subtitleOutput: status === "completed" ? output : undefined } : { enhanceSnapshot: snapshot as EnhanceTaskSnapshot, enhanceOutput: status === "completed" ? enhanceOutput : undefined }),
+  };
+});
+
+const makeGeneratedDemoTasks = (): Task[] => {
+  const generic = (category: "agent" | "quick_creation" | "fission" | "ai_video", status: Task["status"], index: number): Task => {
+    const names = { agent: "春季护肤礼盒整合营销成片", quick_creation: "轻薄羽绒服商品展示", fission: "高转化口播爆款复刻", ai_video: "精华液自然光动态展示" };
+    const name = names[category];
+    const base: Task = { id: `demo-${category}-${status}`, name: `${name} · ${index + 1}`, type: category === "fission" ? "fission" : category === "quick_creation" ? "video_gen" : "video_gen", status, progress: status === "completed" ? 100 : status === "generating" ? 48 : 0, inputFiles: [DEMO_TASK_VIDEO], createdAt: `2026-09-14 1${index}:2${index}:00`, creditsCost: category === "ai_video" ? 36 : category === "agent" ? 12 : 20, source: category === "agent" ? "agent" : "tool", category, autoProgress: false, restartable: status === "failed" || status === "cancelled" };
+    if (status === "failed") { base.failureReason = "演示任务处理失败，未消耗部分积分已退回。"; base.refundedCredits = base.creditsCost; }
+    if (status === "cancelled") { base.refundedCredits = base.creditsCost; base.cancelledAt = "2026-09-14 18:20:00"; }
+    if (category === "quick_creation") base.quickCreationSnapshot = { mode: "video", preset: null, prompt: "展示商品核心卖点与真实使用场景", referenceImages: [], referenceVideo: DEMO_TASK_VIDEO, imageAspectRatio: "1:1", imageQuality: "2K", imageCount: 1, videoAspectRatio: "9:16", videoLength: 8, model: "云镜 Max" };
+    if (category === "ai_video") { base.aiVideoSnapshot = { mode: "reference", model: "video-vd-1", ratio: "9:16", duration: 8, prompt: "镜头自然推进，突出商品质感和使用场景。", references: [{ id: `demo-${category}-media`, name: "精华液商品图.jpg", type: "image", url: "./assets/prototype/skincare-product.jpg" }] }; if (status === "completed") base.aiVideoOutput = { videoUrl: DEMO_TASK_VIDEO, coverUrl: DEMO_TASK_COVER, duration: 8, name: `${name}.mp4` }; }
+    if (category === "fission") base.remakeStage = status === "completed" ? "final" : status === "generating" ? "storyboard" : "video_analysis";
+    if (status === "completed") base.outputFiles = [DEMO_TASK_VIDEO];
+    return base;
+  };
+  return (Object.keys({ agent: true, quick_creation: true, fission: true, ai_video: true }) as Array<"agent" | "quick_creation" | "fission" | "ai_video">).flatMap((category) => DEMO_TASK_STATUSES.map((status, index) => generic(category, status, index)));
+};
+
+INITIAL_TASKS.push(...makeToolDemoTasks("watermark"), ...makeToolDemoTasks("subtitle"), ...makeToolDemoTasks("enhance"), ...makeGeneratedDemoTasks());
 
 export const INITIAL_TRANSACTIONS: CreditTransaction[] = [
   {

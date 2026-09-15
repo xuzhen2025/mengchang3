@@ -21,6 +21,8 @@ export function useFinishedVideos(uploadedVideos: Asset[]) {
         .filter((video) => !edits[video.id]?.deleted)
         .map((video) => ({
           ...video,
+          pushCount: video.pushCount ?? video.syncedAccounts?.length ?? 0,
+          referenceCount: video.referenceCount ?? video.secondaryCount ?? video.cuts ?? 0,
           associatedScripts: DEFAULT_ASSOCIATED_SCRIPTS,
           relatedVideos: DEFAULT_RELATED_VIDEOS,
           ...edits[video.id],

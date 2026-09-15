@@ -145,6 +145,21 @@ export default function VideoFaceSwapWorkspace({ assets, task, credits, onBack, 
     finally { setDownloading(false); }
   };
 
+  if (publishVersion && session) {
+    return <UploadFinishedVideoModal
+      isOpen
+      isPage
+      lockFiles
+      initialFiles={[{ name: publishVersion.name, type: "video", url: publishVersion.videoUrl }]}
+      initialTaskCode={task?.id}
+      onClose={() => setPublishVersion(null)}
+      onPublishSuccess={(message, details) => {
+        if (details) onPublish(session.source, publishVersion, details);
+        setToast(message);
+      }}
+    />;
+  }
+
   return <div className="mr-10 flex h-full min-h-0 flex-col overflow-hidden bg-white text-slate-800" data-testid="face-swap-workspace">
     <header className="grid shrink-0 grid-cols-1 items-center gap-2 border-b border-slate-200 px-3 py-3 md:px-6 xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
       <div className="flex min-w-0 items-center gap-3">
@@ -248,7 +263,6 @@ export default function VideoFaceSwapWorkspace({ assets, task, credits, onBack, 
         <div className="flex shrink-0 justify-end gap-3 border-t border-slate-100 px-5 py-4"><button className={secondary} onClick={() => setMergeSourceId(null)}>取消</button><button disabled={!mergeTarget} className={primary} onClick={() => { update((current) => mergeFaceGroups(current, mergeSource.id, mergeTargetId)); setMergeSourceId(null); setSelectedCrops({}); setToast("已合并角色并保留目标组人像"); }}>确认合并</button></div>
       </div>
     </OverlayPortal>}
-    {publishVersion && session && <UploadFinishedVideoModal isOpen lockFiles initialFiles={[{ name: publishVersion.name, type: "video", url: publishVersion.videoUrl }]} initialTaskCode={task?.id} onClose={() => setPublishVersion(null)} onPublishSuccess={(message, details) => { if (details) onPublish(session.source, publishVersion, details); setToast(message); }} />}
     {toast && <OverlayPortal layer="toast" className="pointer-events-none fixed inset-x-4 top-5 flex justify-center"><div role="status" className="flex max-w-lg items-center gap-2 rounded-md border border-emerald-100 bg-white px-4 py-3 text-sm text-emerald-700 shadow-lg"><Check size={16} />{toast}</div></OverlayPortal>}
   </div>;
 }

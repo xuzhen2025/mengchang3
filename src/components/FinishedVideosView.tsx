@@ -23,6 +23,8 @@ import {
   Share2, 
   Sliders, 
   Download, 
+  Send,
+  Copy,
   Sparkles, 
   Plus, 
   Search, 
@@ -1483,17 +1485,17 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
                   <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 z-10 text-white flex items-center justify-center text-[10px] font-mono ${viral ? "pr-10" : ""}`}>
                     {/* 3 icons centered */}
                     <div data-testid="finished-video-stats" className={`flex items-center justify-center text-white/90 ${viral ? "min-w-0 flex-wrap gap-1" : "gap-3.5"}`}>
-                      <span className="flex items-center gap-0.5" title="剪切/分镜数">
-                        <Scissors className="w-3 h-3 text-white/80" />
-                        <span>{video.cuts || 0}</span>
-                      </span>
-                      <span className="flex items-center gap-0.5" title="下载次数">
+                      <span className="flex items-center gap-0.5" title="下载次数" aria-label={`下载 ${video.downloads || 0} 次`}>
                         <Download className="w-3 h-3 text-white/80" />
                         <span>{video.downloads || 0}</span>
                       </span>
-                      <span className="flex items-center gap-0.5" title="分享转发数">
-                        <Share2 className="w-3 h-3 text-white/80" />
-                        <span>{video.shares || 0}</span>
+                      <span className="flex items-center gap-0.5" title="推送次数" aria-label={`推送 ${video.pushCount || 0} 次`}>
+                        <Send className="w-3 h-3 text-white/80" />
+                        <span>{video.pushCount || 0}</span>
+                      </span>
+                      <span className="flex items-center gap-0.5" title="被引用次数" aria-label={`被引用 ${video.referenceCount || 0} 次`}>
+                        <Copy className="w-3 h-3 text-white/80" />
+                        <span>{video.referenceCount || 0}</span>
                       </span>
                     </div>
                   </div>

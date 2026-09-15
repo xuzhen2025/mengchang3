@@ -669,6 +669,8 @@ export default function FinishedVideoDetailModal({
   const [annotationType, setAnnotationType] = useState<"片段批注" | "单帧批注" | null>(null);
   const [clipStart, setClipStart] = useState<number>(2.5);
   const [clipEnd, setClipEnd] = useState<number>(6.5);
+  const [draggingClipHandle, setDraggingClipHandle] = useState<"start" | "end" | null>(null);
+  const clipTrackRef = useRef<HTMLDivElement | null>(null);
   const [activeDrawTool, setActiveDrawTool] = useState<"rect" | "arrow" | "pencil" | "text">("text");
   const [drawColor, setDrawColor] = useState<string>("#ef4444");
   const [selectedAnnotationRange, setSelectedAnnotationRange] = useState("0分2秒50 至 0分6秒50");
@@ -695,6 +697,47 @@ export default function FinishedVideoDetailModal({
     const endStr = `${eMin}分${eSec.toString().padStart(2, "0")}秒${eMs.toString().padStart(2, "0")}`;
 
     setSelectedAnnotationRange(`${startStr} 至 ${endStr}`);
+  };
+
+  const clipTrackDuration = duration || 15;
+  const clipPercent = (value: number) => `${Math.max(0, Math.min(100, (value / clipTrackDuration) * 100))}%`;
+  const setClipHandleValue = (handle: "start" | "end", value: number) => {
+    const next = Math.max(0, Math.min(clipTrackDuration, value));
+    if (handle === "start") {
+      const clamped = Math.min(clipEnd - 0.2, next);
+      setClipStart(clamped);
+      updateSegmentRangeText(clamped, clipEnd);
+    } else {
+      const clamped = Math.max(clipStart + 0.2, next);
+      setClipEnd(clamped);
+      updateSegmentRangeText(clipStart, clamped);
+    }
+  };
+  const clipValueFromPointer = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rect = clipTrackRef.current?.getBoundingClientRect();
+    if (!rect || !rect.width) return 0;
+    return ((event.clientX - rect.left) / rect.width) * clipTrackDuration;
+  };
+  const beginClipDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    const value = clipValueFromPointer(event);
+    const handle = Math.abs(value - clipStart) <= Math.abs(value - clipEnd) ? "start" : "end";
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDraggingClipHandle(handle);
+    setClipHandleValue(handle, value);
+  };
+  const moveClipDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (draggingClipHandle) setClipHandleValue(draggingClipHandle, clipValueFromPointer(event));
+  };
+  const endClipDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    setDraggingClipHandle(null);
+  };
+  const nudgeClipHandle = (handle: "start" | "end", event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const current = handle === "start" ? clipStart : clipEnd;
+    const step = event.key === "Home" ? -clipTrackDuration : event.key === "End" ? clipTrackDuration : event.key === "ArrowLeft" ? -0.1 : 0.1;
+    setClipHandleValue(handle, current + step);
   };
 
   const commitTextShape = () => {
@@ -1626,72 +1669,60 @@ export default function FinishedVideoDetailModal({
                           </span>
                         </div>
 
-                        {/* Progress Bar 1: 开始时间 (Start Time - FIRST) */}
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-[11px] text-slate-600 font-medium">
-                            <span>1. 开始时间 (Start Time)</span>
-                            <span className="font-mono text-purple-600 font-bold">{Math.floor(clipStart / 60)}分{Math.floor(clipStart % 60).toString().padStart(2, '0')}秒{(Math.floor((clipStart % 1) * 100)).toString().padStart(2, '0')}</span>
+                        {/* Single range track with two handles for the selected clip interval. */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-[11px] font-medium">
+                            <span className="flex items-center gap-1.5 text-slate-600"><span className="h-2 w-2 rounded-full bg-purple-600" />开始时间 <span className="font-mono font-bold text-purple-600">{Math.floor(clipStart / 60)}分{Math.floor(clipStart % 60).toString().padStart(2, '0')}秒{(Math.floor((clipStart % 1) * 100)).toString().padStart(2, '0')}</span></span>
+                            <span className="flex items-center gap-1.5 text-slate-600"><span className="h-2 w-2 rounded-full bg-purple-600" />结束时间 <span className="font-mono font-bold text-purple-600">{Math.floor(clipEnd / 60)}分{Math.floor(clipEnd % 60).toString().padStart(2, '0')}秒{(Math.floor((clipEnd % 1) * 100)).toString().padStart(2, '0')}</span></span>
                           </div>
-                          <div className="relative flex items-center h-4">
-                            <div className="w-full h-2 bg-slate-200 rounded-full relative overflow-hidden">
-                              <div 
-                                className="h-full bg-purple-600 absolute left-0 top-0 rounded-full"
-                                style={{ width: `${(clipStart / (duration || 15)) * 100}%` }}
-                              />
+                          <div
+                            ref={clipTrackRef}
+                            role="group"
+                            aria-label="片段截取区间"
+                            onPointerDown={beginClipDrag}
+                            onPointerMove={moveClipDrag}
+                            onPointerUp={endClipDrag}
+                            onPointerCancel={endClipDrag}
+                            className="relative h-9 cursor-pointer touch-none select-none"
+                          >
+                            <div className="absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-slate-200" />
+                            <div
+                              className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-purple-600 shadow-[0_0_0_3px_rgba(147,51,234,0.12)]"
+                              style={{ left: clipPercent(clipStart), width: `${Math.max(0, ((clipEnd - clipStart) / clipTrackDuration) * 100)}%` }}
+                            />
+                            <div className="absolute inset-x-0 top-1/2 flex -translate-y-1/2 justify-between text-[10px] text-slate-400 pointer-events-none">
+                              <span>0秒</span><span>{Math.floor(clipTrackDuration / 60)}分{Math.floor(clipTrackDuration % 60).toString().padStart(2, '0')}秒</span>
                             </div>
-                            <input
-                              type="range"
-                              min={0}
-                              max={duration || 15}
-                              step={0.1}
-                              value={clipStart}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value);
-                                // ENFORCE: clipStart CANNOT exceed clipEnd - 0.2
-                                const clamped = Math.min(clipEnd - 0.2, val);
-                                setClipStart(clamped);
-                                updateSegmentRangeText(clamped, clipEnd);
-                              }}
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                            />
-                            <div 
-                              className="w-4 h-4 bg-white border-2 border-purple-600 rounded-full shadow-md absolute pointer-events-none z-20 -ml-2"
-                              style={{ left: `${(clipStart / (duration || 15)) * 100}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Progress Bar 2: 结尾时间 (End Time - SECOND) */}
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-[11px] text-slate-600 font-medium">
-                            <span>2. 结尾时间 (End Time)</span>
-                            <span className="font-mono text-amber-600 font-bold">{Math.floor(clipEnd / 60)}分{Math.floor(clipEnd % 60).toString().padStart(2, '0')}秒{(Math.floor((clipEnd % 1) * 100)).toString().padStart(2, '0')}</span>
-                          </div>
-                          <div className="relative flex items-center h-4">
-                            <div className="w-full h-2 bg-slate-200 rounded-full relative overflow-hidden">
-                              <div 
-                                className="h-full bg-amber-500 absolute left-0 top-0 rounded-full"
-                                style={{ width: `${(clipEnd / (duration || 15)) * 100}%` }}
-                              />
-                            </div>
-                            <input
-                              type="range"
-                              min={0}
-                              max={duration || 15}
-                              step={0.1}
-                              value={clipEnd}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value);
-                                const clamped = Math.max(clipStart + 0.2, val);
-                                setClipEnd(clamped);
-                                updateSegmentRangeText(clipStart, clamped);
-                              }}
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                            />
-                            <div 
-                              className="w-4 h-4 bg-white border-2 border-amber-500 rounded-full shadow-md absolute pointer-events-none z-20 -ml-2"
-                              style={{ left: `${(clipEnd / (duration || 15)) * 100}%` }}
-                            />
+                            {(["start", "end"] as const).map((handle) => {
+                              const value = handle === "start" ? clipStart : clipEnd;
+                              return (
+                                <div
+                                  key={handle}
+                                  role="slider"
+                                  tabIndex={0}
+                                  aria-label={handle === "start" ? "开始时间" : "结束时间"}
+                                  aria-valuemin={0}
+                                  aria-valuemax={clipTrackDuration}
+                                  aria-valuenow={Number(value.toFixed(1))}
+                                  onKeyDown={(event) => nudgeClipHandle(handle, event)}
+                                  className={`absolute top-1/2 z-10 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-transparent outline-none transition-shadow focus:ring-2 focus:ring-purple-200 ${draggingClipHandle === handle ? "ring-2 ring-purple-200" : ""}`}
+                                  style={{ left: clipPercent(value) }}
+                                  onPointerDown={(event) => {
+                                    event.stopPropagation();
+                                    event.currentTarget.setPointerCapture(event.pointerId);
+                                    setDraggingClipHandle(handle);
+                                  }}
+                                  onPointerMove={(event) => {
+                                    if (draggingClipHandle === handle) setClipHandleValue(handle, clipValueFromPointer(event));
+                                  }}
+                                  onPointerUp={(event) => {
+                                    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+                                    setDraggingClipHandle(null);
+                                  }}
+                                  onPointerCancel={() => setDraggingClipHandle(null)}
+                                ><span className="block h-4 w-4 rounded-full border-2 border-purple-600 bg-white shadow-md transition-shadow hover:shadow-lg" /></div>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>

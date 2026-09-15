@@ -67,7 +67,6 @@ export default function VideoResourcePickerModal({
   initialSection = "成片",
   initialSourceTab = "library",
   allowLocalUpload = false,
-  showAllSection = false,
   maxSelections,
   maxFileSizeMB = 1000,
   allowImageSelection = false,
@@ -78,7 +77,7 @@ export default function VideoResourcePickerModal({
   const items = useScopedTaggedResources<VideoResourcePickerItem>(sourceItems, (item) => item.section === "成片" ? "finished" : item.section === "图片" ? "images" : "materials");
   const imageItems = useTaggedResources("images", sourceImageItems);
   const [sourceTab, setSourceTab] = useState<"library" | "local">(allowLocalUpload ? initialSourceTab : "library");
-  const [section, setSection] = useState<VideoResourceSection | "全部">(allowImageSelection ? initialSection : showAllSection ? "全部" : initialSection);
+  const [section, setSection] = useState<VideoResourceSection>(initialSection);
   const [primaryCategory, setPrimaryCategory] = useState("全部一级分类");
   const [secondaryCategory, setSecondaryCategory] = useState("全部二级分类");
   const [tag, setTag] = useState("全部标签");
@@ -100,11 +99,11 @@ export default function VideoResourcePickerModal({
   const selectableImageItems = useMemo<VideoResourcePickerItem[]>(() => imageItems.map((item) => ({ ...item, section: "图片", duration: "图片", kind: "image" })), [imageItems]);
   const allItems = useMemo(() => [...items, ...selectableImageItems, ...localItems], [items, localItems, selectableImageItems]);
   const sectionItems = useMemo(
-    () => [...items, ...(allowImageSelection ? selectableImageItems : [])].filter((item) => section === "全部" || item.section === section),
+    () => [...items, ...(allowImageSelection ? selectableImageItems : [])].filter((item) => item.section === section),
     [allowImageSelection, items, section, selectableImageItems],
   );
   const { store: configStore } = useResourceConfig();
-  const scopes = section === "全部" ? ["finished", "materials"] : [section === "成片" ? "finished" : section === "素材" ? "materials" : "images"];
+  const scopes = [section === "成片" ? "finished" : section === "素材" ? "materials" : "images"];
   const categoryNodes = scopes.flatMap(scope => configStore.categories(scope));
   const primaryCategories = uniqueValues(categoryNodes.map(n => n.name));
   const secondaryCategories = uniqueValues(categoryNodes.filter(n => primaryCategory === "全部一级分类" || n.name === primaryCategory).flatMap(n => n.children.map(c => c.name)));
@@ -226,7 +225,7 @@ export default function VideoResourcePickerModal({
           {sourceTab === "library" ? <>
           <div className="flex shrink-0 items-center justify-between border-b border-slate-200">
             <div className="flex items-center gap-1">
-              {(allowImageSelection ? (["成片", "素材", "图片"] as const) : showAllSection ? (["全部", "成片", "素材"] as const) : (["成片", "素材"] as const)).map((item) => (
+              {(allowImageSelection ? (["成片", "素材", "图片"] as const) : (["成片", "素材"] as const)).map((item) => (
                 <button
                   key={item}
                   type="button"
@@ -241,7 +240,7 @@ export default function VideoResourcePickerModal({
                   }}
                   className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${section === item ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}
                 >
-                  {item}
+                  {{ 成片: "成片管理", 素材: "素材管理", 图片: "图片管理" }[item]}
                 </button>
               ))}
             </div>

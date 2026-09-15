@@ -431,6 +431,20 @@ export default function VideoWatermarkWorkspace({
     </div>
   );
 
+  if (uploadOpen && output) {
+    return <UploadFinishedVideoModal
+      key={`${task?.id}-${outputName}`}
+      isOpen
+      isPage
+      initialFiles={[{ name: outputName || output.name, type: "video/mp4", url: output.videoUrl }]}
+      onClose={() => { setUploadOpen(false); setIsPlaying(false); setCurrentTime(0); }}
+      onPublishSuccess={(message) => {
+        onUploadResult({ ...output, name: outputName || output.name });
+        setToast(message);
+      }}
+    />;
+  }
+
   return (
     <section className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto bg-slate-50 text-slate-800 lg:overflow-hidden">
       <header className="shrink-0 border-b border-slate-200 bg-white px-6 py-4">
@@ -519,7 +533,6 @@ export default function VideoWatermarkWorkspace({
       </div>
 
       {pickerOpen && <VideoResourcePickerModal items={videoItems} initialSelectedIds={draftVideo ? [draftVideo.id] : []} allowLocalUpload showAllSection maxSelections={1} onClose={() => setPickerOpen(false)} onConfirm={handlePickerConfirm} />}
-      {uploadOpen && output && <UploadFinishedVideoModal key={`${task?.id}-${outputName}`} isOpen initialFiles={[{ name: outputName || output.name, type: "video/mp4", url: output.videoUrl }]} onClose={() => setUploadOpen(false)} onPublishSuccess={(message) => { onUploadResult({ ...output, name: outputName || output.name }); setToast(message); }} />}
       {toast && <OverlayPortal layer="toast" className="fixed left-1/2 top-6 -translate-x-1/2 rounded-md bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xl">{toast}</OverlayPortal>}
     </section>
   );

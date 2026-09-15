@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useAdStore } from "./lib/useAdStore";
 import Sidebar from "./components/Sidebar";
-import RightQueue from "./components/TaskQueuePanel";
+import RightQueue, { type TaskQueueUploadRequest } from "./components/TaskQueuePanel";
+import UploadFinishedVideoModal from "./components/UploadFinishedVideoModal";
 import MaterialSelector from "./components/MaterialSelector";
 import CreditsDashboard from "./components/CreditsDashboard";
 import HomeView from "./components/HomeView";
@@ -164,8 +165,10 @@ export default function App() {
     type: "图片" | "成片";
     files: Array<{ name: string; type: string; url: string }>;
   } | null>(null);
+  const [queueUploadRequest, setQueueUploadRequest] = useState<TaskQueueUploadRequest | null>(null);
 
   const handleNavigate = (screen: ActiveScreen) => {
+    setQueueUploadRequest(null);
     setScreenHistory((prev) => {
       if (prev[prev.length - 1] === screen) return prev;
       return [...prev, screen];
@@ -173,6 +176,7 @@ export default function App() {
   };
 
   const handleBack = () => {
+    setQueueUploadRequest(null);
     setScreenHistory((prev) => {
       if (prev.length > 1) {
         return prev.slice(0, -1);
@@ -182,6 +186,7 @@ export default function App() {
   };
 
   const handleSidebarNavigate = (screen: ActiveScreen) => {
+    setQueueUploadRequest(null);
     if (screen === "resources") {
       setResourceSearchIntent(null);
     }
@@ -237,6 +242,7 @@ export default function App() {
 
   const handleModeChange = (mode: AppMode) => {
     if (!currentAccount?.allowedModes.includes(mode)) return;
+    setQueueUploadRequest(null);
     const nextSession = { username: currentAccount.username, mode };
     window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextSession));
     setSession(nextSession);
@@ -245,6 +251,7 @@ export default function App() {
   };
 
   const handleConfirmLogout = () => {
+    setQueueUploadRequest(null);
     window.localStorage.removeItem(AUTH_STORAGE_KEY);
     setLogoutDialogOpen(false);
     setSession(null);
@@ -1898,7 +1905,17 @@ export default function App() {
 
       {/* 2. Main Workspace screen router */}
       <main className="flex-1 flex flex-col relative overflow-y-auto">
-        {renderMainView()}
+        {/* Keep the current workspace draft mounted while uploading a queue result. */}
+        <div className={queueUploadRequest ? "hidden" : "contents"}>
+          {renderMainView()}
+        </div>
+        {queueUploadRequest && <UploadFinishedVideoModal
+          isOpen
+          isPage
+          initialFiles={queueUploadRequest.files}
+          onClose={() => { setQueueUploadRequest(null); setIsQueueOpen(true); }}
+          onPublishSuccess={queueUploadRequest.onPublishSuccess}
+        />}
       </main>
 
       {/* 3. Right task queue drawer */}
@@ -1911,6 +1928,11 @@ export default function App() {
           restartTask={handleRestartGenerationTask}
           uploadEraseResult={handleUploadEraseResult}
           uploadEnhanceResult={handleUploadEnhanceResult}
+          uploadPageOpen={Boolean(queueUploadRequest)}
+          onUploadToLibrary={(request) => {
+            setQueueUploadRequest(request);
+            setIsQueueOpen(false);
+          }}
           viewResult={(taskId) => {
             if (faceSwap.tasks.some((task) => task.id === taskId)) {
               setActiveFaceSwapTaskId(taskId);

@@ -21,7 +21,11 @@ import {
 } from "lucide-react";
 import { EnhanceTaskOutput, GenerationTaskCategory, Task, WatermarkTaskOutput } from "../types";
 import OverlayPortal from "./overlays/OverlayPortal";
-import UploadFinishedVideoModal from "./UploadFinishedVideoModal";
+
+export interface TaskQueueUploadRequest {
+  files: Array<{ name: string; type: string; url: string }>;
+  onPublishSuccess: (message: string) => void;
+}
 
 interface TaskQueuePanelProps {
   tasks: Task[];
@@ -32,6 +36,8 @@ interface TaskQueuePanelProps {
   viewResult: (taskId: string) => void;
   uploadEraseResult: (type: "watermark" | "subtitle", output: WatermarkTaskOutput) => void;
   uploadEnhanceResult: (output: EnhanceTaskOutput) => void;
+  onUploadToLibrary: (request: TaskQueueUploadRequest) => void;
+  uploadPageOpen: boolean;
 }
 
 const CATEGORY_META: Record<GenerationTaskCategory, { label: string; shortLabel: string }> = {
@@ -126,12 +132,11 @@ const getTaskStageLabel = (task: Task, category: GenerationTaskCategory) => {
   return "";
 };
 
-export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, restartTask, viewResult, uploadEraseResult, uploadEnhanceResult }: TaskQueuePanelProps) {
+export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, restartTask, viewResult, uploadEraseResult, uploadEnhanceResult, onUploadToLibrary, uploadPageOpen }: TaskQueuePanelProps) {
   const [tab, setTab] = useState<"recent" | "all">("recent");
   const [recentCategory, setRecentCategory] = useState<"agent" | "tool">("agent");
   const [allCategory, setAllCategory] = useState<"all" | GenerationTaskCategory>("all");
   const [eraseDetailTaskId, setEraseDetailTaskId] = useState<string | null>(null);
-  const [eraseUploadTaskId, setEraseUploadTaskId] = useState<string | null>(null);
   const [eraseOutputName, setEraseOutputName] = useState("");
   const [toast, setToast] = useState("");
   const [launcherTop, setLauncherTop] = useState<number | null>(null);
@@ -168,9 +173,6 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
   }, []), [visibleTasks]);
   const selectedEraseDetailTask = eraseDetailTaskId ? tasks.find((task) => task.id === eraseDetailTaskId) || null : null;
   const eraseDetailTask = selectedEraseDetailTask && hasVideoProcessSnapshot(selectedEraseDetailTask) ? selectedEraseDetailTask : null;
-  const eraseUploadTask = eraseUploadTaskId ? tasks.find((task) => task.id === eraseUploadTaskId) || null : null;
-  const eraseUploadType = eraseUploadTask?.category === "enhance" ? "enhance" : eraseUploadTask?.category === "subtitle" ? "subtitle" : "watermark";
-  const eraseUploadOutput = eraseUploadType === "enhance" ? eraseUploadTask?.enhanceOutput : eraseUploadType === "subtitle" ? eraseUploadTask?.subtitleOutput : eraseUploadTask?.watermarkOutput;
 
   useEffect(() => {
     if (!toast) return;
@@ -195,16 +197,23 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
     link.click();
   };
 
-  const uploadProcessedResult = (message: string) => {
-    if (!eraseUploadTask) return;
-    if (eraseUploadTask.category === "enhance" && eraseUploadTask.enhanceOutput) {
-      uploadEnhanceResult({ ...eraseUploadTask.enhanceOutput, name: eraseOutputName || eraseUploadTask.enhanceOutput.name });
-    } else if (eraseUploadTask.category === "subtitle" && eraseUploadTask.subtitleOutput) {
-      uploadEraseResult("subtitle", { ...eraseUploadTask.subtitleOutput, name: eraseOutputName || eraseUploadTask.subtitleOutput.name });
-    } else if (eraseUploadTask.watermarkOutput) {
-      uploadEraseResult("watermark", { ...eraseUploadTask.watermarkOutput, name: eraseOutputName || eraseUploadTask.watermarkOutput.name });
-    }
-    setToast(message);
+  const openResultUpload = (task: Task) => {
+    const output = task.category === "enhance" ? task.enhanceOutput : task.category === "subtitle" ? task.subtitleOutput : task.watermarkOutput;
+    if (task.status !== "completed" || !output) return;
+    const name = eraseOutputName || output.name;
+    onUploadToLibrary({
+      files: [{ name, type: "video/mp4", url: output.videoUrl }],
+      onPublishSuccess: (message) => {
+        if (task.category === "enhance" && task.enhanceOutput) {
+          uploadEnhanceResult({ ...task.enhanceOutput, name });
+        } else if (task.category === "subtitle" && task.subtitleOutput) {
+          uploadEraseResult("subtitle", { ...task.subtitleOutput, name });
+        } else if (task.watermarkOutput) {
+          uploadEraseResult("watermark", { ...task.watermarkOutput, name });
+        }
+        setToast(message);
+      },
+    });
   };
 
   useEffect(() => {
@@ -267,6 +276,8 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
     setIsOpen(true);
   };
 
+  if (uploadPageOpen) return null;
+
   if (!isOpen) {
     return (
       <OverlayPortal
@@ -326,10 +337,9 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
           {(eraseDetailTask.status === "queue" || eraseDetailTask.status === "generating") && <div className="mt-4 rounded-md border border-blue-100 bg-blue-50 p-3"><div className="flex items-center justify-between text-[11px] font-semibold text-blue-700"><span className="flex items-center gap-1.5">{eraseDetailTask.status === "queue" ? <Clock3 className="h-3.5 w-3.5" /> : <Loader2 className="h-3.5 w-3.5 animate-spin" />}{eraseDetailTask.status === "queue" ? "等待处理资源" : isEnhance ? "正在增强视频画质" : isSubtitle ? "正在擦除字幕" : "正在去除水印"}</span><span className="font-mono">{eraseDetailTask.progress}%</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-blue-100"><div className="h-full rounded-full bg-blue-600 transition-[width]" style={{ width: `${Math.max(eraseDetailTask.progress, 3)}%` }} /></div>{eraseDetailTask.status === "queue" && <button type="button" onClick={() => cancelTask(eraseDetailTask.id)} className="mt-3 w-full rounded-md border border-rose-200 bg-white py-2 text-[11px] font-semibold text-rose-600 hover:bg-rose-50">取消排队</button>}</div>}
           {eraseDetailTask.status === "cancelled" && <p className="mt-4 rounded-md border border-amber-100 bg-amber-50 p-3 text-[11px] leading-5 text-amber-700">任务已取消，{eraseDetailTask.creditsCost} 积分已全额退回。</p>}
           {eraseDetailTask.status === "failed" && <p className="mt-4 rounded-md border border-rose-100 bg-rose-50 p-3 text-[11px] leading-5 text-rose-700">{eraseDetailTask.failureReason || `处理失败，${eraseDetailTask.creditsCost} 积分已全额退回。`}</p>}
-          {eraseDetailTask.status === "completed" && output && <div className="mt-4 space-y-3"><div><label className="mb-1.5 block text-[10px] font-semibold text-slate-500">输出文件名称</label><input value={eraseOutputName} onChange={(event) => setEraseOutputName(event.target.value)} className="h-9 w-full rounded-md border border-slate-200 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-violet-400" /></div><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => downloadEraseResult(eraseDetailTask)} className="flex h-9 items-center justify-center gap-1.5 rounded-md border border-slate-200 text-xs font-semibold text-slate-600 hover:border-violet-300 hover:text-violet-700"><Download className="h-3.5 w-3.5" />下载视频</button><button type="button" onClick={() => setEraseUploadTaskId(eraseDetailTask.id)} className="flex h-9 items-center justify-center gap-1.5 rounded-md bg-violet-600 text-xs font-semibold text-white hover:bg-violet-700"><Upload className="h-3.5 w-3.5" />上传资源库</button></div></div>}
+          {eraseDetailTask.status === "completed" && output && <div className="mt-4 space-y-3"><div><label className="mb-1.5 block text-[10px] font-semibold text-slate-500">输出文件名称</label><input value={eraseOutputName} onChange={(event) => setEraseOutputName(event.target.value)} className="h-9 w-full rounded-md border border-slate-200 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-violet-400" /></div><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => downloadEraseResult(eraseDetailTask)} className="flex h-9 items-center justify-center gap-1.5 rounded-md border border-slate-200 text-xs font-semibold text-slate-600 hover:border-violet-300 hover:text-violet-700"><Download className="h-3.5 w-3.5" />下载视频</button><button type="button" onClick={() => openResultUpload(eraseDetailTask)} className="flex h-9 items-center justify-center gap-1.5 rounded-md bg-violet-600 text-xs font-semibold text-white hover:bg-violet-700"><Upload className="h-3.5 w-3.5" />上传资源库</button></div></div>}
         </div>
       </OverlayPortal>
-      {eraseUploadTask && eraseUploadOutput && <UploadFinishedVideoModal key={`${eraseUploadTask.id}-${eraseOutputName}`} isOpen initialFiles={[{ name: eraseOutputName || eraseUploadOutput.name, type: "video/mp4", url: eraseUploadOutput.videoUrl }]} onClose={() => setEraseUploadTaskId(null)} onPublishSuccess={uploadProcessedResult} />}
       {toast && <OverlayPortal layer="toast" className="fixed left-1/2 top-6 -translate-x-1/2 rounded-md bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xl">{toast}</OverlayPortal>}
     </>;
   }

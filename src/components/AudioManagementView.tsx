@@ -538,10 +538,12 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
           </div>
         </div>
 
-        {/* Row 2: 一级分类 */}
-        <div className="flex items-start justify-between pb-2 border-b border-slate-100">
-          <ResourceCategoryFilters scope="audio" primary={selectedPrimaryCategory} secondary={selectedSecondaryCategory} search={searchCategoryKeyword}
-            onPrimary={setSelectedPrimaryCategory} onSecondary={setSelectedSecondaryCategory} onSearch={setSearchCategoryKeyword} />
+        {/* Row 2-3: 一级分类、二级分类 */}
+        <div className="flex items-start justify-between gap-3 pb-2 border-b border-slate-100">
+          <div className="flex min-w-0 flex-1 flex-col gap-3">
+            <ResourceCategoryFilters scope="audio" primary={selectedPrimaryCategory} secondary={selectedSecondaryCategory} search={searchCategoryKeyword}
+              onPrimary={setSelectedPrimaryCategory} onSecondary={setSelectedSecondaryCategory} onSearch={setSearchCategoryKeyword} />
+          </div>
           <button
             onClick={() => setShowMorePrimary(!showMorePrimary)}
             className="text-purple-600 hover:text-purple-700 font-bold text-xs flex items-center gap-0.5 shrink-0 pt-1 cursor-pointer hover:underline"
@@ -550,9 +552,6 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
             <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showMorePrimary ? "rotate-180" : ""}`} />
           </button>
         </div>
-
-        {/* Row 3: 二级分类 */}
-
 
         {/* Row 4: 公共标签 */}
         <div className="flex items-center gap-2 pb-2 border-b border-slate-100 flex-wrap">

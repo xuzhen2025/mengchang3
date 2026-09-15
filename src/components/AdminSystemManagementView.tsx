@@ -356,7 +356,7 @@ const INITIAL_ROLES: RolePermission[] = [
     name: "普通员工",
     code: "STAFF",
     type: "preset",
-    category: "default",
+    category: "other",
     description: "基础工作台、本人资源与被分配任务的最小可用权限",
     memberCount: 18,
     dataScope: "self",
@@ -370,7 +370,7 @@ const INITIAL_ROLES: RolePermission[] = [
     name: "超级管理员",
     code: "SUPER_ADMIN",
     type: "preset",
-    category: "other",
+    category: "default",
     description: "全站最高控制权限，全选所有业务模块与系统管理权限",
     memberCount: 2,
     dataScope: "all",
@@ -675,6 +675,21 @@ const INITIAL_ROLES: RolePermission[] = [
     updatedAt: "2026-08-19 16:20"
   }
 ];
+
+const SUPER_ADMIN_ROLE_ID = "role_super_admin";
+
+function normalizeSystemRoles(roles: RolePermission[]): RolePermission[] {
+  const superAdmin = INITIAL_ROLES.find(role => role.id === SUPER_ADMIN_ROLE_ID)!;
+  const next = roles.map<RolePermission>(role => role.id === SUPER_ADMIN_ROLE_ID
+    ? { ...role, name: superAdmin.name, code: superAdmin.code, type: "preset",
+      category: "default", description: superAdmin.description,
+      enabled: true, dataScope: "all", checkedKeys: [...ALL_PERMISSION_KEYS] }
+    : { ...role, category: role.category === "default" ? "other" : role.category });
+  // Preserve role IDs and ordering because existing member defaults use array positions.
+  if (!next.some(role => role.id === "role_staff")) next.unshift({ ...INITIAL_ROLES[0] });
+  if (!next.some(role => role.id === SUPER_ADMIN_ROLE_ID)) next.push({ ...superAdmin, checkedKeys: [...ALL_PERMISSION_KEYS] });
+  return next;
+}
 
 // ---------------------------------------------------------------------------
 // TYPES & DATA STRUCTURES FOR NOTIFICATIONS
@@ -1169,7 +1184,7 @@ export default function AdminSystemManagementView() {
       selectedDeptId: selDeptId,
       selectedGroupId: selGroupId,
       deptId: finalDeptId,
-      roleId: roles[2]?.id || roles[0]?.id || "",
+      roleId: [roles[2], ...roles].find(role => role && role.id !== SUPER_ADMIN_ROLE_ID)?.id || "",
       dataScope: "self",
       status: "normal",
       boundAccount: "巨量千川-千川主账号01 (1776342461268999)",
@@ -1347,7 +1362,7 @@ export default function AdminSystemManagementView() {
 
   const handleOpenInviteModal = () => {
     const defaultDeptId = depts.find(d => d.id !== "dept_root")?.id || depts[0]?.id || "dept_root";
-    const defaultRoleId = roles.find(r => r.id !== "super_admin")?.id || roles[0]?.id || "";
+    const defaultRoleId = roles.find(r => r.id !== SUPER_ADMIN_ROLE_ID)?.id || "";
     setInviteDeptId(defaultDeptId);
     setInviteRoleId(defaultRoleId);
     setInviteLink(`https://sucaicloud.com/invite/join?org=dreamchang&dept=${defaultDeptId}&code=${Math.random().toString(36).substring(2, 8)}`);
@@ -1398,7 +1413,7 @@ export default function AdminSystemManagementView() {
           phone,
           email,
           deptId: depts[1]?.id || "dept_root",
-          roleIds: [roles[2]?.id || roles[0]?.id || ""],
+          roleIds: [[roles[2], ...roles].find(role => role && role.id !== SUPER_ADMIN_ROLE_ID)?.id || ""],
           roleName: roleStr,
           dataScope: "self",
           status: "normal",
@@ -1461,36 +1476,20 @@ export default function AdminSystemManagementView() {
   // ---------------------------------------------------------------------------
   const [roles, setRoles] = useState<RolePermission[]>(() => {
     const saved = localStorage.getItem("cloud_video_roles_v2");
-    if (!saved) return INITIAL_ROLES;
+    let next = normalizeSystemRoles(INITIAL_ROLES);
     try {
-      const parsed: RolePermission[] = JSON.parse(saved);
-      let staffRole = parsed.find(r => r.id === "role_staff" || r.name === "普通员工");
-      if (!staffRole) {
-        staffRole = {
-          id: "role_staff",
-          name: "普通员工",
-          code: "STAFF",
-          type: "preset",
-          category: "default",
-          description: "标准员工基础权限，支持剪辑、素材与爆款复刻协作",
-          memberCount: 18,
-          dataScope: "self",
-          enabled: true,
-          checkedKeys: BASIC_USER_KEYS,
-          permissions: [],
-          updatedAt: "2026-07-24 10:00"
-        };
-        return [staffRole, ...parsed];
-      }
-      return parsed;
+      if (saved) next = normalizeSystemRoles(JSON.parse(saved));
     } catch {
-      return INITIAL_ROLES;
+      // Invalid legacy role data falls back to the built-in catalog.
     }
+    localStorage.setItem("cloud_video_roles_v2", JSON.stringify(next));
+    return next;
   });
 
   const [selectedRoleId, setSelectedRoleId] = useState<string>("role_super_admin");
   React.useEffect(() => { window.dispatchEvent(new Event(AD_CHANGE_EVENT)); }, [roles]);
   const selectedRole = roles.find((r) => r.id === selectedRoleId) || roles[0];
+  const isSuperAdminRole = selectedRole?.id === SUPER_ADMIN_ROLE_ID;
   
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [roleFormName, setRoleFormName] = useState("");
@@ -1505,6 +1504,7 @@ export default function AdminSystemManagementView() {
   };
 
   const handleOpenEditRole = (role: RolePermission) => {
+    if (role.id === SUPER_ADMIN_ROLE_ID) return;
     setEditingRoleId(role.id);
     setRoleFormName(role.name);
     setRoleFormDesc(role.description || "");
@@ -1512,6 +1512,7 @@ export default function AdminSystemManagementView() {
   };
 
   const handleSaveRole = () => {
+    if (editingRoleId === SUPER_ADMIN_ROLE_ID) return;
     if (!roleFormName.trim()) {
       showToast("请输入角色名称");
       return;
@@ -1552,6 +1553,7 @@ export default function AdminSystemManagementView() {
   };
 
   const handleDeleteRole = (id: string) => {
+    if (id === SUPER_ADMIN_ROLE_ID) return;
     const roleToDelete = roles.find((r) => r.id === id);
     if (roleToDelete?.type === "preset") {
       showToast("预设角色不可删除，可复制后调整为自定义角色");
@@ -1592,19 +1594,19 @@ export default function AdminSystemManagementView() {
   };
 
   const handleToggleRoleEnabled = () => {
-    if (!selectedRole) return;
+    if (!selectedRole || isSuperAdminRole) return;
     const nextEnabled = !(selectedRole.enabled ?? true);
     setRoles(prev => prev.map(r => r.id === selectedRoleId ? { ...r, enabled: nextEnabled } : r));
     showToast(`⚡ 角色【${selectedRole.name}】已${nextEnabled ? '开启' : '停用'}`);
   };
 
   const handleChangeRoleDataScope = (dataScope: NonNullable<RolePermission["dataScope"]>) => {
-    if (!selectedRole) return;
+    if (!selectedRole || isSuperAdminRole) return;
     setRoles(prev => prev.map(role => role.id === selectedRoleId ? { ...role, dataScope } : role));
   };
 
   const handleToggleNodeChecked = (nodeId: string, nodeChildrenKeys: string[]) => {
-    if (!selectedRole) return;
+    if (!selectedRole || isSuperAdminRole) return;
     const currentKeys = selectedRole.checkedKeys || [];
     
     let nextKeys: string[] = [];
@@ -1628,19 +1630,19 @@ export default function AdminSystemManagementView() {
   };
 
   const handleSelectAllTree = () => {
-    if (!selectedRole) return;
+    if (!selectedRole || isSuperAdminRole) return;
     setRoles(prev => prev.map(r => r.id === selectedRoleId ? { ...r, checkedKeys: ALL_PERMISSION_KEYS } : r));
     showToast("✅ 已全选当前角色的所有控制菜单");
   };
 
   const handleClearAllTree = () => {
-    if (!selectedRole) return;
+    if (!selectedRole || isSuperAdminRole) return;
     setRoles(prev => prev.map(r => r.id === selectedRoleId ? { ...r, checkedKeys: [] } : r));
     showToast("🧹 已清空当前角色的所有控制权限");
   };
 
   const handleSaveRolePermissions = () => {
-    if (!selectedRole) return;
+    if (!selectedRole || isSuperAdminRole) return;
     localStorage.setItem("cloud_video_roles_v2", JSON.stringify(roles));
     window.dispatchEvent(new Event(AD_CHANGE_EVENT));
     showToast(`✅ 角色【${selectedRole.name}】权限矩阵保存成功！`);
@@ -1681,7 +1683,7 @@ export default function AdminSystemManagementView() {
   };
 
   const handleToggleNode = (node: PermissionNode) => {
-    if (!selectedRole) return;
+    if (!selectedRole || isSuperAdminRole) return;
     const currentKeys = selectedRole.checkedKeys || [];
     const leafKeys = getLeafKeysOfNode(node);
     const allChecked = leafKeys.every(k => currentKeys.includes(k));
@@ -1716,6 +1718,8 @@ export default function AdminSystemManagementView() {
                   <button
                     type="button"
                     onClick={() => toggleExpandNode(node.id)}
+                    aria-label={`${isExpanded ? "收起" : "展开"}${node.label}`}
+                    aria-expanded={isExpanded}
                     className="w-4 h-4 flex items-center justify-center text-slate-400 hover:text-purple-600 cursor-pointer"
                   >
                     {isExpanded ? (
@@ -1729,9 +1733,14 @@ export default function AdminSystemManagementView() {
                 )}
 
                 {/* Custom Checkbox */}
-                <div
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-label={node.label}
+                  aria-checked={isIndeterminate ? "mixed" : isChecked}
+                  disabled={isSuperAdminRole}
                   onClick={() => handleToggleNode(node)}
-                  className={`w-4 h-4 rounded text-white flex items-center justify-center cursor-pointer transition-all shrink-0 ${
+                  className={`w-4 h-4 rounded text-white flex items-center justify-center cursor-pointer disabled:cursor-not-allowed transition-all shrink-0 ${
                     isChecked || isIndeterminate
                       ? "bg-[#7C3AED] border-[#7C3AED] shadow-2xs"
                       : "bg-white border border-slate-300 hover:border-purple-400"
@@ -1739,12 +1748,12 @@ export default function AdminSystemManagementView() {
                 >
                   {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
                   {isIndeterminate && <Minus className="w-3 h-3 stroke-[3]" />}
-                </div>
+                </button>
 
                 {/* Node Label */}
                 <span
                   onClick={() => handleToggleNode(node)}
-                  className={`text-xs cursor-pointer font-medium ${
+                  className={`text-xs ${isSuperAdminRole ? "cursor-default" : "cursor-pointer"} font-medium ${
                     isChecked || isIndeterminate ? "text-slate-900 font-bold" : "text-slate-700"
                   }`}
                 >
@@ -3237,7 +3246,7 @@ export default function AdminSystemManagementView() {
               {/* Left Column: Role List Sidebar */}
               <div className="w-full lg:w-64 border-r-0 lg:border-r border-slate-200/80 pr-0 lg:pr-4 space-y-4 shrink-0">
                 {/* Default Roles Section */}
-                <div className="space-y-1.5">
+                <div className="space-y-1.5" data-testid="default-roles">
                   <div className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-2">
                     默认角色
                   </div>
@@ -3266,7 +3275,7 @@ export default function AdminSystemManagementView() {
                 </div>
 
                 {/* Other Roles Section */}
-                <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                <div className="space-y-1.5 pt-2 border-t border-slate-100" data-testid="other-roles">
                   <div className="flex items-center justify-between px-2">
                     <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
                       其他角色
@@ -3366,14 +3375,16 @@ export default function AdminSystemManagementView() {
                       <button
                         type="button"
                         onClick={handleSelectAllTree}
-                        className="px-3 py-1 bg-slate-100 hover:bg-purple-100 text-slate-700 hover:text-purple-700 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                        disabled={isSuperAdminRole}
+                        className="px-3 py-1 bg-slate-100 hover:bg-purple-100 text-slate-700 hover:text-purple-700 text-xs font-bold rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         全选
                       </button>
                       <button
                         type="button"
                         onClick={handleClearAllTree}
-                        className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                        disabled={isSuperAdminRole}
+                        className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         清空
                       </button>
@@ -3402,7 +3413,9 @@ export default function AdminSystemManagementView() {
                             key={option.value}
                             type="button"
                             onClick={() => handleChangeRoleDataScope(option.value)}
-                            className={`h-8 px-3 text-[11px] font-bold transition ${selectedRole?.dataScope === option.value ? "bg-purple-600 text-white" : "text-slate-500 hover:bg-slate-50"}`}
+                            disabled={isSuperAdminRole}
+                            aria-pressed={selectedRole?.dataScope === option.value}
+                            className={`h-8 px-3 text-[11px] font-bold transition disabled:cursor-not-allowed ${selectedRole?.dataScope === option.value ? "bg-purple-600 text-white" : "text-slate-500 hover:bg-slate-50"}`}
                           >
                             {option.label}
                           </button>
@@ -3415,7 +3428,8 @@ export default function AdminSystemManagementView() {
                       <button
                         type="button"
                         onClick={handleToggleRoleEnabled}
-                        className={`inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[11px] font-bold transition ${(selectedRole?.enabled ?? true) ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-500"}`}
+                        disabled={isSuperAdminRole}
+                        className={`inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[11px] font-bold transition disabled:cursor-not-allowed ${(selectedRole?.enabled ?? true) ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-500"}`}
                       >
                         <span className={`h-2 w-2 rounded-full ${(selectedRole?.enabled ?? true) ? "bg-emerald-500" : "bg-slate-300"}`} />
                         {(selectedRole?.enabled ?? true) ? "已启用" : "已停用"}
@@ -3455,7 +3469,8 @@ export default function AdminSystemManagementView() {
                   <button
                     type="button"
                     onClick={handleSaveRolePermissions}
-                    className="px-10 py-2 bg-[#7C3AED] hover:bg-purple-700 text-white font-extrabold text-sm rounded-lg shadow-sm hover:shadow-md transition-all active:scale-98 cursor-pointer border border-purple-600"
+                    disabled={isSuperAdminRole}
+                    className="px-10 py-2 bg-[#7C3AED] hover:bg-purple-700 text-white font-extrabold text-sm rounded-lg shadow-sm hover:shadow-md transition-all active:scale-98 cursor-pointer border border-purple-600 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     保存
                   </button>

@@ -30,6 +30,8 @@ export interface FinishedVideo extends VideoResourceMetadata {
   comments: number;    // 评论
   cuts?: number;       // 剪切数
   downloads?: number;  // 下载数
+  pushCount?: number;   // 推送至广告账户的次数
+  referenceCount?: number; // 被其他创作引用的次数
   author: string;      // 作者
   todayCost?: number;  // 今日消耗
   cost: number;        // 总消耗
