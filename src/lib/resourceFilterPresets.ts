@@ -1,6 +1,6 @@
 export const FILTER_PRESET_LIMIT = 5;
 export type FilterValues = Record<string, string>;
-export type ResourcePresetScope = "finished" | "materials" | "scripts" | "images" | "audio";
+export type ResourcePresetScope = "finished" | "materials" | "thirdParty" | "scripts" | "images" | "audio";
 
 export interface FilterPreset<T extends FilterValues = FilterValues> {
   id: string;

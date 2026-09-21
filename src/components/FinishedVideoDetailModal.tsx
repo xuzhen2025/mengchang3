@@ -1,4 +1,6 @@
-import { getAdActor, updateAdStore, type AdDraft } from "../lib/adPush";
+import { activeAdDerivationCount, getAdActor, readAdStore, updateAdStore, type AdDraft } from "../lib/adPush";
+import { activeDerivationCount, submitDerivation, useDerivationTasks } from "../lib/videoDerivation";
+import DeriveVideoDialog from "./DeriveVideoDialog";
 import { useAdStore } from "../lib/useAdStore";
 import React, { useState, useRef, useEffect } from "react";
 import LinkScriptModal from "./LinkScriptModal";
@@ -223,12 +225,14 @@ export interface OperationLogItem {
 }
 
 interface FinishedVideoDetailModalProps {
+  resourceScope?: "finished" | "materials" | "thirdParty";
   video: FinishedVideo;
   onClose: () => void;
+  onDelete?: () => void;
   onSyncToAd?: (video: FinishedVideo) => void;
   isMaterialMode?: boolean;
   initialTagModal?: "public" | "personal";
-  onUpdate?: (patch: VideoResourceMetadata) => boolean | void;
+  onUpdate?: (patch: VideoResourceMetadata & Partial<FinishedVideo>) => boolean | void;
   isAdminMode?: boolean;
 }
 
@@ -615,12 +619,15 @@ const INITIAL_AUDIT_ANNOTATIONS: AuditAnnotation[] = [
 export default function FinishedVideoDetailModal({
   video,
   onClose,
+  onDelete,
   onSyncToAd,
   isMaterialMode = false,
+  resourceScope = isMaterialMode ? "materials" : "finished",
   initialTagModal,
   onUpdate,
   isAdminMode = false
 }: FinishedVideoDetailModalProps) {
+  const resourceName = resourceScope === "thirdParty" ? "第三方" : isMaterialMode ? "素材" : "成片";
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Playback States
@@ -637,17 +644,17 @@ export default function FinishedVideoDetailModal({
   const [activeRightTab, setActiveRightTab] = useState<"info" | "review" | "interaction" | "project">("info");
 
   // Video Info Form Fields
-  const [categoryText, setCategoryText] = useResourceConfigState(isMaterialMode ? "materials" : "finished", video, "category");
+  const [categoryText, setCategoryText] = useResourceConfigState(resourceScope, video, "category");
   const [showModifyCategoryModal, setShowModifyCategoryModal] = useState(false);
   const [titleText, setTitleText] = useState(video.title || "视频标题1");
   const [showModifyTitleModal, setShowModifyTitleModal] = useState(false);
   const [tempTitleText, setTempTitleText] = useState("");
-  const [publicTags, setPublicTags] = useResourceTagState(isMaterialMode ? "materials" : "finished", video, "public");
+  const [publicTags, setPublicTags] = useResourceTagState(resourceScope, video, "public");
   const [showPublicTagModal, setShowPublicTagModal] = useState(initialTagModal === "public");
 
-  const [personalTags, setPersonalTags] = useResourceTagState(isMaterialMode ? "materials" : "finished", video, "personal");
+  const [personalTags, setPersonalTags] = useResourceTagState(resourceScope, video, "personal");
   const [showPersonalTagModal, setShowPersonalTagModal] = useState(initialTagModal === "personal");
-  const [videoStatus, setVideoStatus] = useResourceConfigState(isMaterialMode ? "materials" : "finished", video, "status");
+  const [videoStatus, setVideoStatus] = useResourceConfigState(resourceScope, video, "status");
   const { store: configStore } = useResourceConfig();
   const [isChangingStatus, setIsChangingStatus] = useState(false);
   const [videoNotes, setVideoNotes] = useState("");
@@ -656,7 +663,6 @@ export default function FinishedVideoDetailModal({
   const [showShareDropdown, setShowShareDropdown] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
-  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [showJianyingMenu, setShowJianyingMenu] = useState(false);
 
   // Video Audit States
@@ -920,9 +926,20 @@ export default function FinishedVideoDetailModal({
 
   // Ad account push workflow
   const [showAdPushWorkspace, setShowAdPushWorkspace] = useState(false);
+  const [derivePush, setDerivePush] = useState(false);
+  const [showDeriveDialog, setShowDeriveDialog] = useState(false);
+  const [derivationTaskId, setDerivationTaskId] = useState<string | null>(null);
+  const derivationTasks = useDerivationTasks();
   const [showPushRecordsModal, setShowPushRecordsModal] = useState(false);
   const adStore = useAdStore();
   const [adDraft, setAdDraft] = useState<AdDraft | undefined>();
+  useEffect(() => {
+    const task = derivationTasks.find(item => item.id === derivationTaskId);
+    if (task?.status === "已完成") {
+      setToastMsg(task.resultIds.length ? `衍生处理已完成，共 ${task.resultIds.length} 个视频` : "衍生任务已结束，未生成视频");
+      setDerivationTaskId(null);
+    }
+  }, [derivationTasks, derivationTaskId]);
   const handleCreateAdPushTask = (records: AdPushRecord[]) => {
     updateAdStore(s => ({ ...s, records: [...records, ...s.records] }));
     setAdDraft(undefined);
@@ -1096,6 +1113,11 @@ export default function FinishedVideoDetailModal({
 
   // Toast
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toastMsg) return;
+    const timer = window.setTimeout(() => setToastMsg(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [toastMsg]);
 
   // Video timeupdate listener
   const handleTimeUpdate = () => {
@@ -1221,10 +1243,10 @@ export default function FinishedVideoDetailModal({
           <button
             onClick={onClose}
             className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 hover:text-purple-600 border border-slate-200/90 rounded-xl font-bold text-xs shadow-2xs transition-all flex items-center gap-2 cursor-pointer shrink-0 active:scale-95"
-            title={isMaterialMode ? "返回素材列表" : "返回成片列表"}
+            title={`返回${resourceName}列表`}
           >
             <ArrowLeft className="w-4 h-4 text-purple-600" />
-            <span>{isMaterialMode ? "返回素材列表" : "返回成片列表"}</span>
+            <span>{`返回${resourceName}列表`}</span>
           </button>
         </div>
 
@@ -2385,7 +2407,7 @@ export default function FinishedVideoDetailModal({
                     
                     {/* 成片区 / 素材区 */}
                     <div className="flex items-center gap-3">
-                      <span className="w-20 text-slate-500 font-medium shrink-0">{isMaterialMode ? "素材区" : "成片区"}</span>
+                      <span className="w-20 text-slate-500 font-medium shrink-0">{resourceName}区</span>
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-slate-800 flex items-center gap-1.5">
                           <span>{categoryText}</span>
@@ -2489,12 +2511,12 @@ export default function FinishedVideoDetailModal({
                     {/* 视频状态 */}
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        {configStore.statusEnabled(isMaterialMode ? "materials" : "finished") && <>
+                        {configStore.statusEnabled(resourceScope) && <>
                         <span className="w-20 text-slate-500 font-medium shrink-0">视频状态</span>
                         <div className="flex items-center gap-2">
                           {isChangingStatus ? (
                             <div className="flex items-center gap-1.5">
-                              <VideoStatusSelect value={videoStatus} isMaterialMode={isMaterialMode} onChange={newStatus => {
+                              <VideoStatusSelect value={videoStatus} scope={resourceScope} onChange={newStatus => {
                                 if (!updateMetadata({ status: newStatus })) return;
                                 if (newStatus !== videoStatus) addOperationLog("修改状态", videoStatus, newStatus);
                                 setVideoStatus(newStatus);
@@ -2510,7 +2532,7 @@ export default function FinishedVideoDetailModal({
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <ResourceStatusBadge scope={isMaterialMode ? "materials" : "finished"} status={videoStatus} className="px-2.5 py-1 font-extrabold text-xs rounded-md shadow-2xs" />
+                              <ResourceStatusBadge scope={resourceScope} status={videoStatus} className="px-2.5 py-1 font-extrabold text-xs rounded-md shadow-2xs" />
                               <button
                                 onClick={() => setIsChangingStatus(true)}
                                 className="text-purple-600 hover:text-purple-700 font-medium text-xs cursor-pointer hover:underline"
@@ -2641,7 +2663,7 @@ export default function FinishedVideoDetailModal({
                           <div className="inline-flex items-stretch rounded-xl border border-purple-300 bg-white text-purple-700 shadow-2xs">
                             <button
                               type="button"
-                              onClick={() => { if (!getAdActor().permissions.includes("uc_ad_push")) { setToastMsg("暂无推送权限"); window.setTimeout(() => setToastMsg(null), 4000); return; } setAdDraft(undefined); setShowAdPushWorkspace(true); }}
+                              onClick={() => { if (!getAdActor().permissions.includes("uc_ad_push")) { setToastMsg("暂无推送权限"); window.setTimeout(() => setToastMsg(null), 4000); return; } setDerivePush(false); setAdDraft(undefined); setShowAdPushWorkspace(true); }}
                               className="flex items-center gap-1.5 rounded-l-[11px] px-3 py-2 text-xs font-bold transition-colors hover:bg-purple-50"
                             >
                               <Send className="h-3.5 w-3.5" />
@@ -2686,6 +2708,19 @@ export default function FinishedVideoDetailModal({
 
                           {showMoreMenu && (
                               <AnchoredPopover anchorRef={moreButtonRef} align="end" side="top" width={192} gap={12} onClose={() => setShowMoreMenu(false)} className="bg-white border border-slate-200 shadow-xl rounded-2xl p-2 flex flex-col gap-0.5 text-center font-medium text-slate-700 text-xs animate-in fade-in zoom-in-95 duration-100">
+                                {!isMaterialMode && !isAdminMode && <>
+                                  <button className="w-full rounded-xl px-3 py-2 text-slate-600 hover:bg-purple-50 hover:text-purple-700" onClick={() => {
+                                    setShowMoreMenu(false);
+                                    const actor = getAdActor();
+                                    if (!actor.permissions.includes("uc_finished_derive_push") || !actor.permissions.includes("uc_ad_push")) return setToastMsg("暂无衍生并推送权限");
+                                    setAdDraft(undefined); setDerivePush(true); setShowAdPushWorkspace(true);
+                                  }}>衍生视频并推送</button>
+                                  <button className="w-full rounded-xl px-3 py-2 text-slate-600 hover:bg-purple-50 hover:text-purple-700" onClick={() => {
+                                    setShowMoreMenu(false);
+                                    if (!getAdActor().permissions.includes("uc_finished_derive")) return setToastMsg("暂无衍生权限");
+                                    setShowDeriveDialog(true);
+                                  }}>衍生新视频</button>
+                                </>}
                                 <button
                                   onClick={() => {
                                     setShowMoreMenu(false);
@@ -2706,74 +2741,24 @@ export default function FinishedVideoDetailModal({
                                   操作记录
                                 </button>
 
-                                <button
+                                {(resourceScope !== "thirdParty" || onDelete) && <button
                                   onClick={() => {
                                     setShowMoreMenu(false);
                                     if (window.confirm("删除后将移入回收站，可在回收站恢复。确认继续吗？")) {
-                                      showToast("视频已移至回收站");
+                                      if (onDelete) onDelete();
+                                      else showToast("视频已移至回收站");
                                     }
                                   }}
                                   className="w-full py-2 px-3 text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer text-center font-medium"
                                 >
                                   删除
-                                </button>
+                                </button>}
 
                               </AnchoredPopover>
                           )}
                         </div>
                       </div>
 
-                      {/* Row 2: Main Solid Purple Action Split Button */}
-                      <div className="pt-1">
-                        {/* 1. 下载转码视频 Dropdown Button */}
-                        <div className="relative w-full">
-                          <button
-                            onClick={() => showToast("已通过权限校验，开始直接下载原文件")}
-                            className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center overflow-hidden cursor-pointer active:scale-98"
-                          >
-                            <span className="flex-1 py-3 px-3 text-center font-bold">
-                              下载
-                            </span>
-                          </button>
-
-                          {showDownloadMenu && (
-                            <>
-                              <div className="fixed inset-0 z-40" onClick={() => setShowDownloadMenu(false)} />
-                              <div className="absolute bottom-full left-0 mb-3 z-50 bg-white border border-slate-200/90 shadow-xl rounded-2xl p-2 w-52 flex flex-col gap-0.5 text-center text-xs font-medium text-slate-700 animate-in fade-in zoom-in-95 duration-100">
-                                <button
-                                  onClick={() => {
-                                    setShowDownloadMenu(false);
-                                    showToast("📥 开始下载无水印原片...");
-                                  }}
-                                  className="w-full py-2 px-3 text-slate-600 hover:text-purple-700 hover:bg-purple-50 rounded-xl transition-colors cursor-pointer text-center font-medium"
-                                >
-                                  下载原片
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setShowDownloadMenu(false);
-                                    showToast("📥 开始下载转码视频...");
-                                  }}
-                                  className="w-full py-2 px-3 text-slate-600 hover:text-purple-700 hover:bg-purple-50 rounded-xl transition-colors cursor-pointer text-center font-medium"
-                                >
-                                  下载转码视频
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setShowDownloadMenu(false);
-                                    showToast("📥 开始下载带水印预览视频...");
-                                  }}
-                                  className="w-full py-2 px-3 text-slate-600 hover:text-purple-700 hover:bg-purple-50 rounded-xl transition-colors cursor-pointer text-center font-medium"
-                                >
-                                  下载预览视频 (带水印)
-                                </button>
-
-                                <div className="absolute -bottom-1.5 right-4 w-3 h-3 bg-white rotate-45 border-r border-b border-slate-200/90 pointer-events-none"></div>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
                     </div>
 
                   </div>
@@ -3959,7 +3944,7 @@ export default function FinishedVideoDetailModal({
 
       </div>
 
-      {showModifyCategoryModal && <ResourceCategoryModal scope={isMaterialMode ? "materials" : "finished"} initialCategory={categoryText}
+      {showModifyCategoryModal && <ResourceCategoryModal scope={resourceScope} initialCategory={categoryText}
         onClose={() => setShowModifyCategoryModal(false)}
         onConfirm={category => {
           if (!updateMetadata({ category })) return;
@@ -4271,7 +4256,7 @@ export default function FinishedVideoDetailModal({
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
               <div className="flex items-center gap-2">
                 <span className="w-1.5 h-4 bg-purple-600 rounded-full"></span>
-                <h3 className="text-base font-extrabold text-slate-900 tracking-tight">成片操作记录</h3>
+                <h3 className="text-base font-extrabold text-slate-900 tracking-tight">{resourceName}操作记录</h3>
                 <span className="bg-purple-100 text-purple-700 text-xs px-2.5 py-0.5 rounded-full font-bold">
                   共 {operationLogs.length} 条记录
                 </span>
@@ -4996,9 +4981,18 @@ export default function FinishedVideoDetailModal({
         />
       )}
 
+      {showDeriveDialog && <DeriveVideoDialog
+        activeCount={activeDerivationCount(getAdActor().id) + activeAdDerivationCount(adStore.records, getAdActor().id)}
+        onClose={() => setShowDeriveDialog(false)} onConfirm={count => {
+          const actor = getAdActor();
+          if (!actor.permissions.includes("uc_finished_derive")) throw new Error("暂无衍生权限");
+          const task = submitDerivation(video.id, count, actor.id, activeAdDerivationCount(readAdStore().records, actor.id), { id: video.id, title: titleText, coverUrl: video.coverUrl, videoUrl: video.videoUrl });
+          setDerivationTaskId(task.id); setShowDeriveDialog(false); setToastMsg(`已提交 ${count} 个视频的衍生任务`);
+        }} />}
       {showAdPushWorkspace && (
         <AdAccountPushWorkspace
-          video={{ id: video.id, title: titleText, coverUrl: video.coverUrl, author: video.author }}
+          deriveMode={derivePush}
+          video={{ id: video.id, title: titleText, coverUrl: video.coverUrl, videoUrl: video.videoUrl, author: video.author }}
           initialDraft={adDraft}
           onClose={() => setShowAdPushWorkspace(false)}
           onCreate={handleCreateAdPushTask}
@@ -5009,7 +5003,7 @@ export default function FinishedVideoDetailModal({
         <PushRecordsModal
           records={adStore.records}
           videoId={video.id}
-          onEdit={draft => { setAdDraft(draft); setShowPushRecordsModal(false); setShowAdPushWorkspace(true); }}
+          onEdit={draft => { setDerivePush(Boolean(draft.derivation)); setAdDraft(draft); setShowPushRecordsModal(false); setShowAdPushWorkspace(true); }}
           onClose={() => setShowPushRecordsModal(false)}
         />
       )}

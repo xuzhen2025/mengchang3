@@ -420,3 +420,8 @@ for (const [type, paths] of Object.entries(RESOURCE_CATEGORY_PATHS)) {
   }
 }
 
+// Start from the same taxonomy, with independent IDs and future edits.
+INITIAL_CATEGORIES["第三方"] = INITIAL_CATEGORIES["素材"].map(parent => ({
+  ...parent, id: `third-${parent.id}`,
+  children: parent.children.map(child => ({ ...child, id: `third-${child.id}` })),
+}));

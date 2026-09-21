@@ -61,7 +61,7 @@ try {
   // In-memory task scenarios must not be reset by unrelated workspace edits.
   await page.routeWebSocket(/ws:\/\/localhost:3000\//, (socket) => socket.close());
   await page.addInitScript(() => localStorage.setItem("mengchang_prototype_session", JSON.stringify({ username: "putongyonghu", mode: "user" })));
-  await page.goto("http://localhost:3000", { waitUntil: "domcontentloaded" });
+  await page.goto(process.env.PREVIEW_URL || "http://localhost:3000", { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "快速创作", exact: true }).click();
   await page.getByText("视频换脸", { exact: true }).click();
   await screenshot("upload");
@@ -169,8 +169,18 @@ try {
   const downloaded = await downloadPromise;
   assert.equal(downloaded.suggestedFilename(), "梦畅_视频换脸演示_换脸_版本1.mp4");
   await page.getByRole("button", { name: "上传资源库", exact: true }).click();
+  const uploadPage = page.locator("main").getByTestId("video-upload-page");
+  await expect(uploadPage).toBeVisible();
+  await expect(page.getByTestId("face-swap-workspace")).toHaveCount(0);
+  await expect(page.locator('[data-overlay-layer="modal"]')).toHaveCount(0);
   await waitText("梦畅_视频换脸演示_换脸_版本1.mp4");
   assert.equal(await page.getByText("梦畅_视频换脸演示_换脸_版本2.mp4", { exact: true }).count(), 0);
+  await uploadPage.getByRole("button", { name: "返回列表", exact: true }).click();
+  await expect(versions).toHaveValue(selectedVersionId);
+  await assertResultActions(true);
+  await page.getByRole("button", { name: "上传资源库", exact: true }).click();
+  await expect(uploadPage).toBeVisible();
+  await expect(uploadPage.getByText("梦畅_视频换脸演示_换脸_版本1.mp4", { exact: true })).toBeVisible();
   await screenshot("publish");
   assert.equal(await page.locator('input[type="file"]').count(), 0);
   await page.getByRole("button", { name: "发布", exact: true }).click();

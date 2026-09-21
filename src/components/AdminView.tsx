@@ -64,7 +64,7 @@ export default function AdminView({ adminActiveScreen, onTriggerTask, onOpenTask
   };
 
   const navTabs: { id: ContentTabType; label: string; icon: any; desc: string }[] = [
-    { id: "resource_hub", label: "资源库", icon: FolderHeart, desc: "成片/素材/脚本/图片/音频统一管理" },
+    { id: "resource_hub", label: "资源库", icon: FolderHeart, desc: "成片/素材/第三方/脚本/图片/音频统一管理" },
     { id: "video_status", label: "视频状态", icon: Video, desc: "渲染成片/审片流转/投放状态监控" },
     { id: "script_status", label: "脚本状态", icon: FileText, desc: "文案拆解/AI分镜/审核归档状态" },
     { id: "tasks", label: "任务", icon: ListTodo, desc: "后台AI生成与批量渲染任务监控" },

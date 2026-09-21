@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { recordDownload } from "../lib/operationHistory";
 import {
   ArrowLeft,
   Clock3,
@@ -48,7 +49,7 @@ interface QualityEnhanceViewProps {
 
 const FALLBACK_DURATION = 15;
 const FALLBACK_RESOLUTION = "1920 x 1080";
-const FALLBACK_COVER = "/assets/prototype/beauty-promo-detail.jpg";
+const FALLBACK_COVER = "./assets/prototype/beauty-promo-detail.jpg";
 
 const statusMeta: Record<Task["status"], { label: string; className: string }> = {
   ready: { label: "待配置", className: "bg-amber-50 text-amber-700" },
@@ -282,6 +283,7 @@ export default function QualityEnhanceView({
     const link = document.createElement("a");
     link.href = output.videoUrl;
     link.download = outputName || output.name;
+    recordDownload(link.download, "画质增强");
     link.target = "_blank";
     link.rel = "noreferrer";
     link.click();

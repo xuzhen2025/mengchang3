@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useResourceConfig } from "../lib/useResourceConfig";
+import { VIDEO_RESOURCE_SCOPES, type VideoPartition } from "../lib/resourceConfig";
 import CategoryCascader from "./CategoryCascader";
 import { useTagCatalog, useTagGroupSelection, useTagSelection } from "../lib/useResourceTags";
 import AssetPagination from "./AssetPagination";
@@ -25,9 +26,10 @@ import {
 } from "lucide-react";
 
 import { publishResources, type ResourcePublishDetails } from "../lib/resourceUploads";
+import { operationUser } from "../lib/operationHistory";
 
 export interface VideoPublishDetails extends ResourcePublishDetails {
-  partition: "成片" | "素材";
+  partition: VideoPartition;
   primaryCategory: string;
   secondaryCategory: string;
   names: string[];
@@ -38,7 +40,7 @@ interface UploadFinishedVideoModalProps {
   onClose: () => void;
   onPublishSuccess?: (msg: string, details?: VideoPublishDetails) => void;
   initialTaskCode?: string;
-  initialPartition?: "成片" | "素材";
+  initialPartition?: VideoPartition;
   isPage?: boolean;
   initialFiles?: Array<{ name: string; type?: string; url?: string }>;
   stayOpenOnPublish?: boolean;
@@ -133,7 +135,7 @@ const MOCK_SCRIPTS_LIST = [
 interface PresetTemplate {
   id: string;
   name: string;
-  partition: "成片" | "素材";
+  partition: VideoPartition;
   primaryCategory: string;
   secondaryCategory: string;
   nameType: "filename" | "custom" | "prefix";
@@ -179,9 +181,9 @@ export default function UploadFinishedVideoModal({
     "none",
   );
   const { store: configStore } = useResourceConfig();
-  const categoryOptions = (type: "成片" | "素材") => configStore.categories(type === "成片" ? "finished" : "materials").map(n => ({ primary: n.name, secondaries: n.children.map(c => c.name) }));
-  const [partition, setPartition] = useState<"成片" | "素材">(initialPartition);
-  const productionDateLabel = partition === "素材" ? "拍摄时间" : "剪辑时间";
+  const categoryOptions = (type: VideoPartition) => configStore.categories(VIDEO_RESOURCE_SCOPES[type]).map(n => ({ primary: n.name, secondaries: n.children.map(c => c.name) }));
+  const [partition, setPartition] = useState<VideoPartition>(initialPartition);
+  const productionDateLabel = partition === "成片" ? "剪辑时间" : "拍摄时间";
   const initialCategory = categoryOptions(initialPartition)[0] || { primary: "", secondaries: [] };
 
   // Hierarchical Category State (一级 + 二级)
@@ -349,14 +351,15 @@ export default function UploadFinishedVideoModal({
   };
 
   const handlePublish = (modeText: string = "发布") => {
+    const ownerId = operationUser();
     if (uploadedFiles.length === 0 || isSubmitting) return;
-    if (!configStore.categoryValid(partition === "成片" ? "finished" : "materials", selectedPrimaryCat, selectedSecondaryCat)) { setTemplateToast("请选择当前可用的一级分类和二级分类"); return; }
+    if (!configStore.categoryValid(VIDEO_RESOURCE_SCOPES[partition], selectedPrimaryCat, selectedSecondaryCat)) { setTemplateToast("请选择当前可用的一级分类和二级分类"); return; }
     setIsSubmitting(true);
     setTimeout(() => {
       setIsSubmitting(false);
-      if (!configStore.categoryValid(partition === "成片" ? "finished" : "materials", selectedPrimaryCat, selectedSecondaryCat)) { setTemplateToast("分类已变更，请重新选择"); return; }
+      if (!configStore.categoryValid(VIDEO_RESOURCE_SCOPES[partition], selectedPrimaryCat, selectedSecondaryCat)) { setTemplateToast("分类已变更，请重新选择"); return; }
       const names = uploadedFiles.map((file) => nameType === "custom" ? customName : nameType === "prefix" ? `${prefixName}${file.name}` : file.name);
-      const published = publishResources({ partition, primaryCategory: selectedPrimaryCat, secondaryCategory: selectedSecondaryCat,
+      const published = publishResources({ ownerId, partition, primaryCategory: selectedPrimaryCat, secondaryCategory: selectedSecondaryCat,
         publicTags: addedPublicTags, personalTags: addedPersonalTags,
         files: uploadedFiles.map((file, index) => ({ name: names[index], size: file.size, url: initialFiles.find((initial) => initial.name === file.name)?.url || URL.createObjectURL(file) })),
       });
@@ -606,13 +609,13 @@ export default function UploadFinishedVideoModal({
                 <h4 className="font-bold text-slate-900 text-xs">基础信息</h4>
               </div>
 
-              {/* 1. 视频分区 (仅保留 成片 和 素材，去除图标与第三方) */}
+              {/* 视频分区 */}
               <div className="flex items-center gap-6 pl-3">
                 <span className="w-24 text-slate-700 font-bold text-right shrink-0">
                   <span className="text-rose-500 mr-0.5">*</span>视频分区
                 </span>
                 <div className="flex items-center gap-6">
-                  {(["成片", "素材"] as const).map((p) => (
+                  {(["成片", "素材", "第三方"] as const).map((p) => (
                     <label
                       key={p}
                       className="flex items-center gap-1.5 cursor-pointer font-medium text-slate-700"
@@ -640,7 +643,7 @@ export default function UploadFinishedVideoModal({
               {/* 2. 视频分类 (下拉框：左侧选择一级分类，右侧选择二级分类) */}
               <div className="flex items-start gap-6 pl-3">
                 <span className="w-24 text-slate-700 font-bold text-right shrink-0 pt-2"><span className="text-rose-500 mr-0.5">*</span>视频分类</span>
-                <div className="flex-1"><CategoryCascader scope={partition === "成片" ? "finished" : "materials"} primaryCategory={selectedPrimaryCat} secondaryCategory={selectedSecondaryCat} onSelect={(primary, secondary) => { setSelectedPrimaryCat(primary); setSelectedSecondaryCat(secondary); }} /></div>
+                <div className="flex-1"><CategoryCascader scope={VIDEO_RESOURCE_SCOPES[partition]} primaryCategory={selectedPrimaryCat} secondaryCategory={selectedSecondaryCat} onSelect={(primary, secondary) => { setSelectedPrimaryCat(primary); setSelectedSecondaryCat(secondary); }} /></div>
               </div>
 
               {/* 3. 视频名称 */}

@@ -13,7 +13,7 @@ import {
   User
 } from "lucide-react";
 
-export type ResourceLibraryItemType = "成片" | "素材" | "脚本" | "图片" | "音频";
+export type ResourceLibraryItemType = "成片" | "素材" | "第三方" | "脚本" | "图片" | "音频";
 
 export interface ResourceLibraryItemData {
   id: string;
@@ -147,7 +147,7 @@ function ScriptResourceItem({ item, onOpen, onDownload, footerAction }: Resource
 }
 
 export default function ResourceLibraryItem(props: ResourceLibraryItemProps) {
-  if (props.item.type === "成片" || props.item.type === "素材") return <VideoResourceItem {...props} />;
+  if (["成片", "素材", "第三方"].includes(props.item.type)) return <VideoResourceItem {...props} />;
   if (props.item.type === "图片") return <ImageResourceItem {...props} />;
   if (props.item.type === "音频") return <AudioResourceItem {...props} />;
   return <ScriptResourceItem {...props} />;

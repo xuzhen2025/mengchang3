@@ -10,6 +10,7 @@ import TikTokShopView from "./TikTokShopView";
 import DataInsightsView from "./DataInsightsView";
 import CreationAnalyticsView from "./CreationAnalyticsView";
 import TaskAnalyticsView from "./TaskAnalyticsView";
+import AdPlatformAnalysisView from "./AdPlatformAnalysisView";
 import { 
   BarChart3, Video, Users, Activity, Tag, Tv, FileText, 
   DollarSign, PieChart, ShieldCheck, ShoppingBag, Brain, 
@@ -22,14 +23,14 @@ import {
 export type MainCategory = "video_analytics" | "account_analytics" | "team_analytics";
 
 export type SubTabMap = {
-  video_analytics: "platform_tags" | "tag_analytics" | "tencent_report" | "delivery_report";
+  video_analytics: "platform_tags" | "tag_analytics" | "tencent_report" | "delivery_report" | "ad_platform_analysis";
   account_analytics: "account_data" | "financial_report" | "status_report" | "tiktok_shop";
   team_analytics: "data_insights" | "creation_analytics" | "task_analytics";
 };
 
 export default function AdDeliveryView() {
   const [activeCategory, setActiveCategory] = useState<MainCategory>("video_analytics");
-  const [activeSubTab, setActiveSubTab] = useState<string>("platform_tags");
+  const [activeSubTab, setActiveSubTab] = useState<string>("ad_platform_analysis");
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState("");
@@ -49,6 +50,7 @@ export default function AdDeliveryView() {
       name: "视频数据分析",
       icon: Video,
       subTabs: [
+        { id: "ad_platform_analysis", name: "广告平台分析" },
         { id: "platform_tags", name: "广告平台标签" },
         { id: "tag_analytics", name: "标签分析" },
         { id: "tencent_report", name: "腾讯投放报表" },
@@ -174,6 +176,11 @@ export default function AdDeliveryView() {
             {/* 4. 投放报表 */}
             {activeSubTab === "delivery_report" && (
               <DeliveryReportView showToast={showToast} />
+            )}
+
+            {/* 5. 广告平台分析 */}
+            {activeSubTab === "ad_platform_analysis" && (
+              <AdPlatformAnalysisView showToast={showToast} />
             )}
           </>
         )}

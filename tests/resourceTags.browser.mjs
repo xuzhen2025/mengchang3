@@ -13,6 +13,14 @@ const publicName = "\u79cb\u5b63\u901a\u52e4\u7a7f\u642d";
 const renamed = "\u79cb\u5b63\u901a\u52e4\u5b9e\u62cd";
 const personalName = "\u672c\u6708\u590d\u6295\u5907\u9009";
 const personalRenamed = "\u672c\u6708\u590d\u6295\u7cbe\u9009";
+const expectTagFormFields = async () => {
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.locator("textarea")).toHaveCount(2);
+  await expect(dialog.locator('input[type="date"]')).toHaveCount(2);
+  await expect(dialog.locator('select, input[type="file"]')).toHaveCount(0);
+  await expect(dialog.getByText("AI\u8bc6\u522b\u65b9\u5411", { exact: true })).toHaveCount(0);
+  await expect(dialog.getByText("\u56fe\u7247\u63cf\u8ff0", { exact: true })).toHaveCount(0);
+};
 const switchMode = async (mode) => {
   await page.locator("#btn-client-mode-dropdown").click();
   await button(mode === "admin" ? "\u7ba1\u7406\u7aef" : "\u7528\u6237\u7aef").click();
@@ -36,9 +44,22 @@ try {
   await page.goto(process.env.PREVIEW_URL || "http://localhost:3000/", { waitUntil: "domcontentloaded" });
   await button("\u516c\u5171\u6807\u7b7e").click();
   await button("\u65b0\u589e").click();
+  await expectTagFormFields();
+  await page.getByRole("dialog").getByRole("button", { name: "\u786e\u5b9a", exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(page.getByText("\u8bf7\u8f93\u5165\u6807\u7b7e\u540d\u79f0", { exact: true })).toBeVisible();
   await page.getByRole("dialog").locator("textarea").first().fill(publicName);
+  await page.getByRole("dialog").locator('input[type="date"]').first().fill("2026-09-01");
+  await page.getByRole("dialog").locator('input[type="date"]').last().fill("2026-12-31");
+  await page.getByRole("dialog").locator("textarea").last().fill("Autumn campaign");
+  await page.screenshot({ path: "tmp/public-tag-form.png" });
   await page.getByRole("dialog").getByRole("button", { name: "\u786e\u5b9a", exact: true }).click();
   await expect(page.getByTitle(`\u7f16\u8f91\u6807\u7b7e ${publicName}`)).toBeVisible();
+  const createdTag = await page.evaluate(async name => (await import("/src/lib/resourceTags.ts")).resourceTagStore.getPublicGroups().flatMap(group => group.subTags).find(tag => tag.name === name), publicName);
+  assert.equal(createdTag.startDate, "2026-09-01");
+  assert.equal(createdTag.endDate, "2026-12-31");
+  assert.equal(createdTag.description, "Autumn campaign");
+  assert.ok(!("aiDirection" in createdTag) && !("imageUrl" in createdTag));
   await switchMode("user");
 
   for (const label of ["\u4e0a\u4f20\u56fe\u7247", "\u4e0a\u4f20\u97f3\u9891", "\u4e0a\u4f20\u811a\u672c", "\u4e0a\u4f20\u89c6\u9891"]) {
@@ -52,6 +73,7 @@ try {
   await page.locator("label").filter({ hasText: publicName }).getByRole("checkbox").check();
   await page.locator('input[type="file"][accept*="video"]').first().setInputFiles({ name: "tag-linked-video.mp4", mimeType: "video/mp4", buffer: Buffer.from("prototype fixture") });
   await button("\u53d1\u5e03").click();
+  await expect.poll(async () => (await page.evaluate(async () => (await import("/src/lib/resourceUploads.ts")).getUploadedResources())).length).toBe(1);
   await expect(page.getByText("tag-linked-video.mp4", { exact: true }).first()).toBeVisible();
   const publishedId = await page.evaluate(async () => (await import("/src/lib/resourceUploads.ts")).getUploadedResources()[0].id);
   await page.getByText("tag-linked-video.mp4", { exact: true }).first().click();
@@ -91,9 +113,19 @@ try {
   console.log("PASS: batch public/personal tags preserve existing tags and unselected resources");
 
   await publicAdmin();
+  await page.evaluate(async name => {
+    const { resourceTagStore } = await import("/src/lib/resourceTags.ts");
+    resourceTagStore.setPublicGroups(groups => groups.map(group => ({ ...group, subTags: group.subTags.map(tag => tag.name === name ? { ...tag, aiDirection: "legacy-direction", imageUrl: "/legacy-tag.png" } : tag) })));
+  }, publicName);
   await page.getByTitle(`\u7f16\u8f91\u6807\u7b7e ${publicName}`).click();
+  await expectTagFormFields();
+  await expect(page.getByRole("dialog").locator('input[type="date"]').first()).toHaveValue("2026-09-01");
+  await expect(page.getByRole("dialog").locator('input[type="date"]').last()).toHaveValue("2026-12-31");
+  await expect(page.getByRole("dialog").locator("textarea").last()).toHaveValue("Autumn campaign");
   await page.getByRole("dialog").locator("textarea").first().fill(renamed);
   await page.getByRole("dialog").getByRole("button", { name: "\u786e\u5b9a", exact: true }).click();
+  const editedTag = await page.evaluate(async name => (await import("/src/lib/resourceTags.ts")).resourceTagStore.getPublicGroups().flatMap(group => group.subTags).find(tag => tag.name === name), renamed);
+  assert.deepEqual(editedTag, { ...createdTag, name: renamed, aiDirection: "legacy-direction", imageUrl: "/legacy-tag.png" });
   await switchMode("user");
   await resources();
   await button("\u5546\u54c1\u5356\u70b9").hover();

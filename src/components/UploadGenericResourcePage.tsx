@@ -21,7 +21,9 @@ import {
 } from "lucide-react";
 import { UploadFileType } from "./ResourcesView";
 import UploadScriptPage from "./UploadScriptPage";
+import UploadFinishedVideoModal from "./UploadFinishedVideoModal";
 import { publishResources, type ResourcePublishDetails } from "../lib/resourceUploads";
+import { operationUser } from "../lib/operationHistory";
 
 interface UploadGenericResourcePageProps {
   type: UploadFileType;
@@ -36,12 +38,15 @@ export default function UploadGenericResourcePage({
   onClose,
   onPublishSuccess
 }: UploadGenericResourcePageProps) {
+  if (type === "第三方") {
+    return <UploadFinishedVideoModal isOpen isPage initialPartition="第三方" onClose={onClose} onPublishSuccess={onPublishSuccess} />;
+  }
   if (type === "脚本") {
     return <UploadScriptPage onClose={onClose} onPublishSuccess={onPublishSuccess} />;
   }
   // Config per type
   const configMap: Record<
-    UploadFileType,
+    Exclude<UploadFileType, "第三方">,
     { title: string; formats: string; icon: any; defaultName: string; accept: string; defaultCategory: string[] }
   > = {
     成片: {
@@ -145,6 +150,7 @@ export default function UploadGenericResourcePage({
   };
 
   const handlePublish = () => {
+    const ownerId = operationUser();
     if (!selectedFile || isSubmitting) return;
     if (!resourceConfigStore.categoryValid(resourceScope, primaryCategory, secondaryCategory)) { setCategoryError("请选择当前可用的一级分类和二级分类"); return; }
     setCategoryError("");
@@ -152,7 +158,7 @@ export default function UploadGenericResourcePage({
     setTimeout(() => {
       setIsSubmitting(false);
       if (!resourceConfigStore.categoryValid(resourceScope, primaryCategory, secondaryCategory)) { setCategoryError("分类已变更，请重新选择"); return; }
-      const published = publishResources({ partition: type, primaryCategory, secondaryCategory,
+      const published = publishResources({ ownerId, partition: type, primaryCategory, secondaryCategory,
         publicTags: addedPublicTags, personalTags: addedPersonalTags,
         files: [{ name: selectedFile.name, size: selectedFile.size, url: URL.createObjectURL(selectedFile) }],
       });

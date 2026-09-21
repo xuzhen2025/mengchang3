@@ -164,7 +164,7 @@ const TASK_UPLOAD_ASSETS: PersonalAsset[] = [
   }
 ];
 
-const RESOURCE_CATEGORIES: ResourceCategory[] = ["成片", "素材", "图片", "音频", "脚本"];
+const RESOURCE_CATEGORIES: ResourceCategory[] = ["成片", "素材", "第三方", "图片", "音频", "脚本"];
 
 
 
@@ -272,7 +272,7 @@ export default function PersonalResourceCenterV2({ mode, assets, onToast }: Pers
       return right.createdAt.localeCompare(left.createdAt);
     }), [categoryFilter, endDate, personalAssets, publicTagFilter, resourceCategory, search, sortBy, sourceFilter, startDate]);
 
-  const visualAssets = filteredAssets.filter((asset) => ["成片", "素材", "图片"].includes(asset.resourceCategory));
+  const visualAssets = filteredAssets.filter((asset) => ["成片", "素材", "第三方", "图片"].includes(asset.resourceCategory));
   const audioAssets = filteredAssets.filter((asset) => asset.resourceCategory === "音频");
   const scriptAssets = filteredAssets.filter((asset) => asset.resourceCategory === "脚本");
 

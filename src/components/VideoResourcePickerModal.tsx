@@ -3,10 +3,11 @@ import { AlertCircle, Check, Search, Trash2, Upload, X } from "lucide-react";
 import AssetPagination from "./AssetPagination";
 import OverlayPortal from "./overlays/OverlayPortal";
 import { useResourceConfig } from "../lib/useResourceConfig";
+import { VIDEO_RESOURCE_SCOPES } from "../lib/resourceConfig";
 import { ResourceStatusBadge } from "./ResourceConfigControls";
 import { useScopedTaggedResources, useTaggedResources, useTagFilterSync } from "../lib/useResourceTags";
 
-export type VideoResourceSection = "成片" | "素材" | "图片";
+export type VideoResourceSection = "成片" | "素材" | "第三方" | "图片";
 
 export interface VideoResourcePickerItem {
   id: string;
@@ -74,7 +75,10 @@ export default function VideoResourcePickerModal({
   onClose,
   onConfirm,
 }: VideoResourcePickerModalProps) {
-  const items = useScopedTaggedResources<VideoResourcePickerItem>(sourceItems, (item) => item.section === "成片" ? "finished" : item.section === "图片" ? "images" : "materials");
+  const items = useScopedTaggedResources<VideoResourcePickerItem>(sourceItems, (item) => item.section === "图片" ? "images" : VIDEO_RESOURCE_SCOPES[item.section]);
+  const sections: VideoResourceSection[] = ["成片", "素材"];
+  if (initialSection === "第三方" || sourceItems.some(item => item.section === "第三方")) sections.push("第三方");
+  if (allowImageSelection) sections.push("图片");
   const imageItems = useTaggedResources("images", sourceImageItems);
   const [sourceTab, setSourceTab] = useState<"library" | "local">(allowLocalUpload ? initialSourceTab : "library");
   const [section, setSection] = useState<VideoResourceSection>(initialSection);
@@ -103,7 +107,7 @@ export default function VideoResourcePickerModal({
     [allowImageSelection, items, section, selectableImageItems],
   );
   const { store: configStore } = useResourceConfig();
-  const scopes = [section === "成片" ? "finished" : section === "素材" ? "materials" : "images"];
+  const scopes = [section === "图片" ? "images" : VIDEO_RESOURCE_SCOPES[section]];
   const categoryNodes = scopes.flatMap(scope => configStore.categories(scope));
   const primaryCategories = uniqueValues(categoryNodes.map(n => n.name));
   const secondaryCategories = uniqueValues(categoryNodes.filter(n => primaryCategory === "全部一级分类" || n.name === primaryCategory).flatMap(n => n.children.map(c => c.name)));
@@ -225,7 +229,7 @@ export default function VideoResourcePickerModal({
           {sourceTab === "library" ? <>
           <div className="flex shrink-0 items-center justify-between border-b border-slate-200">
             <div className="flex items-center gap-1">
-              {(allowImageSelection ? (["成片", "素材", "图片"] as const) : (["成片", "素材"] as const)).map((item) => (
+              {sections.map((item) => (
                 <button
                   key={item}
                   type="button"
@@ -240,7 +244,7 @@ export default function VideoResourcePickerModal({
                   }}
                   className={`border-b-2 px-4 py-2.5 text-xs font-semibold ${section === item ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}
                 >
-                  {{ 成片: "成片管理", 素材: "素材管理", 图片: "图片管理" }[item]}
+                  {{ 成片: "成片管理", 素材: "素材管理", 第三方: "第三方管理", 图片: "图片管理" }[item]}
                 </button>
               ))}
             </div>

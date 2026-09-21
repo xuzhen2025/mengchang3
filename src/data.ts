@@ -458,8 +458,8 @@ export const INITIAL_ASSETS: Asset[] = [
 
 const AI_VIDEO_DEMO_RESULT_URL = "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4";
 const AI_VIDEO_DEMO_MEDIA: Record<string, AiVideoMediaItem> = {
-  skincareSet: { id: "stock-1", name: "轻奢护肤礼盒主图.jpg", type: "image", url: "/assets/prototype/luxury-skincare-set.jpg", source: "library" },
-  skincareProduct: { id: "stock-2", name: "精华液商品特写.jpg", type: "image", url: "/assets/prototype/skincare-product.jpg", source: "library" },
+  skincareSet: { id: "stock-1", name: "轻奢护肤礼盒主图.jpg", type: "image", url: "./assets/prototype/luxury-skincare-set.jpg", source: "library" },
+  skincareProduct: { id: "stock-2", name: "精华液商品特写.jpg", type: "image", url: "./assets/prototype/skincare-product.jpg", source: "library" },
   character: { id: "stock-4", name: "都市女性自然口播.jpg", type: "image", url: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=720&auto=format&fit=crop&q=85", source: "library" },
   model: { id: "stock-5", name: "运动服模特正面.jpg", type: "image", url: "https://images.unsplash.com/photo-1538805060514-97d9cc17730c?w=720&auto=format&fit=crop&q=85", source: "library" },
   clothing: { id: "stock-8", name: "白色针织上衣.jpg", type: "image", url: "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=720&auto=format&fit=crop&q=85", source: "library" },

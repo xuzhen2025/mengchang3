@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { operationUser, recordDownload } from "../lib/operationHistory";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp, Download, FileVideo2, GitMerge, ImagePlus, Loader2, ScanFace, Scissors, Trash2, Undo2, Upload, X } from "lucide-react";
 import type { Asset, Task, WatermarkVideo } from "../types";
 import { FACE_DEMO_PORTRAITS } from "../data/faceSwapDemo";
@@ -134,14 +135,16 @@ export default function VideoFaceSwapWorkspace({ assets, task, credits, onBack, 
     if (!selectedVersion || downloading) return;
     const version = selectedVersion;
     setDownloading(true); setError("");
+    const ownerId = operationUser();
     try {
       const response = await fetch(version.videoUrl);
       if (!response.ok) throw new Error();
       const url = URL.createObjectURL(await response.blob());
       const link = document.createElement("a"); link.href = url; link.download = version.name; link.click();
+      recordDownload(version.name, "视频换脸", true, ownerId);
       window.setTimeout(() => URL.revokeObjectURL(url), 60000);
       setToast(`版本${version.number}已开始下载`);
-    } catch { setError("下载失败，请检查网络后重试。"); }
+    } catch { recordDownload(version.name, "视频换脸", false, ownerId); setError("下载失败，请检查网络后重试。"); }
     finally { setDownloading(false); }
   };
 

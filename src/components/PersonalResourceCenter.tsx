@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { recordDownload } from "../lib/operationHistory";
 import { Bookmark, Check, Download, Edit3, File, Image, Link2, Plus, Search, Tag, Trash2, Video, X } from "lucide-react";
 import { Asset } from "../types";
 
@@ -95,6 +96,7 @@ export default function PersonalResourceCenter({ mode, assets, onToast }: Person
     const link = document.createElement("a");
     link.href = asset.url;
     link.download = asset.name;
+    recordDownload(asset.name, asset.resourceCategory || "资源库文件");
     link.target = "_blank";
     link.click();
     onToast(`已开始下载《${asset.name}》`);

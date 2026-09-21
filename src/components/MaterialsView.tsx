@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { recordDownload } from "../lib/operationHistory";
 import { useTaggedResources } from "../lib/useResourceTags";
 import { resourceTagStore } from "../lib/resourceTags";
 import { resourceConfigStore } from "../lib/resourceConfig";
@@ -10,6 +11,8 @@ import FinishedVideoDetailModal from "./FinishedVideoDetailModal";
 import { Pagination } from "./Pagination";
 import { Asset, ResourceSearchIntent } from "../types";
 import { toPublishedVideo } from "../lib/publishedVideo";
+import { INITIAL_THIRD_PARTY } from "../data/thirdPartyVideos";
+import { changeThirdPartyLifecycle, useThirdPartyLifecycle } from "../lib/thirdPartyLifecycle";
 import ResourceSearchCondition from "./ResourceSearchCondition";
 import ResourceFilterPresets from "./ResourceFilterPresets";
 import { VIDEO_PRESET_DEFAULTS } from "../lib/resourceFilterPresets";
@@ -617,6 +620,7 @@ const PUBLIC_TAGS = [
 ];
 
 interface MaterialsViewProps {
+  resourceScope?: "materials" | "thirdParty";
   uploadedVideos?: Asset[];
   onTriggerTask?: (type: any, name: string, inputUrls: string[], cost: number) => void;
   onNavigateToDelivery?: () => void;
@@ -625,15 +629,21 @@ interface MaterialsViewProps {
   onClearSearch?: () => void;
 }
 
-export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNavigateToDelivery, onDetailStateChange, initialSearch, onClearSearch }: MaterialsViewProps) {
+export default function MaterialsView({ uploadedVideos = [], resourceScope = "materials", onTriggerTask, onNavigateToDelivery, onDetailStateChange, initialSearch, onClearSearch }: MaterialsViewProps) {
+  const resourceName = resourceScope === "thirdParty" ? "第三方" : "素材";
   const uploaded = useUploadedResources();
-  const [baseVideos, setVideos] = useState<FinishedVideo[]>(() => [...uploadedVideos.map(toPublishedVideo), ...INITIAL_FINISHED]);
-  const { edits, saveEdits } = useResourceEdits<VideoResourceMetadata>("materials");
-  const untaggedVideos = [...uploaded.filter((item) => item.resourceCategory === "素材").map(toPublishedVideo), ...baseVideos].map(video => ({
+  const lifecycle = useThirdPartyLifecycle();
+  const [baseVideos, setVideos] = useState<FinishedVideo[]>(() => [...uploadedVideos.map(toPublishedVideo), ...(resourceScope === "thirdParty" ? INITIAL_THIRD_PARTY : INITIAL_FINISHED)]);
+  const { edits, saveEdits } = useResourceEdits<VideoResourceMetadata>(resourceScope);
+  const uniqueVideos = new Map<string, FinishedVideo>();
+  for (const video of [...uploaded.filter((item) => item.resourceCategory === resourceName).map(toPublishedVideo), ...baseVideos]) {
+    if (!uniqueVideos.has(video.id)) uniqueVideos.set(video.id, video);
+  }
+  const untaggedVideos = [...uniqueVideos.values()].filter(video => resourceScope !== "thirdParty" || !lifecycle[video.id] || lifecycle[video.id].state === "active").map(video => ({
       ...video, associatedScripts: DEFAULT_ASSOCIATED_SCRIPTS, relatedVideos: DEFAULT_RELATED_VIDEOS,
       ...edits[video.id],
     }));
-  const videos = useTaggedResources<FinishedVideo>("materials", untaggedVideos);
+  const videos = useTaggedResources<FinishedVideo>(resourceScope, untaggedVideos);
   const [activeTab, setActiveTab] = useState<"all" | "secondary" | "performance">("all");
   
   // Screenshot Filter States
@@ -647,9 +657,9 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
   const [secondaryCat, setSecondaryCat] = useState("全部");
   const [statusVal, setStatusVal] = useState("全部");
   const { store: configStore } = useResourceConfig();
-  const PRIMARY_CATEGORIES = ["全部", ...configStore.categories("materials").map(n => n.name)];
-  const SECONDARY_CATEGORIES = ["全部", ...configStore.categories("materials").flatMap(n => n.children.map(c => c.name))];
-  const STATUS_OPTIONS = ["全部", ...configStore.statuses("materials").map(s => s.name)];
+  const PRIMARY_CATEGORIES = ["全部", ...configStore.categories(resourceScope).map(n => n.name)];
+  const SECONDARY_CATEGORIES = ["全部", ...configStore.categories(resourceScope).flatMap(n => n.children.map(c => c.name))];
+  const STATUS_OPTIONS = ["全部", ...configStore.statuses(resourceScope).map(s => s.name)];
   
   const [publicTagSearch, setPublicTagSearch] = useState("");
   const [publicTagKeyword, setPublicTagKeyword] = useState("");
@@ -809,14 +819,15 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
     if (!matchesHomeSearch) return false;
 
     // Primary category
-    const matchesPrimary = primaryCat === "全部" ? true : (v.category === primaryCat || v.title.includes(primaryCat));
+    const [primary, secondary] = (v.category || "").split(" / ");
+    const matchesPrimary = primaryCat === "全部" || primary === primaryCat;
     
     // Secondary category search / option
     const matchesSecondarySearch = !secondarySearch ? true : v.title.toLowerCase().includes(secondarySearch.toLowerCase());
-    const matchesSecondaryCat = secondaryCat === "全部" ? true : v.title.includes(secondaryCat);
+    const matchesSecondaryCat = secondaryCat === "全部" || secondary === secondaryCat;
     
     // Status
-    const matchesStatus = !configStore.statusEnabled("materials") || statusVal === "全部" || v.status === statusVal;
+    const matchesStatus = !configStore.statusEnabled(resourceScope) || statusVal === "全部" || v.status === statusVal;
     
     // Public tag
     const matchesPublicSearch = !publicTagSearch ? true : v.tags?.some(t => t.toLowerCase().includes(publicTagSearch.toLowerCase()));
@@ -986,6 +997,12 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
     return (
       <FinishedVideoDetailModal
         isMaterialMode={true}
+        resourceScope={resourceScope}
+        onDelete={resourceScope === "thirdParty" ? () => {
+          changeThirdPartyLifecycle([detailModalVideo.id], "trash", "用户端");
+          setDetailModalVideo(null);
+          showToast("第三方视频已移入回收站");
+        } : undefined}
         key={detailModalVideo.id}
         video={videos.find(video => video.id === detailModalVideo.id) || detailModalVideo}
         onUpdate={(patch) => saveEdits({ [detailModalVideo.id]: patch })}
@@ -1000,7 +1017,7 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-slate-50 p-5 space-y-4 text-slate-800 font-sans relative">
+    <div data-testid="material-resource-view" data-resource-scope={resourceScope} className="flex-1 overflow-y-auto bg-slate-50 p-5 space-y-4 text-slate-800 font-sans relative">
       {/* Toast Notification Banner */}
       {toastMessage && (
         <OverlayPortal layer="toast" role="status" className="fixed top-6 left-1/2 -translate-x-1/2 z-[200] bg-slate-900/90 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-2xl backdrop-blur-md border border-white/20 animate-in fade-in slide-in-from-top-4 duration-200 flex items-center gap-2">
@@ -1244,7 +1261,7 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
         
         {/* ROW 1: 常用筛选预设 */}
         <div className="flex justify-end items-center gap-2 pb-1 border-b border-slate-100/60">
-          <ResourceFilterPresets scope="materials" defaults={VIDEO_PRESET_DEFAULTS} value={presetFilters}
+          <ResourceFilterPresets scope={resourceScope} defaults={VIDEO_PRESET_DEFAULTS} value={presetFilters}
             selectedName={selectedPreset} onSelectName={setSelectedPreset} onApply={applyPresetFilters}
             seeds={[
               { name: "高爆款素材预设", filters: { costRange: "消耗达到5w", sortBy: "总消耗" } },
@@ -1253,14 +1270,14 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
         </div>
 
         {/* ROW 2: 一级分类 */}
-          <ResourceCategoryFilters scope="materials" primary={primaryCat} secondary={secondaryCat} search={secondarySearch}
+          <ResourceCategoryFilters scope={resourceScope} primary={primaryCat} secondary={secondaryCat} search={secondarySearch}
             onPrimary={setPrimaryCat} onSecondary={setSecondaryCat} onSearch={setSecondarySearch} />
 
         {/* ROW 3: 二级分类 (Custom invented options) */}
 
 
         {/* ROW 4: 状 态 */}
-        <ResourceStatusFilter scope="materials" value={statusVal} onChange={setStatusVal} />
+        <ResourceStatusFilter scope={resourceScope} value={statusVal} onChange={setStatusVal} />
 
         {/* ROW 5: 公共标签 */}
         <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
@@ -1400,7 +1417,7 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
             </div>
 
             <VideoBatchActions videos={videos} selectedIds={selectedVideoIds}
-              isMaterialMode={true} onApply={applyBatchChange} showToast={showToast} />
+              isMaterialMode={true} resourceScope={resourceScope} onApply={applyBatchChange} showToast={showToast} />
           </div>
         ) : (
           /* STANDARD UNSELECTED BAR */
@@ -1601,7 +1618,7 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
                   <td className="p-3 font-mono font-bold text-orange-600">¥{video.cost.toLocaleString()}</td>
                   <td className="p-3 font-mono font-bold text-purple-600">{video.roi ? `${video.roi.toFixed(2)}x` : "-"}</td>
                   <td className="p-3">
-                    <ResourceStatusBadge scope="materials" status={video.status} />
+                    <ResourceStatusBadge scope={resourceScope} status={video.status} />
                   </td>
                   <td className="p-3 text-slate-400 font-mono text-[10px]">{video.createdAt}</td>
                   <td className="p-3 text-right">
@@ -1611,7 +1628,7 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
                         className="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-[10px] px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1"
                       >
                         <BarChart3 className="w-3 h-3 text-purple-600" />
-                        <span>素材详情</span>
+                        <span>{resourceName}详情</span>
                       </button>
                       <button
                         onClick={() => handleSyncToAd(video)}
@@ -1653,6 +1670,8 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
             return (
               <div 
                 key={video.id}
+                data-testid="material-video-card"
+                data-resource-id={video.id}
                 onMouseEnter={() => setHoveredVideoId(video.id)}
                 onMouseLeave={() => {
                   if (!isMenuOpen) {
@@ -1747,6 +1766,7 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
                                   const a = document.createElement("a");
                                   a.href = video.videoUrl;
                                   a.download = `${video.title}_原片.mp4`;
+                                  recordDownload(a.download, resourceScope === "thirdParty" ? "第三方" : "素材");
                                   a.target = "_blank";
                                   a.click();
                                   showToast("📥 开始下载无水印原片...");
@@ -1762,6 +1782,7 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
                                   const a = document.createElement("a");
                                   a.href = video.videoUrl;
                                   a.download = `${video.title}_转码.mp4`;
+                                  recordDownload(a.download, resourceScope === "thirdParty" ? "第三方" : "素材");
                                   a.target = "_blank";
                                   a.click();
                                   showToast("📥 开始下载转码视频...");
@@ -1777,6 +1798,7 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
                                   const a = document.createElement("a");
                                   a.href = video.videoUrl;
                                   a.download = `${video.title}_预览水印.mp4`;
+                                  recordDownload(a.download, resourceScope === "thirdParty" ? "第三方" : "素材");
                                   a.target = "_blank";
                                   a.click();
                                   showToast("📥 开始下载带水印预览视频...");
@@ -1956,11 +1978,11 @@ export default function MaterialsView({ uploadedVideos = [], onTriggerTask, onNa
                   <span className={`absolute top-0 text-white text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-br-lg z-10 shadow-xs transition-all ${
                     isSelected || isSelectionActive ? "left-7 bg-purple-600" : "left-0 bg-[#00aed6]"
                   }`}>
-                    素材
+                    {resourceName}
                   </span>
 
                   {/* Top Right Tag: Status */}
-                  <ResourceStatusBadge scope="materials" status={video.status} className="absolute top-0 right-0 text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-bl-lg z-10 shadow-xs" />
+                  <ResourceStatusBadge scope={resourceScope} status={video.status} className="absolute top-0 right-0 text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-bl-lg z-10 shadow-xs" />
 
                   {/* ID Overlay (top left below tag) */}
                   <div className="absolute top-6 left-1.5 z-10 bg-black/50 backdrop-blur-xs text-white/90 text-[10px] font-mono px-1.5 py-0.2 rounded">

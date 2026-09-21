@@ -3,6 +3,7 @@ import { useTagCatalog, useTagGroupSelection, useTagSelection } from "../lib/use
 import CategoryCascader from "./CategoryCascader";
 import { resourceConfigStore } from "../lib/resourceConfig";
 import { publishResources, type ResourcePublishDetails } from "../lib/resourceUploads";
+import { operationUser } from "../lib/operationHistory";
 import DynamicScriptTemplateForm, { DynamicScriptTemplateFormHandle } from "./DynamicScriptTemplateForm";
 import {
   ArrowLeft,
@@ -65,6 +66,7 @@ export default function UploadScriptPage({
   const [categoryError, setCategoryError] = useState("");
 
   const handlePublish = (keepConfig = false) => {
+    const ownerId = operationUser();
     if (isSubmitting) return;
     if (!resourceConfigStore.categoryValid("scripts", primaryCategory, secondaryCategory)) { setCategoryError("请选择当前可用的一级分类和二级分类"); return; }
     setCategoryError("");
@@ -74,7 +76,7 @@ export default function UploadScriptPage({
     setTimeout(() => {
       setIsSubmitting(false);
       if (!resourceConfigStore.categoryValid("scripts", primaryCategory, secondaryCategory)) { setCategoryError("分类已变更，请重新选择"); return; }
-      const published = publishResources({ partition: "脚本", primaryCategory, secondaryCategory,
+      const published = publishResources({ ownerId, partition: "脚本", primaryCategory, secondaryCategory,
         publicTags: addedPublicTags, personalTags: addedPersonalTags, content,
         files: [{ name: scriptTitle.trim() || "未命名脚本", url: URL.createObjectURL(new Blob([content], { type: "application/json" })) }],
       });

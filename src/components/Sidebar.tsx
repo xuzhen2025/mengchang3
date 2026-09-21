@@ -15,6 +15,7 @@ import {
   Settings,
   TrendingUp,
   BarChart3,
+  History,
   ShoppingBag,
   Clapperboard,
   Radio,
@@ -71,6 +72,7 @@ export default function Sidebar({
     { id: "task_collaboration", label: "任务协作", icon: ListTodo },
     { id: "resources", label: "资源库", icon: FolderHeart },
     { id: "ad_delivery", label: "数据分析", icon: BarChart3 },
+    { id: "operation_records", label: "操作记录", icon: History },
   ];
 
   const adminMenuItems: { id: string; label: string; icon: any; badge?: string }[] = [

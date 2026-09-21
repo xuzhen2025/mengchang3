@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { recordExport } from "../lib/operationHistory";
 import { 
   Sparkles, 
   Coins, 
@@ -322,6 +323,7 @@ export default function AdminCreditsManagementView() {
     const a = document.createElement("a");
     a.href = url;
     a.download = `云视频管家_积分使用明细_${new Date().toISOString().slice(0, 10)}.csv`;
+    recordExport(blob, a.download, "积分使用明细");
     a.click();
     showToast("📄 积分使用明细 CSV 文件已生成并开始下载！");
   };

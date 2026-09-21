@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { recordDownload } from "../lib/operationHistory";
 import {
   ArrowLeft,
   Check,
@@ -49,7 +50,7 @@ const MAX_REGIONS = 4;
 const WATERMARK_COST = 40;
 const MIN_REGION_SIZE = 4;
 const FALLBACK_DURATION = 15;
-const FALLBACK_COVER = "/assets/prototype/beauty-promo-detail.jpg";
+const FALLBACK_COVER = "./assets/prototype/beauty-promo-detail.jpg";
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
@@ -402,6 +403,7 @@ export default function VideoWatermarkWorkspace({
     const link = document.createElement("a");
     link.href = output.videoUrl;
     link.download = outputName || output.name;
+    recordDownload(link.download, "视频处理");
     link.target = "_blank";
     link.rel = "noreferrer";
     link.click();

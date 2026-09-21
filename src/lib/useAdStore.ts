@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { AD_CHANGE_EVENT, AD_STORE_KEY, advanceAdStore, readAdStore, updateAdStore } from "./adPush";
 import { saveResourceEdits } from "./useResourceEdits";
+import { syncPushDerivations } from "./videoDerivation";
 
 export function useAdStore() {
   const [store, setStore] = useState(readAdStore);
   useEffect(() => {
+    syncPushDerivations(readAdStore().records);
     const refresh = () => setStore(readAdStore());
     const storage = (e: StorageEvent) => { if (e.key === AD_STORE_KEY || e.key === "cloud_video_roles_v2" || e.key === "mengchang_prototype_session") refresh(); };
     window.addEventListener(AD_CHANGE_EVENT, refresh);

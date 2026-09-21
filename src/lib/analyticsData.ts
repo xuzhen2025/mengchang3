@@ -1,4 +1,5 @@
 import { INITIAL_DEPTS, INITIAL_MEMBERS } from "../data/adminAccounts";
+import { recordExport } from "./operationHistory";
 import { INITIAL_PUBLIC_TAG_GROUPS } from "./resourceTags";
 
 export const REPORT_PLATFORMS = [
@@ -480,6 +481,7 @@ export function csvText(headers: string[], rows: (string | number)[][]) {
   );
 }
 export function downloadBlob(blob: Blob, filename: string) {
+  recordExport(blob, filename, "数据报表");
   const url = URL.createObjectURL(blob),
     a = document.createElement("a");
   a.href = url;

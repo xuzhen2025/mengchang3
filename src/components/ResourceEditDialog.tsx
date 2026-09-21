@@ -62,11 +62,10 @@ export function ResourceCategoryModal({ initialCategory = "", scope = "finished"
   </ResourceEditDialog>;
 }
 
-export function VideoStatusSelect({ value, onChange, isMaterialMode = false, placeholder = false }: {
-  value: string; onChange: (value: string) => void; isMaterialMode?: boolean; placeholder?: boolean;
+export function VideoStatusSelect({ value, onChange, isMaterialMode = false, scope = isMaterialMode ? "materials" : "finished", placeholder = false }: {
+  value: string; onChange: (value: string) => void; isMaterialMode?: boolean; scope?: string; placeholder?: boolean;
 }) {
   const { store } = useResourceConfig();
-  const scope = isMaterialMode ? "materials" : "finished";
   if (!store.statusEnabled(scope)) return null;
   return <select aria-label="视频状态" value={value} onChange={event => onChange(event.target.value)}
     className="px-2.5 py-1 bg-white border border-purple-300 rounded-lg text-xs font-bold text-purple-900 focus:outline-none cursor-pointer shadow-2xs">

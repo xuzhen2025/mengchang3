@@ -67,9 +67,10 @@ interface HomeViewProps {
   onSearchResources?: (intent: Omit<ResourceSearchIntent, "requestId">) => void;
 }
 
-const RESOURCE_SEARCH_TYPES: ResourceSearchType[] = ["成片", "素材", "图片", "脚本", "音频"];
+const RESOURCE_SEARCH_TYPES: ResourceSearchType[] = ["成片", "素材", "第三方", "图片", "脚本", "音频"];
 
 const RESOURCE_HOT_TAGS: Record<ResourceSearchType, string[]> = {
+  第三方: ["美妆", "服饰内衣", "个护家清", "美妆原片", "服饰穿搭", "洗护展示"],
   成片: ["达人成片", "草本初色内衣", "短视频推广", "直播", "女士内衣", "女士内裤", "女士睡衣", "塑身裤", "首发素材", "AD优质素材"],
   素材: ["达人成片", "草本初色内衣", "短视频推广", "直播", "女士内衣", "女士内裤", "女士睡衣", "塑身裤", "首发素材", "AD优质素材"],
   图片: ["美妆护肤", "服饰内衣", "3C数码", "资质文件", "宣发图库", "家居日用", "食品饮料", "精选主图", "品牌资质", "3D渲染图"],
@@ -78,6 +79,7 @@ const RESOURCE_HOT_TAGS: Record<ResourceSearchType, string[]> = {
 };
 
 const RESOURCE_FILTER_OPTIONS: Record<ResourceSearchType, string[]> = {
+  第三方: [...RESOURCE_HOT_TAGS.第三方, "特写质感镜头", "面料细节展示", "对比体验", "待审核", "审核通过", "已上机", "画面利用"],
   成片: [...RESOURCE_HOT_TAGS.成片, "塑身衣", "保暖内衣", "少女内衣", "袜子", "男士内裤", "男士睡衣", "购买达人视频", "无钢圈", "聚拢款", "蕾丝杯面", "无痕塑形", "爆款走秀", "审核驳回", "已修改", "二次修改", "已上机", "已搭", "放弃", "首发素材", "AD优质素材"],
   素材: [...RESOURCE_HOT_TAGS.素材, "塑身衣", "保暖内衣", "少女内衣", "袜子", "男士内裤", "男士睡衣", "购买达人视频", "无钢圈", "聚拢款", "蕾丝杯面", "无痕塑形", "爆款走秀", "审核驳回", "已修改", "二次修改", "已上机", "画面利用", "放弃", "首发素材", "AD优质素材"],
   图片: [...RESOURCE_HOT_TAGS.图片, "a店铺", "b店铺", "营销资料库", "重点素材", "对比素材", "无个人标签", "有个人标签"],

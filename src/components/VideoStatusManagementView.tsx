@@ -7,12 +7,13 @@ import { Plus, X, AlertCircle, ChevronDown, Check } from "lucide-react";
 
 export type VideoStatusItem = ResourceStatusItem;
 
-const PARTITION_OPTIONS = ["成片", "素材"];
+const PARTITION_OPTIONS = ["成片", "素材", "第三方"];
 
 // 分区简写与特定背景色
 const PARTITION_BADGES: Record<string, { label: string; bg: string }> = {
   成片: { label: "成", bg: "bg-[#06B6D4]" }, // 青色
   素材: { label: "素", bg: "bg-[#7C3AED]" }, // 紫色
+  第三方: { label: "三", bg: "bg-[#2563EB]" },
 };
 
 // 预设颜色选项
@@ -88,7 +89,7 @@ export default function VideoStatusManagementView() {
   // 打开新增模态框
   const handleOpenAddModal = () => {
     setFormName("");
-    setFormPartitions(["成片", "素材"]);
+    setFormPartitions([...PARTITION_OPTIONS]);
     setFormWeight("");
     setIsAddModalOpen(true);
   };

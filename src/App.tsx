@@ -20,6 +20,8 @@ import ResourcesView from "./components/ResourcesView";
 import MaterialsView from "./components/MaterialsView";
 import FinishedVideosView from "./components/FinishedVideosView";
 import AdDeliveryView from "./components/AdDeliveryView";
+import OperationRecordsView from "./components/OperationRecordsView";
+import { recordLogin } from "./lib/operationHistory";
 import SameStyleVideoView from "./components/SameStyleVideoView";
 import AgentCreationView from "./components/AgentCreationView";
 import VideoRemakeView, { type SourceVideo } from "./components/VideoRemakeView";
@@ -229,6 +231,7 @@ export default function App() {
     : null;
 
   const handleLogin = (account: PrototypeAccount) => {
+    recordLogin(account.username, true);
     const nextSession = {
       username: account.username,
       mode: account.defaultMode,
@@ -638,7 +641,7 @@ export default function App() {
               coverUrl:
                 media?.coverUrl ||
                 (media?.type === "image" ? media.url : "") ||
-                "/assets/prototype/luxury-skincare-set.jpg",
+                "./assets/prototype/luxury-skincare-set.jpg",
               duration,
               size: `${(duration * 1.02 + 0.8 + index * 0.33).toFixed(2)}MB`,
               sourceVideoId:
@@ -689,10 +692,10 @@ export default function App() {
           }
           const snapshot = task.quickCreationSnapshot;
           const imageOutputs = [
-            "/assets/prototype/luxury-skincare-set.jpg",
-            "/assets/prototype/skincare-product.jpg",
-            "/assets/prototype/luxury-skincare-set.jpg",
-            "/assets/prototype/skincare-product.jpg",
+            "./assets/prototype/luxury-skincare-set.jpg",
+            "./assets/prototype/skincare-product.jpg",
+            "./assets/prototype/luxury-skincare-set.jpg",
+            "./assets/prototype/skincare-product.jpg",
           ];
           const outputFiles =
             snapshot.mode === "image"
@@ -1816,6 +1819,8 @@ export default function App() {
 
       case "ad_delivery":
         return <AdDeliveryView />;
+      case "operation_records":
+        return <OperationRecordsView />;
 
       case "same_style_video":
         return (

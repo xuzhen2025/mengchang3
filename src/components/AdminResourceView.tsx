@@ -6,6 +6,12 @@ import FinishedVideoDetailModal, { FinishedVideo } from "./FinishedVideoDetailMo
 import ImageDetailView, { ImageItem } from "./ImageDetailView";
 import AudioDetailView, { AudioItem } from "./AudioDetailView";
 import ScriptDetailPage, { ScriptItem } from "./ScriptDetailPage";
+import OverlayPortal from "./overlays/OverlayPortal";
+import { INITIAL_THIRD_PARTY } from "../data/thirdPartyVideos";
+import { useUploadedResources } from "../lib/resourceUploads";
+import { toPublishedVideo } from "../lib/publishedVideo";
+import { useResourceEdits } from "../lib/useResourceEdits";
+import { changeThirdPartyLifecycle, useThirdPartyLifecycle } from "../lib/thirdPartyLifecycle";
 
 export interface AdminResourceItem {
   id: string;
@@ -16,8 +22,11 @@ export interface AdminResourceItem {
   category: string;
   company: string;
   uploadTime: string;
-  tabType: "成片" | "素材" | "图片" | "音频" | "脚本" | "回收站";
-  originalTabType?: "成片" | "素材" | "图片" | "音频" | "脚本";
+  tabType: "成片" | "素材" | "第三方" | "图片" | "音频" | "脚本" | "回收站";
+  originalTabType?: "成片" | "素材" | "第三方" | "图片" | "音频" | "脚本";
+  status?: string;
+  author?: string;
+  personalTags?: string[];
   fileSize?: string;
   duration?: string;
   scriptContent?: string;
@@ -270,7 +279,21 @@ const INITIAL_ADMIN_RESOURCES: AdminResourceItem[] = [
 
 export default function AdminResourceView() {
   const [baseResources, setResources] = useState<AdminResourceItem[]>(INITIAL_ADMIN_RESOURCES);
-  const resources = useScopedTaggedResources<AdminResourceItem>(baseResources, (item) => ({ 成片: "finished", 素材: "materials", 图片: "images", 音频: "audio", 脚本: "scripts" }[item.originalTabType || (item.tabType === "回收站" ? "成片" : item.tabType)]));
+  const uploaded = useUploadedResources();
+  const lifecycle = useThirdPartyLifecycle();
+  const { edits, saveEdits } = useResourceEdits<FinishedVideo>("thirdParty");
+  const thirdParty = [...uploaded.filter(r => r.resourceCategory === "第三方").map(toPublishedVideo), ...INITIAL_THIRD_PARTY]
+    .filter(video => lifecycle[video.id]?.state !== "deleted")
+    .map((source): AdminResourceItem => {
+      const video = { ...source, ...edits[source.id] }, state = lifecycle[video.id];
+      return { id: video.id, name: video.title, cover: video.coverUrl, videoUrl: video.videoUrl,
+        category: video.category || "", tags: video.tags || [], personalTags: video.personalTags,
+        status: video.status, author: video.author, company: "梦畅网络", uploadTime: video.createdAt,
+        duration: video.duration, fileSize: video.size, tabType: state?.state === "trash" ? "回收站" : "第三方",
+        originalTabType: "第三方", originalLocation: `资源库 / 第三方管理 / ${video.category || ""}`,
+        deletedAt: state?.deletedAt, deletedBy: state?.deletedBy, deletedSource: state?.deletedSource };
+    });
+  const resources = useScopedTaggedResources<AdminResourceItem>([...baseResources, ...thirdParty], (item) => ({ 成片: "finished", 素材: "materials", 第三方: "thirdParty", 图片: "images", 音频: "audio", 脚本: "scripts" }[item.originalTabType || (item.tabType === "回收站" ? "成片" : item.tabType)]));
   const [activeTab, setActiveTab] = useState<string>("成片");
   
   // 筛选字段
@@ -417,7 +440,7 @@ export default function AdminResourceView() {
     setTimeout(() => setToastMsg(null), 2500);
   };
 
-  const tabs = ["成片", "素材", "图片", "音频", "脚本", "回收站"];
+  const tabs = ["成片", "素材", "第三方", "图片", "音频", "脚本", "回收站"];
   const companies = ["全部公司", "致上互娱", "梦畅网络", "云享文化", "星耀传媒", "致上电商"];
   const { publicGroups } = useTagCatalog();
   const tagsList = ["全部标签", ...Object.values(publicGroups).flat()];
@@ -460,6 +483,11 @@ export default function AdminResourceView() {
 
   // 单个删除 -> 移入回收站
   const handleMoveToTrash = (id: string) => {
+    if (thirdParty.some(item => item.id === id)) {
+      changeThirdPartyLifecycle([id], "trash");
+      showToast("第三方视频已移入回收站");
+      return;
+    }
     setResources((prev) =>
       prev.map((r) => {
         if (r.id === id) {
@@ -506,6 +534,8 @@ export default function AdminResourceView() {
 
   // 执行彻底删除 (单项或批量)
   const handleConfirmDelete = () => {
+    const targetIds = deleteConfirmModal.isBatch ? selectedIds : [deleteConfirmModal.id || ""];
+    changeThirdPartyLifecycle(targetIds.filter(id => thirdParty.some(item => item.id === id)), "deleted");
     if (deleteConfirmModal.isBatch) {
       const count = selectedIds.length;
       setResources((prev) => prev.filter((r) => !selectedIds.includes(r.id)));
@@ -527,6 +557,7 @@ export default function AdminResourceView() {
       return;
     }
     const count = selectedIds.length;
+    changeThirdPartyLifecycle(selectedIds.filter(id => thirdParty.some(item => item.id === id)), "active");
     setResources((prev) =>
       prev.map((r) => {
         if (selectedIds.includes(r.id)) {
@@ -560,6 +591,7 @@ export default function AdminResourceView() {
       setPasswordError("请输入登录密码");
       return;
     }
+    changeThirdPartyLifecycle(thirdParty.filter(item => item.tabType === "回收站").map(item => item.id), "deleted");
     setResources((prev) => prev.filter((r) => r.tabType !== "回收站"));
     setSelectedIds([]);
     setClearTrashModalOpen(false);
@@ -577,7 +609,8 @@ export default function AdminResourceView() {
 
   // 如果打开了详情页，渲染对应的用户端一致的详情组件
   if (previewItem) {
-    if (previewItem.tabType === "成片" || previewItem.tabType === "素材" || (previewItem.tabType === "回收站" && (previewItem.originalTabType === "成片" || previewItem.originalTabType === "素材"))) {
+    const videoType = previewItem.originalTabType || previewItem.tabType;
+    if (["成片", "素材", "第三方"].includes(videoType)) {
       const finishedVideo: FinishedVideo = {
         id: previewItem.id,
         title: previewItem.name,
@@ -592,7 +625,9 @@ export default function AdminResourceView() {
         shares: 12,
         likes: 120,
         comments: 18,
-        author: previewItem.company,
+        author: previewItem.author || previewItem.company,
+        status: previewItem.status,
+        personalTags: previewItem.personalTags,
         cost: 3.5,
         brandName: previewItem.company,
         category: previewItem.category,
@@ -602,7 +637,15 @@ export default function AdminResourceView() {
       return (
         <FinishedVideoDetailModal
           video={finishedVideo}
-          isMaterialMode={previewItem.tabType === "素材" || previewItem.originalTabType === "素材"}
+          isMaterialMode={videoType !== "成片"}
+          resourceScope={videoType === "第三方" ? "thirdParty" : videoType === "素材" ? "materials" : "finished"}
+          onUpdate={videoType === "第三方" ? patch => {
+            saveEdits({ [previewItem.id]: patch });
+            setPreviewItem(prev => prev ? { ...prev, name: patch.title ?? prev.name, category: patch.category ?? prev.category } : prev);
+          } : undefined}
+          onDelete={videoType === "第三方" && previewItem.tabType !== "回收站" ? () => {
+            handleMoveToTrash(previewItem.id); setPreviewItem(null);
+          } : undefined}
           isAdminMode={true}
           onClose={() => setPreviewItem(null)}
         />
@@ -698,10 +741,10 @@ export default function AdminResourceView() {
     <div className="flex-1 flex flex-col min-h-0 bg-white text-slate-800 font-sans">
       {/* Toast */}
       {toastMsg && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-slate-900/90 text-white px-5 py-2.5 rounded-2xl shadow-2xl backdrop-blur-md border border-slate-700/80 text-xs font-bold flex items-center gap-2 animate-in fade-in zoom-in-95">
+        <OverlayPortal layer="toast" role="status" className="fixed top-5 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white px-5 py-2.5 rounded-2xl shadow-2xl backdrop-blur-md border border-slate-700/80 text-xs font-bold flex items-center gap-2 animate-in fade-in zoom-in-95">
           <Sparkles className="w-4 h-4 text-purple-400" />
           <span>{toastMsg}</span>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* 1. 顶部筛选工具栏 (参考截图1) */}
@@ -909,6 +952,8 @@ export default function AdminResourceView() {
                 return (
                   <div
                     key={item.id}
+                    data-testid="admin-resource-card"
+                    data-resource-id={item.id}
                     onClick={() => {
                       if (activeTab === "回收站" && isSelectMode) {
                         toggleSelectId(item.id);
@@ -991,6 +1036,7 @@ export default function AdminResourceView() {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (item.originalTabType === "第三方") changeThirdPartyLifecycle([item.id], "active");
                               setResources((prev) =>
                                 prev.map((r) => (r.id === item.id ? { ...r, tabType: r.originalTabType || "成片" } : r))
                               );
@@ -1039,7 +1085,7 @@ export default function AdminResourceView() {
       </div>
 
       {moveToTrashItem && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px] animate-in fade-in duration-200">
+        <OverlayPortal layer="dialog" role="dialog" aria-modal="true" aria-label="删除资源" className="fixed inset-0 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px] animate-in fade-in duration-200">
           <div className="w-full max-w-[420px] overflow-hidden rounded-xl border border-slate-100/80 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between px-5 pb-1 pt-4">
               <h3 className="text-base font-bold text-slate-800">删除资源</h3>
@@ -1068,14 +1114,14 @@ export default function AdminResourceView() {
               </button>
             </div>
           </div>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* ============================================================ */}
       {/* 彻底删除 确认弹窗 (对应截图1) */}
       {/* ============================================================ */}
       {deleteConfirmModal.isOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[999] flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <OverlayPortal layer="dialog" role="dialog" aria-modal="true" aria-label="彻底删除资源" className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-[420px] overflow-hidden border border-slate-100/80 animate-in zoom-in-95 duration-200">
             {/* 头部标题与关闭 */}
             <div className="p-4 px-5 flex items-center justify-between border-b-0 pb-1">
@@ -1129,14 +1175,14 @@ export default function AdminResourceView() {
               </button>
             </div>
           </div>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* ============================================================ */}
       {/* 一键清空 密码确认弹窗 (对应截图2) */}
       {/* ============================================================ */}
       {clearTrashModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[999] flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <OverlayPortal layer="dialog" role="dialog" aria-modal="true" aria-label="清空回收站" className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-[480px] overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200">
             {/* 头部标题与关闭：| 一键清空 */}
             <div className="p-4 px-5 flex items-center justify-between border-b border-slate-100/80">
@@ -1221,7 +1267,7 @@ export default function AdminResourceView() {
               </button>
             </div>
           </div>
-        </div>
+        </OverlayPortal>
       )}
     </div>
   );

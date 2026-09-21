@@ -1,6 +1,9 @@
 import { INITIAL_CATEGORIES, CategoryL1Node } from "../data/resourceCategories";
 
-export const RESOURCE_PARTITIONS = { finished: "成片", materials: "素材", images: "图片", audio: "音频", scripts: "脚本" } as const;
+export const RESOURCE_PARTITIONS = { finished: "成片", materials: "素材", thirdParty: "第三方", images: "图片", audio: "音频", scripts: "脚本" } as const;
+export const VIDEO_RESOURCE_SCOPES = { 成片: "finished", 素材: "materials", 第三方: "thirdParty" } as const;
+export type VideoPartition = keyof typeof VIDEO_RESOURCE_SCOPES;
+export type VideoResourceScope = typeof VIDEO_RESOURCE_SCOPES[VideoPartition];
 export type ResourceScope = keyof typeof RESOURCE_PARTITIONS;
 export type StatusKind = "video" | "script";
 export interface ResourceStatusItem {
@@ -14,20 +17,20 @@ export interface ConfigurableResource {
 type Update<T> = T | ((previous: T) => T);
 type ResourceLink = { scope: string; primaryId?: string; secondaryId?: string; statusId?: string; original: ConfigurableResource };
 const makeStatuses = (kind: StatusKind, names: string[]): ResourceStatusItem[] => names.map((name, i) => ({
-  id: `${kind}-status-${i + 1}`, name, partitions: kind === "script" ? ["脚本"] : name === "已搭" ? ["成片"] : name === "画面利用" ? ["素材"] : ["成片", "素材"],
+  id: `${kind}-status-${i + 1}`, name, partitions: kind === "script" ? ["脚本"] : name === "已搭" ? ["成片"] : name === "画面利用" ? ["素材", "第三方"] : ["成片", "素材", "第三方"],
   textColor: "#FFFFFF", bgColor: name.includes("通过") ? "#059669" : name.includes("驳回") ? "#DC2626" : name === "已上机" ? "#2563EB" : "#64748B",
   weight: names.length - i, notifyEnabled: false, isDefault: i === 0,
 }));
 export const INITIAL_VIDEO_STATUSES = makeStatuses("video", ["待审核", "审核通过", "审核驳回", "已修改", "二次修改", "已上机", "已搭", "画面利用", "放弃"]);
 export const INITIAL_SCRIPT_STATUSES = makeStatuses("script", ["待审核", "审核通过", "驳回-待修改", "已分配", "已归档"]);
 const aliases: Record<string, string> = { "未审核": "待审核", "已通过": "审核通过", "审核不通过": "审核驳回", "已投放": "已上机", "1": "待审核", "2": "已分配" };
-const kindOf = (scope: string): StatusKind | undefined => scope === "scripts" ? "script" : scope === "finished" || scope === "materials" ? "video" : undefined;
+const kindOf = (scope: string): StatusKind | undefined => scope === "scripts" ? "script" : ["finished", "materials", "thirdParty"].includes(scope) ? "video" : undefined;
 export const partitionOf = (scope: string) => RESOURCE_PARTITIONS[scope as ResourceScope] || scope;
 
 export function createResourceConfigStore() {
   let categories = structuredClone(INITIAL_CATEGORIES);
   let statuses = { video: structuredClone(INITIAL_VIDEO_STATUSES), script: structuredClone(INITIAL_SCRIPT_STATUSES) };
-  let settings = { video: { enabled: true, partitions: ["成片", "素材"] }, script: { enabled: true, partitions: ["脚本"] } };
+  let settings = { video: { enabled: true, partitions: ["成片", "素材", "第三方"] }, script: { enabled: true, partitions: ["脚本"] } };
   const statusNameIds = new Map(Object.entries(statuses).flatMap(([kind, items]) => items.map(s => [`${kind}:${s.name}`, s.id] as const)));
   const categoryNameIds = new Map<string, { primaryId: string; secondaryId?: string }>();
   const rememberCategoryNames = () => {

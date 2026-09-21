@@ -262,7 +262,6 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
   }, [detailItem, onDetailStateChange]);
   const [selectedDetailThumbIndex, setSelectedDetailThumbIndex] = useState<number>(0);
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
-  const [showExportModal, setShowExportModal] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
@@ -504,20 +503,13 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
           </div>
         </div>
 
-        {/* Reset and export */}
+        {/* Reset */}
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={handleResetFilters}
             className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs"
           >
             重置
-          </button>
-
-          <button
-            onClick={() => setShowExportModal(true)}
-            className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs"
-          >
-            导出
           </button>
         </div>
       </div>
@@ -919,41 +911,6 @@ export default function ImageManagementView({ onTriggerTask, onDetailStateChange
       )}
 
 
-      {/* Modal 2: 导出模态框 */}
-      {showExportModal && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-2xs animate-fade-in p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-sm p-5 space-y-4 relative text-xs">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <h3 className="font-black text-sm text-slate-900">导出图片数据表</h3>
-              <button onClick={() => setShowExportModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <p className="text-slate-600">
-              将根据当前选中的 <span className="font-bold text-purple-600">{filteredImages.length}</span> 条图片记录生成 Excel 数据清单，包含所有标签分类及作者记录。
-            </p>
-
-            <div className="flex justify-end gap-2 pt-2 font-bold">
-              <button
-                onClick={() => setShowExportModal(false)}
-                className="px-3.5 py-1.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 cursor-pointer"
-              >
-                取消
-              </button>
-              <button
-                onClick={() => {
-                  setShowExportModal(false);
-                  showToast("导出已完成，Excel表格开始下载");
-                }}
-                className="px-3.5 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 cursor-pointer"
-              >
-                立即导出
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -1,8 +1,10 @@
-import React, { useState, useRef, useEffect, useId } from "react";
+import React, { useState, useRef, useEffect, useId, useLayoutEffect } from "react";
 import { useTagCatalog, useTagFilterSync } from "../lib/useResourceTags";
 import type { TagKind } from "../lib/resourceTags";
 import AnchoredPopover from "./overlays/AnchoredPopover";
 import { Search, ChevronDown } from "lucide-react";
+
+const COLLAPSED_ROW_HEIGHT = 36;
 
 export interface TagGroupItem {
   id: string;
@@ -43,6 +45,9 @@ const TagFilter = ({
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [popoverSearchKey, setPopoverSearchKey] = useState("");
   const [localSearchKey, setLocalSearchKey] = useState("");
+  const [expanded, setExpanded] = useState(false);
+  const optionsRef = useRef<HTMLDivElement | null>(null);
+  const [hasMore, setHasMore] = useState(false);
   const topSearchKey = searchKeyword ?? localSearchKey;
   const setTopSearchKey = (keyword: string) => {
     setLocalSearchKey(keyword);
@@ -50,7 +55,6 @@ const TagFilter = ({
   };
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
-
   const closePopover = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setActiveGroupId(null);
@@ -95,6 +99,17 @@ const TagFilter = ({
     return matchGroup || matchSub;
   });
 
+  useLayoutEffect(() => {
+    const element = optionsRef.current;
+    if (!element) return;
+    const check = () => setHasMore(element.scrollHeight > COLLAPSED_ROW_HEIGHT + 1);
+    check();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(check);
+    observer?.observe(element);
+    window.addEventListener("resize", check);
+    return () => { observer?.disconnect(); window.removeEventListener("resize", check); };
+  }, [expanded, filteredGroups.length, topSearchKey]);
+
   return (
     <div data-testid={`${kind}-tag-filter`} className="flex flex-1 min-w-0 flex-wrap items-center gap-2 relative">
       {/* 搜索框 */}
@@ -135,6 +150,7 @@ const TagFilter = ({
         全部
       </button>}
 
+      <div ref={optionsRef} className={`flex min-w-0 flex-1 flex-wrap items-center gap-2 ${expanded ? "max-h-[999px]" : "max-h-[2.25rem] overflow-hidden"}`}>
       {/* 标签组列表 */}
       {filteredGroups.map((group) => {
         // 判断当前标签组下是否有子标签被选中
@@ -246,6 +262,11 @@ const TagFilter = ({
       >
         重置{label}
       </button>
+      </div>
+
+      {hasMore && <button type="button" aria-expanded={expanded} onClick={() => setExpanded(current => !current)} className="flex shrink-0 items-center gap-0.5 pt-1 text-xs font-semibold text-purple-600 hover:text-purple-700">
+        {expanded ? "收起" : "更多"}<span className={`text-[11px] transition-transform ${expanded ? "rotate-180" : ""}`}>⌄</span>
+      </button>}
     </div>
   );
 };

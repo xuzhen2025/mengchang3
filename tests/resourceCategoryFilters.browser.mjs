@@ -46,6 +46,21 @@ try {
     await expect(primary()).toBeVisible();
     await expect(secondary()).toBeVisible();
     await expect(mainCategory()).toHaveCount(0);
+    if (scope === "audio") {
+      for (const width of [1440, 1920, 1024, 390]) {
+        await page.setViewportSize({ width, height: 1000 });
+        await expect.poll(async () => {
+          const first = await page.getByTestId("audio-primary-filter").boundingBox();
+          const second = await page.getByTestId("audio-secondary-filter").boundingBox();
+          return Boolean(first && second && second.y >= first.y + first.height
+            && Math.abs(first.x - second.x) <= 1 && Math.abs(first.width - second.width) <= 1);
+        }, { message: `Audio category filters occupy separate aligned rows at ${width}px`, timeout: 3000 }).toBe(true);
+        if (width === 1440 || width === 390) {
+          await page.screenshot({ path: `tmp/audio-category-layout-${width}.png` });
+        }
+      }
+      await page.setViewportSize({ width: 1440, height: 1000 });
+    }
     if (listTitle) await page.getByTitle(listTitle, { exact: true }).click();
     const items = scope === "finished" ? page.getByTestId("finished-video-card") : page.locator("tbody tr");
     const baseline = await items.allTextContents();

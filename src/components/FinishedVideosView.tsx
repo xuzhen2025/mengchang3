@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { recordDownload } from "../lib/operationHistory";
 import FinishedVideoDetailModal from "./FinishedVideoDetailModal";
 import { PublicTagFilter, PersonalTagFilter } from "./PublicTagFilter";
 import { ResourceCategoryFilters, ResourceStatusFilter, ResourceStatusBadge } from "./ResourceConfigControls";
@@ -1260,6 +1261,7 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
                                   const a = document.createElement("a");
                                   a.href = video.videoUrl;
                                   a.download = `${video.title}_原片.mp4`;
+                                  recordDownload(a.download, "成片");
                                   a.target = "_blank";
                                   a.click();
                                   showToast("📥 开始下载无水印原片...");
@@ -1275,6 +1277,7 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
                                   const a = document.createElement("a");
                                   a.href = video.videoUrl;
                                   a.download = `${video.title}_转码.mp4`;
+                                  recordDownload(a.download, "成片");
                                   a.target = "_blank";
                                   a.click();
                                   showToast("📥 开始下载转码视频...");
@@ -1290,6 +1293,7 @@ export default function FinishedVideosView({ uploadedVideos = [], onTriggerTask,
                                   const a = document.createElement("a");
                                   a.href = video.videoUrl;
                                   a.download = `${video.title}_预览水印.mp4`;
+                                  recordDownload(a.download, "成片");
                                   a.target = "_blank";
                                   a.click();
                                   showToast("📥 开始下载带水印预览视频...");

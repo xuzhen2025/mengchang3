@@ -10,7 +10,7 @@ function readEdits<T extends object>(scope: string, preserveLegacyTags = false):
     if (!preserveLegacyTags) for (const patch of Object.values(value) as Record<string, unknown>[]) {
       delete patch.tags; delete patch.publicTags; delete patch.personalTags; delete patch.personalTag;
       delete patch.category; delete patch.primaryCategory; delete patch.secondaryCategory;
-      if (["finished", "materials", "scripts"].includes(scope)) delete patch.status;
+      if (["finished", "materials", "thirdParty", "scripts"].includes(scope)) delete patch.status;
     }
     return value;
   } catch { return {}; }
@@ -27,14 +27,14 @@ export function saveResourceEdits<T extends object>(scope: string, updates: Reco
     delete (metadata as ConfigurableResource).category;
     delete (metadata as ConfigurableResource).primaryCategory;
     delete (metadata as ConfigurableResource).secondaryCategory;
-    if (["finished", "materials", "scripts"].includes(scope)) delete (metadata as ConfigurableResource).status;
+    if (["finished", "materials", "thirdParty", "scripts"].includes(scope)) delete (metadata as ConfigurableResource).status;
     next[id] = { ...next[id], ...metadata };
   }
   try {
     window.sessionStorage.setItem(`mengchang-resource-edits-v1-${scope}`, JSON.stringify(next));
     for (const [id, patch] of Object.entries(updates)) {
       const configPatch = patch as Partial<ConfigurableResource>;
-      if (configPatch.category !== undefined || configPatch.primaryCategory !== undefined || (["finished", "materials", "scripts"].includes(scope) && configPatch.status !== undefined)) {
+      if (configPatch.category !== undefined || configPatch.primaryCategory !== undefined || (["finished", "materials", "thirdParty", "scripts"].includes(scope) && configPatch.status !== undefined)) {
         resourceConfigStore.assign(scope, { id }, configPatch);
       }
       const value = patch as Partial<TaggedResource>;

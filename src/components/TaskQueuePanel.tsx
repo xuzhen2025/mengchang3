@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { recordDownload } from "../lib/operationHistory";
 import { FACE_PHASE_LABELS } from "../lib/videoFaceSwap";
 import {
   AlertCircle,
@@ -192,6 +193,7 @@ export default function TaskQueuePanel({ tasks, isOpen, setIsOpen, cancelTask, r
     const link = document.createElement("a");
     link.href = output.videoUrl;
     link.download = eraseOutputName || output.name;
+    recordDownload(link.download, "任务结果");
     link.target = "_blank";
     link.rel = "noreferrer";
     link.click();

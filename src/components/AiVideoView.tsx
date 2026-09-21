@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { recordDownload } from "../lib/operationHistory";
 import {
   AlertCircle,
   ArrowLeft,
@@ -183,7 +184,7 @@ const getAiVideoTaskOutputs = (task: Task): DisplayAiVideoOutput[] => {
       coverUrl: output.coverUrl
         || fallbackMedia?.coverUrl
         || (fallbackMedia?.type === "image" ? fallbackMedia.url : "")
-        || "/assets/prototype/luxury-skincare-set.jpg",
+        || "./assets/prototype/luxury-skincare-set.jpg",
       duration,
       size: output.size || `${(duration * 1.02 + 0.8 + index * 0.33).toFixed(2)}MB`
     };
@@ -196,9 +197,9 @@ const formatAiVideoDuration = (duration: number) => {
 };
 
 const STOCK_IMAGES: AiVideoMediaItem[] = [
-  { id: "stock-1", name: "轻奢护肤礼盒主图.jpg", type: "image", url: "/assets/prototype/luxury-skincare-set.jpg", source: "library" },
-  { id: "stock-2", name: "精华液商品特写.jpg", type: "image", url: "/assets/prototype/skincare-product.jpg", source: "library" },
-  { id: "stock-3", name: "护肤品促销场景.jpg", type: "image", url: "/assets/prototype/beauty-promo-detail.jpg", source: "library" },
+  { id: "stock-1", name: "轻奢护肤礼盒主图.jpg", type: "image", url: "./assets/prototype/luxury-skincare-set.jpg", source: "library" },
+  { id: "stock-2", name: "精华液商品特写.jpg", type: "image", url: "./assets/prototype/skincare-product.jpg", source: "library" },
+  { id: "stock-3", name: "护肤品促销场景.jpg", type: "image", url: "./assets/prototype/beauty-promo-detail.jpg", source: "library" },
   { id: "stock-4", name: "都市女性自然口播.jpg", type: "image", url: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=720&auto=format&fit=crop&q=85", source: "library" },
   { id: "stock-5", name: "运动服模特正面.jpg", type: "image", url: "https://images.unsplash.com/photo-1538805060514-97d9cc17730c?w=720&auto=format&fit=crop&q=85", source: "library" },
   { id: "stock-6", name: "商务男士口播形象.jpg", type: "image", url: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=720&auto=format&fit=crop&q=85", source: "library" },
@@ -215,7 +216,7 @@ const STOCK_IMAGES: AiVideoMediaItem[] = [
 ];
 
 const STOCK_VIDEOS: AiVideoMediaItem[] = [
-  { id: "video-1", name: "夏日护肤产品展示.mp4", type: "video", url: RESULT_VIDEO_URL, coverUrl: "/assets/prototype/skincare-product.jpg", durationSeconds: 6, source: "library" },
+  { id: "video-1", name: "夏日护肤产品展示.mp4", type: "video", url: RESULT_VIDEO_URL, coverUrl: "./assets/prototype/skincare-product.jpg", durationSeconds: 6, source: "library" },
   { id: "video-2", name: "都市女性口播原片.mp4", type: "video", url: RESULT_VIDEO_URL, coverUrl: STOCK_IMAGES[3].url, durationSeconds: 12, source: "library" },
   { id: "video-3", name: "运动服模特走秀.mp4", type: "video", url: RESULT_VIDEO_URL, coverUrl: STOCK_IMAGES[4].url, durationSeconds: 8, source: "library" },
   { id: "video-4", name: "精华液桌面陈列.mp4", type: "video", url: RESULT_VIDEO_URL, coverUrl: STOCK_IMAGES[1].url, durationSeconds: 17, source: "library" },
@@ -617,6 +618,7 @@ export default function AiVideoView({
     anchor.target = "_blank";
     anchor.rel = "noreferrer";
     anchor.download = output.name;
+    recordDownload(output.name, "AI视频原料");
     anchor.click();
     setToast(`已开始下载：${output.name}`);
   };

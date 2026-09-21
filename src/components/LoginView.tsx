@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { recordLogin } from "../lib/operationHistory";
 import {
   Check,
   ChevronDown,
@@ -60,10 +61,12 @@ export default function LoginView({ accounts, onLogin }: LoginViewProps) {
     event.preventDefault();
     if (!selectedAccount) return;
     if (password !== selectedAccount.password) {
+      recordLogin(selectedAccount.username, false, "密码验证失败");
       setError("账号或密码不正确");
       return;
     }
     if (captchaInput.trim().toUpperCase() !== captchaCode) {
+      recordLogin(selectedAccount.username, false, "验证码验证失败");
       setError("验证码不正确");
       return;
     }

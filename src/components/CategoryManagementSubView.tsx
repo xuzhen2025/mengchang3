@@ -12,7 +12,7 @@ export type { CategoryL2Node, CategoryL1Node } from "../data/resourceCategories"
 export { INITIAL_CATEGORIES } from "../data/resourceCategories";
 
 export default function CategoryManagementSubView() {
-  const resourceTypes = ["成片", "素材", "脚本", "图片", "音频"];
+  const resourceTypes = ["成片", "素材", "第三方", "脚本", "图片", "音频"];
   const [activeResourceType, setActiveResourceType] = useState("成片");
   const { store } = useResourceConfig();
   const categoriesData = store.getCategories();

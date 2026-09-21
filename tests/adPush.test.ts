@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
-import { AD_STORE_KEY, DEFAULT_AD_PARAMETERS, adCatalog, advanceAdStore, authorizeAdAccount, cancelAdRecords, canSeeAdAccount, createAdRecords, createAdStore, getAdActor, readAdStore, resolveAdName, revokeAdAccounts, saveAdTemplate, updateAdStore, validateAdDraft, validateAdTemplate, visibleAdRecords, type AdDraft, type AdTemplate } from "../src/lib/adPush";
+import { AD_STORE_KEY, DEFAULT_AD_PARAMETERS, adCatalog, advanceAdStore, authorizeAdAccount, cancelAdRecords, canSeeAdAccount, createAdRecords, createAdStore, getAdActor, groupAdRows, readAdStore, resolveAdName, revokeAdAccounts, saveAdTemplate, updateAdStore, validateAdDraft, validateAdTemplate, visibleAdRecords, type AdDraft, type AdTemplate } from "../src/lib/adPush";
+import { defaultWorkbench, targetGoal, validateWorkbench } from "../src/lib/adPushConfig";
 import { saveResourceEdits } from "../src/lib/useResourceEdits";
 import { resourceTagStore } from "../src/lib/resourceTags";
 import { resourceConfigStore } from "../src/lib/resourceConfig";
@@ -136,4 +137,92 @@ test("status updates preserve legacy stored metadata without reviving obsolete t
   });
   assert.equal(resourceConfigStore.project("finished", { id: "legacy", status: "待审核" }).status, "已上机");
   assert.deepEqual(resourceTagStore.project("finished", { id: "legacy" }).publicTags, []);
+});
+
+const fullDraft = (create = false) => {
+  const d = planDraft(); d.method = "full_domain"; d.templateIds = [];
+  d.workbench = { ...defaultWorkbench(), target: "商品全域", operation: create ? "create" : "append", budget: "600", roi: "2.5", titles: ["商品实拍展示"], planName: "{创建日期}_{商品名称}_{整体支付ROI目标}" };
+  if (!create) d.rows[0].planId = adCatalog(readAdStore().accounts.find(a => a.id === d.rows[0].accountId)!).plans[0].id;
+  return d;
+};
+
+test("four visible targets map to two plan categories", () => {
+  assert.equal(targetGoal("直播全域"), "推直播间"); assert.equal(targetGoal("直播乘方"), "推直播间");
+  assert.equal(targetGoal("商品全域"), "推商品"); assert.equal(targetGoal("商品乘方"), "推商品");
+  const d = fullDraft(); d.workbench!.target = "直播乘方";
+  assert.match(validateAdDraft(d, readAdStore(), getAdActor()), /不一致/);
+});
+test("AIGC identifier is the video ID, not the employee ID", () => {
+  assert.equal(resolveAdName("{梦畅AIGC编号}_{视频标题}", video, getAdActor()), "test-video_测试视频");
+});
+test("full-domain creation validates money precision, titles and supported targets", () => {
+  const c = fullDraft(true).workbench!;
+  assert.equal(validateWorkbench(c), "");
+  assert.match(validateWorkbench({ ...c, budget: "600.001" }), /两位小数/);
+  assert.match(validateWorkbench({ ...c, roi: "NaN" }), /ROI/);
+  assert.match(validateWorkbench({ ...c, titles: [] }), /标题/);
+  assert.match(validateWorkbench({ ...c, target: "直播全域" }), /直播/);
+});
+test("new full-domain plans are created once, paused, with immutable configuration", () => {
+  const s = readAdStore(), d = fullDraft(true), now = Date.now();
+  s.records = createAdRecords(d, s, getAdActor(), video, now);
+  d.workbench!.budget = "900";
+  const next = advanceAdStore(s, now + 10000), again = advanceAdStore(next, now + 12000);
+  assert.equal(next, again);
+  const r = next.records[0], plan = adCatalog(next.accounts.find(a => a.id === r.accountId)!).plans.find(p => p.id === r.planId)!;
+  assert.equal(plan.status, "已暂停"); assert.equal(plan.budget, 600); assert.equal(r.planResult, "创建成功");
+  assert.match(plan.name, /ELL卸妆油_2.5/); assert.doesNotMatch(plan.name, /\{/);
+});
+test("grouping creates the advertised number of plans within each account", () => {
+  const d = fullDraft(true), first = d.rows[0], c = adCatalog(readAdStore().accounts.find(a => a.id === first.accountId)!);
+  d.rows.push({ ...first, id: "second", douyinId: c.douyins[1].id, productId: c.products[1].id });
+  const counts = { "每个商品一条计划": 2, "每个抖音号一条计划": 2, "全量组合（商品+抖音号）": 4, "聚合为一条计划": 1 };
+  for (const [grouping, count] of Object.entries(counts)) {
+    d.workbench!.target = "商品乘方"; d.workbench!.grouping = grouping;
+    assert.equal(groupAdRows(d).length, count);
+    assert.equal(createAdRecords(d, readAdStore(), getAdActor(), video).length, count);
+  }
+});
+test("single-video average distribution does not silently submit empty targets", () => {
+  const d = fullDraft(); d.workbench!.distribution = "平均分配";
+  const c = adCatalog(readAdStore().accounts.find(a => a.id === d.rows[0].accountId)!);
+  const other = c.plans.find(p => p.goal === d.goal && p.id !== d.rows[0].planId)!;
+  d.rows.push({ ...d.rows[0], id: "other", planId: other.id, douyinId: other.douyinId });
+  assert.match(validateAdDraft(d, readAdStore(), getAdActor()), /平均分配/);
+});
+test("removal uses platform material IDs after success, and leaves the plan state unchanged", () => {
+  const d = fullDraft(), s = readAdStore(), now = Date.now();
+  const a = s.accounts.find(a => a.id === d.rows[0].accountId)!, p = adCatalog(a).plans[0];
+  d.workbench!.removal = "移除指定素材ID"; d.workbench!.removeIds = p.materials![0].assetId;
+  s.records = createAdRecords(d, s, getAdActor(), video, now);
+  const pending = advanceAdStore(s, now + 2000);
+  assert.deepEqual(adCatalog(pending.accounts.find(x => x.id === a.id)!).plans[0].videoIds, ["existing-video"]);
+  const next = advanceAdStore(pending, now + 10000), plan = adCatalog(next.accounts.find(x => x.id === a.id)!).plans[0];
+  assert.deepEqual(plan.videoIds, [video.id]); assert.equal(plan.status, p.status);
+  assert.match(next.records[0].logs.at(-1)!.text, /移除 1/);
+});
+test("failed pushes never remove existing plan videos", () => {
+  const d = fullDraft(), s = readAdStore(), now = Date.now();
+  d.workbench!.removal = "移除卡审视频";
+  s.records = createAdRecords(d, s, getAdActor(), video, now);
+  s.accounts = s.accounts.map(a => a.id === d.rows[0].accountId ? { ...a, status: "expired" } : a);
+  const next = advanceAdStore(s, now + 10000);
+  assert.equal(next.records[0].status, "推送失败");
+  assert.deepEqual(adCatalog(next.accounts.find(a => a.id === d.rows[0].accountId)!).plans[0].videoIds, ["existing-video"]);
+});
+test("low-data removal requires complete matching windows, not missing data treated as zero", () => {
+  const d = fullDraft(), s = readAdStore(), now = Date.now();
+  Object.assign(d.workbench!, { removal: "移除低数据视频", costDays: "7", costMin: "0", costMax: "100", roiDays: "7", roiMax: "2" });
+  s.records = createAdRecords(d, s, getAdActor(), video, now);
+  const next = advanceAdStore(s, now + 10000);
+  assert.deepEqual(adCatalog(next.accounts.find(a => a.id === d.rows[0].accountId)!).plans[0].videoIds, [video.id]);
+  d.workbench!.roiDays = "31"; s.records = createAdRecords(d, s, getAdActor(), video, now);
+  const incomplete = advanceAdStore(s, now + 10000);
+  assert.deepEqual(adCatalog(incomplete.accounts.find(a => a.id === d.rows[0].accountId)!).plans[0].videoIds, ["existing-video", video.id]);
+});
+test("scheduled workbench submissions enforce one hour to thirty days", () => {
+  const d = fullDraft(); d.scheduledAt = new Date(Date.now() + 600000).toISOString();
+  assert.match(validateAdDraft(d, readAdStore(), getAdActor()), /1小时/);
+  d.scheduledAt = new Date(Date.now() + 86400000).toISOString();
+  assert.equal(validateAdDraft(d, readAdStore(), getAdActor()), "");
 });

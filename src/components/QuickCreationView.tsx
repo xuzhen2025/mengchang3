@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { recordDownload } from "../lib/operationHistory";
 import {
   ArrowLeft,
   ChevronDown,
@@ -60,10 +61,10 @@ interface QuickCreationViewProps {
 }
 
 const IMAGE_FALLBACKS = [
-  "/assets/prototype/luxury-skincare-set.jpg",
-  "/assets/prototype/skincare-product.jpg",
-  "/assets/prototype/luxury-skincare-set.jpg",
-  "/assets/prototype/skincare-product.jpg",
+  "./assets/prototype/luxury-skincare-set.jpg",
+  "./assets/prototype/skincare-product.jpg",
+  "./assets/prototype/luxury-skincare-set.jpg",
+  "./assets/prototype/skincare-product.jpg",
 ];
 const VIDEO_FALLBACK =
   "https://assets.mixkit.co/videos/preview/mixkit-beautiful-woman-wearing-a-silk-dress-posing-41710-large.mp4";
@@ -606,6 +607,7 @@ export default function QuickCreationView({
                       anchor.target = "_blank";
                       anchor.rel = "noreferrer";
                       anchor.download = output.name;
+                      recordDownload(output.name, snapshot.mode === "video" ? "生成视频" : "生成图片");
                       anchor.click();
                     }}
                     onUpload={(outputs) => onUploadToLibrary(

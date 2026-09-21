@@ -56,7 +56,7 @@ export interface Asset {
   size: string;
   createdAt: string;
   category?: string;
-  resourceCategory?: "成片" | "素材" | "脚本" | "图片" | "音频";
+  resourceCategory?: "成片" | "素材" | "第三方" | "脚本" | "图片" | "音频";
   source?: "resource_library" | "task_collaboration" | "ai_generation";
   publicTags?: string[];
   personalTags?: string[];
@@ -289,6 +289,7 @@ export interface GalleryItem {
 }
 
 export type ActiveScreen =
+  | "operation_records"
   | "home"
   | "quick_creation"
   | "face_swap"
@@ -313,7 +314,7 @@ export type ActiveScreen =
   | "task_collaboration"
   | "message_center";
 
-export type ResourceSearchType = "成片" | "素材" | "脚本" | "图片" | "音频";
+export type ResourceSearchType = "成片" | "素材" | "第三方" | "脚本" | "图片" | "音频";
 
 export interface ResourceSearchIntent {
   type: ResourceSearchType;

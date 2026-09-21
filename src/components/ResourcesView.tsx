@@ -28,7 +28,7 @@ import {
 
 interface ResourcesViewProps {
   uploadedVideos?: Asset[];
-  initialTab?: "finished_videos" | "materials" | "scripts" | "images" | "audio";
+  initialTab?: "finished_videos" | "materials" | "third_party" | "scripts" | "images" | "audio";
   onTriggerTask?: (
     type: any,
     name: string,
@@ -46,7 +46,7 @@ interface ResourcesViewProps {
   onClearInitialUpload?: () => void;
 }
 
-export type UploadFileType = "成片" | "素材" | "脚本" | "图片" | "音频";
+export type UploadFileType = "成片" | "素材" | "第三方" | "脚本" | "图片" | "音频";
 
 export default function ResourcesView({
   uploadedVideos = [],
@@ -62,12 +62,13 @@ export default function ResourcesView({
   const tabByType = {
     成片: "finished_videos",
     素材: "materials",
+    第三方: "third_party",
     脚本: "scripts",
     图片: "images",
     音频: "audio",
   } as const;
   const [activeTab, setActiveTab] = useState<
-    "finished_videos" | "materials" | "scripts" | "images" | "audio"
+    "finished_videos" | "materials" | "third_party" | "scripts" | "images" | "audio"
   >(initialSearch ? tabByType[initialSearch.type] : initialTab);
   const [activeSearch, setActiveSearch] = useState<ResourceSearchIntent | null>(
     initialSearch && (initialSearch.query || initialSearch.tag)
@@ -147,6 +148,12 @@ export default function ResourcesView({
       desc: "原始片源 / 图片 / 音频 / 关联图谱",
     },
     {
+      id: "third_party" as const,
+      name: "第三方管理",
+      icon: Film,
+      desc: "第三方视频",
+    },
+    {
       id: "scripts" as const,
       name: "脚本管理",
       icon: FileText,
@@ -210,6 +217,10 @@ export default function ResourcesView({
 
   const handleOpenUploadModal = (type: UploadFileType) => {
     setShowUploadDropdown(false);
+    if (type === "成片" && activeTab === "third_party") {
+      setUploadPageView("第三方");
+      return;
+    }
     const matchingOption = uploadOptions.find((o) => o.type === type);
     if (matchingOption) {
       setActiveTab(matchingOption.tabTarget);
@@ -362,10 +373,11 @@ export default function ResourcesView({
               setUploadPageView(null);
               onClearInitialUpload?.();
             }}
-            onPublishSuccess={(msg) => {
+            onPublishSuccess={(msg, details) => {
               showToast(msg);
               setUploadPageView(null);
               onClearInitialUpload?.();
+              if (details) setActiveTab(tabByType[details.partition]);
             }}
           />
         ) : (
@@ -382,10 +394,12 @@ export default function ResourcesView({
                 onDetailStateChange={setIsSubViewDetailOpen}
               />
             )}
-            {activeTab === "materials" && (
+            {(activeTab === "materials" || activeTab === "third_party") && (
               <MaterialsView
+                key={activeTab}
+                resourceScope={activeTab === "third_party" ? "thirdParty" : "materials"}
                 uploadedVideos={uploadedVideos.filter(
-                  (asset) => asset.resourceCategory === "素材",
+                  (asset) => asset.resourceCategory === (activeTab === "third_party" ? "第三方" : "素材"),
                 )}
                 initialSearch={activeSearch}
                 onClearSearch={clearHomeSearch}

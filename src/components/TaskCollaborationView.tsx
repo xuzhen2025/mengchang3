@@ -45,7 +45,7 @@ import {
 
 export interface AssociatedWorkItem {
   id: string;
-  type: "video" | "image" | "text" | "audio" | "成片" | "素材" | "图片" | "音频";
+  type: "video" | "image" | "text" | "audio" | "成片" | "素材" | "第三方" | "图片" | "音频";
   name: string;
   numericId?: string;
   coverUrl?: string;

@@ -282,10 +282,6 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
 
   const [selectedPreset, setSelectedPreset] = useState("");
 
-  // Export Modal
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [exportFormat, setExportFormat] = useState<"csv" | "excel">("csv");
-
   // View / Action Modals
   const [selectedScriptForTasks, setSelectedScriptForTasks] = useState<ScriptItem | null>(null);
   const [selectedScriptForPublish, setSelectedScriptForPublish] = useState<ScriptItem | null>(null);
@@ -478,11 +474,6 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
     const shareUrl = `http://ygj-zssoft.sucaicloud.com/#/script-detail/${script.id}`;
     navigator.clipboard.writeText(shareUrl).catch(() => {});
     showToast(`已复制脚本链接到剪贴板！\n${shareUrl}`);
-  };
-
-  const handleExportSubmit = () => {
-    setShowExportModal(false);
-    showToast(`已成功导出脚本管理数据表格 (${exportFormat.toUpperCase()} 格式)`);
   };
 
   const handlePublishTaskSubmit = (e: React.FormEvent) => {
@@ -732,20 +723,13 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
           </div>
         </div>
 
-        {/* Reset and export */}
+        {/* Reset */}
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={handleResetFilters}
             className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs"
           >
             重置
-          </button>
-
-          <button
-            onClick={() => setShowExportModal(true)}
-            className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs"
-          >
-            导出
           </button>
         </div>
       </div>
@@ -887,66 +871,6 @@ export default function ScriptManagementView({ onTriggerTask, onNavigateToTaskDe
           </table>
         </div>
 
-
-      {/* Modal 2: 导出 (Export Modal) */}
-      {showExportModal && (
-        <OverlayPortal layer="dialog" role="dialog" aria-modal="true" className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-2xs animate-fade-in p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-100">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-bold text-slate-900 text-sm border-l-4 border-purple-600 pl-2">
-                导出
-              </h3>
-              <button
-                onClick={() => setShowExportModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4 text-xs">
-              <div className="flex items-center gap-6">
-                <span className="text-slate-700 font-medium">导出格式</span>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="exportFormat"
-                    checked={exportFormat === "csv"}
-                    onChange={() => setExportFormat("csv")}
-                    className="text-purple-600 focus:ring-purple-500"
-                  />
-                  <span>csv</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="exportFormat"
-                    checked={exportFormat === "excel"}
-                    onChange={() => setExportFormat("excel")}
-                    className="text-purple-600 focus:ring-purple-500"
-                  />
-                  <span>excel</span>
-                </label>
-              </div>
-            </div>
-
-            <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end gap-3">
-              <button
-                onClick={() => setShowExportModal(false)}
-                className="px-4 py-1.5 border border-slate-300 hover:bg-slate-100 text-slate-600 font-bold rounded-lg cursor-pointer text-xs"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleExportSubmit}
-                className="px-4 py-1.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold rounded-lg cursor-pointer shadow-2xs text-xs"
-              >
-                确定
-              </button>
-            </div>
-          </div>
-        </OverlayPortal>
-      )}
 
       {/* Modal 3: 查看关联任务 (View Script Tasks Modal) */}
       {selectedScriptForTasks && (

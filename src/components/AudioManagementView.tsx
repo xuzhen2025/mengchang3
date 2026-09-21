@@ -231,7 +231,6 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
   const [selectedSecondaryCategory, setSelectedSecondaryCategory] = useState("全部");
   const [selectedPublicTag, setSelectedPublicTag] = useState("全部");
   const [selectedPersonalTag, setSelectedPersonalTag] = useState("全部");
-  const [showMorePrimary, setShowMorePrimary] = useState(false);
 
   // Search & Filters
   const [sortBy, setSortBy] = useState("最新发布");
@@ -539,18 +538,9 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
         </div>
 
         {/* Row 2-3: 一级分类、二级分类 */}
-        <div className="flex items-start justify-between gap-3 pb-2 border-b border-slate-100">
-          <div className="flex min-w-0 flex-1 flex-col gap-3">
-            <ResourceCategoryFilters scope="audio" primary={selectedPrimaryCategory} secondary={selectedSecondaryCategory} search={searchCategoryKeyword}
-              onPrimary={setSelectedPrimaryCategory} onSecondary={setSelectedSecondaryCategory} onSearch={setSearchCategoryKeyword} />
-          </div>
-          <button
-            onClick={() => setShowMorePrimary(!showMorePrimary)}
-            className="text-purple-600 hover:text-purple-700 font-bold text-xs flex items-center gap-0.5 shrink-0 pt-1 cursor-pointer hover:underline"
-          >
-            <span>{showMorePrimary ? "收起" : "更多"}</span>
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showMorePrimary ? "rotate-180" : ""}`} />
-          </button>
+        <div className="pb-2 border-b border-slate-100">
+          <ResourceCategoryFilters scope="audio" primary={selectedPrimaryCategory} secondary={selectedSecondaryCategory} search={searchCategoryKeyword}
+            onPrimary={setSelectedPrimaryCategory} onSecondary={setSelectedSecondaryCategory} onSearch={setSearchCategoryKeyword} />
         </div>
 
         {/* Row 4: 公共标签 */}
@@ -625,7 +615,7 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
           </div>
         </div>
 
-        {/* Reset and export */}
+        {/* Reset */}
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => {
@@ -636,13 +626,6 @@ export default function AudioManagementView({ onTriggerTask, onDetailStateChange
             className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs"
           >
             重置
-          </button>
-
-          <button
-            onClick={() => showToast(`已成功导出 ${filteredAudios.length} 条音频资源数据`)}
-            className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs"
-          >
-            导出
           </button>
         </div>
       </div>

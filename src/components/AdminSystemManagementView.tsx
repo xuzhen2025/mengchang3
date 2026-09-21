@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { recordExport } from "../lib/operationHistory";
 import {
   ShieldCheck,
   FileText,
@@ -59,6 +60,7 @@ import { isValidViralVideoRule, saveViralVideoRule, type ViralVideoRule } from "
 import OverlayPortal from "./overlays/OverlayPortal";
 import { useAdStore } from "../lib/useAdStore";
 import { AD_CHANGE_EVENT, adDate, adId, getAdActor, revokeAdAccounts, updateAdStore, type AdAccount, type AdAccountGroup } from "../lib/adPush";
+import { readAdPushSettings, saveAdPushSettings } from "../lib/adPushConfig";
 import { AdDialog } from "./AdAccountPush";
 import AdAuthorizationDialog from "./AdAuthorizationDialog";
 
@@ -101,183 +103,188 @@ export interface RolePermission {
 
 export const USER_CLIENT_PERMISSION_TREE: PermissionNode[] = [
   {
-    id: "uc_workspace",
-    label: "首页与个人工作台",
+    id: "uc_quick_creation_group",
+    label: "快速创作",
     children: [
-      { id: "uc_home_view", label: "访问首页" },
-      { id: "uc_message_view", label: "查看消息中心" },
-      { id: "uc_credit_view", label: "查看积分账户与记录" },
-      { id: "uc_credit_apply", label: "提交积分申请" },
-      { id: "uc_credit_approve", label: "审批积分申请" },
+      { id: "uc_quick_create", label: "快速创作" },
+      { id: "uc_video_watermark", label: "视频去水印" },
+      { id: "uc_subtitle_erase", label: "字幕擦除" },
+      { id: "uc_quality_enhance", label: "画质增强" },
+      { id: "uc_face_swap", label: "视频换脸" },
     ]
   },
+  { id: "uc_agent_run", label: "Agent创作" },
+  { id: "uc_remake_run", label: "爆款复刻" },
   {
-    id: "uc_ai_creation",
-    label: "AI 创作工具",
+    id: "uc_ai_video_material_group",
+    label: "AI视频原料",
     children: [
-      { id: "uc_quick_create", label: "使用快速创作" },
-      { id: "uc_agent_run", label: "使用 Agent 创作" },
-      { id: "uc_remake_run", label: "发起爆款复刻" },
-      { id: "uc_ai_video_generate", label: "生成 AI 视频" },
-      { id: "uc_canvas_edit", label: "使用画布编辑" },
-      { id: "uc_canvas_export", label: "导出画布结果" },
+      { id: "uc_reference_video", label: "参考生视频" },
+      { id: "uc_first_last_frame", label: "首尾帧生视频" },
+      { id: "uc_voiceover_video", label: "配音生视频" },
+      {
+        id: "uc_video_edit",
+        label: "视频编辑",
+        children: [
+          { id: "uc_change_background", label: "换背景" },
+          { id: "uc_change_outfit", label: "换装" },
+        ]
+      },
+      { id: "uc_pain_point_compare", label: "痛点对比" },
+      { id: "uc_usage_process", label: "使用过程" },
     ]
   },
+  { id: "uc_canvas", label: "画布" },
+  { id: "uc_live_management", label: "直播管理" },
   {
-    id: "uc_resources",
-    label: "内容资源",
-    children: [
-      {
-        id: "uc_finished",
-        label: "成片",
-        children: [
-          { id: "uc_finished_view", label: "查看成片" },
-          { id: "uc_finished_upload", label: "上传成片" },
-          { id: "uc_finished_edit", label: "编辑基础信息" },
-          { id: "uc_finished_status", label: "修改业务状态" },
-          { id: "uc_finished_download", label: "下载成片" },
-          { id: "uc_finished_share", label: "分享成片" },
-          { id: "uc_finished_delete", label: "移入回收站" },
-        ]
-      },
-      {
-        id: "uc_material",
-        label: "素材",
-        children: [
-          { id: "uc_material_view", label: "查看素材" },
-          { id: "uc_material_upload", label: "上传素材" },
-          { id: "uc_material_edit", label: "编辑素材信息" },
-          { id: "uc_material_download", label: "下载素材" },
-          { id: "uc_material_category", label: "批量修改分类" },
-          { id: "uc_material_pin", label: "素材置顶" },
-          { id: "uc_material_delete", label: "删除素材" },
-        ]
-      },
-      {
-        id: "uc_script",
-        label: "脚本",
-        children: [
-          { id: "uc_script_view", label: "查看脚本" },
-          { id: "uc_script_create", label: "新建/AI生成脚本" },
-          { id: "uc_script_edit", label: "编辑脚本" },
-          { id: "uc_script_delete", label: "删除脚本" },
-        ]
-      },
-      { id: "uc_media_view", label: "查看图片与音频" },
-      { id: "uc_media_manage", label: "管理图片与音频" },
-    ]
-  },
-  {
-    id: "uc_task",
+    id: "uc_task_collaboration",
     label: "任务协作",
     children: [
-      { id: "uc_task_view", label: "查看任务" },
-      { id: "uc_task_create", label: "新建任务" },
-      { id: "uc_task_edit", label: "编辑任务与改期" },
-      { id: "uc_task_assign", label: "指派执行人" },
-      { id: "uc_task_link", label: "关联作品与脚本" },
-      { id: "uc_task_comment", label: "评论与 @成员" },
-      { id: "uc_task_complete", label: "确认完成/验收" },
+      { id: "uc_task_publish", label: "发布任务" },
+      { id: "uc_task_export", label: "批量导出" },
       { id: "uc_task_delete", label: "删除任务" },
+      { id: "uc_task_complete", label: "确认完成/验收" },
     ]
   },
   {
-    id: "uc_live",
-    label: "直播管理",
+    id: "uc_resource_library",
+    label: "资源库",
     children: [
-      { id: "uc_live_overview", label: "查看直播首页" },
-      { id: "uc_live_account_manage", label: "绑定/解绑直播账号" },
-      { id: "uc_live_team_view", label: "查看直播部门成员" },
-      { id: "uc_live_team_manage", label: "新增/编辑/删除员工" },
-      { id: "uc_live_room_data", label: "查看直播间与场次数据" },
-      { id: "uc_live_data_export", label: "导出直播数据" },
-      { id: "uc_live_schedule_view", label: "查看直播排班" },
-      { id: "uc_live_schedule_manage", label: "新增/调整/取消排班" },
+      { id: "uc_resource_view_finished", label: "查看成片" },
+      { id: "uc_resource_view_material", label: "查看素材" },
+      { id: "uc_resource_view_third_party", label: "查看第三方" },
+      { id: "uc_resource_view_image", label: "查看图片" },
+      { id: "uc_resource_view_audio", label: "查看音频" },
+      { id: "uc_resource_view_script", label: "查看脚本" },
+      {
+        id: "uc_resource_upload",
+        label: "上传文件",
+        children: [
+          { id: "uc_upload_video", label: "上传视频" },
+          { id: "uc_upload_image", label: "上传图片" },
+          { id: "uc_upload_script", label: "上传脚本" },
+          { id: "uc_upload_audio", label: "上传音频" },
+        ]
+      },
+      {
+        id: "uc_finished_management",
+        label: "成片管理",
+        children: [
+          { id: "uc_finished_edit", label: "修改基础信息" },
+          { id: "uc_finished_status", label: "修改状态" },
+          { id: "uc_finished_download", label: "下载原片" },
+          { id: "uc_finished_logs", label: "查看操作记录" },
+          { id: "uc_finished_ad_push", label: "推送广告账户" },
+          { id: "uc_finished_ad_records", label: "查看推送记录" },
+          { id: "uc_finished_derive", label: "衍生新视频" },
+          { id: "uc_finished_derive_push", label: "衍生视频并推送" },
+          { id: "uc_finished_interaction", label: "查看互动数据" },
+          { id: "uc_finished_project_upload", label: "上传工程文件" },
+          { id: "uc_finished_project_download", label: "下载工程文件" },
+          { id: "uc_finished_project_visibility", label: "修改工程文件访问权限" },
+          { id: "uc_finished_delete", label: "删除" },
+          { id: "uc_finished_asset_data", label: "查看素材数据" },
+          { id: "uc_finished_reference_data", label: "查看引用数据" },
+          { id: "uc_finished_new_version", label: "上传新版" },
+        ]
+      },
+      {
+        id: "uc_material_management",
+        label: "素材管理",
+        children: [
+          { id: "uc_material_edit", label: "修改基础信息" },
+          { id: "uc_material_status", label: "修改状态" },
+          { id: "uc_material_download", label: "下载原片" },
+          { id: "uc_material_logs", label: "查看操作记录" },
+          { id: "uc_material_delete", label: "删除" },
+          { id: "uc_material_reference_data", label: "查看引用数据" },
+          { id: "uc_material_new_version", label: "上传新版" },
+        ]
+      },
+      {
+        id: "uc_third_party_management",
+        label: "第三方管理",
+        children: [
+          { id: "uc_third_party_edit", label: "修改基础信息" },
+          { id: "uc_third_party_status", label: "修改状态" },
+          { id: "uc_third_party_download", label: "下载原片" },
+          { id: "uc_third_party_logs", label: "查看操作记录" },
+          { id: "uc_third_party_delete", label: "删除" },
+          { id: "uc_third_party_reference_data", label: "查看引用数据" },
+          { id: "uc_third_party_new_version", label: "上传新版" },
+        ]
+      },
+      {
+        id: "uc_script_management",
+        label: "脚本管理",
+        children: [
+          { id: "uc_script_edit", label: "修改基础信息" },
+          { id: "uc_script_status", label: "修改状态" },
+          { id: "uc_script_logs", label: "查看操作记录" },
+          { id: "uc_script_delete", label: "删除" },
+        ]
+      },
+      {
+        id: "uc_image_management",
+        label: "图片管理",
+        children: [
+          { id: "uc_image_edit", label: "修改基础信息" },
+          { id: "uc_image_download", label: "下载无水印图片" },
+          { id: "uc_image_delete", label: "删除" },
+        ]
+      },
+      {
+        id: "uc_audio_management",
+        label: "音频管理",
+        children: [
+          { id: "uc_audio_edit", label: "修改基础信息" },
+          { id: "uc_audio_download", label: "下载" },
+          { id: "uc_audio_delete", label: "删除" },
+        ]
+      },
     ]
   },
-  {
-    id: "uc_data_analysis",
-    label: "数据分析与投放",
-    children: [
-      { id: "uc_data_dashboard", label: "查看数据看板" },
-      { id: "uc_ad_push", label: "推送广告账户" },
-      { id: "uc_ad_plan_manage", label: "管理投放计划" },
-      { id: "uc_data_export", label: "导出业务数据" },
-    ]
-  },
+  { id: "uc_data_analysis", label: "数据分析" },
 ];
 
 export const ADMIN_BACKEND_PERMISSION_TREE: PermissionNode[] = [
   {
-    id: "ab_content_mgmt",
+    id: "ab_content_management",
     label: "内容管理",
     children: [
-      { id: "ab_resource_view", label: "查看资源库" },
-      { id: "ab_resource_manage", label: "管理/删除资源" },
-      { id: "ab_category_manage", label: "管理分类" },
-      { id: "ab_video_status_manage", label: "管理视频状态" },
-      { id: "ab_script_status_manage", label: "管理脚本状态" },
-      { id: "ab_task_manage", label: "管理任务字段与状态" },
-      { id: "ab_tag_manage", label: "管理标签" },
-      { id: "ab_script_template_manage", label: "管理脚本模板" },
+      { id: "ab_resource_view", label: "资源库（不包含删除类）" },
+      { id: "ab_video_status_manage", label: "视频状态" },
+      { id: "ab_task_manage", label: "任务" },
+      { id: "ab_tag_manage", label: "公共标签" },
+      { id: "ab_category_manage", label: "分类管理" },
+      { id: "ab_script_template_manage", label: "脚本模板" },
     ]
   },
   {
-    id: "ab_org_permission",
-    label: "组织、人员与权限",
+    id: "ab_system_management",
+    label: "系统管理",
     children: [
-      { id: "ab_dept_view", label: "查看组织部门" },
-      { id: "ab_dept_manage", label: "新增/编辑/停用部门" },
-      { id: "ab_member_view", label: "查看人员账号" },
-      { id: "ab_member_invite", label: "邀请/导入人员" },
-      { id: "ab_member_manage", label: "编辑/停用/重置账号" },
-      { id: "ab_role_view", label: "查看角色权限" },
-      { id: "ab_role_manage", label: "新增/编辑/分配角色" },
+      { id: "ab_dept_view", label: "组织部门架构" },
+      {
+        id: "ab_member_view",
+        label: "人员账号管理",
+        children: [{ id: "ab_member_export", label: "导出人员表" }]
+      },
+      { id: "ab_role_view", label: "角色菜单权限配置" },
+      {
+        id: "ab_audit_view",
+        label: "操作记录",
+        children: [{ id: "ab_audit_export", label: "导出" }]
+      },
+      { id: "ab_watermark_manage", label: "水印" },
+      { id: "ab_system_setting_manage", label: "系统设置" },
+      { id: "ab_auto_tag_manage", label: "系统自动化标签" },
+      { id: "ab_ad_group_manage", label: "广告组管理" },
+      { id: "ab_login_log_view", label: "登录记录" },
+      { id: "ab_message_rule_manage", label: "消息通知" },
     ]
   },
-  {
-    id: "ab_security_audit",
-    label: "安全与审计",
-    children: [
-      { id: "ab_audit_view", label: "查看操作记录" },
-      { id: "ab_audit_export", label: "导出操作记录" },
-      { id: "ab_export_audit_view", label: "查看数据导出记录" },
-      { id: "ab_export_audit_handle", label: "核查高风险导出" },
-      { id: "ab_login_log_view", label: "查看登录记录" },
-    ]
-  },
-  {
-    id: "ab_system_config",
-    label: "平台配置",
-    children: [
-      { id: "ab_message_rule_manage", label: "配置消息通知规则" },
-      { id: "ab_watermark_manage", label: "配置水印" },
-      { id: "ab_system_setting_manage", label: "配置系统参数" },
-      { id: "ab_auto_tag_manage", label: "配置自动化标签" },
-      { id: "ab_ad_group_manage", label: "管理广告组" },
-    ]
-  },
-  {
-    id: "ab_credit_mgmt",
-    label: "积分管理",
-    children: [
-      { id: "ab_credit_account_view", label: "查看企业积分账户" },
-      { id: "ab_credit_recharge", label: "充值/调整积分" },
-      { id: "ab_credit_application_view", label: "查看积分申请" },
-      { id: "ab_credit_application_approve", label: "审批积分申请" },
-      { id: "ab_credit_record_export", label: "导出积分记录" },
-      { id: "ab_credit_rule_manage", label: "配置积分规则" },
-    ]
-  },
-  {
-    id: "ab_dashboard",
-    label: "管理驾驶舱",
-    children: [
-      { id: "ab_dashboard_view", label: "查看运营驾驶舱" },
-      { id: "ab_business_data_view", label: "查看全公司业务数据" },
-      { id: "ab_business_data_export", label: "导出全公司业务数据" },
-    ]
-  },
+  { id: "ab_credit_manage", label: "积分管理" },
 ];
 
 const getLeafKeysFromNodes = (nodes: PermissionNode[]): string[] => {
@@ -297,57 +304,37 @@ export const ADMIN_PERMISSION_KEYS = getLeafKeysFromNodes(ADMIN_BACKEND_PERMISSI
 export const ALL_PERMISSION_KEYS = [...USER_PERMISSION_KEYS, ...ADMIN_PERMISSION_KEYS];
 
 const BASIC_USER_KEYS = [
-  "uc_home_view", "uc_message_view", "uc_credit_view", "uc_credit_apply",
-  "uc_finished_view", "uc_material_view", "uc_script_view", "uc_media_view",
-  "uc_task_view", "uc_task_link", "uc_task_comment"
+  "uc_resource_view_finished", "uc_resource_view_material", "uc_resource_view_third_party", "uc_resource_view_image",
+  "uc_resource_view_audio", "uc_resource_view_script", "uc_task_publish"
 ];
 
 const mergePermissionKeys = (...groups: string[][]): string[] => Array.from(new Set(groups.flat()));
 
-const CONTENT_CREATOR_KEYS = [
-  ...BASIC_USER_KEYS,
-  "uc_quick_create", "uc_agent_run", "uc_remake_run", "uc_ai_video_generate", "uc_canvas_edit",
-  "uc_finished_upload", "uc_finished_edit", "uc_finished_status", "uc_finished_download", "uc_finished_share",
-  "uc_material_upload", "uc_material_edit", "uc_material_download", "uc_material_category",
-  "uc_script_create", "uc_script_edit", "uc_media_manage", "uc_task_edit", "uc_task_complete"
-];
+const CONTENT_CREATOR_KEYS = [...USER_PERMISSION_KEYS];
 
-const LIVE_MEMBER_KEYS = [
-  ...BASIC_USER_KEYS,
-  "uc_live_overview", "uc_live_team_view", "uc_live_room_data", "uc_live_schedule_view"
-];
+const LIVE_MEMBER_KEYS = [...BASIC_USER_KEYS, "uc_live_management"];
 
-const LIVE_MANAGER_KEYS = [
-  ...LIVE_MEMBER_KEYS,
-  "uc_live_account_manage", "uc_live_team_manage", "uc_live_data_export", "uc_live_schedule_manage",
-  "uc_task_create", "uc_task_edit", "uc_task_assign", "uc_task_complete"
-];
+const LIVE_MANAGER_KEYS = [...LIVE_MEMBER_KEYS, "uc_task_complete"];
 
-const AD_OPERATOR_KEYS = [
-  ...BASIC_USER_KEYS,
-  "uc_finished_download", "uc_data_dashboard", "uc_ad_push", "uc_ad_plan_manage", "uc_data_export"
-];
+const AD_OPERATOR_KEYS = [...BASIC_USER_KEYS, "uc_finished_ad_push", "uc_finished_ad_records"];
 
 const ADMIN_CONTENT_KEYS = [
-  "ab_resource_view", "ab_resource_manage", "ab_category_manage", "ab_video_status_manage",
-  "ab_script_status_manage", "ab_task_manage", "ab_tag_manage", "ab_script_template_manage"
+  "ab_resource_view", "ab_video_status_manage", "ab_task_manage", "ab_tag_manage",
+  "ab_category_manage", "ab_script_template_manage"
 ];
 
-const ADMIN_READ_KEYS = [
-  "ab_resource_view", "ab_dept_view", "ab_member_view", "ab_role_view", "ab_audit_view", "ab_dashboard_view"
-];
+const ADMIN_READ_KEYS = ["ab_resource_view", "ab_dept_view", "ab_member_view", "ab_role_view", "ab_audit_view"];
 
 const DEPT_MANAGER_KEYS = mergePermissionKeys(
   CONTENT_CREATOR_KEYS,
   LIVE_MEMBER_KEYS,
   ["uc_task_create", "uc_task_assign", "uc_credit_approve", "uc_data_dashboard", "uc_data_export"],
   ADMIN_READ_KEYS,
-  ["ab_credit_application_view", "ab_credit_application_approve"]
+  ["ab_credit_manage"]
 );
 
 const SECURITY_AUDIT_KEYS = [
-  "uc_home_view", "uc_message_view", "ab_role_view", "ab_audit_view", "ab_audit_export",
-  "ab_export_audit_view", "ab_export_audit_handle", "ab_login_log_view"
+  "ab_role_view", "ab_audit_view", "ab_audit_export", "ab_login_log_view"
 ];
 
 const INITIAL_ROLES: RolePermission[] = [
@@ -680,13 +667,15 @@ const SUPER_ADMIN_ROLE_ID = "role_super_admin";
 
 function normalizeSystemRoles(roles: RolePermission[]): RolePermission[] {
   const superAdmin = INITIAL_ROLES.find(role => role.id === SUPER_ADMIN_ROLE_ID)!;
+  const validKeys = new Set(ALL_PERMISSION_KEYS);
+  const normalizeKeys = (keys?: string[]) => (keys || []).filter(key => validKeys.has(key));
   const next = roles.map<RolePermission>(role => role.id === SUPER_ADMIN_ROLE_ID
     ? { ...role, name: superAdmin.name, code: superAdmin.code, type: "preset",
       category: "default", description: superAdmin.description,
       enabled: true, dataScope: "all", checkedKeys: [...ALL_PERMISSION_KEYS] }
-    : { ...role, category: role.category === "default" ? "other" : role.category });
+    : { ...role, category: role.category === "default" ? "other" : role.category, checkedKeys: normalizeKeys(role.checkedKeys) });
   // Preserve role IDs and ordering because existing member defaults use array positions.
-  if (!next.some(role => role.id === "role_staff")) next.unshift({ ...INITIAL_ROLES[0] });
+  if (!next.some(role => role.id === "role_staff")) next.unshift({ ...INITIAL_ROLES[0], checkedKeys: normalizeKeys(INITIAL_ROLES[0].checkedKeys) });
   if (!next.some(role => role.id === SUPER_ADMIN_ROLE_ID)) next.push({ ...superAdmin, checkedKeys: [...ALL_PERMISSION_KEYS] });
   return next;
 }
@@ -1447,6 +1436,7 @@ export default function AdminSystemManagementView() {
     const a = document.createElement("a");
     a.href = url;
     a.download = `云视频管家_全员名单_${new Date().toISOString().slice(0, 10)}.csv`;
+    recordExport(blob, a.download, "成员名单");
     a.click();
     showToast("📄 成员名单 CSV 文件已生成并开始下载！");
   };
@@ -1650,8 +1640,10 @@ export default function AdminSystemManagementView() {
 
   // Node Expansion State
   const [expandedNodeIds, setExpandedNodeIds] = useState<string[]>([
-    "uc_workspace", "uc_resources", "uc_task", "uc_live",
-    "ab_content_mgmt", "ab_org_permission", "ab_security_audit"
+    "uc_quick_creation_group", "uc_ai_video_material_group", "uc_task_collaboration",
+    "uc_resource_library", "uc_resource_upload", "uc_finished_management", "uc_material_management",
+    "uc_third_party_management", "uc_script_management", "uc_image_management", "uc_audio_management",
+    "ab_content_management", "ab_system_management", "ab_member_view", "ab_audit_view"
   ]);
 
   const toggleExpandNode = (nodeId: string) => {
@@ -2002,9 +1994,10 @@ export default function AdminSystemManagementView() {
   });
 
   // 10. 成片推送
-  const [pushNamingRule, setPushNamingRule] = useState<"code_title" | "title_code" | "title_only" | "custom">("title_only");
-  const [maxPushPerStaff, setMaxPushPerStaff] = useState<number>(200);
-  const [maxDerivePerStaff, setMaxDerivePerStaff] = useState<number>(100);
+  const [pushNamingRule, setPushNamingRule] = useState(() => readAdPushSettings().namingRule);
+  const [pushCustomNaming, setPushCustomNaming] = useState(() => readAdPushSettings().customNaming);
+  const [maxPushPerStaff, setMaxPushPerStaff] = useState(() => readAdPushSettings().maxPush);
+  const [maxDerivePerStaff, setMaxDerivePerStaff] = useState(() => readAdPushSettings().maxDerive);
   const [maxRemixPerStaffDaily, setMaxRemixPerStaffDaily] = useState<string>("");
   const [qianchuanBidAlert, setQianchuanBidAlert] = useState<string>("");
   const [qianchuanRoiAlert, setQianchuanRoiAlert] = useState<number>(1);
@@ -4466,8 +4459,8 @@ export default function AdminSystemManagementView() {
                   <span className="w-52 shrink-0">命名规则</span>
                   <div className="flex items-center gap-5 flex-wrap">
                     {[
-                      { key: "code_title", label: "云视频管家编号+视频标题" },
-                      { key: "title_code", label: "视频标题+云视频管家编号" },
+                      { key: "code_title", label: "梦畅AIGC编号+视频标题" },
+                      { key: "title_code", label: "视频标题+梦畅AIGC编号" },
                       { key: "title_only", label: "仅视频标题" },
                       { key: "custom", label: "自定义" },
                     ].map((rule) => (
@@ -4488,6 +4481,7 @@ export default function AdminSystemManagementView() {
                 </div>
 
                 {/* 每个员工，可同时推送成片数量上限 */}
+                {pushNamingRule === "custom" && <div className="flex items-center gap-6"><label className="w-52 shrink-0" htmlFor="push-custom-naming">自定义命名</label><input id="push-custom-naming" value={pushCustomNaming} onChange={e => setPushCustomNaming(e.target.value)} placeholder="{梦畅AIGC编号}_{视频标题}" className="w-64 px-3 py-1.5 border border-slate-200 rounded-xl text-xs outline-none" /></div>}
                 <div className="flex items-center gap-6">
                   <span className="w-52 shrink-0">每个员工，可同时推送成片数量上限</span>
                   <input
@@ -4504,6 +4498,9 @@ export default function AdminSystemManagementView() {
                   <input
                     type="number"
                     value={maxDerivePerStaff}
+                    aria-label="每个员工，可同时衍生视频数量上限"
+                    min={1}
+                    step={1}
                     onChange={(e) => setMaxDerivePerStaff(Number(e.target.value))}
                     className="w-64 px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:border-[#7C3AED] outline-none"
                   />
@@ -4548,7 +4545,13 @@ export default function AdminSystemManagementView() {
               <div className="flex justify-end pt-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => showToast("成片推送相关限制与预警保存成功！")}
+                  onClick={() => {
+                    if (!Number.isInteger(maxPushPerStaff) || maxPushPerStaff < 1) return showToast("同时推送上限须为大于0的整数");
+                    if (!Number.isSafeInteger(maxDerivePerStaff) || maxDerivePerStaff < 1) return showToast("同时衍生上限须为大于0的整数");
+                    if (pushNamingRule === "custom" && !pushCustomNaming.trim()) return showToast("请填写自定义命名格式");
+                    saveAdPushSettings({ namingRule: pushNamingRule, customNaming: pushCustomNaming.trim(), maxPush: maxPushPerStaff, maxDerive: maxDerivePerStaff });
+                    showToast("成片推送相关限制与预警保存成功！");
+                  }}
                   className="px-5 py-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
                 >
                   保存设置
